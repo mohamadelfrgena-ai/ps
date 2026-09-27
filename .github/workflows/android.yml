@@ -16,9 +16,11 @@ jobs:
         working-directory: android
         run: |
           set -o pipefail
-          gradle assembleRelease --no-daemon 2>&1 | tee build.log || {
-            grep -E "^e: |error:|rror: |Could not resolve|Execution failed" build.log | head -40 | while IFS= read -r l; do echo "::error::${l: -300}"; done
-            exit 1; }
+          if ! gradle assembleRelease --no-daemon 2>&1 | tee build.log; then
+            grep -E -A12 "^e: |What went wrong" build.log | grep -v -E "^[[:space:]]*$" | head -45 > errs.txt || true
+            while IFS= read -r l; do echo "::error::${l: -300}"; done < errs.txt
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: AddonStation-apk
