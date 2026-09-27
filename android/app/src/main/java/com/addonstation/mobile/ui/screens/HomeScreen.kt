@@ -13,6 +13,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -178,7 +179,7 @@ private fun CreatorCard(p: Profile, stats: Pair<Long, Long>) {
     ) {
         Box(Modifier.fillMaxWidth().height(66.dp).background(C.elevated2)) {
             if (p.bannerUrl != null) Img(p.bannerUrl, R.drawable.default_banner, Modifier.fillMaxSize())
-            else Image(painterResource(R.drawable.grass_side), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
+            else Image(ImageBitmap.imageResource(R.drawable.grass_side), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
                 filterQuality = FilterQuality.None)
         }
         Column(Modifier.padding(start = 10.dp, end = 10.dp, bottom = 11.dp)) {
