@@ -715,7 +715,7 @@ fun CreatorApplicationScreen(nav: NavHostController, vm: AppViewModel) {
         when {
             ui.loading -> LoadingBox(Modifier.weight(1f))
             ui.error != null -> ErrorBox(ui.error!!, { avm.refresh() }, Modifier.weight(1f))
-            else -> LazyColumn(Modifier.weight(1f), modifier = Modifier.padding(16.dp)) {
+            else -> LazyColumn(modifier = Modifier.weight(1f).padding(16.dp)) {
                 ui.current?.let { cur ->
                     item {
                         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
@@ -891,7 +891,7 @@ fun TipScreen(nav: NavHostController, vm: AppViewModel, creatorId: String) {
                     Button(onClick = { nav.popBackStack() }) { Text(stringResource(R.string.common_ok)) }
                 }
             }
-            else -> LazyColumn(Modifier.weight(1f), modifier = Modifier.padding(16.dp)) {
+            else -> LazyColumn(modifier = Modifier.weight(1f).padding(16.dp)) {
                 item {
                     OutlinedTextField(
                         value = amount, onValueChange = { amount = it.filter { c -> c.isDigit() || c == '.' } },

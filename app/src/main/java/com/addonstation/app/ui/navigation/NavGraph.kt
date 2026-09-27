@@ -253,28 +253,28 @@ fun AppRoot(ready: Boolean) {
         composable(Routes.NOTIFICATIONS) { MainScaffold(nav, null, vm) { NotificationsScreen(nav, vm) } }
         composable(Routes.PROFILE) { MainScaffold(nav, Routes.PROFILE, vm) { ProfileScreen(nav, vm) } }
         composable(Routes.SETTINGS) { MainScaffold(nav, Routes.SETTINGS, vm) { SettingsScreen(nav, vm) } }
-        composable(Routes.ITEM, arguments = listOf(navArgument("id") { type = NavType.LongType })) {
-            MainScaffold(nav, null, vm) { ItemDetailScreen(nav, vm, it.arguments?.getLong("id") ?: 0L) }
+        composable(Routes.ITEM, arguments = listOf(navArgument("id") { type = NavType.LongType })) { back ->
+            MainScaffold(nav, null, vm) { ItemDetailScreen(nav, vm, back.arguments?.getLong("id") ?: 0L) }
         }
-        composable(Routes.USER, arguments = listOf(navArgument("id") { type = NavType.StringType })) {
-            MainScaffold(nav, null, vm) { UserScreen(nav, vm, it.arguments?.getString("id") ?: "") }
+        composable(Routes.USER, arguments = listOf(navArgument("id") { type = NavType.StringType })) { back ->
+            MainScaffold(nav, null, vm) { UserScreen(nav, vm, back.arguments?.getString("id") ?: "") }
         }
         composable(Routes.PROFILE_SETTINGS) { MainScaffold(nav, null, vm) { ProfileSettingsScreen(nav, vm) } }
         composable(Routes.SUPPORT) { MainScaffold(nav, null, vm) { SupportScreen(nav, vm) } }
         composable(Routes.IP_GUIDE) { MainScaffold(nav, null, vm) { IpGuideScreen(nav) } }
         composable(Routes.WALLET) { MainScaffold(nav, null, vm) { WalletScreen(nav, vm) } }
-        composable(Routes.CHECKOUT, arguments = listOf(navArgument("planId") { type = NavType.StringType })) {
-            MainScaffold(nav, null, vm) { CheckoutScreen(nav, vm, it.arguments?.getString("planId") ?: "") }
+        composable(Routes.CHECKOUT, arguments = listOf(navArgument("planId") { type = NavType.StringType })) { back ->
+            MainScaffold(nav, null, vm) { CheckoutScreen(nav, vm, back.arguments?.getString("planId") ?: "") }
         }
         composable(Routes.ORDERS) { MainScaffold(nav, null, vm) { OrdersScreen(nav, vm) } }
         composable(Routes.CREATORS) { MainScaffold(nav, null, vm) { CreatorsScreen(nav, vm) } }
-        composable(Routes.CREATOR, arguments = listOf(navArgument("id") { type = NavType.StringType })) {
-            MainScaffold(nav, null, vm) { CreatorProfileScreen(nav, vm, it.arguments?.getString("id") ?: "") }
+        composable(Routes.CREATOR, arguments = listOf(navArgument("id") { type = NavType.StringType })) { back ->
+            MainScaffold(nav, null, vm) { CreatorProfileScreen(nav, vm, back.arguments?.getString("id") ?: "") }
         }
         composable(Routes.CREATOR_STUDIO) { MainScaffold(nav, null, vm) { CreatorStudioScreen(nav, vm) } }
         composable(Routes.CREATOR_APPLICATION) { MainScaffold(nav, null, vm) { CreatorApplicationScreen(nav, vm) } }
-        composable(Routes.TIP, arguments = listOf(navArgument("creatorId") { type = NavType.StringType })) {
-            MainScaffold(nav, null, vm) { TipScreen(nav, vm, it.arguments?.getString("creatorId") ?: "") }
+        composable(Routes.TIP, arguments = listOf(navArgument("creatorId") { type = NavType.StringType })) { back ->
+            MainScaffold(nav, null, vm) { TipScreen(nav, vm, back.arguments?.getString("creatorId") ?: "") }
         }
         composable(Routes.EXCLUSIVES) { MainScaffold(nav, null, vm) { ExclusivesScreen(nav, vm) } }
         composable(Routes.LOGIN) { AuthScreen(nav, vm) { LoginScreen(nav, vm) } }
@@ -285,8 +285,8 @@ fun AppRoot(ready: Boolean) {
             AuthScreen(nav, vm) { ResetPasswordScreen(nav, vm, pending) }
         }
         composable(Routes.ADMIN) { MainScaffold(nav, null, vm) { AdminScreen(nav, vm) } }
-        composable(Routes.THREAD, arguments = listOf(navArgument("rootId") { type = NavType.LongType })) {
-            MainScaffold(nav, null, vm) { ThreadScreen(nav, vm, it.arguments?.getLong("rootId") ?: 0L) }
+        composable(Routes.THREAD, arguments = listOf(navArgument("rootId") { type = NavType.LongType })) { back ->
+            MainScaffold(nav, null, vm) { ThreadScreen(nav, vm, back.arguments?.getLong("rootId") ?: 0L) }
         }
     }
 }

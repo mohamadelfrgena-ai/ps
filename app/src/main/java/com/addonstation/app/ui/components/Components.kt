@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
@@ -122,7 +124,7 @@ fun Avatar(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .size(size / 3.4)
+                    .size(size / 3.4f)
                     .clip(CircleShape)
                     .background(if (online) Color(0xFF3DDC84) else extra.dim)
             )
@@ -157,7 +159,7 @@ fun TopBar(
             if (showBack) {
                 IconButton(onClick = onBack, modifier = Modifier.size(38.dp)) {
                     Icon(
-                        androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
+                        Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = null
                     )
                 }

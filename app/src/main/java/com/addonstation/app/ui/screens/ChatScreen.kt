@@ -112,6 +112,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.decodeFromJsonElement
 
 suspend fun readUriBytes(ctx: Context, uri: Uri): Pair<ByteArray, String?> {
     val mime = ctx.contentResolver.getType(uri)

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -228,7 +229,7 @@ fun CheckoutScreen(nav: NavHostController, vm: AppViewModel, planId: String) {
             }
             else -> {
                 val plan = ui.plan!!
-                LazyColumn(Modifier.weight(1f), modifier = Modifier.padding(16.dp)) {
+                LazyColumn(modifier = Modifier.weight(1f).padding(16.dp)) {
                     item {
                         Text(plan.name ?: plan.id.uppercase(), style = MaterialTheme.typography.headlineSmall)
                         Text(stringResource(R.string.pay_total, plan.priceLyd.toString()), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
