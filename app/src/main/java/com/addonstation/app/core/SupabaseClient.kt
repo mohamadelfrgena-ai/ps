@@ -56,14 +56,17 @@ class SupabaseBackend(
         install(WebSockets) { pingInterval = 20_000 }
     }
 
-    private val base: String get() = config.url.trimEnd('/')
+    @PublishedApi
+    internal val base: String get() = config.url.trimEnd('/')
 
-    private fun HttpRequestBuilder.authHeaders() {
+    @PublishedApi
+    internal fun HttpRequestBuilder.authHeaders() {
         header("apikey", config.anonKey)
         header(HttpHeaders.Authorization, "Bearer ${tokenProvider() ?: config.anonKey}")
     }
 
-    private suspend fun ensureOk(res: HttpResponse): HttpResponse {
+    @PublishedApi
+    internal suspend fun ensureOk(res: HttpResponse): HttpResponse {
         if (res.status.isSuccess()) return res
         val text = try {
             res.bodyAsText()
@@ -127,7 +130,8 @@ class SupabaseBackend(
             }.joinToString(",")
             header("Prefer", prefer)
             if (onConflict != null) parameter("on_conflict", onConflict)
-            setBody(body)
+            // Encode via JsonObject: kotlinx cannot infer a serializer for raw Maps (Any values would crash).
+            setBody(body.toJsonElement())
         }
         ensureOk(res)
         val text = res.bodyAsText()
@@ -146,7 +150,8 @@ class SupabaseBackend(
             contentType(ContentType.Application.Json)
             header("Prefer", "return=representation")
             filters.forEach { (k, v) -> parameter(k, v) }
-            setBody(body)
+            // Encode via JsonObject: kotlinx cannot infer a serializer for raw Maps (Any values would crash).
+            setBody(body.toJsonElement())
         }
         ensureOk(res)
         val text = res.bodyAsText()
@@ -200,7 +205,7 @@ class SupabaseBackend(
         val res = http.post("$base/storage/v1/object/sign/$bucket/$path") {
             authHeaders()
             contentType(ContentType.Application.Json)
-            setBody(mapOf("expiresIn" to expiresSec))
+            setBody(mapOf("expiresIn" to expiresSec).toJsonElement())
         }
         ensureOk(res)
         val el = json.parseToJsonElement(res.bodyAsText()).jsonObject
@@ -220,7 +225,7 @@ class SupabaseBackend(
     suspend fun authSignIn(email: String, password: String): AuthSession {
         val res = http.post("$base/auth/v1/token?grant_type=password") {
             anonHeaders()
-            setBody(mapOf("email" to email, "password" to password))
+            setBody(mapOf("email" to email, "password" to password).toJsonElement())
         }
         ensureOk(res)
         return json.decodeFromString(res.bodyAsText())
@@ -237,7 +242,7 @@ class SupabaseBackend(
                     "email" to email,
                     "password" to password,
                     "data" to mapOf("username" to username)
-                )
+                ).toJsonElement()
             )
         }
         ensureOk(res)
@@ -255,7 +260,7 @@ class SupabaseBackend(
     suspend fun authRefresh(refreshToken: String): AuthSession {
         val res = http.post("$base/auth/v1/token?grant_type=refresh_token") {
             anonHeaders()
-            setBody(mapOf("refresh_token" to refreshToken))
+            setBody(mapOf("refresh_token" to refreshToken).toJsonElement())
         }
         ensureOk(res)
         return json.decodeFromString(res.bodyAsText())
@@ -275,7 +280,7 @@ class SupabaseBackend(
             anonHeaders()
             val payload = mutableMapOf<String, Any>("email" to email)
             if (redirectTo != null) payload["redirect_to"] = redirectTo
-            setBody(payload)
+            setBody(payload.toJsonElement())
         }
         ensureOk(res)
     }
@@ -285,7 +290,7 @@ class SupabaseBackend(
             header("apikey", config.anonKey)
             header(HttpHeaders.Authorization, "Bearer $accessToken")
             contentType(ContentType.Application.Json)
-            setBody(mapOf("password" to password))
+            setBody(mapOf("password" to password).toJsonElement())
         }
         ensureOk(res)
         return json.decodeFromString(res.bodyAsText())

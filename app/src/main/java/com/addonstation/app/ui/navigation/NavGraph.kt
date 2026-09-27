@@ -64,7 +64,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/** All destinations (mirrors the /m/* routes of the original app). */
+/** All destinations (mirrors the /m/ routes of the original app). */
 object Routes {
     const val SPLASH = "splash"
     const val WELCOME = "welcome"

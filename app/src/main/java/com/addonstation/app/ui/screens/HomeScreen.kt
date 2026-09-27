@@ -126,7 +126,7 @@ fun HomeScreen(nav: NavHostController, vm: AppViewModel) {
                         title = stringResource(R.string.home_featured_title),
                         action = {
                             Text(
-                                stringResource(R.string.home_featured_viewAll),
+                                stringResource(R.string.home_featured_viewall),
                                 color = LocalExtra.current.diamond,
                                 modifier = Modifier.clickable { nav.navigate(Routes.STORE) }
                             )
@@ -212,12 +212,12 @@ private fun HeroCard(nav: NavHostController) {
         Column {
             Text(stringResource(R.string.hero_label), color = Color(0xFF6FB8FF), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
-            Text(stringResource(R.string.hero_titleWhite), style = MaterialTheme.typography.displaySmall, color = Color.White)
-            Text(stringResource(R.string.hero_titleGreen), style = MaterialTheme.typography.displaySmall, color = Color(0xFF3DDC84))
+            Text(stringResource(R.string.hero_titlewhite), style = MaterialTheme.typography.displaySmall, color = Color.White)
+            Text(stringResource(R.string.hero_titlegreen), style = MaterialTheme.typography.displaySmall, color = Color(0xFF3DDC84))
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { nav.navigate(Routes.STORE) }) { Text(stringResource(R.string.hero_btnAddons)) }
-                OutlinedButton(onClick = { nav.navigate(Routes.STORE) }) { Text(stringResource(R.string.hero_btnWorlds)) }
+                Button(onClick = { nav.navigate(Routes.STORE) }) { Text(stringResource(R.string.hero_btnaddons)) }
+                OutlinedButton(onClick = { nav.navigate(Routes.STORE) }) { Text(stringResource(R.string.hero_btnworlds)) }
             }
         }
     }

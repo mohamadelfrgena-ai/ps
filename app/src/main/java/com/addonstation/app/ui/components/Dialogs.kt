@@ -183,7 +183,7 @@ fun ConnectDeviceDialog(
                 if (error != null) Text(error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    stringResource(R.string.connect_guideLink),
+                    stringResource(R.string.connect_guidelink),
                     color = LocalExtra.current.diamond,
                     modifier = Modifier.clickable { onGuide() }
                 )
@@ -266,7 +266,7 @@ fun UserMiniSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         if (profile == null) {
-            Text(stringResource(R.string.legacy_userNotFound), modifier = Modifier.padding(24.dp))
+            Text(stringResource(R.string.legacy_usernotfound), modifier = Modifier.padding(24.dp))
         } else {
             Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Avatar(url = profile.avatarUrl, name = profile.username, size = 72.dp)

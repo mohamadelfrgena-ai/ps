@@ -123,7 +123,7 @@ class ChatRepository(val backend: SupabaseBackend) {
         fileName: String
     ): ChatMessage? {
         val msg = send(channelId, "")
-        val id = msg?.id ?: run {
+        val message = msg ?: run {
             // Fallback: direct insert like the oldest client
             val rows: List<ChatMessage> = backend.restPost(
                 "chat_messages",
@@ -136,11 +136,11 @@ class ChatRepository(val backend: SupabaseBackend) {
         backend.restPost<Unit>(
             "chat_images",
             mapOf(
-                "message_id" to id.id, "uploader_id" to userId, "image_path" to path,
+                "message_id" to message.id, "uploader_id" to userId, "image_path" to path,
                 "mime_type" to mime, "image_size" to bytes.size
             )
         )
-        return id
+        return message
     }
 
     suspend fun mediaSignedUrl(mediaPath: String): String =
