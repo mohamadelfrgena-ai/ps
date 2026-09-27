@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash theme (system splash screen background + animated icon below in Compose) -->
+    <style name="Theme.AddonStation.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/brand_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/brand_bg</item>
+        <item name="postSplashScreenTheme">@style/Theme.AddonStation</item>
+        <item name="windowSplashScreenAnimationDuration">800</item>
+    </style>
+
+    <style name="Theme.AddonStation" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowBackground">@color/brand_bg</item>
+        <item name="android:statusBarColor">@color/brand_bg</item>
+        <item name="android:navigationBarColor">@color/brand_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

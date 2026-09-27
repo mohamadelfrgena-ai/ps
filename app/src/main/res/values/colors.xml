@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand palette, sampled from the original mobile CSS -->
+    <color name="brand_bg">#0B0F14</color>
+    <color name="brand_surface">#131A24</color>
+    <color name="brand_elevated">#1A2330</color>
+    <color name="brand_border">#263240</color>
+    <color name="brand_text">#E8EEF5</color>
+    <color name="brand_muted">#8EA0B3</color>
+    <color name="brand_dim">#5C6F82</color>
+    <color name="brand_blue">#6FB8FF</color>
+    <color name="brand_diamond">#38BDF8</color>
+    <color name="brand_green">#3DDC84</color>
+    <color name="brand_emerald">#10B981</color>
+    <color name="brand_gold">#FFD479</color>
+    <color name="brand_purple">#B98CFF</color>
+    <color name="brand_red">#FF5A5A</color>
+
+    <!-- Light theme -->
+    <color name="light_bg">#F2F5F9</color>
+    <color name="light_surface">#FFFFFF</color>
+    <color name="light_elevated">#E8EEF5</color>
+    <color name="light_border">#D3DCE6</color>
+    <color name="light_text">#10161D</color>
+    <color name="light_muted">#54657A</color>
+</resources>
