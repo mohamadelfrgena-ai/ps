@@ -3,6 +3,8 @@ on:
   push:
     paths: ["android/**", ".github/workflows/android.yml"]
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,3 +27,9 @@ jobs:
         with:
           name: AddonStation-apk
           path: android/app/build/outputs/apk/release/*.apk
+      - name: Publish APK to "latest-apk" release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk AddonStation.apk
+          gh release delete latest-apk -y --cleanup-tag || true
+          gh release create latest-apk AddonStation.apk --prerelease --title "AddonStation (Kotlin) - latest build" --notes "Built from ${GITHUB_SHA::7}" --target "$GITHUB_SHA"
