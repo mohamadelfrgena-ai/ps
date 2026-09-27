@@ -18,7 +18,7 @@ jobs:
           set -o pipefail
           if ! gradle assembleRelease --no-daemon 2>&1 | tee build.log; then
             { grep -E "^e: " build.log | head -25; tail -30 build.log; } > errs.txt || true
-            while IFS= read -r l; do echo "::error::${l: -300}"; done < errs.txt
+            while IFS= read -r l; do echo "::error::${l:0:400}"; done < errs.txt
             exit 1
           fi
       - uses: actions/upload-artifact@v4
