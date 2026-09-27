@@ -103,5 +103,5 @@ in Android Studio, which syncs and builds it directly.
 - `MainActivity` keeps the AndroidX splash on screen until the container finishes
   `init()` (backend ping + profile/plan refresh), then the animated Compose splash runs.
 - Unread badge: realtime `chat_notifications` INSERT events + 30 s polling fallback.
-- All user-visible text (449 keys) ships in English + Arabic; es/pt/fr fall back
-  to English where a translation is missing.
+- All user-visible text (764 keys per locale) ships in English + Arabic; es/pt/fr
+  fall back to English where a translation is missing.
