@@ -1,0 +1,22 @@
+# أندرويد / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/captures/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# عوالم وأرشيفات كبيرة (تبقى محلياً)
+*.zip
+*.z01
+*.z02
+!supabase/functions/**
+
+# نظام
+.DS_Store
+Thumbs.db

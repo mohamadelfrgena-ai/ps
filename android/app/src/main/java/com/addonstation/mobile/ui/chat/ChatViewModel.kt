@@ -1,0 +1,310 @@
+package com.addonstation.mobile.ui.chat
+
+import com.addonstation.mobile.data.AppContainer
+import com.addonstation.mobile.data.model.ChatChannel
+import com.addonstation.mobile.data.model.ChatMessage
+import com.addonstation.mobile.data.model.ChatMessageUi
+import com.addonstation.mobile.data.model.Profile
+import com.addonstation.mobile.data.model.SiteAsset
+import com.addonstation.mobile.data.model.StickerPack
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+
+/**
+ * حالة الشات: تحميل الرسائل مع ترقيم الصفحات، التحديث اللحظي عبر Realtime،
+ * تحديث احتياطي كل ثانيتين (كما في التطبيق الأصلي)، التفاعلات، الطباعة، والقوالب.
+ */
+class ChatViewModel(private val container: AppContainer) {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var pollJob: Job? = null
+
+    private val _channel = MutableStateFlow<ChatChannel?>(null)
+    val channel: StateFlow<ChatChannel?> = _channel.asStateFlow()
+
+    private val _messages = MutableStateFlow<List<ChatMessageUi>>(emptyList())
+    val messages: StateFlow<List<ChatMessageUi>> = _messages.asStateFlow()
+
+    private val _authors = MutableStateFlow<Map<String, Profile>>(emptyMap())
+    val authors: StateFlow<Map<String, Profile>> = _authors.asStateFlow()
+
+    private val _loading = MutableStateFlow(true)
+    val loading: StateFlow<Boolean> = _loading.asStateFlow()
+
+    private val _newMessagesBelow = MutableStateFlow(false)
+    val newMessagesBelow: StateFlow<Boolean> = _newMessagesBelow.asStateFlow()
+
+    private val _newDividerId = MutableStateFlow<Long?>(null)
+    val newDividerId: StateFlow<Long?> = _newDividerId.asStateFlow()
+
+    private val _typing = MutableStateFlow<List<String>>(emptyList())
+    val typing: StateFlow<List<String>> = _typing.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _stickers = MutableStateFlow<List<SiteAsset>>(emptyList())
+    val stickers: StateFlow<List<SiteAsset>> = _stickers.asStateFlow()
+
+    private val _packs = MutableStateFlow<List<StickerPack>>(emptyList())
+    val packs: StateFlow<List<StickerPack>> = _packs.asStateFlow()
+
+    var lastReadId: Long = 0L
+        private set
+
+    fun open(channel: ChatChannel) {
+        _channel.value = channel
+        scope.launch {
+            _loading.value = true
+            loadInitial(channel.id)
+            _loading.value = false
+            startRealtime(channel.id)
+            startPolling(channel.id)
+            loadStickers()
+        }
+    }
+
+    private suspend fun loadInitial(channelId: String) {
+        val list = container.chat.messages(channelId, limit = 100)
+        lastReadId = list.lastOrNull()?.id ?: 0L
+        val ids = list.map { it.userId }.toMutableSet()
+        val profiles = container.profile.loadProfiles(ids)
+        val reactions = container.chat.reactionsFor(list.map { it.id })
+        val myReactions = container.chat.myReactionsFor(list.map { it.id })
+        val byId = list.associateBy { it.id }
+        _authors.value = profiles
+        _messages.value = list.map { message ->
+            val reply = message.replyToId?.let { byId[it] }
+            ChatMessageUi(
+                message = message,
+                author = profiles[message.userId],
+                replyTo = reply,
+                replyAuthorName = reply?.let { profiles[it.userId]?.username },
+                reactions = reactions[message.id] ?: emptyMap(),
+                myReactions = myReactions.filter { it.first == message.id }.map { it.second }.toSet(),
+            )
+        }
+        if (container.supabase.session() != null) {
+            container.chat.markRead(channelId, lastReadId)
+            container.chat.refreshUnread()
+        }
+    }
+
+    private fun startRealtime(channelId: String) {
+        container.realtime.close()
+        val sub = com.addonstation.mobile.data.RealtimeClient(container.supabase).subscribe(
+            scope = scope,
+            table = "chat_messages",
+            filter = "channel_id=eq.$channelId",
+        ) { type, record ->
+            scope.launch {
+                when (type) {
+                    "INSERT" -> onInserted(record)
+                    else -> refreshTails()
+                }
+            }
+        }
+        container.realtime.replace(sub)
+    }
+
+    /** تحديث احتياطي كل ثانيتين (منطق النسخة الأصلية). */
+    private fun startPolling(channelId: String) {
+        pollJob?.cancel()
+        pollJob = scope.launch {
+            while (true) {
+                delay(2000)
+                refreshTails()
+                val names = container.chat.typingNames(channelId, container.supabase.session()?.userId)
+                _typing.value = names
+            }
+        }
+    }
+
+    private suspend fun onInserted(record: JsonObject) {
+        val channelId = _channel.value?.id ?: return
+        val message = runCatching {
+            container.supabase.json.decodeFromJsonElement(ChatMessage.serializer(), record)
+        }.getOrNull() ?: return
+        if (_messages.value.any { it.message.id == message.id }) return
+        _messages.value = _messages.value + toUi(message)
+        if (message.userId != container.supabase.session()?.userId) {
+            // تظهر شارة «↓ New messages» ويمسحها المستخدم بالتمرير للأسفل
+            _newMessagesBelow.value = true
+        }
+    }
+
+    private suspend fun refreshTails() {
+        val channelId = _channel.value?.id ?: return
+        val current = _messages.value
+        val lastId = current.lastOrNull()?.message?.id ?: 0L
+        if (lastId > 0) {
+            val newer = container.chat.messagesSince(channelId, lastId)
+            if (newer.isNotEmpty()) {
+                val mapped = newer.filter { m -> current.none { it.message.id == m.id } }.map { toUi(it) }
+                if (mapped.isNotEmpty()) {
+                    _messages.value = current + mapped
+                    _newMessagesBelow.value = true
+                }
+            }
+        }
+    }
+
+    private suspend fun toUi(message: ChatMessage): ChatMessageUi {
+        val profiles = _authors.value.toMutableMap()
+        if (profiles[message.userId] == null) {
+            container.profile.loadProfile(message.userId)?.let { profiles[message.userId] = it }
+            _authors.value = profiles
+        }
+        val reply = message.replyToId?.let { id -> _messages.value.firstOrNull { it.message.id == id }?.message }
+        val reactions = container.chat.reactionsFor(listOf(message.id))[message.id] ?: emptyMap()
+        val mine = container.chat.myReactionsFor(listOf(message.id))
+            .filter { it.first == message.id }.map { it.second }.toSet()
+        return ChatMessageUi(
+            message = message,
+            author = profiles[message.userId],
+            replyTo = reply,
+            replyAuthorName = reply?.let { profiles[it.userId]?.username },
+            reactions = reactions,
+            myReactions = mine,
+        )
+    }
+
+    fun loadOlder() {
+        val channel = _channel.value ?: return
+        val firstId = _messages.value.firstOrNull()?.message?.id ?: return
+        scope.launch {
+            val older = container.chat.messages(channel.id, beforeId = firstId, limit = 100)
+            if (older.isEmpty()) return@launch
+            val profiles = container.profile.loadProfiles(older.map { it.userId })
+            _authors.value = _authors.value + profiles
+            _messages.value = older.map { toUi(it) } + _messages.value
+        }
+    }
+
+    fun send(
+        content: String?,
+        replyTo: ChatMessage? = null,
+        stickerUrl: String? = null,
+        imagePath: String? = null,
+        messageType: String = "text",
+        mediaPath: String? = null,
+        mediaMime: String? = null,
+        mediaSize: Long? = null,
+        onDone: (Boolean, String?) -> Unit,
+    ) {
+        val channel = _channel.value ?: return
+        scope.launch {
+            val members = _authors.value.values.toList()
+            val mentions = content?.let { container.chat.mentionsIn(it, members) } ?: emptyList()
+            runCatching {
+                container.chat.send(
+                    channelId = channel.id,
+                    content = content,
+                    replyToId = replyTo?.id,
+                    stickerUrl = stickerUrl,
+                    imagePath = imagePath,
+                    messageType = messageType,
+                    mediaPath = mediaPath,
+                    mediaMime = mediaMime,
+                    mediaSize = mediaSize,
+                    mentionIds = mentions,
+                )
+            }.onSuccess {
+                refreshTails()
+                onDone(true, null)
+            }.onFailure { e ->
+                onDone(false, e.message)
+            }
+        }
+    }
+
+    fun toggleReaction(messageId: Long, emoji: String) {
+        scope.launch {
+            val result = container.chat.toggleReaction(messageId, emoji)
+            if (result.isSuccess) {
+                val reactions = container.chat.reactionsFor(listOf(messageId))[messageId] ?: emptyMap()
+                val mine = container.chat.myReactionsFor(listOf(messageId))
+                    .filter { it.first == messageId }.map { it.second }.toSet()
+                _messages.value = _messages.value.map { ui ->
+                    if (ui.message.id == messageId) ui.copy(reactions = reactions, myReactions = mine) else ui
+                }
+            }
+        }
+    }
+
+    fun deleteMine(messageId: Long) {
+        scope.launch {
+            container.chat.deleteMyMessage(messageId).onSuccess {
+                _messages.value = _messages.value.map { ui ->
+                    if (ui.message.id == messageId)
+                        ui.copy(message = ui.message.copy(status = "deleted", content = null))
+                    else ui
+                }
+            }
+        }
+    }
+
+    fun moderate(messageId: Long, hide: Boolean) {
+        scope.launch {
+            container.chat.moderateMessage(messageId, hide).onSuccess { refreshTails(); reload() }
+        }
+    }
+
+    fun pin(messageId: Long, onResult: (Boolean) -> Unit) {
+        scope.launch {
+            container.chat.togglePin(messageId)
+                .onSuccess { onResult(true) }
+                .onFailure { onResult(false) }
+        }
+    }
+
+    fun mute(userId: String, minutes: Int) {
+        scope.launch { container.chat.muteUser(userId, minutes) }
+    }
+
+    fun report(messageId: Long, reason: String, note: String?) {
+        scope.launch { container.chat.report(messageId, reason, note) }
+    }
+
+    fun notifyTyping() {
+        val channel = _channel.value ?: return
+        scope.launch { container.chat.setTyping(channel.id) }
+    }
+
+    fun markReadUpToBottom() {
+        val channel = _channel.value ?: return
+        val last = _messages.value.lastOrNull()?.message?.id ?: return
+        lastReadId = maxOf(lastReadId, last)
+        _newMessagesBelow.value = false
+        scope.launch {
+            container.chat.markRead(channel.id, lastReadId)
+            container.chat.refreshUnread()
+        }
+    }
+
+    private suspend fun loadStickers() {
+        _packs.value = container.chat.stickerPacks()
+        _stickers.value = container.chat.stickers()
+    }
+
+    fun reload() {
+        val channel = _channel.value ?: return
+        scope.launch { loadInitial(channel.id) }
+    }
+
+    fun close() {
+        pollJob?.cancel()
+        container.realtime.close()
+        scope.cancel()
+    }
+}
