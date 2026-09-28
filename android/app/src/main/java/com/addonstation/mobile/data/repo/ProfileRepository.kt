@@ -83,16 +83,16 @@ class ProfileRepository(
 
     /** تحديث الملف الشخصي (اسم المستخدم، النبذة، الحالة، البلد، ظهور الحالة). */
     suspend fun updateMyProfile(
-        username: String?,
-        bio: String?,
-        customStatus: String?,
-        showOnline: Boolean?,
-        country: String?,
+        username: String,
+        bio: String? = null,
+        customStatus: String? = null,
+        showOnline: Boolean? = null,
+        country: String? = null,
     ): Result<Profile?> = runCatching {
         supabase.rpc(
             "update_my_profile",
             params(
-                "username" to p(username),
+                "username" to p(username.trim()),
                 "bio" to p(bio),
                 "custom_status" to p(customStatus),
                 "show_online" to p(showOnline),
@@ -194,7 +194,8 @@ class ProfileRepository(
         return list
     }
 
-    suspend fun canUseAsset(asset: SiteAsset): Boolean = planRank(asset.requiredPlan) <= planRank(state.profile.value?.effectivePlan)
+    fun canUseAsset(requiredPlan: String, profile: Profile?): Boolean =
+        planRank(requiredPlan) <= planRank(profile?.effectivePlan ?: "free")
 
     /** ترتيب الخطط للمقارنة: free < epic < legendary. */
     fun planRank(plan: String?): Int = when (plan) {

@@ -380,7 +380,7 @@ class ChatRepository(
 
     suspend fun stickerPacks(): List<StickerPack> = runCatching {
         val packs = supabase.decodeList<StickerPack>(
-            supabase.select("sticker_packs", "select=*&enabled=eq.true&order=sort_order.asc")
+            supabase.select("sticker_packs", "select=*&active=eq.true&order=sort_order.asc")
         )
         state.setStickerPacks(packs)
         packs

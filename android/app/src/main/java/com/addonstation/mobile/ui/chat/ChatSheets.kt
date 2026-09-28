@@ -352,14 +352,14 @@ fun MessageActionsSheet(
             Spacer(Modifier.height(10.dp))
             ActionRow(Icons.Filled.Reply, stringResource(R.string.chat_reply), onReply)
             ActionRow(Icons.Filled.ContentCopy, stringResource(R.string.chat_copy_text), onCopy)
-            ActionRow(Icons.Filled.Flag, stringResource(R.string.chat_report)) { showReport = true }
+            ActionRow(Icons.Filled.Flag, stringResource(R.string.chat_report), onClick = { showReport = true })
             if (ui.message.userId == myId) {
                 ActionRow(Icons.Filled.Delete, stringResource(R.string.chat_delete_mine), onDeleteMine, AppColors.Red)
             }
             if (isStaff) {
                 ActionRow(Icons.Filled.Visibility, stringResource(R.string.chat_hide_message), onModerate)
                 ActionRow(Icons.Filled.PushPin, stringResource(R.string.chat_pin), onPin)
-                ActionRow(Icons.Filled.VolumeOff, stringResource(R.string.chat_mute_user)) { showMute = true }
+                ActionRow(Icons.Filled.VolumeOff, stringResource(R.string.chat_mute_user), onClick = { showMute = true })
             }
             ActionRow(Icons.Filled.Person, stringResource(R.string.chat_view_profile), onOpenProfile)
         }

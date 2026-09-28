@@ -1011,9 +1011,11 @@ fun AdminCreatorReviewScreen(onBack: () -> Unit) {
                             )
                             tip.message?.let { Text(it, style = AppText.bodySmall, color = AppColors.Muted) }
                             Text(
-                                stringResource(R.string.admin_verify_receipt),
+                                "${tip.transactionReference ?: "—"} · ${tip.receiptUrl ?: "—"}",
                                 style = AppText.tiny,
                                 color = AppColors.Dim,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 GradientButton(

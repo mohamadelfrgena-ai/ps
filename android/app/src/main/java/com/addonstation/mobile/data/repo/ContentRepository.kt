@@ -8,24 +8,22 @@ import com.addonstation.mobile.data.model.ContentItem
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
-/** نتيجة تنزيل: البايتات + اسم الملف + الرابط الموقّع الذي استُخدم. */
-data class DownloadPayload(
-    val bytes: ByteArray,
+/** ملف مُنزَّل ومحفوظ داخل مجلد التطبيق (Documents/AddonStation على البطاقة الخارجية). */
+data class DownloadedFile(
+    val file: java.io.File,
     val fileName: String,
     val signedUrl: String,
-) {
-    override fun equals(other: Any?): Boolean = other is DownloadPayload && other.fileName == fileName
-    override fun hashCode(): Int = fileName.hashCode()
-}
+)
 
 /** حالة وصول المستخدم إلى عنصر: مجاني/مشترك/يحتاج ترقية/يحتاج AC. */
 sealed interface AccessState {
     data object Free : AccessState
     data object Unlocked : AccessState
-    data class RequiresPlan(val plan: String) : AccessState
-    data class RequiresLegendary(val acPrice: Int) : AccessState
-    data class RequiresAc(val acPrice: Int, val balance: Int) : AccessState
+    data object RequiresEpic : AccessState
+    data object RequiresLegendary : AccessState
     data object RequiresLogin : AccessState
+    data class RequiresPlan(val plan: String) : AccessState
+    data class RequiresAc(val acPrice: Int, val balance: Int) : AccessState
 }
 
 /**
@@ -43,11 +41,11 @@ class ContentRepository(
 
     suspend fun browse(
         contentType: String? = null,
+        sort: String = "newest",
+        query: String = "",
+        limit: Int = 60,
         category: String? = null,
         plan: String? = null,
-        query: String = "",
-        sort: String = "newest",
-        limit: Int = 60,
     ): List<ContentItem> {
         val filters = buildString {
             append("select=*&is_published=eq.true")
@@ -202,7 +200,7 @@ class ContentRepository(
      * تنزيل ملف عنصر: تستدعي record_content_download → ترجع bucket/path → رابط موقّع 60 ثانية → البايتات.
      * كل شروط الخطة والحد اليومي تُفرض داخل الدالة على الخادم.
      */
-    suspend fun download(item: ContentItem): Result<DownloadPayload> = runCatching {
+    suspend fun download(context: android.content.Context, item: ContentItem): Result<DownloadedFile> = runCatching {
         val result = supabase.rpc("record_content_download", params("item_id" to p(item.id)), signedOnly = true)
         val outcome = result.toOutcome()
         if (!outcome.ok) throw ApiError(ApiErrorKind.NO_PERMISSION, outcome.message)
@@ -211,11 +209,12 @@ class ContentRepository(
             ?: throw ApiError(ApiErrorKind.FILE_NOT_UPLOADED)
         val signed = supabase.signedUrl(bucket, path, expiresInSeconds = 60)
         val bytes = supabase.downloadBytes(signed)
-        DownloadPayload(
-            bytes = bytes,
-            fileName = path.substringAfterLast('/').ifBlank { "${item.slug ?: item.id}.zip" },
-            signedUrl = signed,
-        )
+        val fileName = path.substringAfterLast('/').ifBlank { "${item.slug ?: item.id}.zip" }
+        val dir = java.io.File(context.getExternalFilesDir(null) ?: context.filesDir, "AddonStation")
+        if (!dir.exists()) dir.mkdirs()
+        val file = java.io.File(dir, fileName)
+        file.writeBytes(bytes)
+        DownloadedFile(file = file, fileName = fileName, signedUrl = signed)
     }
 
     /** فتح قفل عنصر بالعملات AC (للمحتوى المدفوع بـ AC). */
@@ -225,19 +224,24 @@ class ContentRepository(
         outcome.data.num("charged") ?: 0
     }
 
-    /** هل يملك المستخدم هذا المحتوى (اشتراك مطابق أو شراء AC سابق)؟ */
-    suspend fun accessFor(item: ContentItem): AccessState {
-        val profile = state.profile.value ?: return AccessState.RequiresLogin
-        val rank = mapOf("free" to 1, "epic" to 2, "legendary" to 3)
-        val mine = rank[profile.effectivePlan] ?: 1
-        val need = rank[item.plan] ?: 1
+    /**
+     * هل يملك المستخدم هذا المحتوى؟ يُحسب من الخطة الحالية + كونه المالك أو أدمن.
+     * القرار النهائي يبقى على الخادم داخل record_content_download.
+     */
+    fun accessState(item: ContentItem, plan: String, isOwner: Boolean, isAdmin: Boolean): AccessState {
+        if (isAdmin || isOwner) return AccessState.Unlocked
+        val mine = rankOf(plan)
+        val need = rankOf(item.plan)
         if (need <= mine) return if (item.plan == "free") AccessState.Free else AccessState.Unlocked
         if (item.plan == "legendary") return AccessState.RequiresLegendary(item.acPrice)
-        return if (item.acPrice > 0) {
-            AccessState.RequiresAc(item.acPrice, state.wallet.value?.balance ?: 0)
-        } else {
-            AccessState.RequiresPlan(item.plan)
-        }
+        if (item.plan == "epic") return AccessState.RequiresEpic
+        return AccessState.RequiresPlan(item.plan)
+    }
+
+    private fun rankOf(plan: String?): Int = when (plan) {
+        "legendary" -> 3
+        "epic" -> 2
+        else -> 1
     }
 
     /** محتوى المستخدم (للمبدعين) بكل الحالات. */
