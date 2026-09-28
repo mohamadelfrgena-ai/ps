@@ -425,4 +425,14 @@
     <string name="set_support_note_contact">Напишите на hello@addonstation.app или создайте тему в комнате Support — отвечаем в течение 24 часов.</string>
     <string name="set_delete_confirm_text">Удаление аккаунта навсегда стирает профиль и контент. Для подтверждения свяжитесь с поддержкой и укажите свой ник.</string>
     <string name="chat_banned">Вы забанены в чате.</string>
+    <string name="creator_field_country">Страна</string>
+    <string name="creator_field_content_types">Типы контента (аддоны, миры…)</string>
+    <string name="creator_field_experience">Опыт</string>
+    <string name="creator_field_publish_plan">Что вы будете публиковать?</string>
+    <string name="creator_field_previous_work">Ссылка на прошлую работу</string>
+    <string name="creator_field_portfolio">Ссылки на портфолио</string>
+    <string name="creator_field_wallets">Ссылки на кошельки</string>
+    <string name="creator_field_motivation">Почему AddonStation?</string>
+    <string name="creator_field_title">Название</string>
+    <string name="creator_field_version">Версия</string>
 </resources>

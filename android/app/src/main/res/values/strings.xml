@@ -441,4 +441,14 @@
     <string name="set_support_note_contact">Write to hello@addonstation.app or open a topic in the Support room — we reply within 24 hours.</string>
     <string name="set_delete_confirm_text">Deleting the account erases your profile and content permanently. To confirm, contact support with your username.</string>
     <string name="chat_banned">You are banned from the chat.</string>
+    <string name="creator_field_country">Country</string>
+    <string name="creator_field_content_types">Content types (addons, worlds…)</string>
+    <string name="creator_field_experience">Experience</string>
+    <string name="creator_field_publish_plan">What will you publish?</string>
+    <string name="creator_field_previous_work">Previous work link</string>
+    <string name="creator_field_portfolio">Portfolio links</string>
+    <string name="creator_field_wallets">Wallet links</string>
+    <string name="creator_field_motivation">Why AddonStation?</string>
+    <string name="creator_field_title">Title</string>
+    <string name="creator_field_version">Version</string>
 </resources>

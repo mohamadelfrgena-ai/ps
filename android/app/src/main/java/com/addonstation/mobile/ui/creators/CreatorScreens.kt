@@ -395,15 +395,15 @@ fun CreatorApplicationScreen(onBack: () -> Unit, onSubmitted: () -> Unit) {
             }
             Text(stringResource(R.string.home_creator_text), style = AppText.bodySmall, color = AppColors.Muted)
             Spacer(Modifier.height(12.dp))
-            Field(stringResource(R.string.auth_username), contentTypes) { contentTypes = it }
-            Field(stringResource(R.string.creator_tip_amount), country) { country = it }
+            Field(stringResource(R.string.creator_field_content_types), contentTypes) { contentTypes = it }
+            Field(stringResource(R.string.creator_field_country), country) { country = it }
             Field(stringResource(R.string.profile_about), about, lines = 3) { about = it }
-            Field("Experience", experience, lines = 3) { experience = it }
-            Field("What will you publish?", plan, lines = 2) { plan = it }
-            Field("Previous work link", previousWork) { previousWork = it }
-            Field("Portfolio links", portfolio) { portfolio = it }
-            Field("Wallet links", wallets) { wallets = it }
-            Field("Why AddonStation?", motivation, lines = 3) { motivation = it }
+            Field(stringResource(R.string.creator_field_experience), experience, lines = 3) { experience = it }
+            Field(stringResource(R.string.creator_field_publish_plan), plan, lines = 2) { plan = it }
+            Field(stringResource(R.string.creator_field_previous_work), previousWork) { previousWork = it }
+            Field(stringResource(R.string.creator_field_portfolio), portfolio) { portfolio = it }
+            Field(stringResource(R.string.creator_field_wallets), wallets) { wallets = it }
+            Field(stringResource(R.string.creator_field_motivation), motivation, lines = 3) { motivation = it }
             Field(stringResource(R.string.profile_about_me), bio, lines = 2) { bio = it }
 
             Spacer(Modifier.height(8.dp))
@@ -523,7 +523,7 @@ fun CreatorStudioScreen(
                 Text(stringResource(R.string.home_creator_text), style = AppText.bodySmall, color = AppColors.Muted)
             }
             SectionHeader(title = stringResource(R.string.admin_content), leadingEmoji = "📦")
-            Field("Title", title) { title = it }
+            Field(stringResource(R.string.creator_field_title), title) { title = it }
             Field(stringResource(R.string.item_description), description, lines = 3) { description = it }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("addon", "world", "resource_pack", "map").forEach { type ->
@@ -543,7 +543,7 @@ fun CreatorStudioScreen(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            Field("Version", version) { version = it }
+            Field(stringResource(R.string.creator_field_version), version) { version = it }
             GhostButton(
                 text = fileName ?: stringResource(R.string.admin_add_content),
                 onClick = { filePicker.launch("*/*") },

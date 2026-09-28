@@ -92,18 +92,19 @@ fun AppRoot(
 
     // استعادة الجلسة عند الإقلاع + معالجة رابط الاستعادة addonstation://recovery
     LaunchedEffect(Unit) {
-        if (recoveryLink != null && container.auth.acceptRecoveryLink(recoveryLink)) {
-            deepLinkSession = true
-        }
-        if (container.auth.isSignedIn()) {
-            container.auth.ensureFreshSession()
-            container.state.refreshAll()
-            container.assets.all()
+        runCatching {
+            if (recoveryLink != null && container.auth.acceptRecoveryLink(recoveryLink)) {
+                deepLinkSession = true
+            }
+            if (container.auth.isSignedIn()) {
+                container.auth.ensureFreshSession()
+                container.state.refreshAll()
+                container.assets.all()
+            }
             container.plans.loadPlans()
             container.plans.loadPaymentMethods()
-        } else {
-            container.plans.loadPlans()
         }
+        configured = container.isConfigured
         onRecoveryConsumed()
     }
 

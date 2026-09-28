@@ -425,4 +425,14 @@
     <string name="set_support_note_contact">راسلنا على hello@addonstation.app أو افتح موضوعاً في غرفة الدعم — نرد خلال 24 ساعة.</string>
     <string name="set_delete_confirm_text">حذف الحساب يمسح ملفك الشخصي ومحتواك نهائياً. للتأكيد تواصل مع الدعم باسم المستخدم الخاص بك.</string>
     <string name="chat_banned">أنت محظور من الشات.</string>
+    <string name="creator_field_country">الدولة</string>
+    <string name="creator_field_content_types">أنواع المحتوى (إضافات، عوالم…)</string>
+    <string name="creator_field_experience">الخبرة</string>
+    <string name="creator_field_publish_plan">ماذا ستنشر؟</string>
+    <string name="creator_field_previous_work">رابط عمل سابق</string>
+    <string name="creator_field_portfolio">روابط الأعمال</string>
+    <string name="creator_field_wallets">روابط المحفظة</string>
+    <string name="creator_field_motivation">لماذا AddonStation؟</string>
+    <string name="creator_field_title">العنوان</string>
+    <string name="creator_field_version">الإصدار</string>
 </resources>

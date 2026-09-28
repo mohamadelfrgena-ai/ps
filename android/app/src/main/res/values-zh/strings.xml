@@ -425,4 +425,14 @@
     <string name="set_support_note_contact">写信到 hello@addonstation.app 或在 Support 房间发帖，我们会在 24 小时内回复。</string>
     <string name="set_delete_confirm_text">删除账号会永久清除你的个人资料和内容。如需确认，请携带用户名联系客服。</string>
     <string name="chat_banned">你已被禁止进入聊天。</string>
+    <string name="creator_field_country">国家</string>
+    <string name="creator_field_content_types">内容类型（插件、世界…）</string>
+    <string name="creator_field_experience">经验</string>
+    <string name="creator_field_publish_plan">你将发布什么？</string>
+    <string name="creator_field_previous_work">以往作品链接</string>
+    <string name="creator_field_portfolio">作品集链接</string>
+    <string name="creator_field_wallets">钱包链接</string>
+    <string name="creator_field_motivation">为什么选择 AddonStation？</string>
+    <string name="creator_field_title">标题</string>
+    <string name="creator_field_version">版本</string>
 </resources>

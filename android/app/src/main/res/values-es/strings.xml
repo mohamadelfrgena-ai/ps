@@ -425,4 +425,14 @@
     <string name="set_support_note_contact">Escribe a hello@addonstation.app o abre un tema en la sala Support — respondemos en 24 horas.</string>
     <string name="set_delete_confirm_text">Eliminar la cuenta borra tu perfil y tu contenido para siempre. Para confirmar, contacta al soporte con tu usuario.</string>
     <string name="chat_banned">Estás bloqueado del chat.</string>
+    <string name="creator_field_country">País</string>
+    <string name="creator_field_content_types">Tipos de contenido (addons, mundos…)</string>
+    <string name="creator_field_experience">Experiencia</string>
+    <string name="creator_field_publish_plan">¿Qué vas a publicar?</string>
+    <string name="creator_field_previous_work">Enlace de trabajo anterior</string>
+    <string name="creator_field_portfolio">Enlaces de portafolio</string>
+    <string name="creator_field_wallets">Enlaces de cartera</string>
+    <string name="creator_field_motivation">¿Por qué AddonStation?</string>
+    <string name="creator_field_title">Título</string>
+    <string name="creator_field_version">Versión</string>
 </resources>

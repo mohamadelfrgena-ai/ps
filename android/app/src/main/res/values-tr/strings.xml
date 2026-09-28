@@ -425,4 +425,14 @@
     <string name="set_support_note_contact">hello@addonstation.app adresine yaz veya Support odasında konu aç — 24 saat içinde yanıtlıyoruz.</string>
     <string name="set_delete_confirm_text">Hesabı silmek profilini ve içeriğini kalıcı olarak siler. Onaylamak için kullanıcı adınla desteğe başvur.</string>
     <string name="chat_banned">Sohbetten yasaklandın.</string>
+    <string name="creator_field_country">Ülke</string>
+    <string name="creator_field_content_types">İçerik türleri (eklenti, dünya…)</string>
+    <string name="creator_field_experience">Deneyim</string>
+    <string name="creator_field_publish_plan">Ne yayınlayacaksın?</string>
+    <string name="creator_field_previous_work">Önceki çalışma bağlantısı</string>
+    <string name="creator_field_portfolio">Portföy bağlantıları</string>
+    <string name="creator_field_wallets">Cüzdan bağlantıları</string>
+    <string name="creator_field_motivation">Neden AddonStation?</string>
+    <string name="creator_field_title">Başlık</string>
+    <string name="creator_field_version">Sürüm</string>
 </resources>
