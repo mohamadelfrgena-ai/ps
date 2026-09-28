@@ -50,6 +50,7 @@ tools/           أدوات تحقق: اللغات الثمانية + مراجع
 python3 tools/check_i18n.py        # 🟢 كل اللغات مكتملة ومتطابقة (409 × 8)
 python3 tools/check_kotlin_refs.py # ✓ كل مراجع R.string والمستودعات والأيقونات سليمة
 python3 tools/check_calls.py       # ✓ كل نداءات دوال Compose تطابق تعريفاتها
+python3 tools/check_symbols.py     # ✓ لا مراجع إلى أصناف/دوال غير موجودة
 ```
 
 ## الأمان (مُلخّص)

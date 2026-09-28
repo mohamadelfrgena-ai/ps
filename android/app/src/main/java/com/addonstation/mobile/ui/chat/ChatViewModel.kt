@@ -102,18 +102,16 @@ class ChatViewModel(private val container: AppContainer) {
 
     private fun startRealtime(channelId: String) {
         container.realtime.close()
-        val sub = com.addonstation.mobile.data.RealtimeClient(container.supabase).subscribe(
-            scope = scope,
-            table = "chat_messages",
-            filter = "channel_id=eq.$channelId",
-        ) { type, record ->
-            scope.launch {
-                when (type) {
-                    "INSERT" -> onInserted(record)
-                    else -> refreshTails()
-                }
-            }
-        }
+        // قناة Realtime على جدول chat_messages مقيّدة بهذه الغرفة (نفس ما تشترطه وثيقة الشات)
+        val sub = container.realtimeClient.subscribeChatMessages(
+            channelId = channelId,
+            onRecord = { record ->
+                scope.launch { onInserted(record) }
+            },
+            onStatus = { status ->
+                if (status == "failed") scope.launch { refreshTails() }
+            },
+        )
         container.realtime.replace(sub)
     }
 
