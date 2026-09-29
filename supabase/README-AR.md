@@ -48,7 +48,7 @@ select code, name, enabled from public.payment_method_settings order by sort_ord
 select tablename from pg_publication_tables where pubname = 'supabase_realtime' order by 1;
 ```
 
-## رفع الأصول (287 ملفاً)
+## رفع الأصول (288 ملفاً)
 
 ```bash
 python3 tools/upload_seed_assets.py --url https://xxxx.supabase.co --key sb_secret_xxxx
