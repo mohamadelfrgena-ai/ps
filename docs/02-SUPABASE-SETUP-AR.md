@@ -108,6 +108,7 @@
 | 6 | `supabase/06_seed.sql` | الخطط، 8 طرق دفع، 6 مهام AC، 5 حزم ملصقات، **13 غرفة**، القواعد بـ8 لغات |
 | 7 | `supabase/07_seed_assets.sql` | **105 أداة** و**181 ملصقاً** (286 صفاً في `site_assets`) |
 | 8 | `supabase/10_realtime.sql` | تشغيل المزامنة اللحظية لستة جداول |
+| 9 | `supabase/11_grants.sql` | **إلزامي في المشاريع الجديدة:** منح صلاحيات `anon`/`authenticated` على الجداول (بدونه: `permission denied for table …`) |
 
 > الملفان `08_admin_bootstrap.sql` (المدير) و`09_gateway_functions.sql` (بوابات الدفع) لهما توقيت خاص — انظر المرحلتين 8 و12.
 
@@ -384,7 +385,8 @@ ADDONSTATION_SUPABASE_ANON_KEY=sb_publishable_xxxxxxxx
 |---|---|---|
 | `relation "public.xxx" does not exist` | نفّذت ملفاً قبل ملف | نفّذ بالترتيب: 01 → 02 → 03 → 04 → 05 → 06 → 07 |
 | `policy already exists` / `function already exists` | أعدت تنفيذ ملف | كل الملفات idempotent — تجاهل التحذير أو استخدم الملف الجامع مرة واحدة |
-| `permission denied for table ...` | RLS تعمل كما يجب | العمليات الحساسة تُنفَّذ عبر دوال RPC لا كتابة مباشرة — هذا سلوك مقصود |
+| `permission denied for table xxx` **مع** `hint: GRANT SELECT ON public.xxx TO anon` | مشروع جديد (بعد 30 مايو 2026): Supabase لم تعد تمنح الصلاحيات تلقائياً | نفّذ `supabase/11_grants.sql` (أو الملف الجامع الجديد) — RLS وحدها لا تكفي |
+| `permission denied for table xxx` بدون hint عند الكتابة | RLS/الصلاحيات تعمل كما يجب | العمليات الحساسة تُنفَّذ عبر دوال RPC لا كتابة مباشرة — سلوك مقصود |
 | `new row violates row-level security policy` | تكتب من التطبيق مباشرة بلا دالة | استخدم واجهات التطبيق (التي تنادي الدوال)، لا SQL من الخارج بصلاحية anon |
 | «Email not confirmed» عند الدخول | تأكيد البريد مفعّل | أوقف **Confirm email** للاختبار أو أكّد البريد من صندوقك |
 | التطبيق يقول **«تحقق من الرابط والمفتاح»** | مفتاح خطأ/ناقص | تأكد أنك الصقت `sb_publishable_…` (أو `anon`) وليس المفتاح السري، وأن الرابط يبدأ بـ `https://` وينتهي بـ `.supabase.co` |

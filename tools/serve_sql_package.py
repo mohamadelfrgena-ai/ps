@@ -38,6 +38,7 @@ ORDER = [
     ("06_seed.sql", "06_seed.sql", "بديل: الخطط وطرق الدفع والمهام والغرف"),
     ("07_seed_assets.sql", "07_seed_assets.sql", "بديل: 286 صفاً في site_assets"),
     ("10_realtime.sql", "10_realtime.sql", "بديل: تشغيل المزامنة اللحظية"),
+    ("11_grants.sql", "11_grants.sql", "⚠️ إلزامي للمشاريع الجديدة: منح صلاحيات anon/authenticated"),
     ("08_admin_bootstrap.sql", "08_admin_bootstrap_example.sql", "النسخة العامة (you@example.com)"),
     ("09_gateway_functions.sql", "09_gateway_functions.sql", "اختياري: بوابات الدفع الإلكتروني"),
 ]
