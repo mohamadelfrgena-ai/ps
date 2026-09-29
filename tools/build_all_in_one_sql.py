@@ -6,6 +6,7 @@
 
 الترتيب ملزم: 01 → 02 → 03 → 04 → 05 → 06 → 07 → 10
 (08 إعداد الأدمن يُنفَّذ يدوياً بعد إنشاء الحساب، و09 بوابات الدفع اختياري.)
+12_avatars.sql يضيف 25 أفاتاراً إلى site_assets.
 11_grants.sql في النهاية وهو إلزامي لمشاريع Supabase الجديدة (منح صلاحيات anon/authenticated).
 
 الاستخدام: python3 tools/build_all_in_one_sql.py
@@ -24,6 +25,7 @@ ORDER = [
     "05_storage.sql",
     "06_seed.sql",
     "07_seed_assets.sql",
+    "12_avatars.sql",
     "10_realtime.sql",
     "11_grants.sql",
 ]

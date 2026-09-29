@@ -69,7 +69,8 @@ class AssetsRepository(
                 put("file_url", path)
                 put("required_plan", requiredPlan)
                 put("enabled", true)
-                if (packId != null) put("pack_id", packId)
+                // اسم العمود في قاعدة البيانات هو sticker_pack (وليس pack_id)
+                if (packId != null) put("sticker_pack", packId)
             }
             supabase.insert("site_assets", body)
             path

@@ -36,7 +36,8 @@ ORDER = [
     ("04_rls.sql", "04_rls.sql", "بديل: 58 سياسة أمان"),
     ("05_storage.sql", "05_storage.sql", "بديل: 6 مخازن وسياساتها"),
     ("06_seed.sql", "06_seed.sql", "بديل: الخطط وطرق الدفع والمهام والغرف"),
-    ("07_seed_assets.sql", "07_seed_assets.sql", "بديل: 286 صفاً في site_assets"),
+    ("07_seed_assets.sql", "07_seed_assets.sql", "بديل: 286 صفاً في site_assets (بدون الأفاتارات)"),
+    ("12_avatars.sql", "12_avatars.sql", "الأفاتارات الـ25 (1 مجاني · 12 Epic · 12 Legendary)"),
     ("10_realtime.sql", "10_realtime.sql", "بديل: تشغيل المزامنة اللحظية"),
     ("11_grants.sql", "11_grants.sql", "⚠️ إلزامي للمشاريع الجديدة: منح صلاحيات anon/authenticated"),
     ("08_admin_bootstrap.sql", "08_admin_bootstrap_example.sql", "النسخة العامة (you@example.com)"),
@@ -123,7 +124,7 @@ select
   (select count(*) from public.chat_channels)                                  as rooms,     -- 13
   (select count(*) from public.ac_tasks)                                       as tasks,     -- 6
   (select count(*) from public.sticker_packs)                                  as packs,     -- 5
-  (select count(*) from public.site_assets)                                    as assets;    -- 286
+  (select count(*) from public.site_assets)                                    as assets;    -- 311
 
 الخطوة 3) أنشئ حساب الأدمن
 -----------------------------------------------------------------

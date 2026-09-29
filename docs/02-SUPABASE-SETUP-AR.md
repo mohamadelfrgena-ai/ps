@@ -16,7 +16,7 @@
 | 3 | نسخ **الرابط + المفتاح العام** | 2 د | `https://xxx.supabase.co` + `sb_publishable_…` |
 | 4 | تنفيذ ملف SQL الشامل | 5 د | 33 جدولاً + 65 دالة + 6 مخازن + بيانات أولية |
 | 5 | ضبط المصادقة (Auth) | 4 د | تسجيل/دخول/استعادة كلمة مرور تعمل |
-| 6 | رفع الأصول 288 ملفاً | 10 د | أدوات + ملصقات تظهر في التطبيق |
+| 6 | رفع الأصول 311 ملفاً | 10 د | أدوات + ملصقات + أفاتارات تظهر في التطبيق |
 | 7 | تشغيل المزامنة اللحظية | 1 د | شات لحظي مثل Discord |
 | 8 | تعيين حسابك **Admin** | 2 د | لوحة الإدارة تظهر |
 | 9 | ربط التطبيق بالمفتاح | 1 د | شاشة رئيسية ببيانات حقيقية |
@@ -107,6 +107,7 @@
 | 5 | `supabase/05_storage.sql` | 6 مخازن + سياسات الملفات (مدفوع، إيصالات، صور/أوسائط، مبدعون، أصول عامة) |
 | 6 | `supabase/06_seed.sql` | الخطط، 8 طرق دفع، 6 مهام AC، 5 حزم ملصقات، **13 غرفة**، القواعد بـ8 لغات |
 | 7 | `supabase/07_seed_assets.sql` | **105 أداة** و**181 ملصقاً** (286 صفاً في `site_assets`) |
+| 7ب | `supabase/12_avatars.sql` | **25 أفاتاراً** (1 مجاني · 12 Epic · 12 Legendary) — إجمالي `site_assets` = **311** |
 | 8 | `supabase/10_realtime.sql` | تشغيل المزامنة اللحظية لستة جداول |
 | 9 | `supabase/11_grants.sql` | **إلزامي في المشاريع الجديدة:** منح صلاحيات `anon`/`authenticated` على الجداول (بدونه: `permission denied for table …`) |
 
@@ -130,7 +131,7 @@ select count(*) as chat_rooms from public.chat_channels;              -- الم�
 select (select count(*) from public.ac_tasks)      as tasks,         -- 6
        (select count(*) from public.sticker_packs) as packs,         -- 5
        (select count(*) from public.chat_rules)    as rule_langs,    -- 8
-       (select count(*) from public.site_assets)   as assets;        -- 286
+       (select count(*) from public.site_assets)   as assets;        -- 311
 
 -- 5) المخازن الستة
 select id, public, file_size_limit from storage.buckets order by id;
@@ -194,9 +195,10 @@ select id, public, file_size_limit from storage.buckets order by id;
    - يمكنك رفع قسم واحد (`items` أو `stickers` أو `profiles`) عبر قائمة `only`.
 
 > 🔐 المفتاح السري يبقى داخل إعدادات GitHub ولا يظهر في السجل ولا يدخل التطبيق أبداً.
-> يرفع السير عمل 288 ملفاً إلى مخزن `site-assets`، ثم يتحقق تلقائياً أن أول ملف يُقرأ عامّاً (HTTP 200).
+> يرفع السير عمل **311 ملفاً** (105 أدوات + 181 ملصقاً + 25 أفاتاراً) إلى مخزن `site-assets`،
+> ثم يتحقق تلقائياً أن أول ملف يُقرأ عامّاً (HTTP 200).
 
-### 6.1 الطريقة الثانية: سكربت الرفع من حاسوبك (288 ملفاً في دقيقة)
+### 6.1 الطريقة الثانية: سكربت الرفع من حاسوبك (311 ملفاً في دقيقة)
 على **حاسوبك** (يحتاج Python 3 فقط، بلا أي مكتبة إضافية):
 
 ```bash
@@ -215,7 +217,8 @@ python3 tools/upload_seed_assets.py \
   --key sb_secret_xxxxxxxx
 ```
 * استخدم هنا **المفتاح السري** `sb_secret_…` (أو `service_role` القديم) لأنه يرفع ملفات عامة دفعة واحدة.
-* الناتج المتوقع: `✅ نجح: 288  ❌ فشل: 0`.
+* الناتج المتوقع: `✅ نجح: 311  ❌ فشل: 0`.
+* لرفع الأفاتارات وحدها: أضف `--only profiles`.
 * لو أردت قسماً واحداً: أضف `--only items` أو `--only stickers` أو `--only profiles`.
 
 ### 6.2 أو يدوياً من اللوحة (مناسب إن لم يكن لديك حاسوب)
@@ -467,6 +470,7 @@ psql "…" -c "select asset_type, count(*) from public.site_assets group by 1;"
 | `05_storage.sql` | 6 مخازن + سياسات الملفات | إيصال كل مستخدم في مجلده · المحتوى المدفوع بصلاحية الخطة · الأصول العامة للقراءة للجميع · أغلفة المبدعين في `items/<uid>/` داخل `site-assets` |
 | `06_seed.sql` | بيانات أولية | 3 خطط · 8 طرق دفع · 6 مهام AC · 5 حزم ملصقات · 13 غرفة · قواعد بـ8 لغات · إعدادات الفلترة التلقائية |
 | `07_seed_assets.sql` | 286 صفاً في `site_assets` | 105 أدوات (104 أسطورية + Enchanted Bedrock للإدارة) و181 ملصقاً موزعة على 5 حزم |
+| `12_avatars.sql` | 25 صفاً في `site_assets` | 25 أفاتاراً: onefree (مجاني/الافتراضي) + 12 Epic + 12 Legendary — يرفعها إلى `profiles/` |
 
 ## ما بعد هذا الدليل
 

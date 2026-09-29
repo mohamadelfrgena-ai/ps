@@ -52,7 +52,7 @@ python3 tools/check_kotlin_refs.py # ✓ كل مراجع R.string والمستو
 python3 tools/check_calls.py       # ✓ كل نداءات دوال Compose تطابق تعريفاتها
 python3 tools/check_symbols.py     # ✓ لا مراجع إلى أصناف/دوال غير موجودة
 python3 tools/build_all_in_one_sql.py    # يبني supabase/00_ALL_IN_ONE.sql
-python3 tools/upload_seed_assets.py --url ... --key sb_secret_...   # رفع 288 أصلاً
+python3 tools/upload_seed_assets.py --url ... --key sb_secret_...   # رفع 311 أصلاً
 ```
 
 ## الأمان (مُلخّص)

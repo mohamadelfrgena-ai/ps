@@ -5,7 +5,7 @@
 ## الطريقة الأسرع: ملف واحد جامع ✨
 
 انسخ **`00_ALL_IN_ONE.sql`** كاملاً والصقه في **Supabase → SQL Editor → Run** مرة واحدة.
-يحتوي: 33 جدولاً · 65 دالة · 76 سياسة أمنية · 6 مخازن · البيانات الأولية (الخطط، 8 طرق دفع، 6 مهام AC، 5 حزم ملصقات، 13 غرفة، قواعد بـ8 لغات، 286 أصلاً) · تشغيل المزامنة اللحظية.
+يحتوي: 33 جدولاً · 65 دالة · 76 سياسة أمنية · 6 مخازن · البيانات الأولية (الخطط، 8 طرق دفع، 6 مهام AC، 5 حزم ملصقات، 13 غرفة، قواعد بـ8 لغات، 311 أصلاً (منها 25 أفاتاراً)) · تشغيل المزامنة اللحظية.
 
 > يُعاد توليد الملف بالأمر: `python3 tools/build_all_in_one_sql.py` (لا تعدّله يدوياً).
 
@@ -20,10 +20,11 @@
 | 5 | `05_storage.sql` | المخازن الستة وسياسات الملفات |
 | 6 | `06_seed.sql` | الخطط، طرق الدفع، مهام AC، 5 حزم ملصقات، **13 غرفة**، قواعد المجتمع 8 لغات |
 | 7 | `07_seed_assets.sql` | 105 أداة شات + 181 ملصقاً |
-| 8 | `10_realtime.sql` | تشغيل المزامنة اللحظية لستة جداول |
-| 9 | `11_grants.sql` | **إلزامي للمشاريع الجديدة** (بعد 30 مايو 2026): منح `anon`/`authenticated` صلاحية الجداول — بدونه يظهر `permission denied for table …` |
-| 10 | `08_admin_bootstrap.sql` | **بعد** إنشاء حسابك من التطبيق — عدّل البريد داخله أولاً |
-| 11 | `09_gateway_functions.sql` | اختياري — دوال بوابات الدفع الإلكتروني (Stripe) |
+| 8 | `12_avatars.sql` | 25 أفاتاراً (1 مجاني · 12 Epic · 12 Legendary) في `site_assets` |
+| 9 | `10_realtime.sql` | تشغيل المزامنة اللحظية لستة جداول |
+| 10 | `11_grants.sql` | **إلزامي للمشاريع الجديدة** (بعد 30 مايو 2026): منح `anon`/`authenticated` صلاحية الجداول — بدونه يظهر `permission denied for table …` |
+| 11 | `08_admin_bootstrap.sql` | **بعد** إنشاء حسابك من التطبيق — عدّل البريد داخله أولاً |
+| 12 | `09_gateway_functions.sql` | اختياري — دوال بوابات الدفع الإلكتروني (Stripe) |
 
 ## نتائج متوقعة للتحقق
 
@@ -48,7 +49,7 @@ select code, name, enabled from public.payment_method_settings order by sort_ord
 select tablename from pg_publication_tables where pubname = 'supabase_realtime' order by 1;
 ```
 
-## رفع الأصول (288 ملفاً)
+## رفع الأصول (311 ملفاً)
 
 ```bash
 python3 tools/upload_seed_assets.py --url https://xxxx.supabase.co --key sb_secret_xxxx
