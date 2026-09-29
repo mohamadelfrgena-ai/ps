@@ -20,3 +20,6 @@ android/captures/
 # نظام
 .DS_Store
 Thumbs.db
+
+# حزمة SQL الجاهزة (مقصود تعقّبها لتوفير رابط تحميل مباشر)
+!sql-package/**
