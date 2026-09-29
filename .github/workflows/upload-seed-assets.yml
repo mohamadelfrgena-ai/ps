@@ -32,15 +32,10 @@ on:
           - dry-run
           - upload
       only:
-        description: "قسم واحد فقط (اتركه فارغاً لكل الأقسام)"
+        description: "قسم واحد فقط: items أو stickers أو profiles (اتركه فارغاً لكل الأقسام)"
         required: false
         default: ""
-        type: choice
-        options:
-          - ""
-          - items
-          - stickers
-          - profiles
+        type: string
 
 jobs:
   upload:
@@ -80,7 +75,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
-          python3 tools/upload_seed_assets.py --dry-run ${{ inputs.only != '' && format('--only {0}', inputs.only) || '' }}
+          python3 tools/upload_seed_assets.py --dry-run ${{ inputs.only }}
 
       - name: الرفع الفعلي
         if: ${{ inputs.mode == 'upload' }}
@@ -88,7 +83,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
-          python3 tools/upload_seed_assets.py ${{ inputs.only != '' && format('--only {0}', inputs.only) || '' }}
+          python3 tools/upload_seed_assets.py ${{ inputs.only }}
 
       - name: تحقق بعد الرفع (رابط عام لأول ملف)
         if: ${{ inputs.mode == 'upload' }}

@@ -1,5 +1,12 @@
 # بناء APK تلقائياً على GitHub — شغّله يدوياً من تبويب Actions
-# (لا يحتاج أي جهاز محلي، ولا يلمس أي سر: يقرأ المفاتيح من Secrets إن وُجدت)
+# (لا يحتاج أي جهاز محلي، ويقرأ مفاتيح Supabase من Secrets إن وُجدت)
+#
+# ملاحظات الإصلاح (2026-09-29):
+#   • غلاف Gradle أصبح مرفقاً في المودع (android/gradlew + gradle/wrapper) →
+#     لا حاجة لتنصيب Gradle ولا لتشغيل `gradle wrapper` بعد الآن.
+#   • تم تحديث إصدار إجراء Android SDK من v3 إلى v4 (v3 لم يعد يعمل على
+#     صور التشغيل الحالية — كان السبب في فشل كل البناءات السابقة).
+
 name: Build APK
 
 on:
@@ -21,27 +28,29 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0 platform-tools'
+          log-accepted-android-sdk-licenses: false
 
-      - name: Install platform & build-tools
-        run: |
-          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
-          yes | sdkmanager --licenses || true
-
-      - name: Create Gradle wrapper
+      - name: التحقق من غلاف Gradle
         working-directory: android
-        run: gradle wrapper --gradle-version 8.9 --distribution-type bin
+        run: |
+          test -f gradle/wrapper/gradle-wrapper.jar || { echo "::error::gradle-wrapper.jar مفقود"; exit 1; }
+          test -f gradle/wrapper/gradle-wrapper.properties || { echo "::error::gradle-wrapper.properties مفقود"; exit 1; }
+          chmod +x gradlew
+          grep distributionUrl gradle/wrapper/gradle-wrapper.properties
 
-      - name: Write local.properties (Supabase keys from Secrets if provided)
+      - name: Write local.properties (مفاتيح Supabase من Secrets إن وُجدت)
         working-directory: android
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-          echo "ADDONSTATION_SUPABASE_URL=${{ secrets.ADDONSTATION_SUPABASE_URL }}" >> local.properties
-          echo "ADDONSTATION_SUPABASE_ANON_KEY=${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY }}" >> local.properties
+          echo "ADDONSTATION_SUPABASE_URL=${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}" >> local.properties
+          echo "ADDONSTATION_SUPABASE_ANON_KEY=${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}" >> local.properties
 
       - name: Build debug APK
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
