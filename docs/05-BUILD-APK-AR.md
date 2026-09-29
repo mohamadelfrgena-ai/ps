@@ -31,21 +31,34 @@ cd ps
 
 ---
 
-## 2) أضف غلاف Gradle (إن لم يكن موجوداً)
+## 2) غلاف Gradle (Gradle Wrapper) — ✅ موجود داخل المشروع
 
-المشروع لا يحمل ملفات `gradle-wrapper.jar` (ثنائية). أضفها مرة واحدة:
+المشروع يحمل الغلاف كاملاً وليس بحاجة لأي خطوة إضافية:
 
-**الطريقة أ — عبر Android Studio:** عند أول Sync سيعرض «Gradle wrapper is missing, create it?» → اضغط **OK**.
+```
+android/gradlew                                  ← سكربت لينكس/ماك
+android/gradlew.bat                              ← سكربت ويندوز
+android/gradle/wrapper/gradle-wrapper.jar        ← (Gradle 8.9 — مطابق لبصمة Gradle الرسمية)
+android/gradle/wrapper/gradle-wrapper.properties ← distributionUrl → gradle-8.9-bin.zip
+```
 
-**الطريقة ب — عبر سطر الأوامر** (إن كان Gradle مثبتاً):
+**أمر البناء على ويندوز** (من مجلد `android` — لاحظ `.bat` أو `.\`):
+
+```bat
+cd android
+gradlew.bat assembleDebug          :: أو:  .\gradlew.bat assembleDebug
+```
+
+وتثبيت على جهاز موصول: `gradlew.bat installDebug` · وتنظيف: `gradlew.bat clean`
+
+**إن أردت إعادة توليد الغلاف لاحقاً** (اختياري — يحتاج Gradle مثبتاً):
 
 ```bash
 cd android
 gradle wrapper --gradle-version 8.9 --distribution-type bin
-./gradlew --version
 ```
 
-**الطريقة ج — نسخها من مشروع آخر:** انسخ المجلد `gradle/wrapper/` + `gradlew` + `gradlew.bat` من أي مشروع أندرويد يعمل.
+> ملاحظة: إذا نُسخ المشروع إلى جهاز بلا إنترنت لتنزيل Gradle، فسيُحمّل التوزيع `gradle-8.9-bin.zip` مرة واحدة عند أول تشغيل.
 
 ---
 
@@ -69,7 +82,8 @@ ADDONSTATION_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
 ADDONSTATION_SUPABASE_ANON_KEY=eyJhbGciOi...
 ```
 
-> 🔐 **قاعدة أمنية ثابتة:** التطبيق يحمل المفتاح **العام (anon)** فقط. لا تضع أبداً `service_role` في التطبيق.
+> 🔐 **قاعدة أمنية ثابتة:** التطبيق يحمل المفتاح **العام (anon)** فقط. لا تضع أبداً `service_role` أو `sb_secret_…` في التطبيق.
+> البناء نفسه يرفضهما: `app/build.gradle.kts` يوقف البناء فوراً إن وُجد أحدهما في `local.properties` أو `gradle.properties`، وشاشة الإعداد الأول ترفضهما أيضاً.
 >
 > إن نسيت هذه الخطوة، لن يفشل البناء — سيظهر داخل التطبيق **«شاشة الإعداد الأول»** تطلب الرابط والمفتاح وتخزّنهما محلياً.
 
@@ -257,7 +271,7 @@ jobs:
 
 * **اسم الحزمة:** `com.addonstation.mobile` (النسخة التجريبية `…mobile.debug`)، رقم الإصدار 1.2.
 * **أقل إصدار مدعوم:** Android 7.0 (API 24) — **الهدف:** Android 15 (API 35).
-* **اللغات المدمجة:** ar · en · pt · es · ru · zh · fr · tr (409 مفتاح ترجمة متطابق في كل لغة — يُفحص بأمر `python3 tools/check_i18n.py`).
+* **اللغات المدمجة:** ar · en · pt · es · ru · zh · fr · tr (420 مفتاح ترجمة متطابق في كل لغة — يُفحص بأمر `python3 tools/check_i18n.py`).
 * **الخطوط:** خط البكسل داخل `res/font/pixel_regular.ttf` (مبني من Press Start 2P، رخصة OFL — النص الأصلي في `res/font/OFL.txt`).
 * **حجم المتوقع:** ~12–16 MB لنسخة الإصدار (بعد R8 و shrinkResources).
 * **لا يحتوي التطبيق على أي مفتاح خدمة أو سر** — كل العمليات الحساسة تمرّ بدوال SQL محمية داخل Supabase.

@@ -172,8 +172,13 @@ class CreatorRepository(private val supabase: SupabaseClient) {
         runCatching {
             val uid = supabase.session()?.userId
                 ?: throw com.addonstation.mobile.data.ApiError(com.addonstation.mobile.data.ApiErrorKind.NOT_SIGNED_IN)
-            val bucket = if (kind == "cover") "content-media" else "creator-media"
-            val path = "$uid/${System.currentTimeMillis()}-$fileName"
+            // غلاف المبدع → site-assets/items/<uid>/ (سياسة site_assets_creator_write تسمح
+            // للمبدع بالكتابة داخل مجلده فقط)، وبقية الملفات → creator-media الخاص.
+            val isCover = kind == "cover"
+            val bucket = if (isCover) "site-assets" else "creator-media"
+            val path =
+                if (isCover) "items/$uid/${System.currentTimeMillis()}-$fileName"
+                else "$uid/${System.currentTimeMillis()}-$fileName"
             supabase.upload(bucket, path, bytes, mime)
             path
         }

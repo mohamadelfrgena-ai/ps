@@ -126,7 +126,8 @@ create policy "creator_media_read" on storage.objects
   );
 
 -- ---------------------------------------------------------------------------
--- 6) أصول الموقع العامة (أفاتارات/أغلفة/ملصقات/أدوات) — قراءة عامة، كتابة للإدارة
+-- 6) أصول الموقع العامة (الأغلفة/الأفاتارات/الملصقات/الأدوات) — قراءة عامة،
+--    الكتابة للإدارة في أي مسار، وللمبدع داخل مجلد أغلفته items/<uid>/… فقط
 -- ---------------------------------------------------------------------------
 drop policy if exists "site_assets_read" on storage.objects;
 create policy "site_assets_read" on storage.objects
@@ -136,6 +137,17 @@ drop policy if exists "site_assets_admin_write" on storage.objects;
 create policy "site_assets_admin_write" on storage.objects
   for insert to authenticated
   with check (bucket_id = 'site-assets' and public.is_admin());
+
+-- أغلفة المحتوى: المبدع يكتب داخل مجلده فقط (items/<uid>/…) — أما الإدارة فمسارها مفتوح
+drop policy if exists "site_assets_creator_write" on storage.objects;
+create policy "site_assets_creator_write" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'site-assets'
+    and public.current_role_of() in ('creator','admin')
+    and (storage.foldername(name))[1] = 'items'
+    and (storage.foldername(name))[2] = auth.uid()::text
+  );
 
 drop policy if exists "site_assets_admin_update" on storage.objects;
 create policy "site_assets_admin_update" on storage.objects

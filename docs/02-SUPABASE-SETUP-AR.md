@@ -14,7 +14,7 @@
 | 1 | إنشاء حساب Supabase | 3 د | حساب مسجّل |
 | 2 | إنشاء المشروع | 3 د | مشروع جاهز (Active) |
 | 3 | نسخ **الرابط + المفتاح العام** | 2 د | `https://xxx.supabase.co` + `sb_publishable_…` |
-| 4 | تنفيذ ملف SQL الشامل | 5 د | 33 جدولاً + 65 دالة + 7 مخازن + بيانات أولية |
+| 4 | تنفيذ ملف SQL الشامل | 5 د | 33 جدولاً + 65 دالة + 6 مخازن + بيانات أولية |
 | 5 | ضبط المصادقة (Auth) | 4 د | تسجيل/دخول/استعادة كلمة مرور تعمل |
 | 6 | رفع الأصول 287 ملفاً | 10 د | أدوات + ملصقات تظهر في التطبيق |
 | 7 | تشغيل المزامنة اللحظية | 1 د | شات لحظي مثل Discord |
@@ -89,7 +89,7 @@
 
 ### الطريقة (أ) — الأسرع: ملف واحد جامع ✨
 1. من القائمة الجانبية اضغط **SQL Editor** → **New query**.
-2. افتح ملف **`supabase/00_ALL_IN_ONE.sql`** (173 KB — يحتوي 33 جدولاً و65 دالة و75 سياسة أمنية و7 مخازن والبيانات الأولية):
+2. افتح ملف **`supabase/00_ALL_IN_ONE.sql`** (173 KB — يحتوي 33 جدولاً و65 دالة و76 سياسة أمنية و6 مخازن والبيانات الأولية):
    - على الحاسوب: افتح الملف من المودع، اضغط **Raw** في GitHub ثم **Ctrl+A** ثم **Ctrl+C**.
    - على الجوال: افتح الملف في تطبيق GitHub أو المتصفح بنمط **Raw** ثم علّم الكل وانسخ.
 3. الصق في نافذة SQL Editor ثم اضغط **Run** (أو `Ctrl+Enter`).
@@ -104,7 +104,7 @@
 | 2 | `supabase/02_functions_core.sql` | دوال المحتوى والخطط والدفع وAC والملف الشخصي |
 | 3 | `supabase/03_functions_chat.sql` | دوال الشات: إرسال، فلترة تلقائية، كتم/حظر/بلاغات، إشعارات، مبدعون |
 | 4 | `supabase/04_rls.sql` | سياسات الأمان (من يقرأ/يكتب ماذا) وسحب الكتابة المباشرة |
-| 5 | `supabase/05_storage.sql` | 7 مخازن + سياسات الملفات (مدفوع، إيصالات، صور/أوسائط، مبدعون، أصول عامة) |
+| 5 | `supabase/05_storage.sql` | 6 مخازن + سياسات الملفات (مدفوع، إيصالات، صور/أوسائط، مبدعون، أصول عامة) |
 | 6 | `supabase/06_seed.sql` | الخطط، 8 طرق دفع، 6 مهام AC، 5 حزم ملصقات، **13 غرفة**، القواعد بـ8 لغات |
 | 7 | `supabase/07_seed_assets.sql` | **105 أداة** و**181 ملصقاً** (286 صفاً في `site_assets`) |
 | 8 | `supabase/10_realtime.sql` | تشغيل المزامنة اللحظية لستة جداول |
@@ -131,7 +131,7 @@ select (select count(*) from public.ac_tasks)      as tasks,         -- 6
        (select count(*) from public.chat_rules)    as rule_langs,    -- 8
        (select count(*) from public.site_assets)   as assets;        -- 286
 
--- 5) المخازن السبعة
+-- 5) المخازن الستة
 select id, public, file_size_limit from storage.buckets order by id;
 ```
 
@@ -171,7 +171,7 @@ select id, public, file_size_limit from storage.buckets order by id;
 
 ## المرحلة 6 — رفع الأصول (الأدوات والملصقات) 🖼️
 
-المخازن السبعة أُنشئت تلقائياً من `05_storage.sql`:
+المخازن الستة أُنشئت تلقائياً من `05_storage.sql`:
 
 | المخزن | عام؟ | الحد | الاستخدام |
 |---|---|---|---|
@@ -181,7 +181,6 @@ select id, public, file_size_limit from storage.buckets order by id;
 | `chat-images` | ⛔ خاص | 4 MB | صور الشات |
 | `chat-media` | ⛔ خاص | 100 MB | صوت/فيديو الشات |
 | `creator-media` | ⛔ خاص | 200 MB | رفع المبدعين |
-| `content-media` | ⛔ خاص | — | وسائط المحتوى الإضافية |
 
 ### 6.1 الطريقة الأسرع: سكربت الرفع (287 ملفاً في دقيقة)
 على **حاسوبك** (يحتاج Python 3 فقط، بلا أي مكتبة إضافية):
@@ -450,7 +449,7 @@ psql "…" -c "select asset_type, count(*) from public.site_assets group by 1;"
 | `02_functions_core.sql` | 40 دالة: `effective_plan` · `can_access_item` · `record_content_download` · `toggle_favorite` · `ac_claim_task` · `ac_unlock_content` · `create_payment_order` · `submit_payment_receipt` · `update_my_profile` · `set_profile_asset` · `admin_*` … | كل عملية حساسة تُنفَّذ هنا بـ`SECURITY DEFINER` مع تحقق الدور والخطة |
 | `03_functions_chat.sql` | 25 دالة: `send_chat_message` (مع فلترة تلقائية) · `chat_toggle_reaction` · `chat_mute_user/ban` · `chat_report_message` · `chat_mark_read` · `chat_set_typing` · `chat_unread_counts` · `my_chat_status` · `admin_upsert_content/plan/settings` · `submit_creator_application/tip/content` … | تحدد الأدوار والصلاحيات والإعلانات و«يكتب الآن…» |
 | `04_rls.sql` | 58 سياسة | أمثلة: `content_select_public` (المحتوى المنشور للجميع) · `orders_select_own` (الطلب لصاحبه فقط) · `ac_wallet_own` · `messages_read` (حسب عضوية الغرفة) · `audit_admin_read` (سجل الإدارة للأدمن فقط) |
-| `05_storage.sql` | 7 مخازن + سياسات الملفات | إيصال كل مستخدم في مجلده · المحتوى المدفوع بصلاحية الخطة · الأصول العامة للقراءة للجميع |
+| `05_storage.sql` | 6 مخازن + سياسات الملفات | إيصال كل مستخدم في مجلده · المحتوى المدفوع بصلاحية الخطة · الأصول العامة للقراءة للجميع · أغلفة المبدعين في `items/<uid>/` داخل `site-assets` |
 | `06_seed.sql` | بيانات أولية | 3 خطط · 8 طرق دفع · 6 مهام AC · 5 حزم ملصقات · 13 غرفة · قواعد بـ8 لغات · إعدادات الفلترة التلقائية |
 | `07_seed_assets.sql` | 286 صفاً في `site_assets` | 105 أدوات (104 أسطورية + Enchanted Bedrock للإدارة) و181 ملصقاً موزعة على 5 حزم |
 

@@ -16,6 +16,28 @@ val localProps = Properties().apply {
 fun configValue(key: String): String =
     (localProps.getProperty(key) ?: project.findProperty(key)?.toString() ?: "").trim()
 
+// ---------------------------------------------------------------------------
+// حماية إلزامية: المفتاح السري (sb_secret_… / service_role) لا يدخل BuildConfig
+// أو الـAPK إطلاقاً. إن وُجد في local.properties أو gradle.properties يتوقف
+// البناء فوراً برسالة واضحة (الحماية تعمل على جهازك وعلى GitHub Actions معاً).
+// ---------------------------------------------------------------------------
+fun requirePublishableOnly(key: String, value: String) {
+    if (value.isBlank()) return
+    val lowered = value.lowercase()
+    if (lowered.contains("sb_secret") || lowered.contains("service_role")) {
+        throw GradleException(
+            "⛔ المفتاح السري مرفوض: القيمة في «$key» تحتوي sb_secret أو service_role.\n" +
+                "   المفتاح السري يبقى في لوحة Supabase وفي أسرار الخادم/السكربتات فقط،\n" +
+                "   ولا يدخل التطبيق أبداً. استخدم المفتاح العام: sb_publishable_… أو anon."
+        )
+    }
+}
+
+val supabaseUrlValue = configValue("ADDONSTATION_SUPABASE_URL")
+val supabaseAnonValue = configValue("ADDONSTATION_SUPABASE_ANON_KEY")
+requirePublishableOnly("ADDONSTATION_SUPABASE_URL", supabaseUrlValue)
+requirePublishableOnly("ADDONSTATION_SUPABASE_ANON_KEY", supabaseAnonValue)
+
 android {
     namespace = "com.addonstation.mobile"
     compileSdk = 35
@@ -29,8 +51,8 @@ android {
 
         resourceConfigurations += listOf("en", "ar", "pt", "es", "ru", "zh", "fr", "tr")
 
-        buildConfigField("String", "DEFAULT_SUPABASE_URL", "\"${configValue("ADDONSTATION_SUPABASE_URL")}\"")
-        buildConfigField("String", "DEFAULT_SUPABASE_ANON_KEY", "\"${configValue("ADDONSTATION_SUPABASE_ANON_KEY")}\"")
+        buildConfigField("String", "DEFAULT_SUPABASE_URL", "\"$supabaseUrlValue\"")
+        buildConfigField("String", "DEFAULT_SUPABASE_ANON_KEY", "\"$supabaseAnonValue\"")
     }
 
     buildTypes {

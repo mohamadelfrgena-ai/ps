@@ -141,8 +141,12 @@ class AdminRepository(private val supabase: SupabaseClient) {
         isCover: Boolean,
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
-            val bucket = if (isCover) "content-media" else "content-files"
-            val path = "${System.currentTimeMillis()}-$fileName"
+            // الأغلفة → مخزن site-assets العام داخل مجلد items/ (نفس المسار الذي تقرأ منه
+            // الواجهة عبر assetUrl/‏siteAssetUrl)، والملفات نفسها → content-files الخاص.
+            val bucket = if (isCover) "site-assets" else "content-files"
+            val path =
+                if (isCover) "items/${System.currentTimeMillis()}-$fileName"
+                else "${System.currentTimeMillis()}-$fileName"
             supabase.upload(bucket, path, bytes, mime)
             path
         }
