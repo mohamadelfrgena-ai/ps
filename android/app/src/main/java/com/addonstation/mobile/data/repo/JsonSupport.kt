@@ -25,6 +25,15 @@ inline fun <reified T> SupabaseClient.decodeOne(element: JsonElement): T? =
 
 fun JsonElement?.asObject(): JsonObject? = this as? JsonObject
 
+// ---------------------------------------------------------------- قراءة قيم JSON
+// (دوال مساعدة تستخدمها المستودعات لقراءة حقول نتائج RPC: asInt()/asString()/…)
+fun JsonElement?.asString(): String? = (this as? JsonPrimitive)?.contentOrNull
+fun JsonElement?.asInt(): Int? = (this as? JsonPrimitive)?.intOrNull
+fun JsonElement?.asLong(): Long? = (this as? JsonPrimitive)?.longOrNull
+fun JsonElement?.asDouble(): Double? = (this as? JsonPrimitive)?.doubleOrNull
+fun JsonElement?.asBool(): Boolean? = (this as? JsonPrimitive)?.booleanOrNull
+fun JsonElement?.asArray(): JsonArray? = this as? JsonArray
+
 fun JsonObject?.str(key: String): String? = this?.get(key)?.jsonPrimitive?.contentOrNull
 fun JsonObject?.num(key: String): Int? = this?.get(key)?.jsonPrimitive?.intOrNull
 fun JsonObject?.dbl(key: String): Double? = this?.get(key)?.jsonPrimitive?.doubleOrNull
@@ -42,11 +51,17 @@ fun JsonElement?.toOutcome(): RpcOutcome {
     return RpcOutcome(ok = okValue, message = message, data = obj)
 }
 
+/** اسم بديل مختصر لـtoOutcome() تستخدمه المستودعات في كل مكان. */
+fun JsonElement?.asOutcome(): RpcOutcome = this.toOutcome()
+
 /** يرمي خطأً عربياً مفهوماً إذا كانت الدالة أعادت ok=false. */
 fun RpcOutcome.orThrow(fallback: String? = null): RpcOutcome {
     if (!ok) throw com.addonstation.mobile.data.ApiError.message(message ?: fallback)
     return this
 }
+
+/** مثل orThrow بلا وسيط — توقف التنفيذ إن كانت النتيجة غير ناجحة. */
+fun RpcOutcome.requireOk(): RpcOutcome = orThrow()
 
 /** يبني وسائط RPC ويتجاهل القيم الفارغة (null) حتى لا تُرسل للحقول الاختيارية. */
 fun params(vararg pairs: Pair<String, JsonElement?>): Map<String, JsonElement?> =

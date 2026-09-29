@@ -16,6 +16,14 @@ data class SupabaseConfig(val url: String, val anonKey: String) {
             return "$base/realtime/v1/websocket"
         }
 
+    /** رابط عام لملف داخل مخزن عام (site-assets مثلاً). */
+    fun publicUrl(bucket: String, path: String): String =
+        "${storageUrl}/object/public/$bucket/${path.trimStart('/')}"
+
+    /** رابط موقّع قصير الأجل يُبنى في SupabaseClient (يحتاج توكن المستخدم). */
+    fun signedUrl(bucket: String, path: String): String =
+        "${storageUrl}/object/sign/$bucket/${path.trimStart('/')}"
+
     fun projectRef(): String =
         url.trimEnd('/').substringAfter("https://", url.trimEnd('/')).substringBefore('.')
 

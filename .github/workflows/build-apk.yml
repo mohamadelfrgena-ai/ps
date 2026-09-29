@@ -84,7 +84,7 @@ jobs:
           if [ "$code" -ne 0 ]; then
             echo "================= ملخّص الخطأ ================="
             grep -n -E "^e: |error: |What went wrong|> Task .* FAILED|Execution failed|Could not (resolve|find|determine)" build.log \
-              | head -25 | while IFS= read -r line; do
+              | head -70 | while IFS= read -r line; do
                 echo "::error::$line"
               done
             exit "$code"
