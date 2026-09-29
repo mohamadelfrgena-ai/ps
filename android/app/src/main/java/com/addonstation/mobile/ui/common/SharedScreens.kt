@@ -210,6 +210,7 @@ fun SetupScreen(onDone: () -> Unit) {
     var key by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val errMsg = stringResource(R.string.setup_error)
+    val secretWarn = stringResource(R.string.setup_secret_warning)
 
     Column(
         modifier = Modifier
@@ -248,10 +249,14 @@ fun SetupScreen(onDone: () -> Unit) {
                 text = stringResource(R.string.setup_connect),
                 onClick = {
                     val cleanUrl = url.trim()
-                    if (!cleanUrl.startsWith("http") || key.trim().length < 20) {
+                    val cleanKey = key.trim()
+                    if (cleanKey.startsWith("sb_secret_") || cleanKey.startsWith("service_role")) {
+                        // حماية: منع لصق المفتاح السري داخل التطبيق
+                        error = secretWarn
+                    } else if (!cleanUrl.startsWith("http") || cleanKey.length < 20) {
                         error = errMsg
                     } else {
-                        container.saveConfig(cleanUrl, key.trim())
+                        container.saveConfig(cleanUrl, cleanKey)
                         onDone()
                     }
                 },

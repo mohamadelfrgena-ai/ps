@@ -32,7 +32,7 @@ class PlansRepository(
                 supabase.select(
                     "subscription_plans",
                     "select=*&order=sort_order.asc",
-                    token = supabase.config().anonKey,
+                    token = null,   // قراءة عامة: ترويسة apikey تكفي
                 )
             )
         }.getOrElse { emptyList() }
@@ -46,7 +46,7 @@ class PlansRepository(
                 supabase.select(
                     "payment_method_settings",
                     "select=*&enabled=eq.true&order=sort_order.asc",
-                    token = supabase.config().anonKey,
+                    token = null,   // قراءة عامة: ترويسة apikey تكفي
                 )
             )
         }.getOrElse { emptyList() }

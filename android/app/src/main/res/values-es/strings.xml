@@ -412,9 +412,9 @@
     <string name="admin_no_permission">No tienes permiso para esta acción</string>
 
     <string name="setup_title">Conectar con Supabase</string>
-    <string name="setup_text">Pega la URL del proyecto y la clave pública anon. Las encuentras en Supabase → Ajustes del proyecto → API.</string>
+    <string name="setup_text">Pega la URL del proyecto y la clave pública (publishable sb_publishable_… o la anon antigua). Están en Supabase → Settings → API Keys.</string>
     <string name="setup_url">URL del proyecto</string>
-    <string name="setup_anon">Clave pública anon</string>
+    <string name="setup_anon">Clave pública (publishable / anon)</string>
     <string name="setup_connect">Conectar</string>
     <string name="setup_error">Revisa la URL y la clave</string>
     <string name="setup_hint">Solo necesitas hacerlo una vez.</string>
@@ -435,4 +435,5 @@
     <string name="creator_field_motivation">¿Por qué AddonStation?</string>
     <string name="creator_field_title">Título</string>
     <string name="creator_field_version">Versión</string>
+    <string name="setup_secret_warning">Esto parece una clave secreta (sb_secret_…). Nunca la pongas en la app: usa solo la clave pública.</string>
 </resources>

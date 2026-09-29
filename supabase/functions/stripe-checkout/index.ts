@@ -12,6 +12,29 @@
 import Stripe from "npm:stripe@16";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+// ---------------------------------------------------------------------------
+//  قراءة مفاتيح Supabase بنوعيها:
+//  الجديدة (sb_publishable_… / sb_secret_…) موجودة في متغيّري البيئة على شكل JSON
+//  باسم "default"، والقديمة (anon / service_role) ما زالت موجودة كسلاسل JWT.
+//  هذه الدوال تعمل مع الحالتين تلقائياً.
+// ---------------------------------------------------------------------------
+function readKeyEnv(jsonEnv: string, plainEnv: string): string {
+  const raw = Deno.env.get(jsonEnv);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      const first = parsed["default"] ?? Object.values(parsed)[0];
+      if (typeof first === "string" && first.length > 0) return first;
+    } catch (_) {
+      // ليس JSON — نتجاهله وننتقل للمفتاح القديم
+    }
+  }
+  return Deno.env.get(plainEnv) ?? "";
+}
+
+const PUBLIC_KEY = () => readKeyEnv("SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY");
+const SECRET_KEY = () => readKeyEnv("SUPABASE_SECRET_KEYS", "SUPABASE_SERVICE_ROLE_KEY");
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -35,7 +58,7 @@ Deno.serve(async (req) => {
     // 1) عميل المستخدم (لإنشاء الطلب باسمه والتحقق من هويته)
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
+      PUBLIC_KEY(),
       { global: { headers: { Authorization: authHeader } } },
     );
 
@@ -81,7 +104,7 @@ Deno.serve(async (req) => {
     // 4) ربط الجلسة بالطلب
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      SECRET_KEY(),
     );
     await adminClient.rpc("gateway_attach_session", {
       p_order_id: order.order_id,

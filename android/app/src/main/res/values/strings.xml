@@ -428,9 +428,9 @@
 
     <!-- First-run setup -->
     <string name="setup_title">Connect to Supabase</string>
-    <string name="setup_text">Paste your project URL and the public anon key. You can find them in Supabase → Project Settings → API.</string>
+    <string name="setup_text">Paste your Project URL and the public key (publishable sb_publishable_… or the legacy anon). Find both in Supabase → Settings → API Keys.</string>
     <string name="setup_url">Project URL</string>
-    <string name="setup_anon">Anon public key</string>
+    <string name="setup_anon">Public key (publishable / anon)</string>
     <string name="setup_connect">Connect</string>
     <string name="setup_error">Check the URL and the key</string>
     <string name="setup_hint">You only need to do this once.</string>
@@ -451,4 +451,5 @@
     <string name="creator_field_motivation">Why AddonStation?</string>
     <string name="creator_field_title">Title</string>
     <string name="creator_field_version">Version</string>
+    <string name="setup_secret_warning">That looks like a secret key (sb_secret_…). Never put it in the app — use the public key only.</string>
 </resources>

@@ -12,7 +12,7 @@
 ## ⚡ ابدأ من هنا (3 خطوات)
 
 1. **اقرأ الخطة:** [`docs/01-ROADMAP-AR.md`](docs/01-ROADMAP-AR.md) — المراحل وما تم وما تبقى.
-2. **أنشئ قاعدة البيانات:** [`docs/02-SUPABASE-SETUP-AR.md`](docs/02-SUPABASE-SETUP-AR.md) — من إنشاء الحساب حتى تشغيل أول رسالة في الشات.
+2. **أنشئ قاعدة البيانات:** [`docs/02-SUPABASE-SETUP-AR.md`](docs/02-SUPABASE-SETUP-AR.md) — من التسجيل في Supabase حتى تشغيل أول رسالة في الشات (خطوة بخطوة بالتفصيل).
 3. **افهم الدفع:** [`docs/03-PAYMENTS-AR.md`](docs/03-PAYMENTS-AR.md) — التحويل اليدوي + الإيصالات الآن، وبوابة الدفع الإلكتروني عندما تجهز.
 
 > ⛔ **لا يتم بناء أي APK حتى تطلب ذلك صراحةً** — أنت أوقفت البناء بنفسك حتى تكتمل الميزات.
@@ -24,7 +24,7 @@
 ```
 docs/specs/      الوثائق الثلاث الملزمة (كما هي حرفياً)
 docs/            خطة العمل + دليل Supabase + دليل الدفع + بنية المشروع
-supabase/        9 ملفات SQL + دوال Stripe (Edge Functions)
+supabase/        10 ملفات SQL (منها 00_ALL_IN_ONE.sql) + دوال Stripe (Edge Functions)
 android/         مشروع أندرويد: Gradle، Manifest، 8 لغات، خط البكسل، أيقونات
 seed-assets/     105 أداة شات + 181 ملصقاً من مشروعك الأصلي (جاهزة للرفع)
 reference/       كود مشروعك القديم (43 ملف SQL + قوائم الأدوات والملصقات) — للمراجعة فقط
@@ -51,6 +51,8 @@ python3 tools/check_i18n.py        # 🟢 كل اللغات مكتملة ومت�
 python3 tools/check_kotlin_refs.py # ✓ كل مراجع R.string والمستودعات والأيقونات سليمة
 python3 tools/check_calls.py       # ✓ كل نداءات دوال Compose تطابق تعريفاتها
 python3 tools/check_symbols.py     # ✓ لا مراجع إلى أصناف/دوال غير موجودة
+python3 tools/build_all_in_one_sql.py    # يبني supabase/00_ALL_IN_ONE.sql
+python3 tools/upload_seed_assets.py --url ... --key sb_secret_...   # رفع 287 أصلاً
 ```
 
 ## الأمان (مُلخّص)

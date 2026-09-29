@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+يبني ملفاً واحداً جامعاً `supabase/00_ALL_IN_ONE.sql` من ملفات SQL المرقّمة،
+حتى يستطيع المستخدم نسخه مرة واحدة ولصقه في Supabase SQL Editor بدل سبع مرات.
+
+الترتيب ملزم: 01 → 02 → 03 → 04 → 05 → 06 → 07 → 10
+(08 إعداد الأدمن يُنفَّذ يدوياً بعد إنشاء الحساب، و09 بوابات الدفع اختياري.)
+
+الاستخدام: python3 tools/build_all_in_one_sql.py
+"""
+import io
+import os
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SUPABASE = os.path.join(ROOT, "supabase")
+ORDER = [
+    "01_schema.sql",
+    "02_functions_core.sql",
+    "03_functions_chat.sql",
+    "04_rls.sql",
+    "05_storage.sql",
+    "06_seed.sql",
+    "07_seed_assets.sql",
+    "10_realtime.sql",
+]
+
+HEADER = """-- ============================================================================
+--  AddonStation Mobile — ملف التجهيز الشامل (All-in-One)
+--  يولّده tools/build_all_in_one_sql.py — لا تعدّله يدوياً، عدّل ملفات المصدر.
+--
+--  الطريقة الأسرع: انسخ هذا الملف كاملاً والصقه في Supabase → SQL Editor → Run.
+--  إن ظهر خطأ في أي سطر، نفّذ الملفات الأصلية واحداً واحداً بنفس الترتيب:
+--      01_schema → 02_functions_core → 03_functions_chat → 04_rls
+--      → 05_storage → 06_seed → 07_seed_assets → 10_realtime
+--  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
+--  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
+--
+--  كل الملفات آمنة لإعادة التنفيذ (idempotent).
+-- ============================================================================
+
+"""
+
+
+def main() -> int:
+    parts = [HEADER]
+    for name in ORDER:
+        path = os.path.join(SUPABASE, name)
+        if not os.path.exists(path):
+            print(f"✗ الملف مفقود: {name}")
+            return 1
+        body = io.open(path, encoding="utf-8").read().rstrip() + "\n"
+        parts.append("\n\n-- ############################################################################\n")
+        parts.append(f"-- ##  القسم: {name}\n")
+        parts.append("-- ############################################################################\n\n")
+        parts.append(body)
+    out_path = os.path.join(SUPABASE, "00_ALL_IN_ONE.sql")
+    io.open(out_path, "w", encoding="utf-8").write("".join(parts))
+    size = os.path.getsize(out_path)
+    lines = io.open(out_path, encoding="utf-8").read().count("\n")
+    print(f"✓ {out_path}  ({lines} سطراً، {size // 1024} KB)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

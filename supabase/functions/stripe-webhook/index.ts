@@ -10,6 +10,29 @@
 import Stripe from "npm:stripe@16";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+// ---------------------------------------------------------------------------
+//  قراءة مفاتيح Supabase بنوعيها:
+//  الجديدة (sb_publishable_… / sb_secret_…) موجودة في متغيّري البيئة على شكل JSON
+//  باسم "default"، والقديمة (anon / service_role) ما زالت موجودة كسلاسل JWT.
+//  هذه الدوال تعمل مع الحالتين تلقائياً.
+// ---------------------------------------------------------------------------
+function readKeyEnv(jsonEnv: string, plainEnv: string): string {
+  const raw = Deno.env.get(jsonEnv);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      const first = parsed["default"] ?? Object.values(parsed)[0];
+      if (typeof first === "string" && first.length > 0) return first;
+    } catch (_) {
+      // ليس JSON — نتجاهله وننتقل للمفتاح القديم
+    }
+  }
+  return Deno.env.get(plainEnv) ?? "";
+}
+
+const PUBLIC_KEY = () => readKeyEnv("SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY");
+const SECRET_KEY = () => readKeyEnv("SUPABASE_SECRET_KEYS", "SUPABASE_SERVICE_ROLE_KEY");
+
 Deno.serve(async (req) => {
   const signature = req.headers.get("stripe-signature");
   const body = await req.text();
@@ -37,7 +60,7 @@ Deno.serve(async (req) => {
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      SECRET_KEY(),
     );
 
     const { data, error } = await admin.rpc("gateway_confirm_order", {

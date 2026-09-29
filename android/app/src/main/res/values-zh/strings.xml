@@ -412,9 +412,9 @@
     <string name="admin_no_permission">你没有执行此操作的权限</string>
 
     <string name="setup_title">连接 Supabase</string>
-    <string name="setup_text">粘贴项目 URL 和公开的 anon 密钥。可在 Supabase → 项目设置 → API 中找到。</string>
+    <string name="setup_text">粘贴项目 URL 和公钥（新的 publishable sb_publishable_… 或旧版 anon）。位置：Supabase → Settings → API Keys。</string>
     <string name="setup_url">项目 URL</string>
-    <string name="setup_anon">公开 anon 密钥</string>
+    <string name="setup_anon">公钥（publishable / anon）</string>
     <string name="setup_connect">连接</string>
     <string name="setup_error">请检查 URL 和密钥</string>
     <string name="setup_hint">只需执行一次。</string>
@@ -435,4 +435,5 @@
     <string name="creator_field_motivation">为什么选择 AddonStation？</string>
     <string name="creator_field_title">标题</string>
     <string name="creator_field_version">版本</string>
+    <string name="setup_secret_warning">这看起来是私钥（sb_secret_…）。绝对不要放进应用——只用公钥。</string>
 </resources>

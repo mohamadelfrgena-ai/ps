@@ -315,6 +315,7 @@ class SupabaseClient(
 
     // ------------------------------------------------------------------ HTTP
 
+    /** @param token توكن المستخدم (JWT) فقط — لا تُمرّر مفاتيح المشروع هنا. null = طلب عام بهوية anon. */
     private suspend fun exec(
         method: String,
         url: String,
@@ -325,8 +326,12 @@ class SupabaseClient(
     ): String {
         val cfg = config()
         val builder = Request.Builder().url(url)
+        // المفتاح العام يمرّ في ترويسة apikey فقط.
+        // ملاحظة مهمة (تحديث Supabase 2025/2026): المفاتيح الجديدة sb_publishable_... / sb_secret_...
+        // ليست JWT، ولا يجوز وضعها في Authorization — بل يُترك فارغاً ما لم يوجد توكن مستخدم.
         builder.header("apikey", cfg.anonKey)
-        builder.header("Authorization", "Bearer ${token ?: cfg.anonKey}")
+        val bearer = token?.takeIf { it.isNotBlank() }
+        if (bearer != null) builder.header("Authorization", "Bearer $bearer")
         builder.header("Accept", "application/json")
         body?.contentType()?.let { builder.header("Content-Type", it.toString()) }
         extra.forEach { (k, v) -> builder.header(k, v) }

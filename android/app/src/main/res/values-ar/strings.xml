@@ -412,9 +412,9 @@
     <string name="admin_no_permission">لا تملك صلاحية هذا الإجراء</string>
 
     <string name="setup_title">الاتصال بـ Supabase</string>
-    <string name="setup_text">الصق رابط المشروع والمفتاح العام (anon). تجدهما في Supabase ← إعدادات المشروع ← API.</string>
+    <string name="setup_text">الصق رابط المشروع والمفتاح العام (publishable يبدأ بـ sb_publishable_… أو anon القديم). تجدهما في Supabase ← Settings ← API Keys.</string>
     <string name="setup_url">رابط المشروع (Project URL)</string>
-    <string name="setup_anon">المفتاح العام (anon key)</string>
+    <string name="setup_anon">المفتاح العام (publishable / anon)</string>
     <string name="setup_connect">اتصال</string>
     <string name="setup_error">تحقق من الرابط والمفتاح</string>
     <string name="setup_hint">تحتاج فعل هذا مرة واحدة فقط.</string>
@@ -435,4 +435,5 @@
     <string name="creator_field_motivation">لماذا AddonStation؟</string>
     <string name="creator_field_title">العنوان</string>
     <string name="creator_field_version">الإصدار</string>
+    <string name="setup_secret_warning">هذا يبدو مفتاحاً سرياً (sb_secret_…). لا تضعه في التطبيق أبداً — استخدم المفتاح العام فقط.</string>
 </resources>

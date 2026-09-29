@@ -412,9 +412,9 @@
     <string name="admin_no_permission">У вас нет прав на это действие</string>
 
     <string name="setup_title">Подключение к Supabase</string>
-    <string name="setup_text">Вставьте URL проекта и публичный anon-ключ. Их можно найти в Supabase → Настройки проекта → API.</string>
+    <string name="setup_text">Вставь URL проекта и публичный ключ (publishable sb_publishable_… или старый anon). Они в Supabase → Settings → API Keys.</string>
     <string name="setup_url">URL проекта</string>
-    <string name="setup_anon">Публичный anon-ключ</string>
+    <string name="setup_anon">Публичный ключ (publishable / anon)</string>
     <string name="setup_connect">Подключить</string>
     <string name="setup_error">Проверьте URL и ключ</string>
     <string name="setup_hint">Это нужно сделать только один раз.</string>
@@ -435,4 +435,5 @@
     <string name="creator_field_motivation">Почему AddonStation?</string>
     <string name="creator_field_title">Название</string>
     <string name="creator_field_version">Версия</string>
+    <string name="setup_secret_warning">Похоже на секретный ключ (sb_secret_…). Никогда не вставляй его в приложение — только публичный ключ.</string>
 </resources>
