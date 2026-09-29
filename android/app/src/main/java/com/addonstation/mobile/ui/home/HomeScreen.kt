@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -61,8 +62,8 @@ import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.components.PromoCard
 import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.components.SectionHeader
-import com.addonstation.mobile.ui.metaOf
-import com.addonstation.mobile.ui.planLabelOf
+import com.addonstation.mobile.ui.common.metaOf
+import com.addonstation.mobile.ui.common.planLabelOf
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
@@ -491,7 +492,7 @@ private fun CreatorMiniCard(card: CreatorCard, onClick: () -> Unit) {
     val container = rememberContainer()
     Column(
         modifier = Modifier
-            .size(width = 150.dp)
+            .width(150.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(AppColors.Surface)
             .border(1.dp, AppColors.Border, RoundedCornerShape(16.dp))

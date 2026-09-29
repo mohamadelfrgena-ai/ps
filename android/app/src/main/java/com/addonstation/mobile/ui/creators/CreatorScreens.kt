@@ -61,8 +61,8 @@ import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.components.SectionHeader
 import com.addonstation.mobile.ui.components.StatTile
 import com.addonstation.mobile.ui.components.SubScreenHeader
-import com.addonstation.mobile.ui.metaOf
-import com.addonstation.mobile.ui.planLabelOf
+import com.addonstation.mobile.ui.common.metaOf
+import com.addonstation.mobile.ui.common.planLabelOf
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText

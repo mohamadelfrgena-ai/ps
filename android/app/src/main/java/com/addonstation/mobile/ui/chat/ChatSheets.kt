@@ -534,10 +534,11 @@ fun DiscordProfileCardSheet(
 ) {
     val container = rememberContainer()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var friendState by remember { mutableStateOf("none") }
+    var friendEntry by remember { mutableStateOf<com.addonstation.mobile.data.model.FriendEntry?>(null) }
+    val friendState = friendEntry?.status ?: "none"
 
     androidx.compose.runtime.LaunchedEffect(profile.id) {
-        friendState = container.profile.friendshipState(profile.id)
+        friendEntry = container.profile.friendshipState(profile.id)
     }
 
     ModalBottomSheet(

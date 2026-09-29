@@ -136,7 +136,7 @@ fun SplashScreen(onFinished: () -> Unit) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .offset(y = (1f - brand.value) * 20f)
+                    .offset(y = ((1f - brand.value) * 20f).dp)
                     .alpha(brand.value),
             ) {
                 Text(
@@ -176,7 +176,7 @@ private fun SplashLine(text: String, progress: Float) {
             ),
         ),
         modifier = Modifier
-            .offset(x = (1f - progress) * -60f)
+            .offset(x = ((1f - progress) * -60f).dp)
             .alpha(progress),
     )
 }

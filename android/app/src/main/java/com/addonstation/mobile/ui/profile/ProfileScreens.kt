@@ -66,8 +66,8 @@ import com.addonstation.mobile.ui.components.RowItem
 import com.addonstation.mobile.ui.components.SectionHeader
 import com.addonstation.mobile.ui.components.SubScreenHeader
 import com.addonstation.mobile.ui.components.ThinProgress
-import com.addonstation.mobile.ui.metaOf
-import com.addonstation.mobile.ui.planLabelOf
+import com.addonstation.mobile.ui.common.metaOf
+import com.addonstation.mobile.ui.common.planLabelOf
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
@@ -658,13 +658,14 @@ fun UserProfileScreen(
     var profile by remember { mutableStateOf<Profile?>(null) }
     var items by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var card by remember { mutableStateOf<com.addonstation.mobile.data.model.CreatorCard?>(null) }
-    var friendState by remember { mutableStateOf("none") }
+    var friendEntry by remember { mutableStateOf<com.addonstation.mobile.data.model.FriendEntry?>(null) }
+    val friendState = friendEntry?.status ?: "none"
 
     LaunchedEffect(userId) {
         profile = container.profile.loadProfile(userId)
         items = container.content.byCreator(userId, 20)
         card = container.creators.creatorStats(userId)
-        friendState = container.profile.friendshipState(userId)
+        friendEntry = container.profile.friendshipState(userId)
     }
 
     Column(Modifier.fillMaxSize()) {

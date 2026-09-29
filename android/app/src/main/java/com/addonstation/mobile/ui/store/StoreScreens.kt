@@ -67,8 +67,8 @@ import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.components.SectionHeader
 import com.addonstation.mobile.ui.components.SubScreenHeader
-import com.addonstation.mobile.ui.metaOf
-import com.addonstation.mobile.ui.planLabelOf
+import com.addonstation.mobile.ui.common.metaOf
+import com.addonstation.mobile.ui.common.planLabelOf
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
@@ -146,13 +146,13 @@ fun StoreScreen(
             }
 
             Spacer(Modifier.height(10.dp))
+            val sorts = listOf(
+                "newest" to stringResource(R.string.store_sort_newest),
+                "downloads" to stringResource(R.string.store_sort_downloads),
+                "views" to stringResource(R.string.store_sort_views),
+                "rating" to stringResource(R.string.store_sort_rating),
+            )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val sorts = listOf(
-                    "newest" to stringResource(R.string.store_sort_newest),
-                    "downloads" to stringResource(R.string.store_sort_downloads),
-                    "views" to stringResource(R.string.store_sort_views),
-                    "rating" to stringResource(R.string.store_sort_rating),
-                )
                 items(sorts) { (key, label) ->
                     FilterChip(label = label, selected = sort == key, onClick = { sort = key })
                 }
@@ -365,7 +365,7 @@ fun ContentDetailScreen(
                             scope.launch {
                                 busy = true
                                 message = texts.downloading
-                                runCatching { container.content.download(context, current) }
+                                container.content.download(context, current)
                                     .onSuccess {
                                         message = "${texts.downloading} → ${it.file.absolutePath}"
                                         unlocked = true

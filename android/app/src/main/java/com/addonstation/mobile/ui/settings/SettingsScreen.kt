@@ -1,6 +1,7 @@
 package com.addonstation.mobile.ui.settings
 
 import android.app.Activity
+import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
