@@ -68,6 +68,13 @@ jobs:
           echo "ADDONSTATION_SUPABASE_URL=${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}" >> local.properties
           echo "ADDONSTATION_SUPABASE_ANON_KEY=${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}" >> local.properties
 
+      - name: فحص الموارد res/ قبل البناء
+        run: |
+          python3 tools/check_resources.py || {
+            echo "::error::مشاكل في مجلد res/ — أصلحها أولاً (التفاصيل في السجل أعلاه)"
+            exit 1
+          }
+
       - name: Build debug APK
         working-directory: android
         run: |
