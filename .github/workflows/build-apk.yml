@@ -1,23 +1,43 @@
-# بناء APK تلقائياً على GitHub — شغّله يدوياً من تبويب Actions
-# (لا يحتاج أي جهاز محلي، ويقرأ مفاتيح Supabase من Secrets إن وُجدت)
+# سير عمل واحد بمهمّتين — من تبويب Actions → Build APK → Run workflow
 #
-# ملاحظات الإصلاح (2026-09-29):
-#   • غلاف Gradle أصبح مرفقاً في المودع (android/gradlew + gradle/wrapper) →
-#     لا حاجة لتنصيب Gradle ولا لتشغيل `gradle wrapper` بعد الآن.
-#   • تم تحديث إصدار إجراء Android SDK من v3 إلى v4 (v3 لم يعد يعمل على
-#     صور التشغيل الحالية — كان السبب في فشل كل البناءات السابقة).
+#   1) task = apk            → يبني ملف APK (يُرفع كمُخرَج قابل للتنزيل)
+#   2) task = assets-dry-run → تجربة رفع أصول site-assets بلا رفع فعلي
+#   3) task = assets-upload  → رفع 311 ملفاً (أدوات + ملصقات + أفاتارات) فعلياً
+#
+# الإعداد مرة واحدة لمهمّة الرفع (Settings → Secrets and variables → Actions):
+#   ADDONSTATION_SUPABASE_URL         = https://xxxx.supabase.co
+#   ADDONSTATION_SUPABASE_SECRET_KEY  = sb_secret_…        (يبقى هنا فقط ولا يدخل التطبيق أبداً)
+#
+# ملاحظات إصلاح (2026-09-29):
+#   • تحديث إجراء Android SDK من v3 إلى v4 (v3 كان يوقف كل البناءات عند ثانية 25).
+#   • غلاف Gradle أصبح مرفقاً في المودع → لا حاجة لتنصيب Gradle.
+#   • عند فشل البناء تُطبع أبرز الأخطاء كـ«ملاحظات» (Annotations) لقراءتها من الواجهة.
 
 name: Build APK
 
 on:
   workflow_dispatch:
+    inputs:
+      task:
+        description: "المهمّة: apk (بناء التطبيق) · assets-dry-run (تجربة رفع) · assets-upload (رفع فعلي)"
+        required: true
+        default: apk
+        type: choice
+        options:
+          - apk
+          - assets-dry-run
+          - assets-upload
   push:
     branches: [ main, arena/01a0e97c-ps ]
   pull_request:
     branches: [ main ]
 
 jobs:
+  # ==========================================================================
+  # 1) بناء التطبيق (debug APK)
+  # ==========================================================================
   build-debug-apk:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.task == 'apk' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,11 +70,94 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          set +e
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            echo "================= ملخّص الخطأ ================="
+            grep -n -E "^e: |error: |What went wrong|> Task .* FAILED|Execution failed|Could not (resolve|find|determine)" build.log \
+              | head -25 | while IFS= read -r line; do
+                echo "::error::$line"
+              done
+            exit "$code"
+          fi
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: android/build.log
+          if-no-files-found: ignore
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: addonstation-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+  # ==========================================================================
+  # 2) رفع أصول site-assets (311 ملفاً) — يدوياً فقط
+  # ==========================================================================
+  upload-assets:
+    if: ${{ github.event_name == 'workflow_dispatch' && startsWith(inputs.task, 'assets-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: التحقق من السرّين
+        env:
+          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          S_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          if [ -z "$S_URL" ] || [ -z "$S_KEY" ]; then
+            echo "::error::السرّان غير مضبوطين — أضف ADDONSTATION_SUPABASE_URL و ADDONSTATION_SUPABASE_SECRET_KEY من Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          echo "✓ السرّان موجودان (الرابط: $S_URL · طول المفتاح: ${#S_KEY} حرفاً)"
+          case "$S_KEY" in
+            sb_secret_*|eyJ*) echo "✓ شكل المفتاح مقبول" ;;
+            *) echo "::warning::المفتاح لا يبدأ بـ sb_secret_ ولا يشبه JWT — تأكد أنه المفتاح السري" ;;
+          esac
+
+      - name: عدّ الملفات المحلية
+        run: |
+          echo "items   : $(find seed-assets/items    -type f | wc -l)"
+          echo "stickers: $(find seed-assets/stickers -type f | wc -l)"
+          echo "profiles: $(find seed-assets/profiles -type f | wc -l)"
+          echo "الإجمالي: $(find seed-assets -type f | wc -l) ملف"
+
+      - name: رفع الأصول
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          if [ "${{ inputs.task }}" = "assets-dry-run" ]; then
+            echo "▶ وضع التجربة (بلا رفع فعلي)"
+            python3 tools/upload_seed_assets.py --dry-run
+          else
+            echo "▶ الرفع الفعلي"
+            python3 tools/upload_seed_assets.py
+          fi
+
+      - name: تحقق بعد الرفع (رابط عام لثلاثة ملفات)
+        if: ${{ inputs.task == 'assets-upload' }}
+        env:
+          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+        run: |
+          for REL in items/apple.png profiles/onefree.png stickers/meme/sticker-001.webp; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "${S_URL%/}/storage/v1/object/public/site-assets/$REL")
+            echo "$REL → HTTP $CODE"
+            if [ "$CODE" != "200" ]; then
+              echo "::error::$REL لم يُقرأ (HTTP $CODE) — تأكد أن المخزن site-assets عام وأن 05_storage.sql نُفِّذ"
+              exit 1
+            fi
+          done
+          echo "✅ الأصول المرفوعة تعمل — ستظهر الصور في التطبيق"
