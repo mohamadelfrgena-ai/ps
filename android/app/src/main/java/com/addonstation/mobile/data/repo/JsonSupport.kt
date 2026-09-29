@@ -11,6 +11,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.serializer
 
@@ -56,7 +57,7 @@ fun JsonElement?.asOutcome(): RpcOutcome = this.toOutcome()
 
 /** يرمي خطأً عربياً مفهوماً إذا كانت الدالة أعادت ok=false. */
 fun RpcOutcome.orThrow(fallback: String? = null): RpcOutcome {
-    if (!ok) throw com.addonstation.mobile.data.ApiError.message(message ?: fallback)
+    if (!ok) throw com.addonstation.mobile.data.apiErrorFromMessage(message ?: fallback)
     return this
 }
 

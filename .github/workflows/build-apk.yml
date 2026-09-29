@@ -15,6 +15,9 @@
 
 name: Build APK
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -89,6 +92,24 @@ jobs:
               done
             exit "$code"
           fi
+
+      - name: نشر قائمة الأخطاء كتعليق على العمولة
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LOG=android/build.log
+          [ -f "$LOG" ] || exit 0
+          {
+            echo "### ❌ فشل بناء APK — قائمة الأخطاء"
+            echo ""
+            echo '```'
+            grep -n -E "^e: |^w: .*(deprecat|warning)|error: |What went wrong|> Task .* FAILED|Execution failed|Could not (resolve|find|determine)|Unresolved reference" "$LOG" \
+              | sed 's|file:///home/runner/work/ps/ps/||' | head -150
+            echo '```'
+          } > /tmp/body.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@/tmp/body.md >/dev/null \
+            && echo "✓ نُشرت قائمة الأخطاء كتعليق على العمولة" || echo "تعذّر نشر التعليق"
 
       - name: Upload build log
         if: always()

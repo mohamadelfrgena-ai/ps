@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package com.addonstation.mobile.ui.chat
 
 import android.net.Uri

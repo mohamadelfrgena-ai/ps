@@ -35,7 +35,7 @@ class ProfileRepository(
             supabase.select("profiles", "select=*&id=eq.$userId&limit=1")
         )
 
-    suspend fun loadProfiles(ids: List<String>): Map<String, Profile> {
+    suspend fun loadProfiles(ids: Collection<String>): Map<String, Profile> {
         if (ids.isEmpty()) return emptyMap()
         val list = ids.distinct().chunked(60).flatMap { chunk ->
             val filter = chunk.joinToString(",")

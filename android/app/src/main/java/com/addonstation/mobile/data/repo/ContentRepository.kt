@@ -233,7 +233,7 @@ class ContentRepository(
         val mine = rankOf(plan)
         val need = rankOf(item.plan)
         if (need <= mine) return if (item.plan == "free") AccessState.Free else AccessState.Unlocked
-        if (item.plan == "legendary") return AccessState.RequiresLegendary(item.acPrice)
+        if (item.plan == "legendary") return AccessState.RequiresLegendary
         if (item.plan == "epic") return AccessState.RequiresEpic
         return AccessState.RequiresPlan(item.plan)
     }
