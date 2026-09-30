@@ -741,14 +741,27 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var packId by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
+    var messageIsError by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@launch
-            val mime = context.contentResolver.getType(uri) ?: "image/png"
-            val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "asset.png"
+            messageIsError = false
+            message = "جارٍ تجهيز الصورة…"
+            // تصغير + إعادة ترميز: يمنع رفض المخزن للصور الكبيرة أو بصيغة HEIC
+            val prepared = com.addonstation.mobile.util.prepareImageForUpload(context, uri)
+            val bytes = prepared?.bytes
+                ?: runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+            if (bytes == null) {
+                messageIsError = true
+                message = "تعذّر قراءة الملف المختار"
+                return@launch
+            }
+            val mime = prepared?.mime ?: context.contentResolver.getType(uri) ?: "image/png"
+            val fileName = prepared?.fileName
+                ?: uri.lastPathSegment?.substringAfterLast('/') ?: "asset.png"
+            message = "جارٍ رفع الصورة… (${bytes.size / 1024} KB)"
             container.assets.create(
                 assetType = type,
                 name = name.ifBlank { fileName },
@@ -758,9 +771,13 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
                 fileName = fileName,
                 packId = packId.takeIf { it.isNotBlank() },
             ).onSuccess {
-                message = "✓ $fileName"
+                messageIsError = false
+                message = "✓ رُفعت $fileName (${bytes.size / 1024} KB)"
                 assets = container.assets.all()
-            }.onFailure { message = it.message }
+            }.onFailure {
+                messageIsError = true
+                message = "فشل الرفع: ${it.message ?: it::class.simpleName}"
+            }
         }
     }
 
@@ -815,7 +832,11 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
             )
             message?.let {
                 Spacer(Modifier.height(8.dp))
-                Text(it, style = AppText.tiny, color = AppColors.Green)
+                Text(
+                    it,
+                    style = AppText.tiny,
+                    color = if (messageIsError) AppColors.Red else AppColors.Green,
+                )
             }
             SectionHeader(title = stringResource(R.string.admin_assets), leadingEmoji = "🖼")
             if (loading) {

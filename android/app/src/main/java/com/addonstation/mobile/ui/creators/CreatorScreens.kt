@@ -503,11 +503,15 @@ fun CreatorStudioScreen(
     val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@launch
-            val mime = context.contentResolver.getType(uri) ?: "image/png"
-            container.creators.uploadCreatorFile(bytes, mime, "cover-${System.currentTimeMillis()}.png", "cover")
+            message = null
+            val prepared = com.addonstation.mobile.util.prepareImageForUpload(context, uri)
+            val bytes = prepared?.bytes
+                ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@launch
+            val mime = prepared?.mime ?: context.contentResolver.getType(uri) ?: "image/png"
+            val fileName = prepared?.fileName ?: "cover-${System.currentTimeMillis()}.jpg"
+            container.creators.uploadCreatorFile(bytes, mime, fileName, "cover")
                 .onSuccess { coverPath = it }
-                .onFailure { message = it.message }
+                .onFailure { message = "فشل رفع الغلاف: ${it.message ?: it::class.simpleName}" }
         }
     }
 

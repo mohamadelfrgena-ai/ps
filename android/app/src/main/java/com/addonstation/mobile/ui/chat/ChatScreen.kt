@@ -146,13 +146,14 @@ fun ChatScreen(
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            val prepared = com.addonstation.mobile.util.prepareImageForUpload(context, uri, maxSide = 1080)
+            val bytes = prepared?.bytes ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             if (bytes == null) {
                 statusMessage = failedMsg
                 return@launch
             }
-            val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
-            val name = "chat-${System.currentTimeMillis()}.jpg"
+            val mime = prepared?.mime ?: context.contentResolver.getType(uri) ?: "image/jpeg"
+            val name = prepared?.fileName ?: "chat-${System.currentTimeMillis()}.jpg"
             container.chat.uploadImage(bytes, mime, name)
                 .onSuccess { path -> attachment = path to "image" }
                 .onFailure { statusMessage = imageFormatsMsg }

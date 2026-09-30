@@ -231,9 +231,13 @@ fun CheckoutScreen(
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        receiptBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        receiptMime = context.contentResolver.getType(uri) ?: "image/png"
-        receiptName = "receipt-${System.currentTimeMillis()}.png"
+        scope.launch {
+            val prepared = com.addonstation.mobile.util.prepareImageForUpload(context, uri, maxSide = 1600)
+            receiptBytes = prepared?.bytes
+                ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            receiptMime = prepared?.mime ?: context.contentResolver.getType(uri) ?: "image/png"
+            receiptName = prepared?.fileName ?: "receipt-${System.currentTimeMillis()}.jpg"
+        }
     }
 
     Column(Modifier.fillMaxSize()) {

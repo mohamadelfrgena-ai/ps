@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -54,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.Profile
@@ -252,6 +254,19 @@ fun PlanChip(plan: String, modifier: Modifier = Modifier) {
 
 /* ================================ الصور ================================ */
 
+/** بديل الأفاتار: يظهر عند غياب الرابط أو فشل تحميل الصورة. */
+@Composable
+private fun AvatarFallback(size: Dp) {
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        Icon(
+            imageVector = Icons.Filled.Person,
+            contentDescription = null,
+            tint = AppColors.Muted,
+            modifier = Modifier.size(size * 0.55f),
+        )
+    }
+}
+
 /** صورة رمزية دائرية مع نقطة حالة اختيارية. */
 @Composable
 fun AvatarImage(
@@ -272,7 +287,7 @@ fun AvatarImage(
                 .border(borderWidth, borderColor, shape),
         ) {
             if (!url.isNullOrBlank()) {
-                AsyncImage(
+                SubcomposeAsyncImage(
                     model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
                         .data(url)
                         .crossfade(true)
@@ -280,16 +295,11 @@ fun AvatarImage(
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(size).clip(shape),
+                    loading = { },
+                    error = { AvatarFallback(size) },
                 )
             } else {
-                Icon(
-                    imageVector = Icons.Filled.Person,
-                    contentDescription = null,
-                    tint = AppColors.Muted,
-                    modifier = Modifier
-                        .size(size * 0.55f)
-                        .align(Alignment.Center),
-                )
+                AvatarFallback(size)
             }
         }
         if (online != null) {
@@ -318,11 +328,22 @@ fun CoverImage(
             .background(AppColors.Elevated2),
     ) {
         if (!url.isNullOrBlank()) {
-            AsyncImage(
+            SubcomposeAsyncImage(
                 model = url,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
+                loading = { },
+                error = {
+                    Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.BrokenImage,
+                            contentDescription = null,
+                            tint = AppColors.Muted,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                },
             )
         }
     }
