@@ -56,7 +56,20 @@ update public.chat_channels set name = 'Support',             icon = null, categ
 update public.chat_channels set name = 'Social Media Makers', icon = null, category = 'main', sort_order = 5 where id = 'social-media-makers';
 
 -- ---------------------------------------------------------------------------
--- 3) أي غرفة لغة بمعرّف لم يُذكر أعلاه: توحيد التصنيف فقط
+-- 3) أي غرفة بمعرّف غير قياسي: يُعاد اسمها إلى لغتها بحسب ما هو مكتوب فيها
+--    (مثال: غرفة اسمها «Russian» أو «الروسية» → تصبح «Русский»)
+-- ---------------------------------------------------------------------------
+update public.chat_channels set name = 'العربية' where lower(name) in ('arabic', 'ar', 'arab', 'العربية') and id <> 'lang-ar';
+update public.chat_channels set name = 'English' where lower(name) in ('english', 'en')                       and id <> 'lang-en';
+update public.chat_channels set name = 'Español' where lower(name) in ('spanish', 'es', 'espanol', 'الإسبانية', 'الاسبانية') and id <> 'lang-es';
+update public.chat_channels set name = 'Français' where lower(name) in ('french', 'fr', 'francais', 'الفرنسية') and id <> 'lang-fr';
+update public.chat_channels set name = 'Português' where lower(name) in ('portuguese', 'pt', 'portugues', 'البرتغالية') and id <> 'lang-pt';
+update public.chat_channels set name = 'Русский' where lower(name) in ('russian', 'ru', 'الروسية')            and id <> 'lang-ru';
+update public.chat_channels set name = 'Türkçe' where lower(name) in ('turkish', 'tr', 'turkce', 'التركية')    and id <> 'lang-tr';
+update public.chat_channels set name = '中文' where lower(name) in ('chinese', 'zh', 'الصينية', '中文')          and id <> 'lang-zh';
+
+-- ---------------------------------------------------------------------------
+-- 3.1) أي غرفة لغة بمعرّف لم يُذكر أعلاه: توحيد التصنيف فقط
 -- ---------------------------------------------------------------------------
 update public.chat_channels set category = 'lang', icon = null where id like 'lang-%';
 

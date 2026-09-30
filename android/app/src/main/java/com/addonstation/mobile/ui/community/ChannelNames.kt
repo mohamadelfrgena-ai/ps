@@ -3,14 +3,18 @@ package com.addonstation.mobile.ui.community
 import com.addonstation.mobile.data.model.ChatChannel
 
 /**
- * أسماء غرف اللغات **بلغتها نفسها** — ثابتة داخل التطبيق لا تتغيّر مع لغة الواجهة
- * ولا يعتمد صحّتها على ما هو مخزّن في قاعدة البيانات:
+ * أسماء غرف اللغات **بلغتها نفسها** — العربية · Русский · Português · 中文 … إلخ.
  *
- *     العربية · Русский · Português · 中文 · English · Español · Français · Türkçe
+ * القاعدة: كل غرفة لغة يظهر اسمها بلغة أهلها، تماماً كعنوانٍ على باب الغرفة.
+ * والاسم يؤخذ من **أول مصدر متاح** بهذا الترتيب:
  *
- * السبب: غرفة اللغة مكانٌ لأهل تلك اللغة، فيجب أن يقرأ اسمها بلغته — كما لو كان
- * عنواناً على باب الغرفة. لذلك يُشتق الاسم من **معرّف الغرفة** (channel.id) لا من
- * عمود الاسم، فإن كانت القاعدة قديمة أو مُعدَّلة يظهر الاسم الصحيح دائماً.
+ *   1) معرّف الغرفة (`lang-ar` → «العربية») — لا يتأثر بأي تعديل في قاعدة البيانات.
+ *   2) اسم الغرفة المخزَّن إن طابق أحد أسماء اللغة المعروفة (بأي لغة كُتب، ومع/بلا إيموجي):
+ *      «Russian» أو «الروسية» أو «Русский» → «Русский» · «English» أو «الإنجليزية» → «English».
+ *   3) وإلا يُعرض الاسم المخزَّن بعد تنظيفه من الإيموجي والرموز — فلا تختفي أي غرفة.
+ *
+ * النتيجة: لو كانت قاعدتك تحمل أسماء إنجليزية أو عربية لغرف اللغات، أو أسماء قديمة
+ * بأعلام وإيموجي، يظهر في التطبيق الاسم الصحيح بلغة الغرفة فوراً.
  */
 private val LANGUAGE_ROOM_NAMES: Map<String, String> = mapOf(
     "lang-ar" to "العربية",
@@ -23,7 +27,22 @@ private val LANGUAGE_ROOM_NAMES: Map<String, String> = mapOf(
     "lang-zh" to "中文",
 )
 
-/** وصف مختصر لكل غرفة لغة بلغتها (يظهر تحت الاسم عند الحاجة). */
+/** أسماء اللغة كما قد ترد في قاعدة البيانات (بأي لغة) → الاسم المعروض بلغتها. */
+private val LANGUAGE_NAME_ALIASES: Map<String, String> = buildMap {
+    fun register(native: String, vararg aliases: String) {
+        aliases.forEach { put(normalizeName(it), native) }
+    }
+    register("العربية", "العربية", "عربي", "الغرفه العربيه", "الغرفة العربية", "arabic", "arab", "ar")
+    register("English", "english", "الإنجليزية", "الانجليزية", "الأنجليزية", "انجليزي", "إنجليزي", "en")
+    register("Español", "español", "espanol", "Spanish", "spanish", "الإسبانية", "الاسبانية", "الأسبانية", "es")
+    register("Français", "français", "francais", "French", "french", "الفرنسية", "الفرنسيه", "fr")
+    register("Português", "português", "portugues", "Portuguese", "portuguese", "البرتغالية", "البرتغاليه", "pt")
+    register("Русский", "русский", "Russian", "russian", "الروسية", "الروسيه", "ru")
+    register("Türkçe", "türkçe", "turkce", "Turkish", "turkish", "التركية", "التركيه", "tr")
+    register("中文", "中文", "简体中文", "chinese", "الصينية", "الصينيه", "zh")
+}
+
+/** أوصاف غرف اللغات بلغتها. */
 private val LANGUAGE_ROOM_DESCRIPTIONS: Map<String, String> = mapOf(
     "lang-ar" to "غرفة الدردشة العربية",
     "lang-en" to "English chat room",
@@ -35,17 +54,32 @@ private val LANGUAGE_ROOM_DESCRIPTIONS: Map<String, String> = mapOf(
     "lang-zh" to "中文聊天室",
 )
 
-/** اسم الغرفة للعرض: غرف اللغات باسمها بلغتها، وغيرها بالاسم المخزَّن كما هو. */
+/** تبسيط للمقارنة: حروف وأرقام فقط (تُزيل الإيموجي والأعلام والمسافات وعلامات التشكيل الشكلية). */
+private fun normalizeName(text: String): String =
+    text.lowercase().filter { it.isLetterOrDigit() }
+
+/** يُزيل الإيموجي والرموز من طرفي الاسم (مثل «🇷🇺 Русский» → «Русский»). */
+private fun cleanStoredName(text: String): String {
+    val trimmed = text.trim().trim { !it.isLetterOrDigit() }
+    return trimmed.ifBlank { text.trim() }
+}
+
+/** الاسم الأصلي لغرفة لغة إن عُرفت من معرّفها أو من اسمها المخزَّن. */
+fun languageRoomNativeName(id: String, storedName: String): String? =
+    LANGUAGE_ROOM_NAMES[id] ?: LANGUAGE_NAME_ALIASES[normalizeName(storedName)]
+
+/** هل هذه غرفة لغة؟ (معرّفها يبدأ بـ lang- أو اسمها اسم لغة معروف) */
+fun isLanguageRoom(id: String, storedName: String = ""): Boolean =
+    id.startsWith("lang-") || LANGUAGE_NAME_ALIASES.containsKey(normalizeName(storedName))
+
+/** اسم الغرفة للعرض: غرف اللغات باسمها بلغتها، وغيرها بالاسم المخزَّن منظَّفاً. */
+fun channelDisplayName(id: String, storedName: String): String =
+    languageRoomNativeName(id, storedName) ?: cleanStoredName(storedName)
+
 fun channelDisplayName(channel: ChatChannel): String =
     channelDisplayName(channel.id, channel.name)
 
-/** اسم الغرفة من المعرّف مباشرة (للشاشات التي لا تحمل كائن الغرفة كاملاً). */
-fun channelDisplayName(id: String, storedName: String): String =
-    LANGUAGE_ROOM_NAMES[id] ?: storedName
-
 /** وصف الغرفة للعرض: غرف اللغات بوصفها بلغتها، وغيرها بالمخزَّن. */
 fun channelDisplayDescription(channel: ChatChannel): String? =
-    LANGUAGE_ROOM_DESCRIPTIONS[channel.id] ?: channel.description
-
-/** هل هذه غرفة لغة؟ (تُستخدم لتمييز القسم في القوائم) */
-fun isLanguageRoom(id: String): Boolean = id.startsWith("lang-")
+    LANGUAGE_ROOM_DESCRIPTIONS[channel.id]
+        ?: channel.description?.let { cleanStoredName(it) }
