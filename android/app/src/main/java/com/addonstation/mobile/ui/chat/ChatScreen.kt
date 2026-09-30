@@ -894,7 +894,12 @@ private fun MessageBlock(
                 Box(
                     modifier = Modifier
                         .padding(start = 48.dp, top = 4.dp)
-                        .size(150.dp)
+                        // حجم الملصق يتبع عرض شاشة الهاتف (لا يفيض على الشاشات الضيقة)
+                        .size(
+                            com.addonstation.mobile.ui.theme.screenWidthFraction(
+                                fraction = 0.38f, minDp = 108, maxDp = 180,
+                            ),
+                        )
                         .clickable { message.stickerUrl?.let(onOpenImage) },
                 ) {
                     com.addonstation.mobile.ui.components.CoverImage(url = url, radius = 12.dp, modifier = Modifier.fillMaxSize())

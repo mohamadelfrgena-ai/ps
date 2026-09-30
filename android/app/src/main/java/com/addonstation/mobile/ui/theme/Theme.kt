@@ -67,12 +67,16 @@ fun AddonStationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkScheme else LightScheme,
-        typography = AppTypography,
-        shapes = AppShapes,
-        content = content,
-    )
+    // كل شاشات التطبيق تمرّ من هنا، فتُضبط المقاسات على مقاس شاشة الهاتف مرة واحدة:
+    // الأحجام والخطوط والمسافات كلها بنسبة واحدة (انظر Sizing.kt).
+    ProvideAppSizing {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkScheme else LightScheme,
+            typography = AppTypography,
+            shapes = AppShapes,
+            content = content,
+        )
+    }
 }
 
 /**

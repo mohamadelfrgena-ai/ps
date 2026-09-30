@@ -179,7 +179,11 @@ fun InfoDialog(title: String, text: String, onClose: () -> Unit) {
         text = {
             Column(
                 modifier = Modifier
-                    .heightIn(max = 430.dp)
+                    .heightIn(
+                        max = com.addonstation.mobile.ui.theme.screenHeightFraction(
+                            fraction = 0.62f, minDp = 280, maxDp = 520,
+                        ),
+                    )
                     .verticalScroll(rememberScrollState()),
             ) {
                 Text(text, style = AppText.bodySmall)

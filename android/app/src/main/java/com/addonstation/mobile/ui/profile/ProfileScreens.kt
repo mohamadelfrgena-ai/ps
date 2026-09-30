@@ -50,6 +50,8 @@ import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.ContentItem
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.ui.assetUrl
+import com.addonstation.mobile.ui.theme.adaptiveColumns
+import com.addonstation.mobile.ui.theme.appScreenWidthDp
 import com.addonstation.mobile.ui.equippedItemUrl
 import com.addonstation.mobile.ui.groupAssetsByCollection
 import com.addonstation.mobile.ui.components.AvatarImage
@@ -590,6 +592,15 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
             } else {
                 val sections = groupAssetsByCollection(assets)
+                // عدد الأعمدة يتبع عرض شاشة الهاتف: 4 على الضيّق · 5 على المعتاد · 6 على الكبير،
+                // وارتفاع الخلية يُحسب من عرض الخلية نفسه (أيقونة 40dp + سطرا الاسم) فلا يُقصّ النص.
+                val gridColumns = adaptiveColumns(
+                    minCellDp = 62, maxCellDp = 86, maxColumns = 6,
+                    horizontalPaddingDp = 28, spacingDp = GRID_SPACING,
+                )
+                val gridContentWidth = appScreenWidthDp() - 28f - (gridColumns - 1) * GRID_SPACING
+                val cellWidth = (gridContentWidth / gridColumns).coerceAtLeast(48f)
+                val cellHeight = (cellWidth + 30f).coerceIn(74f, 104f).toInt()
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -600,7 +611,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                             verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
                         ) {
                             AssetSectionHeader(title = section.title, count = section.assets.size)
-                            section.assets.chunked(GRID_COLUMNS).forEach { rowAssets ->
+                            section.assets.chunked(gridColumns).forEach { rowAssets ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
@@ -615,7 +626,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                         Column(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .height(GRID_CELL_HEIGHT.dp)
+                                                .height(cellHeight.dp)
                                                 .clip(RoundedCornerShape(12.dp))
                                                 .background(AppColors.Elevated)
                                                 .border(
@@ -653,7 +664,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                         }
                                     }
                                     // خلايا فارغة تكمل الصف الأخير حتى تبقى الأعمدة متساوية
-                                    repeat(GRID_COLUMNS - rowAssets.size) {
+                                    repeat(gridColumns - rowAssets.size) {
                                         Spacer(Modifier.weight(1f))
                                     }
                                 }
@@ -687,9 +698,7 @@ private fun OutlinedTextFieldBidi(
     )
 }
 
-// مقاسات ورقة الأصول في شاشة تعديل الملف: 5 أعمدة مصغّرة (أيقونة + اسم) في صفوف متساوية.
-private const val GRID_COLUMNS = 5
-private const val GRID_CELL_HEIGHT = 86
+// تباعد ورقة الأصول؛ عدد الأعمدة وارتفاع الخلية يُحسبان من عرض شاشة الهاتف (Sizing.kt).
 private const val GRID_SPACING = 6
 
 /** ملف مستخدم عام (يُفتح من الشات أو من بطاقة المبدع). */

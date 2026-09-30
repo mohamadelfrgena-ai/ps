@@ -127,9 +127,15 @@ fun EmojiStickerSheet(
                     }
                 }
                 Spacer(Modifier.height(6.dp))
+                val emojiColumns = com.addonstation.mobile.ui.theme.adaptiveColumns(
+                    minCellDp = 40, maxCellDp = 58, maxColumns = 10,
+                    horizontalPaddingDp = 28, spacingDp = 4,
+                )
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(8),
-                    modifier = Modifier.height(260.dp),
+                    columns = GridCells.Fixed(emojiColumns),
+                    modifier = Modifier.height(
+                        com.addonstation.mobile.ui.theme.screenHeightFraction(0.36f, minDp = 210, maxDp = 330),
+                    ),
                     contentPadding = PaddingValues(vertical = 6.dp),
                 ) {
                     items(filtered) { emoji ->
@@ -149,9 +155,16 @@ fun EmojiStickerSheet(
                 // ثم شبكة ملصقاته — وعناوين الأقسام تمتد بعرض الشبكة كاملاً.
                 val visible = stickers.filter { selectedPack == null || it.packId == selectedPack }
                 val groups = com.addonstation.mobile.ui.groupAssetsByCollection(visible)
+                // الملصقات: عدد الأعمدة والارتفاع يتبعان شاشة الهاتف (أوسع ⇒ أعمدة أكثر)
+                val stickerColumns = com.addonstation.mobile.ui.theme.adaptiveColumns(
+                    minCellDp = 78, maxCellDp = 104, maxColumns = 6,
+                    horizontalPaddingDp = 28, spacingDp = 8,
+                )
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(4),
-                    modifier = Modifier.height(240.dp),
+                    columns = GridCells.Fixed(stickerColumns),
+                    modifier = Modifier.height(
+                        com.addonstation.mobile.ui.theme.screenHeightFraction(0.34f, minDp = 200, maxDp = 320),
+                    ),
                 ) {
                     groups.forEach { section ->
                         item(span = { GridItemSpan(maxLineSpan) }, key = "sec-${section.title}") {
