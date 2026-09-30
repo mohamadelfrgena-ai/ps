@@ -254,6 +254,20 @@ fun PlanChip(plan: String, modifier: Modifier = Modifier) {
 
 /* ================================ الصور ================================ */
 
+/** علم دائري مرسوم لكل لغة مدعومة (بدل إيموجي العلم). */
+@androidx.annotation.DrawableRes
+fun langFlagRes(languageCode: String): Int = when (languageCode.lowercase()) {
+    "ar" -> R.drawable.ic_room_lang_ar
+    "en" -> R.drawable.ic_room_lang_en
+    "pt" -> R.drawable.ic_room_lang_pt
+    "es" -> R.drawable.ic_room_lang_es
+    "ru" -> R.drawable.ic_room_lang_ru
+    "zh" -> R.drawable.ic_room_lang_zh
+    "fr" -> R.drawable.ic_room_lang_fr
+    "tr" -> R.drawable.ic_room_lang_tr
+    else -> R.drawable.ic_room_lang_en
+}
+
 /** أيقونة غرفة الشات الدائرية: صورة جاهزة حسب معرّف الغرفة، وبالحجم المطلوب. */
 @Composable
 fun RoomIcon(channelId: String, size: Dp = 20.dp, modifier: Modifier = Modifier) {

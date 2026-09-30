@@ -3,6 +3,7 @@ package com.addonstation.mobile.ui.settings
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.BuildConfig
@@ -65,6 +67,7 @@ import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.components.RowItem
 import com.addonstation.mobile.ui.components.SectionHeader
+import com.addonstation.mobile.ui.components.langFlagRes
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
@@ -139,7 +142,7 @@ fun SettingsScreen(
             }
 
             // الحساب
-            SectionHeader(title = stringResource(R.string.set_account), leadingEmoji = "👤")
+            SectionHeader(title = stringResource(R.string.set_account))
             GlassCard(padding = 10.dp) {
                 if (signedOut) {
                     Text(
@@ -189,7 +192,7 @@ fun SettingsScreen(
             }
 
             // التفضيلات
-            SectionHeader(title = stringResource(R.string.set_prefs), leadingEmoji = "🎛")
+            SectionHeader(title = stringResource(R.string.set_prefs))
             GlassCard(padding = 10.dp) {
                 RowItem(
                     iconRes = R.drawable.ic_set_notifications,
@@ -200,7 +203,7 @@ fun SettingsScreen(
                     RowItem(
                         iconRes = R.drawable.ic_set_language,
                         title = stringResource(R.string.set_language),
-                        subtitle = LocaleManager.byCode(currentLocale).let { "${it.flag} ${it.label}" },
+                        subtitle = LocaleManager.byCode(currentLocale).label,
                         onClick = { languageMenu = true },
                         trailing = { },
                     )
@@ -211,9 +214,16 @@ fun SettingsScreen(
                     ) {
                         LocaleManager.supported.forEach { language ->
                             DropdownMenuItem(
+                                leadingIcon = {
+                                    Image(
+                                        painter = painterResource(langFlagRes(language.code)),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                },
                                 text = {
                                     Text(
-                                        "${language.flag}  ${language.label}",
+                                        language.label,
                                         style = AppText.bodySmall,
                                         color = if (language.code == currentLocale) AppColors.Green else AppColors.Text,
                                     )
@@ -246,7 +256,7 @@ fun SettingsScreen(
             }
 
             // الدعم
-            SectionHeader(title = stringResource(R.string.set_support), leadingEmoji = "❓")
+            SectionHeader(title = stringResource(R.string.set_support))
             GlassCard(padding = 10.dp) {
                 RowItem(
                     iconRes = R.drawable.ic_set_help,
@@ -272,7 +282,7 @@ fun SettingsScreen(
             }
 
             // حول التطبيق
-            SectionHeader(title = stringResource(R.string.set_about), leadingEmoji = "ℹ️")
+            SectionHeader(title = stringResource(R.string.set_about))
             GlassCard(padding = 10.dp) {
                 RowItem(
                     iconRes = R.drawable.ic_set_version,
@@ -292,7 +302,7 @@ fun SettingsScreen(
             }
 
             // منطقة الحساب
-            SectionHeader(title = stringResource(R.string.set_account_area), leadingEmoji = "⚠️")
+            SectionHeader(title = stringResource(R.string.set_account_area))
             GlassCard(padding = 12.dp, borderColor = AppColors.Red.copy(alpha = 0.35f)) {
                 Text(stringResource(R.string.set_delete_note), style = AppText.tiny, color = AppColors.Muted)
                 RowItem(

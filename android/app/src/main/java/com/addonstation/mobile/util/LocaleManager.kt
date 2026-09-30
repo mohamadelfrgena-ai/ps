@@ -13,14 +13,14 @@ import java.util.Locale
 object LocaleManager {
 
     val supported: List<AppLanguage> = listOf(
-        AppLanguage("ar", "العربية", "🇱🇾", isRtl = true),
-        AppLanguage("en", "English", "🇬🇧", isRtl = false),
-        AppLanguage("pt", "Português", "🇧🇷", isRtl = false),
-        AppLanguage("es", "Español", "🇪🇸", isRtl = false),
-        AppLanguage("ru", "Русский", "🇷🇺", isRtl = false),
-        AppLanguage("zh", "简体中文", "🇨🇳", isRtl = false),
-        AppLanguage("fr", "Français", "🇫🇷", isRtl = false),
-        AppLanguage("tr", "Türkçe", "🇹🇷", isRtl = false),
+        AppLanguage("ar", "العربية", isRtl = true),
+        AppLanguage("en", "English", isRtl = false),
+        AppLanguage("pt", "Português", isRtl = false),
+        AppLanguage("es", "Español", isRtl = false),
+        AppLanguage("ru", "Русский", isRtl = false),
+        AppLanguage("zh", "简体中文", isRtl = false),
+        AppLanguage("fr", "Français", isRtl = false),
+        AppLanguage("tr", "Türkçe", isRtl = false),
     )
 
     fun byCode(code: String?): AppLanguage =
@@ -59,6 +59,5 @@ object LocaleManager {
 data class AppLanguage(
     val code: String,
     val label: String,
-    val flag: String,
     val isRtl: Boolean,
 )
