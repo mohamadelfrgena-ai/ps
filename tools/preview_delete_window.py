@@ -29,7 +29,7 @@ STR_DELETE_MINE = "حذف رسالتي"
 STR_LEFT = "متبقٍ ٣ دقيقة للحذف"
 STR_EXPIRED = "انتهت مدة الحذف: يمكن حذف الرسالة خلال ٣ دقائق فقط من إرسالها."
 STR_REPLY, STR_COPY, STR_REPORT = "رد", "نسخ", "إبلاغ"
-STR_DELETED_VIEW = "🚫 تم حذف هذه الرسالة"
+STR_DELETED_VIEW = '🚫 تم إخفاء هذه الرسالة'  # نص التطبيق الفعلي (chat_hidden_message)
 
 
 def rtl(text: str) -> str:
@@ -138,7 +138,7 @@ def main() -> int:
 
     # ---------- صف الرسالة المحذوفة ----------
     y += 6
-    d.text((W - 30, y), rtl("بعد الحذف: تُعرض الرسالة في الشات هكذا للجميع"), font=f_h, fill=TEXT, anchor="ra")
+    d.text((W - 30, y), rtl("بعد الحذف: تظهر الرسالة في الشات هكذا للجميع"), font=f_h, fill=TEXT, anchor="ra")
     y += 36
     d.rounded_rectangle((30, y, W - 30, y + 52), radius=12, fill=CARD, outline=BORDER)
     d.ellipse((W - 78, y + 8, W - 46, y + 40), fill="#2B3A4D")
