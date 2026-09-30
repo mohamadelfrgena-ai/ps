@@ -176,7 +176,7 @@ fun SettingsScreen(
                     }
                 }
                 RowItem(
-                    icon = Icons.Filled.Person,
+                    iconRes = R.drawable.ic_set_email,
                     title = stringResource(R.string.set_email_row),
                     subtitle = container.supabase.session()?.email ?: "—",
                 )
@@ -192,13 +192,13 @@ fun SettingsScreen(
             SectionHeader(title = stringResource(R.string.set_prefs), leadingEmoji = "🎛")
             GlassCard(padding = 10.dp) {
                 RowItem(
-                    icon = Icons.Filled.Notifications,
+                    iconRes = R.drawable.ic_set_notifications,
                     title = stringResource(R.string.set_notifications),
                     onClick = onNotifications,
                 )
                 Column {
                     RowItem(
-                        icon = Icons.Filled.Language,
+                        iconRes = R.drawable.ic_set_language,
                         title = stringResource(R.string.set_language),
                         subtitle = LocaleManager.byCode(currentLocale).let { "${it.flag} ${it.label}" },
                         onClick = { languageMenu = true },
@@ -232,7 +232,7 @@ fun SettingsScreen(
                     }
                 }
                 RowItem(
-                    icon = if (dark) Icons.Filled.DarkMode else Icons.Filled.LightMode,
+                    iconRes = R.drawable.ic_set_appearance,
                     title = stringResource(R.string.set_theme),
                     subtitle = if (dark) stringResource(R.string.set_theme_dark)
                     else stringResource(R.string.set_theme_light),
@@ -249,21 +249,21 @@ fun SettingsScreen(
             SectionHeader(title = stringResource(R.string.set_support), leadingEmoji = "❓")
             GlassCard(padding = 10.dp) {
                 RowItem(
-                    icon = Icons.Filled.HelpOutline,
+                    iconRes = R.drawable.ic_set_help,
                     title = stringResource(R.string.set_help),
                     onClick = {
                         dialogKey = "help"
                     },
                 )
                 RowItem(
-                    icon = Icons.Filled.Report,
+                    iconRes = R.drawable.ic_set_report,
                     title = stringResource(R.string.set_report_problem),
                     onClick = {
                         dialogKey = "report"
                     },
                 )
                 RowItem(
-                    icon = Icons.Filled.Info,
+                    iconRes = R.drawable.ic_set_contact,
                     title = stringResource(R.string.set_contact),
                     onClick = {
                         dialogKey = "contact"
@@ -275,17 +275,17 @@ fun SettingsScreen(
             SectionHeader(title = stringResource(R.string.set_about), leadingEmoji = "ℹ️")
             GlassCard(padding = 10.dp) {
                 RowItem(
-                    icon = Icons.Filled.Info,
+                    iconRes = R.drawable.ic_set_version,
                     title = stringResource(R.string.set_version),
                     subtitle = "AddonStation Mobile v${BuildConfig.VERSION_NAME}",
                 )
                 RowItem(
-                    icon = Icons.Filled.Article,
+                    iconRes = R.drawable.ic_set_terms,
                     title = stringResource(R.string.set_terms),
                     onClick = { dialogKey = "terms" },
                 )
                 RowItem(
-                    icon = Icons.Filled.Lock,
+                    iconRes = R.drawable.ic_set_privacy,
                     title = stringResource(R.string.set_privacy),
                     onClick = { dialogKey = "privacy" },
                 )

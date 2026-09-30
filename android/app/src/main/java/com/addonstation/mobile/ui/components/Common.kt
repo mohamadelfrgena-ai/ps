@@ -490,13 +490,15 @@ fun CounterCard(value: String, label: String, modifier: Modifier = Modifier, acc
 /** صف قابل للنقر بأيقونة وسهم — يستخدم في الإعدادات و«المزيد». */
 @Composable
 fun RowItem(
-    icon: ImageVector,
+    icon: ImageVector? = null,
     title: String,
     subtitle: String? = null,
     onClick: (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     tint: Color = AppColors.Green,
+    /** مورد أيقونة صورة جاهزة (اختياري) — يُعرض بدل الأيقونة المتجهة. */
+    iconRes: Int? = null,
 ) {
     Row(
         modifier = modifier
@@ -507,14 +509,27 @@ fun RowItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(RoundedCornerShape(11.dp))
-                .background(AppColors.Elevated2),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        if (iconRes != null) {
+            // أيقونة ملوّنة جاهزة (مربّع بأطراف دائرية) — تُعرض كما هي بلا تلوين
+            Image(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(11.dp)),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(AppColors.Elevated2),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (icon != null) {
+                    Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+                }
+            }
         }
         Column(Modifier.weight(1f)) {
             Text(title, style = AppText.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), color = AppColors.Text)
