@@ -208,13 +208,29 @@ jobs:
           SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
+          set -o pipefail
           if [ "${{ needs.request.outputs.task }}" = "assets-dry-run" ]; then
             echo "▶ وضع التجربة (بلا رفع فعلي)"
-            python3 tools/upload_seed_assets.py --dry-run
+            python3 tools/upload_seed_assets.py --dry-run 2>&1 | tee /tmp/upload.log
           else
             echo "▶ الرفع الفعلي"
-            python3 tools/upload_seed_assets.py
+            python3 tools/upload_seed_assets.py 2>&1 | tee /tmp/upload.log
           fi
+
+      - name: نشر تقرير الرفع كتعليق على العمولة
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f /tmp/upload.log ]; then echo "لا يوجد تقرير"; exit 0; fi
+          {
+            echo "### تقرير رفع الأصول (task=${{ needs.request.outputs.task }})"
+            echo ""
+            echo '```'
+            tail -n 70 /tmp/upload.log
+            echo '```'
+          } > /tmp/report.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@/tmp/report.md || true
 
       - name: تحقق بعد الرفع (رابط عام لثلاثة ملفات)
         if: needs.request.outputs.task == 'assets-upload'
