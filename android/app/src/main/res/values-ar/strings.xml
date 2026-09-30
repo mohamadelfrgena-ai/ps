@@ -198,6 +198,12 @@
     <string name="set_help">مركز المساعدة</string>
     <string name="set_report_problem">الإبلاغ عن مشكلة</string>
     <string name="set_contact">تواصل معنا</string>
+    <string name="set_support_email">silverfoxinteractive@gmail.com</string>
+    <string name="set_support_mail_help">AddonStation — طلب مساعدة</string>
+    <string name="set_support_mail_report">AddonStation — بلاغ عن مشكلة</string>
+    <string name="set_support_mail_contact">AddonStation — تواصل</string>
+    <string name="set_support_mail_body">مرحباً فريق الدعم،\n\n(اكتب رسالتك هنا)\n\n—————\nإصدار التطبيق: %1$s\nالجهاز: %2$s\nأندرويد: %3$s\nلغة التطبيق: %4$s\nالمستخدم: %5$s</string>
+    <string name="set_support_no_mail_app">لم يُعثر على تطبيق بريد على جهازك. راسلنا من بريدك على:\nsilverfoxinteractive@gmail.com</string>
     <string name="set_about">حول التطبيق</string>
     <string name="set_version">إصدار التطبيق</string>
     <string name="set_terms">الشروط والأحكام</string>
@@ -452,9 +458,9 @@
     <string name="setup_hint">تحتاج فعل هذا مرة واحدة فقط.</string>
     <string name="set_terms_text">هذه الشروط تحدّدها AddonStation: استخدم التطبيق باحترام، ولا تُعد توزيع المحتوى المدفوع، والتزم بقواعد المجتمع.</string>
     <string name="set_privacy_text">نحفظ بيانات حسابك على خوادم Supabase. بريدك الإلكتروني لا يظهر للمستخدمين الآخرين، وجلستك محفوظة مشفّرة على جهازك.</string>
-    <string name="set_support_note_help">مركز المساعدة يجيب عن الأسئلة الشائعة حول التحميل والخطط والشات. لأي أمر عاجل تواصل معنا من غرفة الدعم.</string>
-    <string name="set_support_note_report">اشرح المشكلة (الشاشة، الخطوات، نوع جهازك) وأرسلها في غرفة الدعم أو إلى بريدنا.</string>
-    <string name="set_support_note_contact">راسلنا على hello@addonstation.app أو افتح موضوعاً في غرفة الدعم — نرد خلال 24 ساعة.</string>
+    <string name="set_support_note_help">لأي سؤال عن التحميل أو الخطط أو الشات اضغط هذا الخيار وسيُفتح بريدك برسالة جاهزة إلى فريق الدعم.</string>
+    <string name="set_support_note_report">اشرح المشكلة (الشاشة، الخطوات، نوع جهازك) — سيُفتح بريدك برسالة جاهزة تتضمن بيانات جهازك تلقائياً.</string>
+    <string name="set_support_note_contact">سيُفتح بريدك فوراً على silverfoxinteractive@gmail.com — نرد خلال 24 ساعة.</string>
     <string name="set_delete_confirm_text">حذف الحساب يمسح ملفك الشخصي ومحتواك نهائياً. للتأكيد تواصل مع الدعم باسم المستخدم الخاص بك.</string>
     <string name="chat_banned">أنت محظور من الشات.</string>
     <string name="creator_field_country">الدولة</string>

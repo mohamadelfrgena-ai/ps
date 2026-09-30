@@ -2,7 +2,9 @@ package com.addonstation.mobile.ui.settings
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.ContextWrapper
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -59,6 +61,7 @@ import com.addonstation.mobile.data.AppContainer
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.common.ConfirmDialog
 import com.addonstation.mobile.ui.common.InfoDialog
+import com.addonstation.mobile.ui.components.appLocaleCode
 import com.addonstation.mobile.ui.components.AvatarImage
 import com.addonstation.mobile.ui.components.GhostButton
 import com.addonstation.mobile.ui.components.GradientButton
@@ -74,6 +77,38 @@ import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.util.AppPrefs
 import com.addonstation.mobile.util.LocaleManager
 import kotlinx.coroutines.launch
+
+/** بريد فريق الدعم — تُفتح عليه رسالة المستخدم تلقائياً من قسم الدعم. */
+const val SUPPORT_EMAIL = "silverfoxinteractive@gmail.com"
+
+/**
+ * يفتح تطبيق البريد برسالة جاهزة إلى بريد الدعم (Gmail أولاً إن كان مثبتاً).
+ * يرجع false إن لم يوجد أي تطبيق بريد على الجهاز.
+ */
+fun openSupportEmail(context: Context, subject: String, body: String): Boolean {
+    val uri = Uri.parse(
+        "mailto:" + SUPPORT_EMAIL +
+            "?subject=" + Uri.encode(subject) +
+            "&body=" + Uri.encode(body),
+    )
+    val mailIntent = Intent(Intent.ACTION_SENDTO, uri)
+    // Gmail مباشرةً إن وُجد، ثم أي تطبيق بريد، ثم اختيار المستخدم
+    val candidates = listOf(
+        Intent(mailIntent).setPackage("com.google.android.gm"),
+        mailIntent,
+    )
+    for (intent in candidates) {
+        val ok = runCatching {
+            context.startActivity(Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.isSuccess
+        if (ok) return true
+    }
+    return runCatching {
+        context.startActivity(
+            Intent.createChooser(mailIntent, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.isSuccess
+}
 
 /** الشاشة الإعدادات — الأقسام الأربعة كما في وثيقة التصميم §9. */
 @Composable
@@ -91,6 +126,19 @@ fun SettingsScreen(
     val wallet by container.state.wallet.collectAsState()
     val currentLocale by container.prefs.locale.collectAsState(initial = "en")
     val dark by container.prefs.darkTheme.collectAsState(initial = true)
+
+    // نصوص/بيانات رسالة الدعم (تُبنى هنا لأن stringResource للـComposable فقط)
+    val supportSubjectHelp = stringResource(R.string.set_support_mail_help)
+    val supportSubjectReport = stringResource(R.string.set_support_mail_report)
+    val supportSubjectContact = stringResource(R.string.set_support_mail_contact)
+    val supportBody = stringResource(
+        R.string.set_support_mail_body,
+        BuildConfig.VERSION_NAME,
+        (android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL).trim(),
+        "Android " + android.os.Build.VERSION.RELEASE,
+        appLocaleCode(),
+        profile?.username ?: profile?.displayName ?: "—",
+    )
 
     var username by remember { mutableStateOf(profile?.username ?: "") }
     var usernameMessage by remember { mutableStateOf<String?>(null) }
@@ -268,25 +316,35 @@ fun SettingsScreen(
             // الدعم
             SectionHeader(title = stringResource(R.string.set_support))
             GlassCard(padding = 10.dp) {
+                // الثلاثة تفتح تطبيق البريد برسالة جاهزة إلى بريد الدعم (Gmail أولاً)
                 RowItem(
                     iconRes = R.drawable.ic_set_help,
                     title = stringResource(R.string.set_help),
+                    subtitle = SUPPORT_EMAIL,
                     onClick = {
-                        dialogKey = "help"
+                        if (!openSupportEmail(context, supportSubjectHelp, supportBody)) {
+                            dialogKey = "no_mail_app"
+                        }
                     },
                 )
                 RowItem(
                     iconRes = R.drawable.ic_set_report,
                     title = stringResource(R.string.set_report_problem),
+                    subtitle = SUPPORT_EMAIL,
                     onClick = {
-                        dialogKey = "report"
+                        if (!openSupportEmail(context, supportSubjectReport, supportBody)) {
+                            dialogKey = "no_mail_app"
+                        }
                     },
                 )
                 RowItem(
                     iconRes = R.drawable.ic_set_contact,
                     title = stringResource(R.string.set_contact),
+                    subtitle = SUPPORT_EMAIL,
                     onClick = {
-                        dialogKey = "contact"
+                        if (!openSupportEmail(context, supportSubjectContact, supportBody)) {
+                            dialogKey = "no_mail_app"
+                        }
                     },
                 )
             }
@@ -348,6 +406,7 @@ fun SettingsScreen(
 
     dialogKey?.let { key ->
         val info = when (key) {
+            "no_mail_app" -> stringResource(R.string.set_contact) to stringResource(R.string.set_support_no_mail_app)
             "help" -> stringResource(R.string.set_help) to stringResource(R.string.set_support_note_help)
             "report" -> stringResource(R.string.set_report_problem) to stringResource(R.string.set_support_note_report)
             "contact" -> stringResource(R.string.set_contact) to stringResource(R.string.set_support_note_contact)

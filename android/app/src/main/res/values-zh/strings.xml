@@ -198,6 +198,12 @@
     <string name="set_help">帮助中心</string>
     <string name="set_report_problem">报告问题</string>
     <string name="set_contact">联系我们</string>
+    <string name="set_support_email">silverfoxinteractive@gmail.com</string>
+    <string name="set_support_mail_help">AddonStation — 帮助请求</string>
+    <string name="set_support_mail_report">AddonStation — 问题反馈</string>
+    <string name="set_support_mail_contact">AddonStation — 联系</string>
+    <string name="set_support_mail_body">你好，支持团队：\n\n（在这里写下你的消息）\n\n—————\n应用版本：%1$s\n设备：%2$s\nAndroid：%3$s\n应用语言：%4$s\n用户：%5$s</string>
+    <string name="set_support_no_mail_app">设备上未找到邮件应用。请用你的邮箱写信给我们：\nsilverfoxinteractive@gmail.com</string>
     <string name="set_about">关于应用</string>
     <string name="set_version">应用版本</string>
     <string name="set_terms">条款与条件</string>

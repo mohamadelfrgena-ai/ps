@@ -198,6 +198,12 @@
     <string name="set_help">Центр помощи</string>
     <string name="set_report_problem">Сообщить о проблеме</string>
     <string name="set_contact">Связаться с нами</string>
+    <string name="set_support_email">silverfoxinteractive@gmail.com</string>
+    <string name="set_support_mail_help">AddonStation — Запрос помощи</string>
+    <string name="set_support_mail_report">AddonStation — Сообщение о проблеме</string>
+    <string name="set_support_mail_contact">AddonStation — Связь</string>
+    <string name="set_support_mail_body">Здравствуйте, команда поддержки!\n\n(напишите сообщение здесь)\n\n—————\nВерсия приложения: %1$s\nУстройство: %2$s\nAndroid: %3$s\nЯзык приложения: %4$s\nПользователь: %5$s</string>
+    <string name="set_support_no_mail_app">Почтовое приложение не найдено. Напишите нам со своей почты на:\nsilverfoxinteractive@gmail.com</string>
     <string name="set_about">О приложении</string>
     <string name="set_version">Версия приложения</string>
     <string name="set_terms">Условия использования</string>

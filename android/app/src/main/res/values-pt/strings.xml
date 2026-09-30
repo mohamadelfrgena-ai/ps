@@ -198,6 +198,12 @@
     <string name="set_help">Central de ajuda</string>
     <string name="set_report_problem">Reportar um problema</string>
     <string name="set_contact">Fale conosco</string>
+    <string name="set_support_email">silverfoxinteractive@gmail.com</string>
+    <string name="set_support_mail_help">AddonStation — Pedido de ajuda</string>
+    <string name="set_support_mail_report">AddonStation — Relato de problema</string>
+    <string name="set_support_mail_contact">AddonStation — Contato</string>
+    <string name="set_support_mail_body">Olá equipe de suporte,\n\n(escreva sua mensagem aqui)\n\n—————\nVersão do app: %1$s\nAparelho: %2$s\nAndroid: %3$s\nIdioma do app: %4$s\nUsuário: %5$s</string>
+    <string name="set_support_no_mail_app">Nenhum app de e-mail encontrado. Escreva para nós de seu e-mail em:\nsilverfoxinteractive@gmail.com</string>
     <string name="set_about">Sobre o app</string>
     <string name="set_version">Versão do app</string>
     <string name="set_terms">Termos e condições</string>

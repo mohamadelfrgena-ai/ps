@@ -198,6 +198,12 @@
     <string name="set_help">Yardım merkezi</string>
     <string name="set_report_problem">Sorun bildir</string>
     <string name="set_contact">Bize ulaş</string>
+    <string name="set_support_email">silverfoxinteractive@gmail.com</string>
+    <string name="set_support_mail_help">AddonStation — Yardım isteği</string>
+    <string name="set_support_mail_report">AddonStation — Sorun bildirimi</string>
+    <string name="set_support_mail_contact">AddonStation — İletişim</string>
+    <string name="set_support_mail_body">Merhaba destek ekibi,\n\n(mesajını buraya yaz)\n\n—————\nUygulama sürümü: %1$s\nCihaz: %2$s\nAndroid: %3$s\nUygulama dili: %4$s\nKullanıcı: %5$s</string>
+    <string name="set_support_no_mail_app">Cihazında e-posta uygulaması bulunamadı. Bize kendi e-postandan yaz:\nsilverfoxinteractive@gmail.com</string>
     <string name="set_about">Uygulama hakkında</string>
     <string name="set_version">Uygulama sürümü</string>
     <string name="set_terms">Şartlar ve koşullar</string>

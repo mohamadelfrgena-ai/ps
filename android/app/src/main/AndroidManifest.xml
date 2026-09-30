@@ -5,6 +5,16 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- قسم الدعم في الإعدادات يفتح تطبيق البريد على silverfoxinteractive@gmail.com
+         (مطلوب في أندرويد 11+ للوصول إلى تطبيقات البريد وGmail) -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+        <package android:name="com.google.android.gm" />
+    </queries>
+
     <application
         android:name=".AddonStationApp"
         android:allowBackup="false"

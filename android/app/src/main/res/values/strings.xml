@@ -207,6 +207,12 @@
     <string name="set_help">Help center</string>
     <string name="set_report_problem">Report a problem</string>
     <string name="set_contact">Contact us</string>
+    <string name="set_support_email">silverfoxinteractive@gmail.com</string>
+    <string name="set_support_mail_help">AddonStation — Help request</string>
+    <string name="set_support_mail_report">AddonStation — Problem report</string>
+    <string name="set_support_mail_contact">AddonStation — Contact</string>
+    <string name="set_support_mail_body">Hello support team,\n\n(write your message here)\n\n—————\nApp version: %1$s\nDevice: %2$s\nAndroid: %3$s\nApp language: %4$s\nUser: %5$s</string>
+    <string name="set_support_no_mail_app">No email app was found on your device. Write to us from your mail at:\nsilverfoxinteractive@gmail.com</string>
     <string name="set_about">About the app</string>
     <string name="set_version">App version</string>
     <string name="set_terms">Terms &amp; conditions</string>
@@ -468,9 +474,9 @@
     <string name="setup_hint">You only need to do this once.</string>
     <string name="set_terms_text">These Terms are set by AddonStation: use the app respectfully, do not redistribute paid content, and follow the community rules.</string>
     <string name="set_privacy_text">Your account data is stored on Supabase servers. Your email is never shown to other users, and your session is kept encrypted on your device.</string>
-    <string name="set_support_note_help">The help center answers common questions about downloads, plans and chat. For anything urgent, reach us from the Support room.</string>
-    <string name="set_support_note_report">Describe the problem (screen, steps, your device) and send it in the Support room or by email.</string>
-    <string name="set_support_note_contact">Write to hello@addonstation.app or open a topic in the Support room — we reply within 24 hours.</string>
+    <string name="set_support_note_help">Tap this option and your mail app opens with a ready message to the support team.</string>
+    <string name="set_support_note_report">Describe the problem (screen, steps, device) — your mail app opens with your device details filled in.</string>
+    <string name="set_support_note_contact">Your mail app opens straight to silverfoxinteractive@gmail.com — we reply within 24 hours.</string>
     <string name="set_delete_confirm_text">Deleting the account erases your profile and content permanently. To confirm, contact support with your username.</string>
     <string name="chat_banned">You are banned from the chat.</string>
     <string name="creator_field_country">Country</string>
