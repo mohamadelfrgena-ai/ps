@@ -557,6 +557,8 @@ fun RowItem(
     iconRes: Int? = null,
     /** صورة ختامية (اختياري) — مثل صورة الأداة المجهّزة، وتتحرّك إن كانت GIF. */
     trailingImageUrl: String? = null,
+    /** إظهار سهم الانتقال «›» (يُخفى في الصفوف المعلوماتية مثل «إصدار التطبيق»). */
+    showChevron: Boolean = true,
 ) {
     Row(
         modifier = modifier
@@ -599,7 +601,7 @@ fun RowItem(
             CoverImage(url = trailingImageUrl, radius = 8.dp, modifier = Modifier.size(28.dp))
         }
         if (trailing != null) trailing()
-        else if (trailingImageUrl == null) Icon(
+        else if (trailingImageUrl == null && showChevron) Icon(
             imageVector = Icons.Filled.KeyboardArrowRight,
             contentDescription = null,
             tint = AppColors.Dim,

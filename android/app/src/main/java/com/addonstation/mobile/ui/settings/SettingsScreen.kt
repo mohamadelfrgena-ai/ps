@@ -353,11 +353,6 @@ fun SettingsScreen(
             SectionHeader(title = stringResource(R.string.set_about))
             GlassCard(padding = 10.dp) {
                 RowItem(
-                    iconRes = R.drawable.ic_set_version,
-                    title = stringResource(R.string.set_version),
-                    subtitle = "AddonStation Mobile v${BuildConfig.VERSION_NAME}",
-                )
-                RowItem(
                     iconRes = R.drawable.ic_set_terms,
                     title = stringResource(R.string.set_terms),
                     onClick = { dialogKey = "terms" },
@@ -366,6 +361,13 @@ fun SettingsScreen(
                     iconRes = R.drawable.ic_set_privacy,
                     title = stringResource(R.string.set_privacy),
                     onClick = { dialogKey = "privacy" },
+                )
+                // إصدار التطبيق صفّ معلوماتي: تحت سياسة الخصوصية وبلا سهم انتقال «›»
+                RowItem(
+                    iconRes = R.drawable.ic_set_version,
+                    title = stringResource(R.string.set_version),
+                    subtitle = "AddonStation Mobile v${BuildConfig.VERSION_NAME}",
+                    showChevron = false,
                 )
             }
 
