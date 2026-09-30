@@ -1,0 +1,167 @@
+# استبدال أصول الواجهة (أفاتارات + ملصقات + أدوات) بالدفعة الجديدة وتنظيمها في أقسام
+#
+# لماذا هذا الملف؟
+#   الدفعة الجديدة أصلها أرشيف مقسّم كبير (185 MB) مستضاف في المستودع العام
+#   mohamadelfrgena-ai/vae — فبدل رفع 492 صورة إلى هذا المستودع، ينزّلها هذا
+#   السير وقت التشغيل، يوزّعها على الأقسام، ويرفعها إلى مخزن site-assets.
+#
+# ما يفعله بالترتيب:
+#   1) ينزّل أقراص الأرشيف (news.z01..news.z07 + news.zip) من المستودع العام
+#   2) يستخرجها بمستخرج الأقراص المتعددة (tools/spanned_zip.py) — unzip لا يكفي
+#   3) يجهّزها في شجرة أقسام (tools/prepare_new_assets.py) + بيان JSON
+#   4) يرفع الأصول الجديدة إلى site-assets (tools/upload_seed_assets.py)
+#   5) يحذف الأصول القديمة الـ311 من المخزن (tools/prune_old_assets.py)
+#   6) يتحقق بقراءة رابط عام لثلاثة ملفات جديدة
+#
+# الإعداد المطلوب مرة واحدة (نفس سرّي رفع الأصول القديم):
+#   Settings → Secrets and variables → Actions:
+#     ADDONSTATION_SUPABASE_URL          = https://xxxx.supabase.co
+#     ADDONSTATION_SUPABASE_SECRET_KEY   = sb_secret_xxxxxxxx
+#
+# التشغيل: Actions → Upload new assets → Run workflow
+#   mode  = dry-run (تجربة بلا رفع) أو upload (رفع فعلي)
+#   prune = true (يحذف الأصول القديمة بعد نجاح الرفع) أو false
+#
+# وبعد نجاح الرفع نفّذ في Supabase → SQL Editor:
+#   supabase/15_assets_v2.sql   (يحذف السجلات القديمة ويسجّل الجديدة بأقسامها)
+
+name: Upload new assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "الوضع: dry-run (تجربة) أو upload (رفع فعلي)"
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - upload
+      prune:
+        description: "حذف الأصول القديمة من المخزن بعد نجاح الرفع"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+jobs:
+  replace-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: التحقق من وجود السرّين
+        env:
+          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          S_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          if [ -z "$S_URL" ] || [ -z "$S_KEY" ]; then
+            echo "::error::السرّان غير مضبوطين. أضف ADDONSTATION_SUPABASE_URL و ADDONSTATION_SUPABASE_SECRET_KEY في Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          echo "✓ السرّان موجودان (الرابط: ${S_URL%%/} · طول المفتاح: ${#S_KEY} حرفاً)"
+
+      - name: تنزيل الأرشيف المقسّم من المستودع العام
+        run: |
+          set -e
+          mkdir -p /tmp/news
+          for f in news.z01 news.z02 news.z03 news.z04 news.z05 news.z06 news.z07 news.zip; do
+            echo "⬇ $f"
+            curl -fsSL -o "/tmp/news/$f" "https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/$f"
+          done
+          echo "الحجم الكلي: $(du -sh /tmp/news | cut -f1)"
+
+      - name: تجهيز الأقسام (استخراج + تنظيم + بيان)
+        run: |
+          python3 tools/prepare_new_assets.py --archive-dir /tmp/news --out new-assets --manifest assets-manifest.json
+
+      - name: مطابقة البيان مع المستودع (الأقسام والأعداد)
+        run: |
+          python3 - <<'PY'
+          import json
+          m = json.load(open("assets-manifest.json", encoding="utf-8"))
+          per = {}
+          for a in m["assets"]:
+              per[a["type"]] = per.get(a["type"], 0) + 1
+          print("الأقسام:", len(m["sections"]))
+          for k, v in per.items():
+              print(f"  {k}: {v}")
+          an = sum(1 for a in m["assets"] if a["animated"])
+          print(f"إجمالي: {len(m['assets'])} أصلاً · متحرّك: {an}")
+          assert len(m["assets"]) == 492, "عدد الأصول غير متوقّع"
+          PY
+
+      - name: عدّ الملفات الجاهزة
+        run: |
+          echo "profiles: $(find new-assets/profiles -type f | wc -l)"
+          echo "stickers: $(find new-assets/stickers -type f | wc -l)"
+          echo "items   : $(find new-assets/items    -type f | wc -l)"
+          echo "الإجمالي: $(find new-assets -type f | wc -l) ملفاً · $(du -sh new-assets | cut -f1)"
+
+      - name: تجربة بلا رفع (dry-run)
+        if: ${{ inputs.mode == 'dry-run' }}
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python3 tools/upload_seed_assets.py --source new-assets --dry-run
+          python3 tools/prune_old_assets.py --dry-run
+
+      - name: الرفع الفعلي
+        if: ${{ inputs.mode == 'upload' }}
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python3 tools/upload_seed_assets.py --source new-assets
+
+      - name: حذف الأصول القديمة من المخزن
+        if: ${{ inputs.mode == 'upload' && inputs.prune == 'true' }}
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python3 tools/prune_old_assets.py || echo "::warning::تعذّر حذف بعض الأصول القديمة — أكمل يدوياً من Storage"
+
+      - name: "تحقق بعد الرفع (ثلاثة ملفات: بروفايل + ستيكر + آيتم)"
+        if: ${{ inputs.mode == 'upload' }}
+        env:
+          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+        run: |
+          set -e
+          python3 - <<'PY' > /tmp/sample_paths.txt
+          import json, random
+          m = json.load(open("assets-manifest.json", encoding="utf-8"))
+          for kind in ("avatars", "stickers", "items"):
+              pool = [a for a in m["assets"] if a["type"] == kind]
+              animated = [a for a in pool if a["animated"]] or pool
+              print(random.choice(animated)["path"])
+          PY
+          FAIL=0
+          while read -r REL; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "${S_URL%/}/storage/v1/object/public/site-assets/$REL")
+            echo "$REL → HTTP $CODE"
+            [ "$CODE" = "200" ] || FAIL=1
+          done < /tmp/sample_paths.txt
+          if [ "$FAIL" = "1" ]; then
+            echo "::warning::ملف أو أكثر لم يُقرأ عامّاً — تأكد أن المخزن site-assets عام وأن 05_storage.sql نُفِّذ"
+          else
+            echo "✅ الأصول الجديدة تعمل — الخطوة الأخيرة: نفّذ supabase/15_assets_v2.sql في SQL Editor"
+          fi
+
+      - name: الخطوة التالية في السجل
+        if: ${{ inputs.mode == 'upload' }}
+        run: |
+          echo "================================================"
+          echo "الخطوة الأخيرة المطلوبة منك:"
+          echo "  Supabase → SQL Editor → الصق محتوى supabase/15_assets_v2.sql → RUN"
+          echo "  ثم افتح التطبيق: ستجد الأقسام (PFP · Animated · Memes · Minecraft Items …)"
+          echo "================================================"

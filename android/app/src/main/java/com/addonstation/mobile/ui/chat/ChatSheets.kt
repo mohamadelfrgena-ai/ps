@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -144,26 +145,37 @@ fun EmojiStickerSheet(
                     }
                 }
             } else {
+                // الملصقات في **فقرات منفصلة**: عنوان لكل قسم/مجلد (Memes · Minecraft Memes 1 …)
+                // ثم شبكة ملصقاته — وعناوين الأقسام تمتد بعرض الشبكة كاملاً.
+                val visible = stickers.filter { selectedPack == null || it.packId == selectedPack }
+                val groups = com.addonstation.mobile.ui.groupAssetsByCollection(visible)
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(4),
                     modifier = Modifier.height(240.dp),
                 ) {
-                    val visible = stickers.filter { selectedPack == null || it.packId == selectedPack }
-                    items(visible, key = { it.id }) { sticker ->
-                        Box(
-                            modifier = Modifier
-                                .padding(4.dp)
-                                .height(84.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(AppColors.Elevated)
-                                .clickable { onSticker(sticker.fileUrl) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            com.addonstation.mobile.ui.components.CoverImage(
-                                url = resolvedStickerUrl(sticker.fileUrl),
-                                radius = 10.dp,
-                                modifier = Modifier.fillMaxWidth().height(80.dp),
+                    groups.forEach { section ->
+                        item(span = { GridItemSpan(maxLineSpan) }, key = "sec-${section.title}") {
+                            com.addonstation.mobile.ui.components.AssetSectionHeader(
+                                title = section.title,
+                                count = section.assets.size,
                             )
+                        }
+                        items(section.assets, key = { it.id }) { sticker ->
+                            Box(
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .height(84.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(AppColors.Elevated)
+                                    .clickable { onSticker(sticker.fileUrl) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                com.addonstation.mobile.ui.components.CoverImage(
+                                    url = resolvedStickerUrl(sticker.fileUrl),
+                                    radius = 10.dp,
+                                    modifier = Modifier.fillMaxWidth().height(80.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -590,15 +602,31 @@ fun DiscordProfileCardSheet(
                             .padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                     if (profile.equippedItemId != "none") {
-                        Text(
-                            "🎖 ${profile.equippedItemId}",
-                            style = AppText.tiny,
-                            color = AppColors.Muted,
+                        // الأداة المجهّزة تظهر بصورتها الحقيقية (وتتحرّك إن كانت GIF)
+                        val itemImg = com.addonstation.mobile.ui.equippedItemUrl(container, profile.equippedItemId)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier
                                 .clip(CircleShape)
                                 .background(AppColors.Elevated)
                                 .padding(horizontal = 8.dp, vertical = 3.dp),
-                        )
+                        ) {
+                            if (itemImg != null) {
+                                com.addonstation.mobile.ui.components.CoverImage(
+                                    url = itemImg,
+                                    radius = 4.dp,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            } else {
+                                Text("🎖", style = AppText.tiny)
+                            }
+                            Text(
+                                profile.equippedItemId,
+                                style = AppText.tiny,
+                                color = AppColors.Muted,
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(12.dp))

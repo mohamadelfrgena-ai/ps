@@ -332,6 +332,9 @@ data class SiteAsset(
     @SerialName("sticker_pack") val packId: String? = null,
     @SerialName("animated") val animated: Boolean = false,
     @SerialName("sort_order") val sortOrder: Int = 0,
+    /** القسم الذي ينتمي إليه الأصل (اسم المجلد الأصلي) — تُعرض الأصول في فقرات منفصلة. */
+    val collection: String? = null,
+    @SerialName("collection_order") val collectionOrder: Int = 0,
 )
 
 /** مبدع في قائمة المبدعين (يُبنى من profiles + إحصاءات). */

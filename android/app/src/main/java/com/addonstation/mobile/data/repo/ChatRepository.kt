@@ -390,7 +390,7 @@ class ChatRepository(
         supabase.decodeList<SiteAsset>(
             supabase.select(
                 "site_assets",
-                "select=*&asset_type=eq.sticker&enabled=eq.true&order=id.asc&limit=500",
+                "select=*&asset_type=eq.sticker&enabled=eq.true&order=collection_order.asc,sort_order.asc&limit=500",
             )
         )
     }.getOrElse { emptyList() }

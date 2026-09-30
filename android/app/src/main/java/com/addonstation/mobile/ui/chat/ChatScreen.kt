@@ -845,7 +845,17 @@ private fun MessageBlock(
                     com.addonstation.mobile.ui.components.RankBadge(role = author.role, plan = author.effectivePlan)
                 }
                 if (author?.equippedItemId != null && author.equippedItemId != "none") {
-                    Text("🎖", style = AppText.tiny)
+                    // الأداة المجهّزة بجانب اسم صاحبها: صورتها الحقيقية (متحرّكة إن كانت GIF)
+                    val itemImg = com.addonstation.mobile.ui.equippedItemUrl(container, author.equippedItemId)
+                    if (itemImg != null) {
+                        com.addonstation.mobile.ui.components.CoverImage(
+                            url = itemImg,
+                            radius = 4.dp,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    } else {
+                        Text("🎖", style = AppText.tiny)
+                    }
                 }
                 Text(
                     TimeFormat.timeOnly(message.createdAt, Locale.getDefault()),

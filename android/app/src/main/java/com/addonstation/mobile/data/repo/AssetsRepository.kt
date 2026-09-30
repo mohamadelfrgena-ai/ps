@@ -19,20 +19,39 @@ class AssetsRepository(
 ) {
 
     suspend fun all(): List<SiteAsset> = runCatching {
-        val assets = supabase.decodeList<SiteAsset>(
-            supabase.select("site_assets", "select=*&order=sort_order.asc&limit=1000")
-        )
+        val assets = runCatching {
+            supabase.decodeList<SiteAsset>(
+                supabase.select("site_assets", "select=*&order=collection_order.asc,sort_order.asc&limit=1000")
+            )
+        }.getOrElse {
+            // ترميز احتياطي قبل تنفيذ supabase/15_assets_v2.sql (لا عمود collection_order بعد)
+            supabase.decodeList<SiteAsset>(
+                supabase.select("site_assets", "select=*&order=sort_order.asc&limit=1000")
+            )
+        }
         state.setSiteAssets(assets)
         assets
     }.getOrElse { emptyList() }
 
     suspend fun byType(type: String): List<SiteAsset> = runCatching {
-        supabase.decodeList<SiteAsset>(
-            supabase.select(
-                "site_assets",
-                "select=*&asset_type=eq.$type&enabled=eq.true&order=sort_order.asc&limit=500",
+        val ordered = runCatching {
+            supabase.decodeList<SiteAsset>(
+                supabase.select(
+                    "site_assets",
+                    "select=*&asset_type=eq.$type&enabled=eq.true&order=collection_order.asc,sort_order.asc&limit=500",
+                )
             )
-        )
+        }.getOrElse { emptyList() }
+        if (ordered.isNotEmpty()) {
+            ordered
+        } else {
+            supabase.decodeList<SiteAsset>(
+                supabase.select(
+                    "site_assets",
+                    "select=*&asset_type=eq.$type&enabled=eq.true&order=sort_order.asc&limit=500",
+                )
+            )
+        }
     }.getOrElse { emptyList() }
 
     suspend fun packs(): List<StickerPack> = runCatching {

@@ -555,6 +555,8 @@ fun RowItem(
     tint: Color = AppColors.Green,
     /** مورد أيقونة صورة جاهزة (اختياري) — يُعرض بدل الأيقونة المتجهة. */
     iconRes: Int? = null,
+    /** صورة ختامية (اختياري) — مثل صورة الأداة المجهّزة، وتتحرّك إن كانت GIF. */
+    trailingImageUrl: String? = null,
 ) {
     Row(
         modifier = modifier
@@ -593,8 +595,11 @@ fun RowItem(
                 Text(subtitle, style = AppText.tiny, color = AppColors.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
+        if (trailingImageUrl != null) {
+            CoverImage(url = trailingImageUrl, radius = 8.dp, modifier = Modifier.size(28.dp))
+        }
         if (trailing != null) trailing()
-        else Icon(
+        else if (trailingImageUrl == null) Icon(
             imageVector = Icons.Filled.KeyboardArrowRight,
             contentDescription = null,
             tint = AppColors.Dim,
@@ -908,4 +913,40 @@ fun BorderBox(
             .border(BorderStroke(stroke, border), RoundedCornerShape(radius)),
         contentAlignment = Alignment.Center,
     ) { content() }
+}
+
+
+/**
+ * عنوان فقرة/قسم في ورقة الأصول: اسم القسم (اسم المجلد) + عدده، يفصل بين الفقرات.
+ * يُستخدم في تعديل الملف الشخصي وفي نافذة الملصقات فتبدو الأصول مجمّعة كما في المجلدات.
+ */
+@Composable
+fun AssetSectionHeader(title: String, count: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            title.uppercase(),
+            style = AppText.tiny,
+            color = AppColors.Green,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Text(
+            count.toString(),
+            style = AppText.tiny,
+            color = AppColors.Dim,
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(AppColors.Border),
+        )
+    }
 }

@@ -16,7 +16,7 @@
 | 3 | نسخ **الرابط + المفتاح العام** | 2 د | `https://xxx.supabase.co` + `sb_publishable_…` |
 | 4 | تنفيذ ملف SQL الشامل | 5 د | 35 جدولاً + 68 دالة + 78 سياسة + 6 مخازن + بيانات أولية |
 | 5 | ضبط المصادقة (Auth) | 4 د | تسجيل/دخول/استعادة كلمة مرور تعمل |
-| 6 | رفع الأصول 311 ملفاً | 10 د | أدوات + ملصقات + أفاتارات تظهر في التطبيق |
+| 6 | رفع الأصول **492 ملفاً** (الدفعة الجديدة) | 15 د | أفاتارات + ملصقات + أدوات في **21 قسماً** تظهر في التطبيق |
 | 7 | تشغيل المزامنة اللحظية | 1 د | شات لحظي مثل Discord |
 | 8 | تعيين حسابك **Admin** | 2 د | لوحة الإدارة تظهر |
 | 9 | ربط التطبيق بالمفتاح | 1 د | شاشة رئيسية ببيانات حقيقية |
@@ -230,58 +230,64 @@ select id, public, file_size_limit from storage.buckets order by id;
 1. أضف «سرّين» مرة واحدة: المستودع → **Settings → Secrets and variables → Actions**:
    - `ADDONSTATION_SUPABASE_URL` = `https://<معرّف-مشروعك>.supabase.co`
    - `ADDONSTATION_SUPABASE_SECRET_KEY` = `sb_secret_…`
-2. تبويب **Actions** → **Upload seed assets** → **Run workflow**:
-   - اختر `dry-run` أولاً للتجربة، ثم `upload` للرفع الفعلي.
-   - يمكنك رفع قسم واحد (`items` أو `stickers` أو `profiles`) عبر قائمة `only`.
+2. تبويب **Actions** → **Upload new assets** → **Run workflow**:
+   - `mode` = `dry-run` أولاً للتجربة، ثم `mode` = `upload` مع `prune` = `true`.
+   - السير ينزّل أرشيف الدفعة الجديدة (185 MB) من المستودع العام، يستخرجه، يوزّعه على
+     **21 قسماً** حسب مجلداتك، يرفع **492 ملفاً** إلى `site-assets`، **ويحذف الأصول القديمة الـ311**،
+     ثم يتحقق تلقائياً أن ثلاثة ملفات تُقرأ عامّة (HTTP 200).
+   - بعد نجاحه نفّذ `supabase/15_assets_v2.sql` (انظر **docs/06-ASSETS-AR.md**).
 
 > 🔐 المفتاح السري يبقى داخل إعدادات GitHub ولا يظهر في السجل ولا يدخل التطبيق أبداً.
-> يرفع السير عمل **311 ملفاً** (105 أدوات + 181 ملصقاً + 25 أفاتاراً) إلى مخزن `site-assets`،
-> ثم يتحقق تلقائياً أن أول ملف يُقرأ عامّاً (HTTP 200).
+> تفاصيل كاملة (الأقسام الـ21 · تحريك GIF · التحقق) في: **`docs/06-ASSETS-AR.md`**.
 
-### 6.1 الطريقة الثانية: سكربت الرفع من حاسوبك (311 ملفاً في دقيقة)
-على **حاسوبك** (يحتاج Python 3 فقط، بلا أي مكتبة إضافية):
+### 6.1 الطريقة الثانية: سكربت الرفع من حاسوبك (492 ملفاً في دقائق)
+الدفعة الجديدة تأتي داخل **أرشيف مقسّم**، فيجهّزها سكربت واحد ثم يرفعها:
 
 ```bash
 # 1) نزّل المودع
 git clone https://github.com/mohamadelfrgena-ai/ps.git && cd ps
 
-# 2) تجربة بدون رفع (تتأكد أن كل شيء صحيح)
-python3 tools/upload_seed_assets.py \
-  --url https://xxxx.supabase.co \
-  --key sb_secret_xxxxxxxx \
-  --dry-run
+# 2) نزّل الأرشيف المقسّم من المستودع العام وجهّزه في أقسام + بيان
+python3 tools/prepare_new_assets.py --download --out new-assets --manifest assets-manifest.json
 
-# 3) الرفع الفعلي
-python3 tools/upload_seed_assets.py \
-  --url https://xxxx.supabase.co \
-  --key sb_secret_xxxxxxxx
+# 3) تجربة بدون رفع (تتأكد أن كل شيء صحيح)
+python3 tools/upload_seed_assets.py --source new-assets --url https://xxxx.supabase.co --key sb_secret_xxxxxxxx --dry-run
+
+# 4) الرفع الفعلي
+python3 tools/upload_seed_assets.py --source new-assets --url https://xxxx.supabase.co --key sb_secret_xxxxxxxx
+
+# 5) حذف الأصول القديمة الـ311 من المخزن
+python3 tools/prune_old_assets.py --url https://xxxx.supabase.co --key sb_secret_xxxxxxxx
 ```
 * استخدم هنا **المفتاح السري** `sb_secret_…` (أو `service_role` القديم) لأنه يرفع ملفات عامة دفعة واحدة.
-* الناتج المتوقع: `✅ نجح: 311  ❌ فشل: 0`.
-* لرفع الأفاتارات وحدها: أضف `--only profiles`.
-* لو أردت قسماً واحداً: أضف `--only items` أو `--only stickers` أو `--only profiles`.
+* الناتج المتوقع: `✅ نجح: 492  ❌ فشل: 0`.
+* لرفع نوع واحد: أضف `--only profiles` أو `--only stickers` أو `--only items`.
+* بعد الرفع نفّذ `supabase/15_assets_v2.sql` — وهو الذي يسجّل الأصول بأقسامها ويحذف القديم من الجداول.
 
 ### 6.2 أو يدوياً من اللوحة (مناسب إن لم يكن لديك حاسوب)
 **Storage** → `site-assets` → **Create folder** ثم ارفع داخل كل مجلد:
 
 ```
 site-assets/
-├── profiles/   ← onefree.png (الأفاتار الافتراضي)
-├── items/      ← 105 أداة (من مجلد seed-assets/items)
-└── stickers/
-    ├── meme/               (47)
-    ├── Minecraft_Memes1/   (21)
-    ├── Minecraft_Memes2/   (87)
-    ├── Minecraft_Memes3/   (20)
-    └── Minecraft_Movie/    (6)
+├── profiles/<القسم>/   ← 123 أفاتاراً في 11 قسماً
+│                          (pfp · profiles · pack-one · best-cartoon · cartoon-meme ·
+│                           cool-cartoon · call-of-duty · sad · ahh · moumen · animated)
+├── stickers/<القسم>/   ← 193 ملصقاً في 6 أقسام
+│                          (memes · minecraft-memes-1/2/3 · minecraft-movie · top)
+└── items/<القسم>/      ← 176 أداة في 4 أقسام
+                           (minecraft-item · games · playstation · random-things)
 ```
+> المجلدات الثلاثة القديمة `items/` و`stickers/` و`profiles/onefree.png` أُلغيت وحلّت محلها الأقسام أعلاه.
 > ⚠️ **المسار داخل المخزن يجب أن يطابق ما في قاعدة البيانات حرفياً**: `items/apple.png` وليس `site-assets/items/apple.png`.
 > 💡 على الحاسوب يمكنك سحب المجلد كاملاً وإفلاته في صفحة الرفع.
 
 ### 6.3 تحقق
 ```sql
 select asset_type, count(*) from public.site_assets group by 1 order by 1;
--- المتوقّع: sticker = 181 ، item = 105
+-- المتوقّع (بعد 15_assets_v2.sql): sticker = 193 ، item = 176 ، avatar = 123
+
+-- الأقسام كما ستراها في التطبيق:
+select collection, count(*) from public.site_assets group by 1 order by 1;
 
 -- اختبار رابط عام مباشر لعنصر (يجب أن يفتح صورة في المتصفح):
 select 'https://<معرّف-المشروع>.supabase.co/storage/v1/object/public/site-assets/' || file_url as url

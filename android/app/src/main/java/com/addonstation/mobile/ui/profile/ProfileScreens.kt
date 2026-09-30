@@ -50,7 +50,10 @@ import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.ContentItem
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.ui.assetUrl
+import com.addonstation.mobile.ui.equippedItemUrl
+import com.addonstation.mobile.ui.groupAssetsByCollection
 import com.addonstation.mobile.ui.components.AvatarImage
+import com.addonstation.mobile.ui.components.AssetSectionHeader
 import com.addonstation.mobile.ui.components.ContentCard
 import com.addonstation.mobile.ui.components.ContentColumn
 import com.addonstation.mobile.ui.components.EmptyState
@@ -332,6 +335,8 @@ private fun AboutTab(me: Profile, onOpenSettings: () -> Unit, onSignOut: () -> U
             icon = Icons.Filled.Edit,
             title = stringResource(R.string.profile_avatar_item),
             subtitle = me.equippedItemId,
+            // الأداة المجهّزة تظهر بصورتها الحقيقية (متحرّكة إن كانت GIF) بدل النص وحده
+            trailingImageUrl = equippedItemUrl(container, me.equippedItemId),
         )
         RowItem(
             icon = Icons.Filled.Settings,
@@ -577,76 +582,87 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                 Text(lockedHint, style = AppText.tiny, color = AppColors.Dim)
             }
             Spacer(Modifier.height(8.dp))
-            // ورقة أصول مصغّرة: 5 أعمدة × صفوف (أيقونة + الاسم تحتها) — بلا تمرير داخلي،
-            // تنساب مع تمرير الصفحة فتظهر كلها مرة واحدة كما في ورقة الأيقونات المرجعية.
+            // ورقة أصول مصغّرة: 5 أعمدة × صفوف (أيقونة + الاسم تحتها) — **فقرات منفصلة**
+            // لكل قسم/مجلد مصدر (PFP · Animated · Memes · Minecraft Items …) بلا تمرير داخلي،
+            // تنساب مع تمرير الصفحة فتظهر كل الأقسام مرة واحدة كما في ورقة الأيقونات المرجعية.
             if (assets.isEmpty()) {
                 EmptyState(text = stringResource(R.string.common_loading))
                 Spacer(Modifier.height(12.dp))
             } else {
+                val sections = groupAssetsByCollection(assets)
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    assets.chunked(GRID_COLUMNS).forEach { rowAssets ->
-                        Row(
+                    sections.forEach { section ->
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
+                            verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
                         ) {
-                            rowAssets.forEach { asset ->
-                                val unlocked = container.profile.canUseAsset(asset.requiredPlan, me)
-                                val selected = when (kind) {
-                                    "avatar" -> me?.avatarUrl == asset.fileUrl
-                                    "banner" -> me?.bannerUrl == asset.fileUrl
-                                    else -> me?.equippedItemId == asset.name
-                                }
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(GRID_CELL_HEIGHT.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(AppColors.Elevated)
-                                        .border(
-                                            1.dp,
-                                            if (selected) AppColors.Green else AppColors.Border,
-                                            RoundedCornerShape(12.dp),
-                                        )
-                                        .clickable(enabled = unlocked) {
-                                            scope.launch {
-                                                val value = if (kind == "item") asset.name else asset.fileUrl
-                                                container.profile.setProfileAsset(kind, value)
-                                                message = if (unlocked) null else lockedHint
-                                            }
-                                        }
-                                        .padding(4.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
+                            AssetSectionHeader(title = section.title, count = section.assets.size)
+                            section.assets.chunked(GRID_COLUMNS).forEach { rowAssets ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        AvatarImage(url = assetUrl(container, asset.fileUrl), size = 40.dp)
-                                        if (!unlocked) {
-                                            Text("🔒", style = AppText.tiny)
+                                    rowAssets.forEach { asset ->
+                                        val unlocked = container.profile.canUseAsset(asset.requiredPlan, me)
+                                        val selected = when (kind) {
+                                            "avatar" -> me?.avatarUrl == asset.fileUrl
+                                            "banner" -> me?.bannerUrl == asset.fileUrl
+                                            else -> me?.equippedItemId == asset.name
+                                        }
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(GRID_CELL_HEIGHT.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(AppColors.Elevated)
+                                                .border(
+                                                    1.dp,
+                                                    if (selected) AppColors.Green else AppColors.Border,
+                                                    RoundedCornerShape(12.dp),
+                                                )
+                                                .clickable(enabled = unlocked) {
+                                                    scope.launch {
+                                                        val value = if (kind == "item") asset.name else asset.fileUrl
+                                                        container.profile.setProfileAsset(kind, value)
+                                                        message = if (unlocked) null else lockedHint
+                                                    }
+                                                }
+                                                .padding(4.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center,
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                AvatarImage(url = assetUrl(container, asset.fileUrl), size = 40.dp)
+                                                if (!unlocked) {
+                                                    Text("🔒", style = AppText.tiny)
+                                                }
+                                            }
+                                            Spacer(Modifier.height(4.dp))
+                                            Text(
+                                                asset.name,
+                                                style = AppText.tiny,
+                                                color = if (selected) AppColors.Green else AppColors.Muted,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                                textAlign = TextAlign.Center,
+                                                lineHeight = AppText.tiny.fontSize * 1.05f,
+                                            )
                                         }
                                     }
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(
-                                        asset.name,
-                                        style = AppText.tiny,
-                                        color = if (selected) AppColors.Green else AppColors.Muted,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.Center,
-                                        lineHeight = AppText.tiny.fontSize * 1.05f,
-                                    )
+                                    // خلايا فارغة تكمل الصف الأخير حتى تبقى الأعمدة متساوية
+                                    repeat(GRID_COLUMNS - rowAssets.size) {
+                                        Spacer(Modifier.weight(1f))
+                                    }
                                 }
-                            }
-                            // خلايا فارغة تكمل الصف الأخير حتى تبقى الأعمدة متساوية
-                            repeat(GRID_COLUMNS - rowAssets.size) {
-                                Spacer(Modifier.weight(1f))
                             }
                         }
                     }
                 }
             }
+
             Spacer(Modifier.height(96.dp))
         }
     }
