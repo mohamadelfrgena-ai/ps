@@ -123,6 +123,14 @@ jobs:
         run: |
           python3 tools/upload_seed_assets.py --source new-assets
 
+      - name: تسجيل الأصول الجديدة في قاعدة البيانات (بلا لصق SQL)
+        if: ${{ inputs.mode == 'upload' }}
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python3 tools/seed_assets_rest.py
+
       - name: حذف الأصول القديمة من المخزن
         if: ${{ inputs.mode == 'upload' && inputs.prune == 'true' }}
         env:

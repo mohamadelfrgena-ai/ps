@@ -13,7 +13,8 @@
 #
 #   1) task = apk            → يبني ملف APK (يُرفع كمُخرَج قابل للتنزيل)
 #   2) task = assets-dry-run → تجربة رفع أصول site-assets بلا رفع فعلي
-#   3) task = assets-upload  → رفع 311 ملفاً (أدوات + ملصقات + أفاتارات) فعلياً
+#   3) task = assets-upload  → رفع 492 أصلاً (أدوات + ملصقات + أفاتارات) فعلياً + حذف القديم + تسجيلها في القاعدة
+#   4) task = assets-seed    → تسجيل فقط في القاعدة (بلا إعادة رفع)
 #
 # الإعداد مرة واحدة لمهمّة الرفع (Settings → Secrets and variables → Actions):
 #   ADDONSTATION_SUPABASE_URL         = https://xxxx.supabase.co
@@ -245,8 +246,16 @@ jobs:
           } > /tmp/report.md
           gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@/tmp/report.md || true
 
+      - name: تسجيل الأصول الجديدة في قاعدة البيانات (بلا لصق SQL)
+        if: needs.request.outputs.task == 'assets-upload' || needs.request.outputs.task == 'assets-seed'
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python3 tools/seed_assets_rest.py 2>&1 | tee -a /tmp/upload.log
+
       - name: تحقق بعد الرفع (رابط عام لثلاثة ملفات جديدة)
-        if: needs.request.outputs.task == 'assets-upload'
+        if: needs.request.outputs.task == 'assets-upload' || needs.request.outputs.task == 'assets-seed'
         env:
           S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
         run: |

@@ -29,16 +29,30 @@ fun assetUrl(container: AppContainer, path: String?): String? = container.siteAs
 data class AssetSection(val title: String, val assets: List<SiteAsset>)
 
 /**
- * يجمّع الأصول في **فقرات منفصلة** حسب القسم (collection) مع الحفاظ على ترتيب الخادم.
- * الأصول التي لا قسم لها تُوضع في فقرة واحدة بعنوان «أخرى» بدل أن تختفي.
+ * يجمّع الأصول في **فقرات منفصلة** حسب القسم مع الحفاظ على ترتيب الخادم.
+ *
+ * القسم يأتي من عمود `collection` إن كان مسجّلاً (supabase/15_assets_v2.sql)،
+ * وإلا يُشتق من مسار الملف نفسه: `profiles/pfp/x.png` → «PFP» — فيظهر الترتيب
+ * بالفقرات حتى قبل تنفيذ ملف SQL، بلا أي شاشة فارغة.
  */
 fun groupAssetsByCollection(assets: List<SiteAsset>, othersTitle: String = "Other"): List<AssetSection> {
     val groups = LinkedHashMap<String, MutableList<SiteAsset>>()
     assets.forEach { asset ->
-        val key = asset.collection?.takeIf { it.isNotBlank() } ?: othersTitle
+        val key = asset.collection?.takeIf { it.isNotBlank() } ?: sectionFromPath(asset.fileUrl) ?: othersTitle
         groups.getOrPut(key) { mutableListOf() }.add(asset)
     }
     return groups.map { (title, list) -> AssetSection(title, list) }
+}
+
+/** يستخرج اسم القسم من مسار الملف: `items/minecraft-item/x.png` → «Minecraft Item». */
+fun sectionFromPath(path: String?): String? {
+    val parts = path?.trim('/')?.split('/')?.filter { it.isNotBlank() } ?: return null
+    if (parts.size < 3) return null
+    val raw = parts[1]
+    if (raw == parts[0]) return null
+    return raw.split('-', '_')
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
 }
 
 /**
