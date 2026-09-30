@@ -29,6 +29,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import List, Optional, Tuple
 
@@ -56,11 +57,16 @@ def request(url: str, key: str, data: Optional[bytes] = None, method: str = "GET
         return resp.status, body
 
 
+def encode_path(path: str) -> str:
+    """ترميز المسار للاستخدام في رابط: المسافات وأسماء مثل «Waguri-chan is Minecraft.jpg»."""
+    return urllib.parse.quote(path, safe="/")
+
+
 def upload(url: str, key: str, bucket: str, path: str, file_path: str) -> Tuple[int, str]:
     ctype = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
     with open(file_path, "rb") as fh:
         payload = fh.read()
-    endpoint = f"{url.rstrip('/')}/storage/v1/object/{bucket}/{path}"
+    endpoint = f"{url.rstrip('/')}/storage/v1/object/{bucket}/{encode_path(path)}"
     return request(endpoint, key, payload, method="POST", content_type=ctype)
 
 
@@ -137,7 +143,7 @@ def main() -> int:
                 else:
                     raise RuntimeError(f"HTTP {status}")
                 break
-            except (urllib.error.HTTPError, urllib.error.URLError, RuntimeError, TimeoutError) as exc:
+            except Exception as exc:  # noqa: BLE001 — لا نوقف الرفع بسبب ملف واحد
                 detail = ""
                 if isinstance(exc, urllib.error.HTTPError):
                     try:
