@@ -215,7 +215,7 @@
     <string name="set_support_no_mail_app">No email app was found on your device. Write to us from your mail at:\nsilverfoxinteractive@gmail.com</string>
     <string name="set_about">About the app</string>
     <string name="set_version">App version</string>
-    <string name="set_terms">Terms &amp; conditions</string>
+    <string name="set_terms">Terms of use</string>
     <string name="set_privacy">Privacy policy</string>
     <string name="set_account_area">Account</string>
     <string name="set_delete_account">Delete account</string>
@@ -472,8 +472,8 @@
     <string name="setup_connect">Connect</string>
     <string name="setup_error">Check the URL and the key</string>
     <string name="setup_hint">You only need to do this once.</string>
-    <string name="set_terms_text">These Terms are set by AddonStation: use the app respectfully, do not redistribute paid content, and follow the community rules.</string>
-    <string name="set_privacy_text">Your account data is stored on Supabase servers. Your email is never shown to other users, and your session is kept encrypted on your device.</string>
+    <string name="set_terms_text">By using AddonStation, you agree to these terms and undertake to use the service lawfully and responsibly.\n\nYou are responsible for your account and for the content you post. You must not post content that infringes the rights of others or contains malicious software, fraud, abuse, or illegal material.\n\nYou retain the rights to the content you create, but by uploading it to AddonStation you grant the platform the permission needed to host, display, and distribute it within its services.\n\nAddonStation may include subscriptions, paid services, and the AC system. AC usage is limited to the features defined by the platform, and AC is not considered cash unless stated otherwise.\n\nAddonStation may remove violating content or restrict or suspend accounts that breach these terms.\n\nAddonStation is not owned, operated, or endorsed by Mojang or Microsoft unless officially stated otherwise.\n\nServices, features, or these terms may change from time to time.\n\nLast updated: 30 September 2026</string>
+    <string name="set_privacy_text">We respect your privacy and are committed to protecting your data. We may collect information such as your email address, username, profile picture, and the content you post in order to run and improve AddonStation\'s services.\n\nWe may use external services such as hosting, authentication, storage, and payments. Some of your data may be processed by these services under their own policies.\n\nContent you post in the community or chat rooms may be visible to other users. Do not share personal or confidential information you do not want to publish.\n\nWe protect your data with appropriate security measures, but no online service can be guaranteed to be completely secure.\n\nYou can request deletion of your account and data, although some information may be retained when legally required or necessary for safety.\n\nWe may update this privacy policy from time to time. Continuing to use AddonStation after an update means you accept the updated policy.\n\nLast updated: 30 September 2026</string>
     <string name="set_support_note_help">Tap this option and your mail app opens with a ready message to the support team.</string>
     <string name="set_support_note_report">Describe the problem (screen, steps, device) — your mail app opens with your device details filled in.</string>
     <string name="set_support_note_contact">Your mail app opens straight to silverfoxinteractive@gmail.com — we reply within 24 hours.</string>

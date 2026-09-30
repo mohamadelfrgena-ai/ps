@@ -11,8 +11,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -171,7 +174,17 @@ fun InfoDialog(title: String, text: String, onClose: () -> Unit) {
         titleContentColor = AppColors.Text,
         textContentColor = AppColors.Muted,
         title = { Text(title, style = AppText.sectionTitle) },
-        text = { Text(text, style = AppText.bodySmall) },
+        // النصوص الطويلة (سياسة الخصوصية · شروط وأحكام الاستخدام) تُمرَّر داخل النافذة
+        // فتبقى كل الفقرات مقروءة ولا يخرج زر «حسناً» خارج الشاشة.
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 430.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Text(text, style = AppText.bodySmall)
+            }
+        },
         confirmButton = {
             TextButton(onClick = onClose) {
                 Text(stringResource(R.string.common_ok), color = AppColors.Green)

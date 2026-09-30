@@ -206,7 +206,7 @@
     <string name="set_support_no_mail_app">设备上未找到邮件应用。请用你的邮箱写信给我们：\nsilverfoxinteractive@gmail.com</string>
     <string name="set_about">关于应用</string>
     <string name="set_version">应用版本</string>
-    <string name="set_terms">条款与条件</string>
+    <string name="set_terms">使用条款</string>
     <string name="set_privacy">隐私政策</string>
     <string name="set_account_area">账号</string>
     <string name="set_delete_account">删除账号</string>
@@ -456,8 +456,8 @@
     <string name="setup_connect">连接</string>
     <string name="setup_error">请检查 URL 和密钥</string>
     <string name="setup_hint">只需执行一次。</string>
-    <string name="set_terms_text">本条款由 AddonStation 制定：请文明使用应用，不要二次分发付费内容，并遵守社区规则。</string>
-    <string name="set_privacy_text">你的账号数据保存在 Supabase 服务器上。你的邮箱不会向其他用户显示，登录会话在你的设备上加密保存。</string>
+    <string name="set_terms_text">使用 AddonStation 即表示你同意这些条款，并承诺以合法、负责的方式使用本服务。\n\n你需对自己的账号及发布的内容负责。不得发布侵犯他人权利，或含有恶意软件、欺诈、滥用或违法内容的信息。\n\n你保留自己创作内容的相关权利，但将其上传至 AddonStation 即表示你授予平台在其服务范围内托管、展示和分发该内容的必要许可。\n\nAddonStation 可能包含订阅、付费服务和 AC 系统。AC 的使用仅限于平台规定的功能，除另有说明外，AC 不视为现金。\n\nAddonStation 有权删除违规内容，并限制或暂停违反这些条款的账号。\n\n除官方另有说明外，AddonStation 不归 Mojang 或 Microsoft 所有，也不由其运营或认可。\n\n服务、功能或这些条款可能不时变更。\n\n最后更新：2026年9月30日</string>
+    <string name="set_privacy_text">我们尊重你的隐私并承诺保护你的数据。为运行和改进 AddonStation 的服务，我们可能收集电子邮箱、用户名、头像以及你发布的内容等信息。\n\n我们可能使用托管、身份验证、存储和支付等外部服务。你的部分数据可能由这些服务按其自身政策处理。\n\n你在社区或聊天室发布的内容可能对其他用户可见。请勿分享你不想公开的个人或机密信息。\n\n我们采用适当的安全措施保护你的数据，但任何在线服务都无法保证绝对安全。\n\n你可以请求删除你的账号和数据，但在法律要求或安全需要时，部分信息可能会被保留。\n\n我们可能不时更新本隐私政策。更新后你继续使用 AddonStation 即表示接受更新后的政策。\n\n最后更新：2026年9月30日</string>
     <string name="set_support_note_help">帮助中心解答下载、订阅和聊天方面的常见问题。如需紧急帮助，请在 Support 房间联系我们。</string>
     <string name="set_support_note_report">请描述问题（界面、操作步骤、你的设备），并在 Support 房间或邮件中发送。</string>
     <string name="set_support_note_contact">写信到 hello@addonstation.app 或在 Support 房间发帖，我们会在 24 小时内回复。</string>

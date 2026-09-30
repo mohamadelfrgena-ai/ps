@@ -206,7 +206,7 @@
     <string name="set_support_no_mail_app">Cihazında e-posta uygulaması bulunamadı. Bize kendi e-postandan yaz:\nsilverfoxinteractive@gmail.com</string>
     <string name="set_about">Uygulama hakkında</string>
     <string name="set_version">Uygulama sürümü</string>
-    <string name="set_terms">Şartlar ve koşullar</string>
+    <string name="set_terms">Kullanım şartları</string>
     <string name="set_privacy">Gizlilik politikası</string>
     <string name="set_account_area">Hesap</string>
     <string name="set_delete_account">Hesabı sil</string>
@@ -456,8 +456,8 @@
     <string name="setup_connect">Bağlan</string>
     <string name="setup_error">URL ve anahtarı kontrol et</string>
     <string name="setup_hint">Bunu yalnızca bir kez yapman gerekir.</string>
-    <string name="set_terms_text">Bu Koşullar AddonStation tarafından belirlenir: uygulamayı saygılı kullan, ücretli içeriği yeniden dağıtma ve topluluk kurallarına uy.</string>
-    <string name="set_privacy_text">Hesap verilerin Supabase sunucularında saklanır. E-postan diğer kullanıcılara gösterilmez ve oturumun cihazında şifreli tutulur.</string>
+    <string name="set_terms_text">AddonStation kullanarak bu şartları kabul eder ve hizmeti yasal ve sorumlu bir şekilde kullanmayı taahhüt edersin.\n\nHesabından ve paylaştığın içerikten sen sorumlusun. Başkalarının haklarını ihlal eden ya da zararlı yazılım, dolandırıcılık, kötüye kullanım veya yasa dışı içerik barındıran içerik paylaşmamalısın.\n\nOluşturduğun içeriğin haklarını korursun; ancak onu AddonStation\'a yüklediğinde platforma hizmetleri kapsamında barındırma, gösterme ve dağıtma izni vermiş olursun.\n\nAddonStation abonelikler, ücretli hizmetler ve AC sistemi içerebilir. AC kullanımı platformun belirlediği özelliklerle sınırlıdır ve aksi belirtilmedikçe AC nakit para sayılmaz.\n\nAddonStation ihlal içeren içeriği kaldırabilir, bu şartları ihlal eden hesapları kısıtlayabilir veya askıya alabilir.\n\nAddonStation, resmî olarak aksi belirtilmedikçe Mojang veya Microsoft\'a ait değildir, onlar tarafından yönetilmez ve onaylanmaz.\n\nHizmetler, özellikler veya bu şartlar zaman zaman değişebilir.\n\nSon güncelleme: 30 Eylül 2026</string>
+    <string name="set_privacy_text">Gizliliğine saygı duyuyor ve verilerini korumayı taahhüt ediyoruz. AddonStation hizmetlerini sunmak ve geliştirmek için e-posta adresi, kullanıcı adı, profil resmi ve paylaştığın içerik gibi bilgileri toplayabiliriz.\n\nBarındırma, kimlik doğrulama, depolama ve ödeme gibi üçüncü taraf hizmetleri kullanabiliriz. Bazı verilerin bu hizmetler tarafından kendi politikalarına göre işlenebilir.\n\nToplulukta veya sohbet odalarında paylaştığın içerik diğer kullanıcılar tarafından görülebilir. Paylaşmak istemediğin kişisel veya gizli bilgileri paylaşma.\n\nVerilerini uygun güvenlik önlemleriyle koruruz, ancak hiçbir çevrimiçi hizmetin güvenliği tamamen garanti edilemez.\n\nHesabının ve verilerinin silinmesini talep edebilirsin; bazı bilgiler yasal olarak gerekli olduğunda veya güvenlik için zorunlu olduğunda saklanabilir.\n\nBu gizlilik politikasını zaman zaman güncelleyebiliriz. Güncellemeden sonra AddonStation kullanmaya devam etmen, güncellenmiş politikayı kabul ettiğin anlamına gelir.\n\nSon güncelleme: 30 Eylül 2026</string>
     <string name="set_support_note_help">Yardım merkezi indirmeler, planlar ve sohbet hakkındaki sık soruları yanıtlar. Acil bir durumda Support odasından bize yaz.</string>
     <string name="set_support_note_report">Sorunu açıkla (ekran, adımlar, cihazın) ve Support odasına ya da e-postayla gönder.</string>
     <string name="set_support_note_contact">hello@addonstation.app adresine yaz veya Support odasında konu aç — 24 saat içinde yanıtlıyoruz.</string>

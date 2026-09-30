@@ -206,7 +206,7 @@
     <string name="set_support_no_mail_app">Nenhum app de e-mail encontrado. Escreva para nós de seu e-mail em:\nsilverfoxinteractive@gmail.com</string>
     <string name="set_about">Sobre o app</string>
     <string name="set_version">Versão do app</string>
-    <string name="set_terms">Termos e condições</string>
+    <string name="set_terms">Termos de uso</string>
     <string name="set_privacy">Política de privacidade</string>
     <string name="set_account_area">Conta</string>
     <string name="set_delete_account">Excluir conta</string>
@@ -456,8 +456,8 @@
     <string name="setup_connect">Conectar</string>
     <string name="setup_error">Verifique a URL e a chave</string>
     <string name="setup_hint">Você só precisa fazer isso uma vez.</string>
-    <string name="set_terms_text">Estes Termos são definidos pela AddonStation: use o app com respeito, não redistribua conteúdo pago e siga as regras da comunidade.</string>
-    <string name="set_privacy_text">Os dados da sua conta ficam nos servidores Supabase. Seu e-mail nunca é mostrado a outros usuários e sua sessão fica criptografada no aparelho.</string>
+    <string name="set_terms_text">Ao usar a AddonStation, você concorda com estes termos e compromete-se a usar o serviço de forma legal e responsável.\n\nVocê é responsável pela sua conta e pelo conteúdo que publica. Não deve publicar conteúdo que viole os direitos de terceiros ou que contenha software malicioso, fraude, abuso ou conteúdo ilegal.\n\nVocê mantém os direitos sobre o conteúdo que cria, mas ao enviá-lo para a AddonStation você concede à plataforma a permissão necessária para hospedá-lo, exibi-lo e distribuí-lo nos seus serviços.\n\nA AddonStation pode incluir assinaturas, serviços pagos e o sistema AC. O uso dos AC limita-se aos recursos definidos pela plataforma, e os AC não são considerados dinheiro, salvo indicação em contrário.\n\nA AddonStation pode remover conteúdo infrator ou restringir ou suspender contas que violem estes termos.\n\nA AddonStation não é propriedade da Mojang ou da Microsoft, nem é administrada ou endossada por elas, salvo indicação oficial em contrário.\n\nOs serviços, os recursos ou estes termos podem mudar de tempos em tempos.\n\nÚltima atualização: 30 de setembro de 2026</string>
+    <string name="set_privacy_text">Respeitamos a sua privacidade e comprometemo-nos a proteger os seus dados. Podemos recolher informações como o e-mail, o nome de usuário, a foto de perfil e o conteúdo que você publica para operar e melhorar os serviços da AddonStation.\n\nPodemos usar serviços externos como hospedagem, autenticação, armazenamento e pagamento. Alguns dos seus dados podem ser processados por esses serviços de acordo com as políticas deles.\n\nO conteúdo que você publica na comunidade ou nas salas de chat pode ser visível para outros usuários. Não compartilhe informações pessoais ou confidenciais que você não queira publicar.\n\nProtegemos os seus dados com medidas de segurança adequadas, mas a segurança de qualquer serviço online não pode ser totalmente garantida.\n\nVocê pode solicitar a exclusão da sua conta e dos seus dados, podendo algumas informações ser mantidas quando exigido por lei ou necessário para a segurança.\n\nPodemos atualizar esta política de privacidade de tempos em tempos. Continuar a usar a AddonStation após uma atualização significa que você aceita a política atualizada.\n\nÚltima atualização: 30 de setembro de 2026</string>
     <string name="set_support_note_help">A central de ajuda responde dúvidas comuns sobre downloads, planos e chat. Para urgências, fale conosco na sala Support.</string>
     <string name="set_support_note_report">Descreva o problema (tela, passos, seu aparelho) e envie na sala Support ou por e-mail.</string>
     <string name="set_support_note_contact">Escreva para hello@addonstation.app ou abra um tópico na sala Support — respondemos em até 24 horas.</string>
