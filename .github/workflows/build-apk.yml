@@ -1,3 +1,9 @@
+# ⚠️ لا يُبنى أي APK تلقائياً. البناء يحدث فقط عند «طلب بناء» صريح.
+#
+#   • أي دفعة عادية من الكود → لا يُشغَّل شيء إطلاقاً (صفر عمليات).
+#   • لطلب بناء: يُعدَّل الملف .build-request ويُدفع مع تعليق يحوي العلامة [build-apk].
+#   • مهمّتا رفع الأصول تحتاجان العلامة [assets-upload] بدلاً منها.
+#
 # سير عمل واحد بمهمّتين — من تبويب Actions → Build APK → Run workflow
 #
 #   1) task = apk            → يبني ملف APK (يُرفع كمُخرَج قابل للتنزيل)
@@ -30,17 +36,22 @@ on:
           - apk
           - assets-dry-run
           - assets-upload
+  # هذا المحفّز لا يعمل إلا إذا تغيّر ملف طلب البناء (.build-request).
+  # أي دفعة عادية للكود لا تُشغّل شيئاً.
   push:
     branches: [ main, arena/01a0e97c-ps ]
-  pull_request:
-    branches: [ main ]
+    paths:
+      - '.build-request'
 
 jobs:
   # ==========================================================================
   # 1) بناء التطبيق (debug APK)
   # ==========================================================================
   build-debug-apk:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.task == 'apk' }}
+    # يبني فقط عند: تشغيل يدوي بمهمّة apk، أو دفعة موسومة بـ[build-apk] (طلب صريح).
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.task == 'apk') ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[build-apk]'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -131,7 +142,9 @@ jobs:
   # 2) رفع أصول site-assets (311 ملفاً) — يدوياً فقط
   # ==========================================================================
   upload-assets:
-    if: ${{ github.event_name == 'workflow_dispatch' && startsWith(inputs.task, 'assets-') }}
+    if: >-
+      (github.event_name == 'workflow_dispatch' && startsWith(inputs.task, 'assets-')) ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[assets-upload]'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
