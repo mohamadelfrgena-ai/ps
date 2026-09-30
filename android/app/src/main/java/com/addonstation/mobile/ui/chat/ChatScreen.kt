@@ -618,7 +618,8 @@ private fun ChatHeader(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 RoomIcon(channelId = channel.id, size = 20.dp)
                 Text(
-                    channel.name,
+                    // اسم غرفة اللغة بلغتها نفسها (العربية · Русский · 中文 …)
+                    com.addonstation.mobile.ui.community.channelDisplayName(channel),
                     style = AppText.chatName,
                     color = AppColors.Text,
                     maxLines = 1,
@@ -626,7 +627,8 @@ private fun ChatHeader(
                 )
                 if (channel.isLocked) Text("🔒", style = AppText.tiny)
             }
-            channel.description?.let {
+            // الوصف أيضاً بلغة الغرفة نفسها لغرف اللغات
+            com.addonstation.mobile.ui.community.channelDisplayDescription(channel)?.let {
                 Text(it, style = AppText.tiny, color = AppColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -715,7 +717,10 @@ private fun ChatInputBar(
                     onValueChange = { if (it.length <= 500) onTextChange(it) },
                     placeholder = {
                         Text(
-                            stringResource(R.string.chat_hint, channel.name),
+                            stringResource(
+                                R.string.chat_hint,
+                                com.addonstation.mobile.ui.community.channelDisplayName(channel),
+                            ),
                             style = AppText.bodySmall,
                         )
                     },

@@ -369,7 +369,8 @@ private fun RoomRow(
         }
         RoomIcon(channelId = channel.id, size = 22.dp)
         Text(
-            text = channel.name,
+            // غرف اللغات باسمها بلغتها (العربية · Русский · 中文 …) كما في ChannelNames.kt
+            text = channelDisplayName(channel),
             style = AppText.body.copy(fontWeight = if (unread > 0 || mentions > 0) FontWeight.Bold else FontWeight.Normal),
             color = if (unread > 0 || mentions > 0) AppColors.Text else AppColors.Muted,
             maxLines = 1,

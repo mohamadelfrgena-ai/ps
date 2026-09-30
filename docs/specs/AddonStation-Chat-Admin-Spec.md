@@ -110,6 +110,10 @@ Rules:
 | 7 | 🇫🇷 Français | lang-fr |
 | 8 | 🇹🇷 Türkçe | lang-tr |
 
+> ملاحظة تنفيذ: اسم كل غرفة لغة يُشتق في التطبيق من **معرّف الغرفة** لا من عمود الاسم
+> (`ui/community/ChannelNames.kt`) فيبقى الاسم بلغته دائماً حتى لو تغيّر الصف في قاعدة
+> البيانات. وملف `supabase/16_language_room_names.sql` يجعل قاعدة البيانات مطابقة.
+
 Total: 13 rooms in 2 categories. Names are shown exactly as above (they are not translated). The category titles are translated with the app language.
 
 Room data: `id`, `name`, `icon`, `category`, `sort_order`, `description`, `is_locked` (read-only), `slowmode_seconds` (0 = off), `created_at`. Only the admin can create, rename, reorder, lock, or delete rooms (see Part E).

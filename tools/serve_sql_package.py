@@ -42,6 +42,8 @@ ORDER = [
     ("11_grants.sql", "11_grants.sql", "⚠️ إلزامي للمشاريع الجديدة: منح صلاحيات anon/authenticated"),
     ("13_channels_icons.sql", "13_channels_icons.sql", "أسماء غرف الشات بلا إيموجي (الأيقونات داخل التطبيق)"),
     ("14_redeem_codes.sql", "14_redeem_codes.sql", "أكواد هدايا AC: جدول + دالتا توليد واستبدال"),
+    ("16_language_room_names.sql", "16_language_room_names.sql",
+     "أسماء غرف اللغة بلغتها (العربية · Русский · 中文 …) والغرف الأساسية بلا إيموجي"),
     ("15_assets_v2.sql", "15_assets_v2.sql",
      "الأصول الجديدة: يستبدل كل الأفاتارات والملصقات والأدوات بـ492 أصلاً في 21 قسماً"),
     ("08_admin_bootstrap.sql", "08_admin_bootstrap_example.sql", "النسخة العامة (you@example.com)"),
