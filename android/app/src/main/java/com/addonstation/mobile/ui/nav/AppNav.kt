@@ -135,6 +135,7 @@ private fun MainNavigation(startAtReset: Boolean) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
     val tab = MainTab.entries.firstOrNull { it.route == route }
+    val profile by container.state.profile.collectAsState()
     val wallet by container.state.wallet.collectAsState()
 
     LaunchedEffect(startAtReset) {
@@ -189,7 +190,9 @@ private fun MainNavigation(startAtReset: Boolean) {
                 composable(Routes.COMMUNITY) {
                     com.addonstation.mobile.ui.community.CommunityGate(
                         onOpenRoom = { channel: ChatChannel -> go(Routes.chat(channel.id)) },
-                        onOpenSettings = { goTab(MainTab.Settings) },
+                        // ترس لوحة المستخدم في الشات → تعديل الملف الشخصي (وإن لم يسجّل: شاشة الدخول)
+                        onOpenEditProfile = { if (profile == null) go(Routes.LOGIN) else go(Routes.EDIT_PROFILE) },
+                        onOpenWallet = { go(Routes.WALLET) },
                         onLogin = { go(Routes.LOGIN) },
                         onDeclineToHome = { goTab(MainTab.Home) },
                     )

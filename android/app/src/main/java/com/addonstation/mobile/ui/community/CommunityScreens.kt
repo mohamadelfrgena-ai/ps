@@ -68,7 +68,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun CommunityGate(
     onOpenRoom: (ChatChannel) -> Unit,
-    onOpenSettings: () -> Unit,
+    onOpenEditProfile: () -> Unit,
+    onOpenWallet: () -> Unit,
     onLogin: () -> Unit,
     onDeclineToHome: () -> Unit,
 ) {
@@ -104,7 +105,8 @@ fun CommunityGate(
 
     RoomListScreen(
         onOpenRoom = onOpenRoom,
-        onOpenSettings = onOpenSettings,
+        onOpenEditProfile = onOpenEditProfile,
+        onOpenWallet = onOpenWallet,
         onLogin = onLogin,
     )
 }
@@ -165,7 +167,8 @@ fun RulesScreen(onAccepted: () -> Unit, onDecline: () -> Unit) {
 @Composable
 fun RoomListScreen(
     onOpenRoom: (ChatChannel) -> Unit,
-    onOpenSettings: () -> Unit,
+    onOpenEditProfile: () -> Unit,
+    onOpenWallet: () -> Unit,
     onLogin: () -> Unit,
 ) {
     val container = rememberContainer()
@@ -191,7 +194,7 @@ fun RoomListScreen(
         PixelTopBar(
             title = stringResource(R.string.nav_community),
             walletBalance = wallet?.balance,
-            onWalletClick = { onOpenSettings() },
+            onWalletClick = { onOpenWallet() },
             icon = Icons.Filled.Group,
         )
         if (loading) {
@@ -283,15 +286,21 @@ fun RoomListScreen(
                         )
                     }
                 }
+                // ترس لوحة المستخدم: ينقل إلى تعديل الملف الشخصي (لا إلى إعدادات التطبيق)
                 Box(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(AppColors.Elevated2)
-                        .clickable { onOpenSettings() },
+                        .clickable { onOpenEditProfile() },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.Settings, contentDescription = null, tint = AppColors.Muted, modifier = Modifier.size(18.dp))
+                    Icon(
+                        Icons.Filled.Settings,
+                        contentDescription = stringResource(R.string.profile_edit),
+                        tint = AppColors.Muted,
+                        modifier = Modifier.size(18.dp),
+                    )
                 }
             }
         }
