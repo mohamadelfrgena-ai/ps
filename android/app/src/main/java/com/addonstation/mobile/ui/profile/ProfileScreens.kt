@@ -577,47 +577,62 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                 Text(lockedHint, style = AppText.tiny, color = AppColors.Dim)
             }
             Spacer(Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(assets, key = { it.id }) { asset ->
-                    val unlocked = container.profile.canUseAsset(asset.requiredPlan, me)
-                    val selected = when (kind) {
-                        "avatar" -> me?.avatarUrl == asset.fileUrl
-                        "banner" -> me?.bannerUrl == asset.fileUrl
-                        else -> me?.equippedItemId == asset.name
-                    }
-                    Column(
-                        modifier = Modifier
-                            .size(84.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(AppColors.Elevated)
-                            .border(
-                                1.dp,
-                                if (selected) AppColors.Green else AppColors.Border,
-                                RoundedCornerShape(14.dp),
-                            )
-                            .clickable(enabled = unlocked) {
-                                scope.launch {
-                                    val value = if (kind == "item") asset.name else asset.fileUrl
-                                    container.profile.setProfileAsset(kind, value)
-                                    message = if (unlocked) null else lockedHint
+            // شبكة عمودية (3 أعمدة) بدل الشريط الأفقي — تعرض كل الأصول دون تمرير جانبي.
+            if (assets.isEmpty()) {
+                EmptyState(text = stringResource(R.string.common_loading))
+                Spacer(Modifier.height(12.dp))
+            } else {
+                val gridRows = (assets.size + GRID_COLUMNS - 1) / GRID_COLUMNS
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(GRID_COLUMNS),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height((gridRows * GRID_CELL_HEIGHT + (gridRows - 1) * GRID_SPACING).dp),
+                    horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
+                    verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
+                ) {
+                    items(assets, key = { it.id }) { asset ->
+                        val unlocked = container.profile.canUseAsset(asset.requiredPlan, me)
+                        val selected = when (kind) {
+                            "avatar" -> me?.avatarUrl == asset.fileUrl
+                            "banner" -> me?.bannerUrl == asset.fileUrl
+                            else -> me?.equippedItemId == asset.name
+                        }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(GRID_CELL_HEIGHT.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(AppColors.Elevated)
+                                .border(
+                                    1.dp,
+                                    if (selected) AppColors.Green else AppColors.Border,
+                                    RoundedCornerShape(14.dp),
+                                )
+                                .clickable(enabled = unlocked) {
+                                    scope.launch {
+                                        val value = if (kind == "item") asset.name else asset.fileUrl
+                                        container.profile.setProfileAsset(kind, value)
+                                        message = if (unlocked) null else lockedHint
+                                    }
+                                }
+                                .padding(6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                AvatarImage(url = assetUrl(container, asset.fileUrl), size = 62.dp)
+                                if (!unlocked) {
+                                    Text("🔒", style = AppText.bodySmall)
                                 }
                             }
-                            .padding(6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            AvatarImage(url = assetUrl(container, asset.fileUrl), size = 52.dp)
-                            if (!unlocked) {
-                                Text("🔒", style = AppText.bodySmall)
-                            }
+                            Text(
+                                asset.name,
+                                style = AppText.tiny,
+                                color = if (selected) AppColors.Green else AppColors.Muted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
-                        Text(
-                            asset.name,
-                            style = AppText.tiny,
-                            color = AppColors.Muted,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
                     }
                 }
             }
@@ -644,6 +659,11 @@ private fun OutlinedTextFieldBidi(
         modifier = Modifier.fillMaxWidth(),
     )
 }
+
+// مقاسات شبكة اختيار الأصول في شاشة تعديل الملف (3 أعمدة)
+private const val GRID_COLUMNS = 3
+private const val GRID_CELL_HEIGHT = 104
+private const val GRID_SPACING = 10
 
 /** ملف مستخدم عام (يُفتح من الشات أو من بطاقة المبدع). */
 @Composable
