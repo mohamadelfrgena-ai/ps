@@ -352,6 +352,7 @@
     <string name="ac_not_enough">رصيد AC غير كافٍ</string>
     <string name="ac_redeem_title">كود هدية AC</string>
     <string name="ac_redeem_hint">الكود من 8 خانات: حروف كبيرة وصغيرة ورقمان</string>
+    <string name="ac_redeem_detected">فئة الكود: %1$s AC</string>
     <string name="ac_redeem_action">استبدال الكود</string>
     <string name="ac_redeem_success">تمت إضافة %1$s AC إلى رصيدك.</string>
     <string name="ac_redeem_invalid">الكود غير صحيح. تحقّق من الحروف والأرقام.</string>
@@ -433,6 +434,8 @@
     <string name="admin_codes_title">أكواد هدايا AC</string>
     <string name="admin_codes_amount">قيمة الكود (AC)</string>
     <string name="admin_codes_count">عدد الأكواد</string>
+    <string name="admin_codes_summary">%1$s كود × %2$s AC = %3$s AC إجمالاً</string>
+    <string name="admin_codes_bad_amount">أدخل قيمة 100 AC على الأقل.</string>
     <string name="admin_codes_generate">توليد الأكواد</string>
     <string name="admin_codes_created">تم توليد %1$s كوداً — انسخها الآن:</string>
     <string name="admin_codes_hint">انسخ الأكواد وأرسلها لمن تريد. كل كود يُستخدم مرة واحدة لكل مستخدم.</string>

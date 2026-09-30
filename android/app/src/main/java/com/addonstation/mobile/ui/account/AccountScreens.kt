@@ -81,6 +81,7 @@ fun AcWalletScreen(
     var messageOk by remember { mutableStateOf(true) }
     var codeInput by remember { mutableStateOf("") }
     var redeeming by remember { mutableStateOf(false) }
+    var detectedTier by remember { mutableStateOf<Int?>(null) }
 
     val localeCode = appLocaleCode()
     val arabic = localeCode.equals("ar", ignoreCase = true)
@@ -191,6 +192,7 @@ fun AcWalletScreen(
                             container.ac.redeemCode(codeInput)
                                 .onSuccess { amount ->
                                     messageOk = true
+                                    detectedTier = amount
                                     message = msgSuccess.format("%,d".format(java.util.Locale.US, amount))
                                     codeInput = ""
                                     transactions = container.ac.transactions()
@@ -206,6 +208,21 @@ fun AcWalletScreen(
                     enabled = !redeeming && codeInput.length >= 4,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // التطبيق يتعرّف على فئة الكود تلقائياً ويعرضها — لا يختار المستخدم شيئاً
+                detectedTier?.let { tier ->
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        CoinIcon(size = 16.dp)
+                        Text(
+                            stringResource(R.string.ac_redeem_detected, "%,d".format(java.util.Locale.US, tier)),
+                            style = AppText.tiny,
+                            color = AppColors.Gold,
+                        )
+                    }
+                }
             }
 
             SectionHeader(title = stringResource(R.string.ac_tasks))

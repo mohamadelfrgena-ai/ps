@@ -352,6 +352,7 @@
     <string name="ac_not_enough">AC 不足</string>
     <string name="ac_redeem_title">AC 礼品码</string>
     <string name="ac_redeem_hint">8 位：大写字母、小写字母和两个数字</string>
+    <string name="ac_redeem_detected">代码面值：%1$s AC</string>
     <string name="ac_redeem_action">兑换代码</string>
     <string name="ac_redeem_success">已为余额添加 %1$s AC。</string>
     <string name="ac_redeem_invalid">该代码无效，请检查字母和数字。</string>
@@ -433,6 +434,8 @@
     <string name="admin_codes_title">AC 礼品码</string>
     <string name="admin_codes_amount">代码面值（AC）</string>
     <string name="admin_codes_count">代码数量</string>
+    <string name="admin_codes_summary">%1$s 个代码 × %2$s AC = 共 %3$s AC</string>
+    <string name="admin_codes_bad_amount">请输入至少 100 AC。</string>
     <string name="admin_codes_generate">生成代码</string>
     <string name="admin_codes_created">已生成 %1$s 个代码 — 请立即复制：</string>
     <string name="admin_codes_hint">复制代码并发送给你想给的人。每个代码每位成员只能使用一次。</string>

@@ -352,6 +352,7 @@
     <string name="ac_not_enough">AC insuficiente</string>
     <string name="ac_redeem_title">Código de regalo AC</string>
     <string name="ac_redeem_hint">8 caracteres: mayúsculas, minúsculas y dos dígitos</string>
+    <string name="ac_redeem_detected">Valor del código: %1$s AC</string>
     <string name="ac_redeem_action">Canjear código</string>
     <string name="ac_redeem_success">Se añadieron %1$s AC a tu saldo.</string>
     <string name="ac_redeem_invalid">El código no es válido. Revisa las letras y los dígitos.</string>
@@ -433,6 +434,8 @@
     <string name="admin_codes_title">Códigos de regalo AC</string>
     <string name="admin_codes_amount">Valor del código (AC)</string>
     <string name="admin_codes_count">Cantidad de códigos</string>
+    <string name="admin_codes_summary">%1$s códigos × %2$s AC = %3$s AC en total</string>
+    <string name="admin_codes_bad_amount">Introduce al menos 100 AC.</string>
     <string name="admin_codes_generate">Generar códigos</string>
     <string name="admin_codes_created">Se generaron %1$s códigos — cópialos ahora:</string>
     <string name="admin_codes_hint">Copia los códigos y envíalos a quien quieras. Cada código se usa una vez por miembro.</string>

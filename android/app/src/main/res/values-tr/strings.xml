@@ -352,6 +352,7 @@
     <string name="ac_not_enough">Yeterli AC yok</string>
     <string name="ac_redeem_title">AC hediye kodu</string>
     <string name="ac_redeem_hint">8 karakter: büyük, küçük harf ve iki rakam</string>
+    <string name="ac_redeem_detected">Kod değeri: %1$s AC</string>
     <string name="ac_redeem_action">Kodu kullan</string>
     <string name="ac_redeem_success">Bakiyene %1$s AC eklendi.</string>
     <string name="ac_redeem_invalid">Bu kod geçerli değil. Harf ve rakamları kontrol et.</string>
@@ -433,6 +434,8 @@
     <string name="admin_codes_title">AC hediye kodları</string>
     <string name="admin_codes_amount">Kod değeri (AC)</string>
     <string name="admin_codes_count">Kod sayısı</string>
+    <string name="admin_codes_summary">%1$s kod × %2$s AC = toplam %3$s AC</string>
+    <string name="admin_codes_bad_amount">En az 100 AC gir.</string>
     <string name="admin_codes_generate">Kod üret</string>
     <string name="admin_codes_created">%1$s kod üretildi — şimdi kopyala:</string>
     <string name="admin_codes_hint">Kodları kopyala ve istediğin kişiye gönder. Her kod üye başına bir kez çalışır.</string>

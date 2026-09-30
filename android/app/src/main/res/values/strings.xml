@@ -364,6 +364,7 @@
     <string name="ac_not_enough">Not enough AC</string>
     <string name="ac_redeem_title">AC gift code</string>
     <string name="ac_redeem_hint">8 characters: uppercase, lowercase and two digits</string>
+    <string name="ac_redeem_detected">Code tier: %1$s AC</string>
     <string name="ac_redeem_action">Redeem code</string>
     <string name="ac_redeem_success">Added %1$s AC to your balance.</string>
     <string name="ac_redeem_invalid">This code is not valid. Check the letters and digits.</string>
@@ -448,6 +449,8 @@
     <string name="admin_codes_title">AC gift codes</string>
     <string name="admin_codes_amount">Code value (AC)</string>
     <string name="admin_codes_count">Number of codes</string>
+    <string name="admin_codes_summary">%1$s codes × %2$s AC = %3$s AC total</string>
+    <string name="admin_codes_bad_amount">Enter at least 100 AC.</string>
     <string name="admin_codes_generate">Generate codes</string>
     <string name="admin_codes_created">Generated %1$s codes — copy them now:</string>
     <string name="admin_codes_hint">Copy the codes and send them to whoever you want. Each code works once per member.</string>

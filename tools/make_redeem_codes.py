@@ -10,8 +10,8 @@
     redeem_codes.csv   ← لجدول أو حملة تسويقية (الأكواد بلا أعمدة)
 
 أمثلة:
-    python3 tools/make_redeem_codes.py                 # 5 أكواد من كل فئة
-    python3 tools/make_redeem_codes.py -n 20           # 20 كوداً من كل فئة
+    python3 tools/make_redeem_codes.py --amount 30000 -n 10   # 10 أكواد فئة 30,000 (المثال المطلوب)
+    python3 tools/make_redeem_codes.py                         # 10 أكواد من كل فئة قيمة
     python3 tools/make_redeem_codes.py --amount 50000 -n 3
 """
 import argparse
@@ -75,7 +75,7 @@ def write_sql(path, rows):
 
 def main():
     ap = argparse.ArgumentParser(description="توليد أكواد هدايا AC (حروف كبيرة/صغيرة + رقمان)")
-    ap.add_argument("-n", "--per-tier", type=int, default=5, help="عدد الأكواد لكل فئة قيمة (افتراضي 5)")
+    ap.add_argument("-n", "--per-tier", type=int, default=10, help="عدد الأكواد لكل فئة قيمة (افتراضي 10)")
     ap.add_argument("--amount", type=int, action="append", help="فئة قيمة مخصّصة (يمكن تكرارها)")
     ap.add_argument("--max-uses", type=int, default=1, help="أقصى عدد مستخدمين لكل كود (افتراضي 1)")
     ap.add_argument("--note", default=None, help="وصف داخلي يُحفظ مع الأكواد (اختياري)")

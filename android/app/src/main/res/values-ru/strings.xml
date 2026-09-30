@@ -352,6 +352,7 @@
     <string name="ac_not_enough">Недостаточно AC</string>
     <string name="ac_redeem_title">Подарочный код AC</string>
     <string name="ac_redeem_hint">8 символов: заглавные, строчные и две цифры</string>
+    <string name="ac_redeem_detected">Номинал кода: %1$s AC</string>
     <string name="ac_redeem_action">Применить код</string>
     <string name="ac_redeem_success">На баланс добавлено %1$s AC.</string>
     <string name="ac_redeem_invalid">Неверный код. Проверьте буквы и цифры.</string>
@@ -433,6 +434,8 @@
     <string name="admin_codes_title">Подарочные коды AC</string>
     <string name="admin_codes_amount">Номинал кода (AC)</string>
     <string name="admin_codes_count">Количество кодов</string>
+    <string name="admin_codes_summary">%1$s кодов × %2$s AC = %3$s AC всего</string>
+    <string name="admin_codes_bad_amount">Введите не меньше 100 AC.</string>
     <string name="admin_codes_generate">Создать коды</string>
     <string name="admin_codes_created">Создано кодов: %1$s — скопируйте сейчас:</string>
     <string name="admin_codes_hint">Скопируйте коды и отправьте кому нужно. Каждый код работает один раз на участника.</string>
