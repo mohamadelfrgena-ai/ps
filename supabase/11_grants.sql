@@ -70,6 +70,25 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- 4.5) دور service_role: يحتاجه سير الرفع الآلي من GitHub لكتابة الأصول
+--      (بلا هذه المنح يرفض PostgREST الكتابة بخطأ 42501 insufficient_privilege)
+-- ---------------------------------------------------------------------------
+grant usage on schema public to service_role;
+
+do $$
+declare t text;
+begin
+  for t in
+    select tablename from pg_tables where schemaname = 'public'
+  loop
+    execute format('grant select, insert, update, delete on public.%I to service_role', t);
+  end loop;
+end $$;
+
+grant select, insert, update, delete on public.site_assets to service_role;
+grant select, insert, update, delete on public.sticker_packs to service_role;
+
+-- ---------------------------------------------------------------------------
 -- 5) للمستقبل: أي جدول/متسلسلة تُنشأ في public تُمنح القراءة تلقائياً
 --    (ملاحظة: هذا يخص دور postgres — وهو الدور الذي ينفّذ SQL Editor)
 -- ---------------------------------------------------------------------------

@@ -33,6 +33,14 @@ delete from public.sticker_packs;
 create unique index if not exists site_assets_file_url_uidx on public.site_assets (file_url);
 
 -- ---------------------------------------------------------------------------
+-- 2.5) صلاحيات دور service_role — حتى يستطيع سير الرفع الآلي كتابة الأصول
+--      (يقابل الخطوة 4.5 في supabase/11_grants.sql)
+-- ---------------------------------------------------------------------------
+grant usage on schema public to service_role;
+grant select, insert, update, delete on public.site_assets to service_role;
+grant select, insert, update, delete on public.sticker_packs to service_role;
+
+-- ---------------------------------------------------------------------------
 -- 3) حزم الملصقات الجديدة (كل قسم ملصقات = حزمة)
 -- ---------------------------------------------------------------------------
 insert into public.sticker_packs (id, name, icon_url, sort_order, active)

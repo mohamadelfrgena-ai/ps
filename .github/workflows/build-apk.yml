@@ -237,6 +237,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
+          set -o pipefail
           python3 tools/seed_assets_rest.py 2>&1 | tee -a /tmp/upload.log
 
       - name: تحقق بعد الرفع (رابط عام لثلاثة ملفات جديدة)
