@@ -231,21 +231,6 @@ jobs:
             } 2>&1 | tee /tmp/upload.log
           fi
 
-      - name: نشر تقرير الرفع كتعليق على العمولة
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ ! -f /tmp/upload.log ]; then echo "لا يوجد تقرير"; exit 0; fi
-          {
-            echo "### تقرير رفع الأصول (task=${{ needs.request.outputs.task }})"
-            echo ""
-            echo '```'
-            tail -n 70 /tmp/upload.log
-            echo '```'
-          } > /tmp/report.md
-          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@/tmp/report.md || true
-
       - name: تسجيل الأصول الجديدة في قاعدة البيانات (بلا لصق SQL)
         if: needs.request.outputs.task == 'assets-upload' || needs.request.outputs.task == 'assets-seed'
         env:
@@ -280,3 +265,18 @@ jobs:
             exit 1
           fi
           echo "✅ الأصول الجديدة تعمل — الخطوة الأخيرة: نفّذ supabase/15_assets_v2.sql في SQL Editor"
+
+      - name: نشر تقرير الرفع كتعليق على العمولة
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f /tmp/upload.log ]; then echo "لا يوجد تقرير"; exit 0; fi
+          {
+            echo "### تقرير رفع الأصول (task=${{ needs.request.outputs.task }})"
+            echo ""
+            echo '```'
+            tail -n 70 /tmp/upload.log
+            echo '```'
+          } > /tmp/report.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@/tmp/report.md || true

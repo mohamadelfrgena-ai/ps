@@ -58,14 +58,18 @@ def legacy_paths(extra_manifests: List[str]) -> Set[str]:
     return paths - keep
 
 
-def delete(url: str, key: str, bucket: str, path: str) -> int:
+def delete(url: str, key: str, bucket: str, path: str):
+    """يحذف ملفاً من المخزن. يرجع (الحالة، هل هو غير موجود أصلاً؟)."""
     endpoint = f"{url.rstrip('/')}/storage/v1/object/{bucket}/{urllib.parse.quote(path, safe='/')}"
     req = urllib.request.Request(endpoint, method="DELETE", headers=headers(key))
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
-            return resp.status
+            return resp.status, False
     except urllib.error.HTTPError as exc:
-        return exc.code
+        body = exc.read().decode("utf-8", "replace")
+        # Supabase يرجع 400/404 مع «not found» للملفات المحذوفة سابقاً — ليست مشكلة
+        gone = exc.code == 404 or "not_found" in body or "Object not found" in body
+        return exc.code, gone
 
 
 def main() -> int:
@@ -99,16 +103,16 @@ def main() -> int:
 
     ok = missing = failed = 0
     for index, path in enumerate(paths, 1):
-        status = delete(args.url, args.key, args.bucket, path)
+        status, gone = delete(args.url, args.key, args.bucket, path)
         if 200 <= status < 300:
             ok += 1
-        elif status == 404:
-            missing += 1  # غير موجود أصلاً — لا مشكلة
+        elif gone:
+            missing += 1  # محذوف مسبقاً — لا مشكلة
         else:
             failed += 1
             print(f"   [{index}/{len(paths)}] ✗ {path} → HTTP {status}")
         time.sleep(0.02)
-    print(f"\n✓ حُذف {ok} · غير موجود {missing} · فشل {failed}")
+    print(f"\n✓ حُذف {ok} · محذوف مسبقاً {missing} · فشل {failed}")
     return 0 if failed == 0 else 1
 
 
