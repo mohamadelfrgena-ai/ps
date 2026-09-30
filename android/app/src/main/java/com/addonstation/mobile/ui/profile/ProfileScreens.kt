@@ -3,7 +3,6 @@ package com.addonstation.mobile.ui.profile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -578,65 +577,69 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                 Text(lockedHint, style = AppText.tiny, color = AppColors.Dim)
             }
             Spacer(Modifier.height(8.dp))
-            // شبكة ثنائية الاتجاه: صفوف أفقية × أعمدة، تُمرَّر يميناً/يساراً وأعلى/أسفل معاً.
-            // النافذة تعرض ~3 أعمدة و~3 صفوف وبقية الشبكة تُكشف بالسحب (خلية مقطوعة = دلالة على وجود تمرير).
+            // ورقة أصول مصغّرة: 5 أعمدة × صفوف (أيقونة + الاسم تحتها) — بلا تمرير داخلي،
+            // تنساب مع تمرير الصفحة فتظهر كلها مرة واحدة كما في ورقة الأيقونات المرجعية.
             if (assets.isEmpty()) {
                 EmptyState(text = stringResource(R.string.common_loading))
                 Spacer(Modifier.height(12.dp))
             } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(GRID_VIEWPORT_HEIGHT.dp)
-                        .verticalScroll(rememberScrollState()),
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
                 ) {
-                    Column(modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                        assets.chunked(GRID_COLUMNS).forEachIndexed { rowIndex, rowAssets ->
-                            if (rowIndex > 0) Spacer(Modifier.height(GRID_SPACING.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp)) {
-                                rowAssets.forEach { asset ->
-                                    val unlocked = container.profile.canUseAsset(asset.requiredPlan, me)
-                                    val selected = when (kind) {
-                                        "avatar" -> me?.avatarUrl == asset.fileUrl
-                                        "banner" -> me?.bannerUrl == asset.fileUrl
-                                        else -> me?.equippedItemId == asset.name
-                                    }
-                                    Column(
-                                        modifier = Modifier
-                                            .width(GRID_CELL_WIDTH.dp)
-                                            .height(GRID_CELL_HEIGHT.dp)
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(AppColors.Elevated)
-                                            .border(
-                                                1.dp,
-                                                if (selected) AppColors.Green else AppColors.Border,
-                                                RoundedCornerShape(14.dp),
-                                            )
-                                            .clickable(enabled = unlocked) {
-                                                scope.launch {
-                                                    val value = if (kind == "item") asset.name else asset.fileUrl
-                                                    container.profile.setProfileAsset(kind, value)
-                                                    message = if (unlocked) null else lockedHint
-                                                }
-                                            }
-                                            .padding(6.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                    ) {
-                                        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                            AvatarImage(url = assetUrl(container, asset.fileUrl), size = 58.dp)
-                                            if (!unlocked) {
-                                                Text("🔒", style = AppText.bodySmall)
+                    assets.chunked(GRID_COLUMNS).forEach { rowAssets ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
+                        ) {
+                            rowAssets.forEach { asset ->
+                                val unlocked = container.profile.canUseAsset(asset.requiredPlan, me)
+                                val selected = when (kind) {
+                                    "avatar" -> me?.avatarUrl == asset.fileUrl
+                                    "banner" -> me?.bannerUrl == asset.fileUrl
+                                    else -> me?.equippedItemId == asset.name
+                                }
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(GRID_CELL_HEIGHT.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(AppColors.Elevated)
+                                        .border(
+                                            1.dp,
+                                            if (selected) AppColors.Green else AppColors.Border,
+                                            RoundedCornerShape(12.dp),
+                                        )
+                                        .clickable(enabled = unlocked) {
+                                            scope.launch {
+                                                val value = if (kind == "item") asset.name else asset.fileUrl
+                                                container.profile.setProfileAsset(kind, value)
+                                                message = if (unlocked) null else lockedHint
                                             }
                                         }
-                                        Text(
-                                            asset.name,
-                                            style = AppText.tiny,
-                                            color = if (selected) AppColors.Green else AppColors.Muted,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
+                                        .padding(4.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        AvatarImage(url = assetUrl(container, asset.fileUrl), size = 40.dp)
+                                        if (!unlocked) {
+                                            Text("🔒", style = AppText.tiny)
+                                        }
                                     }
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        asset.name,
+                                        style = AppText.tiny,
+                                        color = if (selected) AppColors.Green else AppColors.Muted,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
+                            }
+                            // خلايا فارغة تكمل الصف الأخير حتى تبقى الأعمدة متساوية
+                            repeat(GRID_COLUMNS - rowAssets.size) {
+                                Spacer(Modifier.weight(1f))
                             }
                         }
                     }
@@ -666,13 +669,10 @@ private fun OutlinedTextFieldBidi(
     )
 }
 
-// مقاسات شبكة اختيار الأصول في شاشة تعديل الملف.
-// 4 أعمدة أفقياً + نافذة بارتفاع ~3 صفوف → الشبكة تُمرَّر في الاتجاهين معاً.
-private const val GRID_COLUMNS = 4
-private const val GRID_CELL_WIDTH = 92
-private const val GRID_CELL_HEIGHT = 104
-private const val GRID_SPACING = 8
-private const val GRID_VIEWPORT_HEIGHT = 306
+// مقاسات ورقة الأصول في شاشة تعديل الملف: 5 أعمدة مصغّرة (أيقونة + اسم) في صفوف متساوية.
+private const val GRID_COLUMNS = 5
+private const val GRID_CELL_HEIGHT = 74
+private const val GRID_SPACING = 6
 
 /** ملف مستخدم عام (يُفتح من الشات أو من بطاقة المبدع). */
 @Composable
