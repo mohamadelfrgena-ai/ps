@@ -127,7 +127,7 @@
     <string name="item_view">Voir →</string>
     <string name="item_description">Description</string>
     <string name="item_download">📥 Télécharger</string>
-    <string name="item_unlock_ac">🪙 %1$s AC · Débloquer avec AC</string>
+    <string name="item_unlock_ac">%1$s AC · Débloquer avec AC</string>
     <string name="item_save">☆ Enregistrer</string>
     <string name="item_saved">★ Enregistré</string>
     <string name="item_added_fav">Ajouté aux favoris ⭐</string>

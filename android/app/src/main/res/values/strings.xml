@@ -134,7 +134,7 @@
     <string name="item_view">View →</string>
     <string name="item_description">Description</string>
     <string name="item_download">📥 Download</string>
-    <string name="item_unlock_ac">🪙 %1$s AC · Unlock with AC</string>
+    <string name="item_unlock_ac">%1$s AC · Unlock with AC</string>
     <string name="item_save">☆ Save</string>
     <string name="item_saved">★ Saved</string>
     <string name="item_added_fav">Added to favorites ⭐</string>

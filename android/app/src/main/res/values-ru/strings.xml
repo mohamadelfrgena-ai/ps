@@ -127,7 +127,7 @@
     <string name="item_view">Открыть →</string>
     <string name="item_description">Описание</string>
     <string name="item_download">📥 Скачать</string>
-    <string name="item_unlock_ac">🪙 %1$s AC · Открыть за AC</string>
+    <string name="item_unlock_ac">%1$s AC · Открыть за AC</string>
     <string name="item_save">☆ Сохранить</string>
     <string name="item_saved">★ Сохранено</string>
     <string name="item_added_fav">Добавлено в избранное ⭐</string>

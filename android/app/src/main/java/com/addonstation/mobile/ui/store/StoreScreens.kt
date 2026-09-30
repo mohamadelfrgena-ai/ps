@@ -56,6 +56,7 @@ import com.addonstation.mobile.data.toApiError
 import com.addonstation.mobile.ui.apiErrorText
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.components.AvatarImage
+import com.addonstation.mobile.ui.components.CoinIcon
 import com.addonstation.mobile.ui.components.CoverImage
 import com.addonstation.mobile.ui.components.EmptyState
 import com.addonstation.mobile.ui.components.FilterChip
@@ -361,6 +362,7 @@ fun ContentDetailScreen(
                         text = if (current.acPrice > 0 && !unlocked)
                             stringResource(R.string.item_unlock_ac, current.acPrice)
                         else stringResource(R.string.item_download),
+                        leading = if (current.acPrice > 0 && !unlocked) ({ CoinIcon(size = 18.dp) }) else null,
                         onClick = {
                             scope.launch {
                                 busy = true

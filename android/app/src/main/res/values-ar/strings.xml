@@ -127,7 +127,7 @@
     <string name="item_view">عرض ←</string>
     <string name="item_description">الوصف</string>
     <string name="item_download">📥 تحميل</string>
-    <string name="item_unlock_ac">🪙 %1$s AC · افتح بالـ AC</string>
+    <string name="item_unlock_ac">%1$s AC · افتح بالـ AC</string>
     <string name="item_save">☆ حفظ</string>
     <string name="item_saved">★ محفوظ</string>
     <string name="item_added_fav">أُضيف إلى المفضلة ⭐</string>

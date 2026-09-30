@@ -99,12 +99,7 @@ fun PixelTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Icon(
-                    Icons.Filled.MonetizationOn,
-                    contentDescription = null,
-                    tint = AppColors.Gold,
-                    modifier = Modifier.size(14.dp),
-                )
+                CoinIcon(size = 15.dp)
                 Text(
                     text = walletBalance?.toString() ?: "—",
                     style = AppText.small,

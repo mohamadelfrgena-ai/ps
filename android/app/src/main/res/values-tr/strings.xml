@@ -127,7 +127,7 @@
     <string name="item_view">Gör →</string>
     <string name="item_description">Açıklama</string>
     <string name="item_download">📥 İndir</string>
-    <string name="item_unlock_ac">🪙 %1$s AC · AC ile aç</string>
+    <string name="item_unlock_ac">%1$s AC · AC ile aç</string>
     <string name="item_save">☆ Kaydet</string>
     <string name="item_saved">★ Kaydedildi</string>
     <string name="item_added_fav">Favorilere eklendi ⭐</string>

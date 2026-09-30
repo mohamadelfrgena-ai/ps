@@ -2,6 +2,7 @@ package com.addonstation.mobile.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -137,6 +139,7 @@ fun GradientButton(
     enabled: Boolean = true,
     icon: ImageVector? = null,
     style: TextStyle = AppText.button,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -158,6 +161,7 @@ fun GradientButton(
         contentAlignment = Alignment.Center,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            leading?.invoke()
             if (icon != null) {
                 Icon(icon, contentDescription = null, tint = textColor, modifier = Modifier.size(18.dp))
             }
@@ -170,6 +174,16 @@ fun GradientButton(
             )
         }
     }
+}
+
+/** أيقونة عملة AC (صورة بكسل) — تُعرض بجانب أي رصيد أو سعر. */
+@Composable
+fun CoinIcon(size: Dp = 18.dp, modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(R.drawable.coin_ac),
+        contentDescription = null,
+        modifier = modifier.size(size),
+    )
 }
 
 /** زر شبح (Ghost): خلفية elevated2، إطار 1dp، نص فاتح. */

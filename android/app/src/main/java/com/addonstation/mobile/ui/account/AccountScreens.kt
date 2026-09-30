@@ -45,6 +45,7 @@ import com.addonstation.mobile.data.model.CreatorTip
 import com.addonstation.mobile.data.model.FriendEntry
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.components.AvatarImage
+import com.addonstation.mobile.ui.components.CoinIcon
 import com.addonstation.mobile.ui.components.EmptyState
 import com.addonstation.mobile.ui.components.GhostButton
 import com.addonstation.mobile.ui.components.GlassCard
@@ -100,7 +101,10 @@ fun AcWalletScreen(
                         style = AppText.pageTitle,
                         color = AppColors.Gold,
                     )
-                    Text("AC 🪙", style = AppText.sectionTitle, color = AppColors.Gold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        CoinIcon(size = 22.dp)
+                        Text("AC", style = AppText.sectionTitle, color = AppColors.Gold)
+                    }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text("+${wallet?.totalEarned ?: 0}", style = AppText.tiny, color = AppColors.Green)
@@ -189,7 +193,10 @@ fun AcWalletScreen(
                             color = if (tx.amount > 0) AppColors.Green else AppColors.Red,
                         )
                         Spacer(Modifier.padding(horizontal = 4.dp))
-                        Text("${tx.balanceAfter}", style = AppText.tiny, color = AppColors.Muted)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            CoinIcon(size = 11.dp)
+                            Text("${tx.balanceAfter}", style = AppText.tiny, color = AppColors.Muted)
+                        }
                     }
                 }
             }

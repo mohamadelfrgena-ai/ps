@@ -127,7 +127,7 @@
     <string name="item_view">查看 →</string>
     <string name="item_description">介绍</string>
     <string name="item_download">📥 下载</string>
-    <string name="item_unlock_ac">🪙 %1$s AC · 用 AC 解锁</string>
+    <string name="item_unlock_ac">%1$s AC · 用 AC 解锁</string>
     <string name="item_save">☆ 收藏</string>
     <string name="item_saved">★ 已收藏</string>
     <string name="item_added_fav">已加入收藏 ⭐</string>
