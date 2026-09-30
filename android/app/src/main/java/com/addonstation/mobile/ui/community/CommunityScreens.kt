@@ -52,6 +52,7 @@ import com.addonstation.mobile.ui.components.GhostButton
 import com.addonstation.mobile.ui.components.GlassCard
 import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.LoadingBox
+import com.addonstation.mobile.ui.components.RoomIcon
 import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.rememberContainer
@@ -357,7 +358,7 @@ private fun RoomRow(
                     .background(AppColors.Green),
             )
         }
-        Text(channel.icon ?: "💬", style = AppText.body)
+        RoomIcon(channelId = channel.id, size = 22.dp)
         Text(
             text = channel.name,
             style = AppText.body.copy(fontWeight = if (unread > 0 || mentions > 0) FontWeight.Bold else FontWeight.Normal),

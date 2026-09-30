@@ -71,6 +71,7 @@ import com.addonstation.mobile.ui.components.GhostButton
 import com.addonstation.mobile.ui.components.GlassCard
 import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.LoadingBox
+import com.addonstation.mobile.ui.components.RoomIcon
 import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.components.RowItem
@@ -1418,12 +1419,18 @@ fun AdminChatScreen(onBack: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {
-            SectionHeader(title = stringResource(R.string.comm_main_rooms), leadingEmoji = "💬")
+            SectionHeader(title = stringResource(R.string.comm_main_rooms))
             channels.forEach { channel ->
                 var slow by remember(channel.id) { mutableStateOf(channel.slowmodeSeconds) }
                 GlassCard(padding = 10.dp) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("${channel.icon ?: ""} ${channel.name}", style = AppText.sectionTitle, color = AppColors.Text)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            RoomIcon(channelId = channel.id, size = 22.dp)
+                            Text(channel.name, style = AppText.sectionTitle, color = AppColors.Text)
+                        }
                         Spacer(Modifier.weight(1f))
                         Text(channel.category, style = AppText.tiny, color = AppColors.Muted)
                     }

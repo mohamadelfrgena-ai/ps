@@ -254,6 +254,35 @@ fun PlanChip(plan: String, modifier: Modifier = Modifier) {
 
 /* ================================ الصور ================================ */
 
+/** أيقونة غرفة الشات الدائرية: صورة جاهزة حسب معرّف الغرفة، وبالحجم المطلوب. */
+@Composable
+fun RoomIcon(channelId: String, size: Dp = 20.dp, modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(roomIconRes(channelId)),
+        contentDescription = null,
+        modifier = modifier.size(size),
+    )
+}
+
+/** يحوّل معرّف الغرفة إلى أيقونتها المرسومة (بلا إيموجي). */
+@androidx.annotation.DrawableRes
+fun roomIconRes(channelId: String): Int = when (channelId) {
+    "general" -> R.drawable.ic_room_general
+    "minecraft" -> R.drawable.ic_room_minecraft
+    "creator" -> R.drawable.ic_room_creator
+    "support" -> R.drawable.ic_room_support
+    "social-media-makers" -> R.drawable.ic_room_social
+    "lang-ar" -> R.drawable.ic_room_lang_ar
+    "lang-ru" -> R.drawable.ic_room_lang_ru
+    "lang-pt" -> R.drawable.ic_room_lang_pt
+    "lang-zh" -> R.drawable.ic_room_lang_zh
+    "lang-en" -> R.drawable.ic_room_lang_en
+    "lang-es" -> R.drawable.ic_room_lang_es
+    "lang-fr" -> R.drawable.ic_room_lang_fr
+    "lang-tr" -> R.drawable.ic_room_lang_tr
+    else -> R.drawable.ic_room_general
+}
+
 /** بديل الأفاتار: يظهر عند غياب الرابط أو فشل تحميل الصورة. */
 @Composable
 private fun AvatarFallback(size: Dp) {

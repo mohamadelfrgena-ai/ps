@@ -40,6 +40,7 @@ ORDER = [
     ("12_avatars.sql", "12_avatars.sql", "الأفاتارات الـ25 (1 مجاني · 12 Epic · 12 Legendary)"),
     ("10_realtime.sql", "10_realtime.sql", "بديل: تشغيل المزامنة اللحظية"),
     ("11_grants.sql", "11_grants.sql", "⚠️ إلزامي للمشاريع الجديدة: منح صلاحيات anon/authenticated"),
+    ("13_channels_icons.sql", "13_channels_icons.sql", "أسماء غرف الشات بلا إيموجي (الأيقونات داخل التطبيق)"),
     ("08_admin_bootstrap.sql", "08_admin_bootstrap_example.sql", "النسخة العامة (you@example.com)"),
     ("09_gateway_functions.sql", "09_gateway_functions.sql", "اختياري: بوابات الدفع الإلكتروني"),
 ]

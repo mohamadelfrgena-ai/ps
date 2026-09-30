@@ -5,7 +5,8 @@
 --  الطريقة الأسرع: انسخ هذا الملف كاملاً والصقه في Supabase → SQL Editor → Run.
 --  إن ظهر خطأ في أي سطر، نفّذ الملفات الأصلية واحداً واحداً بنفس الترتيب:
 --      01_schema → 02_functions_core → 03_functions_chat → 04_rls
---      → 05_storage → 06_seed → 07_seed_assets → 10_realtime
+--      → 05_storage → 06_seed → 07_seed_assets → 12_avatars → 10_realtime → 11_grants
+--      → 13_channels_icons (أسماء الغرف بلا إيموجي)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --
@@ -2084,10 +2085,21 @@ begin
 
   insert into public.chat_channels(id, name, icon, category, description, sort_order,
                                    is_locked, slowmode_seconds, post_permission)
-  values (p_id, p_name, p_icon, coalesce(p_category,'main'), p_description,
-          coalesce(p_sort_order,0), coalesce(p_is_locked,false),
-          coalesce(p_slowmode_seconds,0), coalesce(p_post_permission,'members'))
-  on conflict (id) do update
+  values
+  ('general'              , 'General'             , NULL, 'main', 'General chat for the community'         , 1, false, 0, 'members'),
+  ('minecraft'            , 'Minecraft'           , NULL, 'main', 'Minecraft talk: worlds, addons, servers', 2, false, 0, 'members'),
+  ('creator'              , 'Creator'             , NULL, 'main', 'For creators and developers'            , 3, false, 0, 'members'),
+  ('support'              , 'Support'             , NULL, 'main', 'Technical help and troubleshooting'     , 4, false, 0, 'members'),
+  ('social-media-makers'  , 'Social Media Makers' , NULL, 'main', 'For content makers on social media'     , 5, false, 0, 'members'),
+  ('lang-ar'              , 'العربية'             , NULL, 'lang', 'الغرفة العربية'                         , 1, false, 0, 'members'),
+  ('lang-ru'              , 'Русский'             , NULL, 'lang', 'Русская комната'                        , 2, false, 0, 'members'),
+  ('lang-pt'              , 'Português'           , NULL, 'lang', 'Sala em português'                      , 3, false, 0, 'members'),
+  ('lang-zh'              , '中文'                  , NULL, 'lang', '中文聊天室'                                  , 4, false, 0, 'members'),
+  ('lang-en'              , 'English'             , NULL, 'lang', 'English room'                           , 5, false, 0, 'members'),
+  ('lang-es'              , 'Español'             , NULL, 'lang', 'Sala en español'                        , 6, false, 0, 'members'),
+  ('lang-fr'              , 'Français'            , NULL, 'lang', 'Salon français'                         , 7, false, 0, 'members'),
+  ('lang-tr'              , 'Türkçe'              , NULL, 'lang', 'Türkçe sohbet odası'                    , 8, false, 0, 'members')
+on conflict (id) do update
      set name = excluded.name,
          icon = excluded.icon,
          category = excluded.category,
@@ -3204,19 +3216,19 @@ on conflict (id) do update set name = excluded.name, icon_url = excluded.icon_ur
 -- ---------------------------------------------------------------------------
 insert into public.chat_channels (id, name, icon, category, description, sort_order, is_locked, slowmode_seconds, post_permission)
 values
-  ('general',              '🌐 General',              '🌐', 'main', 'General chat for the community',        1, false, 0, 'members'),
-  ('minecraft',            '⛏️ Minecraft',            '⛏️', 'main', 'Minecraft talk: worlds, addons, servers', 2, false, 0, 'members'),
-  ('creator',              '🎨 Creator',              '🎨', 'main', 'For creators and developers',           3, false, 0, 'creators_admin'),
-  ('support',              '🛠️ Support',              '🛠️', 'main', 'Technical help and troubleshooting',    4, false, 0, 'members'),
-  ('social-media-makers',  '📱 Social Media Makers',  '📱', 'main', 'For content makers on social media',    5, false, 0, 'members'),
-  ('lang-ar',              '🇱🇾 العربية',             '🇱🇾', 'lang', 'الغرفة العربية',                        1, false, 0, 'members'),
-  ('lang-ru',              '🇷🇺 Русский',             '🇷🇺', 'lang', 'Русская комната',                       2, false, 0, 'members'),
-  ('lang-pt',              '🇵🇹 Português',           '🇵🇹', 'lang', 'Sala em português',                     3, false, 0, 'members'),
-  ('lang-zh',              '🇨🇳 中文',                 '🇨🇳', 'lang', '中文聊天室',                             4, false, 0, 'members'),
-  ('lang-en',              '🇬🇧 English',             '🇬🇧', 'lang', 'English room',                          5, false, 0, 'members'),
-  ('lang-es',              '🇪🇸 Español',             '🇪🇸', 'lang', 'Sala en español',                       6, false, 0, 'members'),
-  ('lang-fr',              '🇫🇷 Français',            '🇫🇷', 'lang', 'Salon français',                        7, false, 0, 'members'),
-  ('lang-tr',              '🇹🇷 Türkçe',              '🇹🇷', 'lang', 'Türkçe sohbet odası',                   8, false, 0, 'members')
+  ('general'              , 'General'             , NULL, 'main', 'General chat for the community'         , 1, false, 0, 'members'),
+  ('minecraft'            , 'Minecraft'           , NULL, 'main', 'Minecraft talk: worlds, addons, servers', 2, false, 0, 'members'),
+  ('creator'              , 'Creator'             , NULL, 'main', 'For creators and developers'            , 3, false, 0, 'members'),
+  ('support'              , 'Support'             , NULL, 'main', 'Technical help and troubleshooting'     , 4, false, 0, 'members'),
+  ('social-media-makers'  , 'Social Media Makers' , NULL, 'main', 'For content makers on social media'     , 5, false, 0, 'members'),
+  ('lang-ar'              , 'العربية'             , NULL, 'lang', 'الغرفة العربية'                         , 1, false, 0, 'members'),
+  ('lang-ru'              , 'Русский'             , NULL, 'lang', 'Русская комната'                        , 2, false, 0, 'members'),
+  ('lang-pt'              , 'Português'           , NULL, 'lang', 'Sala em português'                      , 3, false, 0, 'members'),
+  ('lang-zh'              , '中文'                  , NULL, 'lang', '中文聊天室'                                  , 4, false, 0, 'members'),
+  ('lang-en'              , 'English'             , NULL, 'lang', 'English room'                           , 5, false, 0, 'members'),
+  ('lang-es'              , 'Español'             , NULL, 'lang', 'Sala en español'                        , 6, false, 0, 'members'),
+  ('lang-fr'              , 'Français'            , NULL, 'lang', 'Salon français'                         , 7, false, 0, 'members'),
+  ('lang-tr'              , 'Türkçe'              , NULL, 'lang', 'Türkçe sohbet odası'                    , 8, false, 0, 'members')
 on conflict (id) do update
   set name = excluded.name,
       icon = excluded.icon,
@@ -3790,3 +3802,39 @@ select grantee, count(*) as tables_with_select
    and grantee in ('anon', 'authenticated')
  group by grantee
  order by grantee;
+
+
+-- ############################################################################
+-- ##  القسم: 13_channels_icons.sql
+-- ############################################################################
+
+-- ============================================================================
+--  AddonStation Mobile — 13) أسماء الغرف بلا إيموجي + أيقونات مرسومة
+--
+--  الغرف صارت تُرسم أيقوناتها داخل التطبيق من معرّف الغرفة (channel.id)
+--  عبر الدالة RoomIcon في ui/components/Common.kt — فلا حاجة لإيموجي في
+--  قاعدة البيانات. نفّذ هذا الملف مرة واحدة بعد 06_seed.sql (أو بعد
+--  00_ALL_IN_ONE.sql) ليصبح الاسم نظيفاً بلا رموز.
+-- ============================================================================
+
+update public.chat_channels set name = 'General',             icon = null where id = 'general';
+update public.chat_channels set name = 'Minecraft',           icon = null where id = 'minecraft';
+update public.chat_channels set name = 'Creator',             icon = null where id = 'creator';
+update public.chat_channels set name = 'Support',             icon = null where id = 'support';
+update public.chat_channels set name = 'Social Media Makers', icon = null where id = 'social-media-makers';
+
+update public.chat_channels set name = 'العربية',   icon = null where id = 'lang-ar';
+update public.chat_channels set name = 'Русский',   icon = null where id = 'lang-ru';
+update public.chat_channels set name = 'Português', icon = null where id = 'lang-pt';
+update public.chat_channels set name = '中文',       icon = null where id = 'lang-zh';
+update public.chat_channels set name = 'English',   icon = null where id = 'lang-en';
+update public.chat_channels set name = 'Español',   icon = null where id = 'lang-es';
+update public.chat_channels set name = 'Français',  icon = null where id = 'lang-fr';
+update public.chat_channels set name = 'Türkçe',    icon = null where id = 'lang-tr';
+
+-- ---------------------------------------------------------------------------
+-- تحقق: يجب أن ترى 13 صفاً بلا أي إيموجي في name، و icon كلها NULL
+-- ---------------------------------------------------------------------------
+select id, name, category, sort_order
+from public.chat_channels
+order by category desc, sort_order;

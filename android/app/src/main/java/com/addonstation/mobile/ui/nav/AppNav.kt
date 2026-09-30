@@ -306,7 +306,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                     var channel by remember { mutableStateOf<ChatChannel?>(null) }
                     LaunchedEffect(channelId) {
                         channel = container.chat.channels().firstOrNull { it.id == channelId }
-                            ?: ChatChannel(id = channelId, name = channelId, icon = "💬")
+                            ?: ChatChannel(id = channelId, name = channelId)
                     }
                     val current = channel
                     if (current == null) {

@@ -28,6 +28,7 @@ ORDER = [
     "12_avatars.sql",
     "10_realtime.sql",
     "11_grants.sql",
+    "13_channels_icons.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -37,7 +38,8 @@ HEADER = """-- =================================================================
 --  الطريقة الأسرع: انسخ هذا الملف كاملاً والصقه في Supabase → SQL Editor → Run.
 --  إن ظهر خطأ في أي سطر، نفّذ الملفات الأصلية واحداً واحداً بنفس الترتيب:
 --      01_schema → 02_functions_core → 03_functions_chat → 04_rls
---      → 05_storage → 06_seed → 07_seed_assets → 10_realtime
+--      → 05_storage → 06_seed → 07_seed_assets → 12_avatars → 10_realtime → 11_grants
+--      → 13_channels_icons (أسماء الغرف بلا إيموجي)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --

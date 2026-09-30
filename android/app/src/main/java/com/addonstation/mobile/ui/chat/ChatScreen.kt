@@ -63,6 +63,7 @@ import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.components.EmptyState
 import com.addonstation.mobile.ui.components.GradientButton
+import com.addonstation.mobile.ui.components.RoomIcon
 import com.addonstation.mobile.ui.components.LoadingBox
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
@@ -605,7 +606,7 @@ private fun ChatHeader(
         }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(channel.icon ?: "💬", style = AppText.bodySmall)
+                RoomIcon(channelId = channel.id, size = 20.dp)
                 Text(
                     channel.name,
                     style = AppText.chatName,
@@ -704,7 +705,7 @@ private fun ChatInputBar(
                     onValueChange = { if (it.length <= 500) onTextChange(it) },
                     placeholder = {
                         Text(
-                            stringResource(R.string.chat_hint, "${channel.icon ?: ""} ${channel.name}".trim()),
+                            stringResource(R.string.chat_hint, channel.name),
                             style = AppText.bodySmall,
                         )
                     },
