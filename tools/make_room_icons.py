@@ -202,18 +202,34 @@ def flag_en():
 
 
 def flag_ar():
-    """العلم بأسلوب أخضر + الشهادتان (خط مبسّط) + السيف."""
+    """العلم السعودي: خلفية خضراء + الشهادتان (سطر خطي مبسّط) + سيف أفقي مسنّن."""
     layer = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
-    d.rectangle([0, 0, S, S], fill=GREEN)
-    # الشهادتان: كتلة خطية مبسّطة (بدون خط عربي في البيئة)
-    d.rounded_rectangle([p(0.20), p(0.30), p(0.80), p(0.40)], radius=p(0.05), fill=WHITE)
-    d.rounded_rectangle([p(0.26), p(0.44), p(0.74), p(0.52)], radius=p(0.04), fill=WHITE)
-    d.polygon([(p(0.30), p(0.55)), (p(0.34), p(0.50)), (p(0.38), p(0.55)), (p(0.34), p(0.59))], fill=WHITE)
-    # السيف
-    d.rectangle([p(0.22), p(0.66), p(0.78), p(0.705)], fill=WHITE)
-    d.polygon([(p(0.78), p(0.63)), (p(0.86), p(0.6825)), (p(0.78), p(0.735))], fill=WHITE)
-    d.rectangle([p(0.20), p(0.63), p(0.245), p(0.74)], fill=WHITE)
+    d.rectangle([0, 0, S, S], fill=(0x16, 0x5D, 0x2E, 255))   # الأخضر السعودي
+
+    # --- الشهادتان: سطران مبسّطان يدوران حولهما زخرفة صغيرة ---
+    # السطر الأول (أعرض وأطول)
+    d.rounded_rectangle([p(0.27), p(0.285), p(0.735), p(0.355)], radius=p(0.032), fill=WHITE)
+    # امتدادات تشبه تشكيل الحروف: قمم صغيرة أعلى السطر
+    for cx in (0.335, 0.425, 0.515, 0.605):
+        d.polygon([(p(cx - 0.028), p(0.285)), (p(cx), p(0.242)), (p(cx + 0.028), p(0.285))], fill=WHITE)
+    # نقاط/لمعات أسفل السطر الأول
+    for cx in (0.315, 0.41, 0.50, 0.59, 0.665):
+        d.ellipse([p(cx - 0.013), p(0.372), p(cx + 0.013), p(0.398)], fill=WHITE)
+    # السطر الثاني (أقصر، يدلّ على بقية الشهادة)
+    d.rounded_rectangle([p(0.36), p(0.435), p(0.70), p(0.485)], radius=p(0.025), fill=WHITE)
+    for cx in (0.43, 0.52, 0.61):
+        d.polygon([(p(cx - 0.024), p(0.435)), (p(cx), p(0.40)), (p(cx + 0.024), p(0.435))], fill=WHITE)
+
+    # --- السيف الأفقي المسنّن أسفل الشهادتين ---
+    blade_top, blade_bottom = 0.615, 0.675
+    d.rectangle([p(0.20), p(blade_top), p(0.80), p(blade_bottom)], fill=WHITE)
+    # نصل مدبّب إلى اليسار
+    d.polygon([(p(0.20), p(0.645)), (p(0.115), p(blade_top)), (p(0.115), p(blade_bottom))], fill=WHITE)
+    # مقبض السيف إلى اليمين
+    d.rounded_rectangle([p(0.80), p(0.596), p(0.865), p(0.694)], radius=p(0.014), fill=WHITE)
+    # شفرة السيف (واقي يد) أعلى المقبض
+    d.rectangle([p(0.845), p(0.565), p(0.868), p(0.725)], fill=WHITE)
     return clip_circle(layer)
 
 
