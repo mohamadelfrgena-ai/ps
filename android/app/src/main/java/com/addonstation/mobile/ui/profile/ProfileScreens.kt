@@ -632,8 +632,10 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                         asset.name,
                                         style = AppText.tiny,
                                         color = if (selected) AppColors.Green else AppColors.Muted,
-                                        maxLines = 1,
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center,
+                                        lineHeight = AppText.tiny.fontSize * 1.05f,
                                     )
                                 }
                             }
@@ -671,7 +673,7 @@ private fun OutlinedTextFieldBidi(
 
 // مقاسات ورقة الأصول في شاشة تعديل الملف: 5 أعمدة مصغّرة (أيقونة + اسم) في صفوف متساوية.
 private const val GRID_COLUMNS = 5
-private const val GRID_CELL_HEIGHT = 74
+private const val GRID_CELL_HEIGHT = 86
 private const val GRID_SPACING = 6
 
 /** ملف مستخدم عام (يُفتح من الشات أو من بطاقة المبدع). */
