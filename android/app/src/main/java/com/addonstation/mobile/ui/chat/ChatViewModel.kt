@@ -240,15 +240,22 @@ class ChatViewModel(private val container: AppContainer) {
         }
     }
 
-    fun deleteMine(messageId: Long) {
+    /**
+     * حذف المستخدم لرسالته — مسموح في أول ٣ دقائق فقط من الإرسال (القاعدة ترفض ما بعدها).
+     * عند الرفض لانتهاء المدة نعرض السبب للمستخدم بدل الفشل الصامت.
+     */
+    fun deleteMine(messageId: Long, onResult: (Boolean) -> Unit = {}) {
         scope.launch {
-            container.chat.deleteMyMessage(messageId).onSuccess {
-                _messages.value = _messages.value.map { ui ->
-                    if (ui.message.id == messageId)
-                        ui.copy(message = ui.message.copy(status = "deleted", content = null))
-                    else ui
+            container.chat.deleteMyMessage(messageId)
+                .onSuccess {
+                    _messages.value = _messages.value.map { ui ->
+                        if (ui.message.id == messageId)
+                            ui.copy(message = ui.message.copy(status = "deleted", content = null))
+                        else ui
+                    }
+                    onResult(true)
                 }
-            }
+                .onFailure { onResult(false) }
         }
     }
 

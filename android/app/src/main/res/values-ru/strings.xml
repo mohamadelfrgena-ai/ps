@@ -249,6 +249,9 @@
     <string name="chat_reason_other">Другое</string>
     <string name="chat_report_sent">Жалоба отправлена ✅</string>
     <string name="chat_delete_mine">Удалить моё сообщение</string>
+    <string name="chat_delete_expired">Время истекло: удалить сообщение можно только в течение 3 минут после отправки.</string>
+    <string name="chat_delete_left">Осталось %1$d мин на удаление</string>
+    <string name="chat_delete_done">Сообщение удалено.</string>
     <string name="chat_hide_message">Скрыть сообщение</string>
     <string name="chat_pin">Закрепить</string>
     <string name="chat_unpin">Открепить</string>

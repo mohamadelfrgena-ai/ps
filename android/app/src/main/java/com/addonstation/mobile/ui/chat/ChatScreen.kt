@@ -130,6 +130,7 @@ fun ChatScreen(
     val videoLabel = stringResource(R.string.chat_video_label)
     val sendLabel = stringResource(R.string.chat_send)
     val reportSentMsg = stringResource(R.string.chat_report_sent)
+    val deleteExpiredMsg = stringResource(R.string.chat_delete_expired)
     val pinMsg = stringResource(R.string.chat_pin)
     val unpinMsg = stringResource(R.string.chat_unpin)
     val imageFormatsMsg = stringResource(R.string.chat_image_formats)
@@ -533,10 +534,16 @@ fun ChatScreen(
     }
 
     actionsFor?.let { ui ->
+        // مدة الحذف: ٣ دقائق من وقت الإرسال — يُخفى الخيار بعدها ويُعلَّل السبب.
+        val deleteLeftMinutes = deleteWindowRemainingMinutes(ui.message.createdAt)
         MessageActionsSheet(
             ui = ui,
             myId = container.supabase.session()?.userId,
             isStaff = profile?.let { it.role == "admin" || it.role == "moderator" } == true,
+            canDeleteMine = canDeleteOwnMessage(ui.message.createdAt),
+            deleteLeftText = if (deleteLeftMinutes > 0) {
+                stringResource(R.string.chat_delete_left, deleteLeftMinutes)
+            } else null,
             onDismiss = { actionsFor = null },
             onReply = {
                 replyTo = ui.message
@@ -549,7 +556,14 @@ fun ChatScreen(
                 actionsFor = null
             },
             onDeleteMine = {
-                vm.deleteMine(ui.message.id)
+                // داخل المدة فقط (القاعدة ترفض ما بعدها) — والنتيجة تُعرض في الشريط السفلي
+                if (canDeleteOwnMessage(ui.message.createdAt)) {
+                    vm.deleteMine(ui.message.id) { ok ->
+                        if (!ok) statusMessage = deleteExpiredMsg // رفض الخادم: انتهت المدة
+                    }
+                } else {
+                    statusMessage = deleteExpiredMsg
+                }
                 actionsFor = null
             },
             onModerate = {

@@ -29,6 +29,8 @@ fun apiErrorText(kind: ApiErrorKind): String = when (kind) {
     ApiErrorKind.ALREADY_CLAIMED -> stringResource(R.string.ac_claimed)
     ApiErrorKind.ALREADY_UNLOCKED -> stringResource(R.string.ac_unlocked)
     ApiErrorKind.INVALID_STATUS -> stringResource(R.string.msg_generic_error)
+    ApiErrorKind.DELETE_WINDOW_EXPIRED -> stringResource(R.string.chat_delete_expired)
+    ApiErrorKind.ALREADY_DELETED -> stringResource(R.string.chat_delete_done)
     ApiErrorKind.MUTED_OR_BANNED -> stringResource(R.string.chat_muted_until, "—")
     ApiErrorKind.RULES_REQUIRED -> stringResource(R.string.chat_rules_title)
     ApiErrorKind.INVALID_IMAGE_FORMAT -> stringResource(R.string.chat_image_formats)

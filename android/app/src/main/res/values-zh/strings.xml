@@ -249,6 +249,9 @@
     <string name="chat_reason_other">其他</string>
     <string name="chat_report_sent">举报已发送 ✅</string>
     <string name="chat_delete_mine">删除我的消息</string>
+    <string name="chat_delete_expired">已超时：消息只能在发送后 3 分钟内删除。</string>
+    <string name="chat_delete_left">剩余 %1$d 分钟可删除</string>
+    <string name="chat_delete_done">消息已删除。</string>
     <string name="chat_hide_message">隐藏消息</string>
     <string name="chat_pin">置顶</string>
     <string name="chat_unpin">取消置顶</string>

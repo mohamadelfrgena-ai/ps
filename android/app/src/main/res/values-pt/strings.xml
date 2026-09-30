@@ -249,6 +249,9 @@
     <string name="chat_reason_other">Outro</string>
     <string name="chat_report_sent">Denúncia enviada ✅</string>
     <string name="chat_delete_mine">Excluir minha mensagem</string>
+    <string name="chat_delete_expired">Prazo encerrado: só é possível excluir a mensagem em até 3 minutos após o envio.</string>
+    <string name="chat_delete_left">Restam %1$d min para excluir</string>
+    <string name="chat_delete_done">Mensagem excluída.</string>
     <string name="chat_hide_message">Ocultar mensagem</string>
     <string name="chat_pin">Fixar</string>
     <string name="chat_unpin">Desafixar</string>

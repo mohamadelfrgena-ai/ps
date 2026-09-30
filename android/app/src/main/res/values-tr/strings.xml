@@ -249,6 +249,9 @@
     <string name="chat_reason_other">Diğer</string>
     <string name="chat_report_sent">Bildirim gönderildi ✅</string>
     <string name="chat_delete_mine">Mesajımı sil</string>
+    <string name="chat_delete_expired">Süre doldu: mesaj yalnızca gönderildikten sonraki 3 dakika içinde silinebilir.</string>
+    <string name="chat_delete_left">Silmek için %1$d dk kaldı</string>
+    <string name="chat_delete_done">Mesaj silindi.</string>
     <string name="chat_hide_message">Mesajı gizle</string>
     <string name="chat_pin">Sabitle</string>
     <string name="chat_unpin">Sabitlemeyi kaldır</string>

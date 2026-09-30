@@ -223,14 +223,46 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- 2) حذف/إخفاء الرسائل
+--
+--    قاعدة الحذف الذاتي: **٣ دقائق فقط بعد الإرسال** (Source of truth هنا في القاعدة،
+--    والتطبيق يخفي الخيار بعد انتهاء المدة ويعرض سبب الرفض لو حاول أحد تجاوزه).
+--    بعد المدة: المستخدم لا يستطيع الحذف، ويبقى أمامه الإبلاغ ليتولّى الفريق الإشراف.
 -- ---------------------------------------------------------------------------
+create or replace function public.chat_delete_window_seconds()
+returns integer
+language sql immutable
+as $$ select 180 $$;   -- 3 دقائق
+
 create or replace function public.chat_delete_my_message(p_message_id bigint)
 returns jsonb
 language plpgsql security definer set search_path = public
 as $$
-declare v_uid uuid := auth.uid();
+declare
+  v_uid     uuid := auth.uid();
+  v_owner   uuid;
+  v_created timestamptz;
+  v_status  text;
+  v_window  integer := public.chat_delete_window_seconds();
 begin
   if v_uid is null then return jsonb_build_object('ok', false, 'message', 'sign_in_required'); end if;
+
+  select user_id, created_at, status
+    into v_owner, v_created, v_status
+    from public.chat_messages
+   where id = p_message_id;
+
+  if v_owner is null then return jsonb_build_object('ok', false, 'message', 'not_found'); end if;
+  if v_owner <> v_uid then return jsonb_build_object('ok', false, 'message', 'forbidden'); end if;
+  if v_status = 'deleted' then return jsonb_build_object('ok', false, 'message', 'already_deleted'); end if;
+
+  if now() - v_created > make_interval(secs => v_window) then
+    return jsonb_build_object(
+      'ok', false,
+      'message', 'delete_window_expired',
+      'window_seconds', v_window,
+      'age_seconds', floor(extract(epoch from (now() - v_created)))::int
+    );
+  end if;
 
   update public.chat_messages
      set status = 'deleted', content = null, sticker_url = null, image_path = null,
@@ -238,7 +270,7 @@ begin
    where id = p_message_id and user_id = v_uid;
 
   if not found then return jsonb_build_object('ok', false, 'message', 'forbidden'); end if;
-  return jsonb_build_object('ok', true);
+  return jsonb_build_object('ok', true, 'window_seconds', v_window);
 end;
 $$;
 

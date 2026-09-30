@@ -181,6 +181,13 @@ For the message owner **[NEW]**: Delete my message.
 For Moderator/Admin: Delete message (hide), Pin/Unpin **[NEW]**, Mute this user, View profile.
 Report opens a small form with reasons (spam, insult, inappropriate, other) **[ORIGINAL: reports exist with a reason field]**.
 
+> تنفيذ «حذف رسالتي» (طلب المستخدم): الحذف الذاتي متاح **خلال ٣ دقائق فقط** من وقت
+> الإرسال (`public.chat_delete_window_seconds()` = 180)، وبعدها لا يستطيع المستخدم حذفها.
+> القاعدة الحاسمة في `supabase/03_functions_chat.sql` و`supabase/17_message_delete_window.sql`
+> (ترفض بـ`delete_window_expired`)، والواجهة تُخفي الخيار بعد المدة وتُظهر السبب
+> (`ui/chat/ChatTimeRules.kt` · `ChatSheets.kt` · `ChatScreen.kt`). الإدارة تبقى قادرة على
+> الإخفاء/الحذف بلا حدّ زمني عبر `chat_moderate_message`.
+
 ### C5. Input bar (bottom) — must include: send button, stickers, add image
 Layout, from start to end:
 1. **➕ button** (round, elevated2): opens a sheet with **Photo** (image from gallery) and **Audio / Video file**. **[ORIGINAL]**

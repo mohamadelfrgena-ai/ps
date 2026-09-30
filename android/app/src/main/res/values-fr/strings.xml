@@ -249,6 +249,9 @@
     <string name="chat_reason_other">Autre</string>
     <string name="chat_report_sent">Signalement envoyé ✅</string>
     <string name="chat_delete_mine">Supprimer mon message</string>
+    <string name="chat_delete_expired">Délai dépassé : un message ne peut être supprimé que dans les 3 minutes suivant son envoi.</string>
+    <string name="chat_delete_left">Il reste %1$d min pour supprimer</string>
+    <string name="chat_delete_done">Message supprimé.</string>
     <string name="chat_hide_message">Masquer le message</string>
     <string name="chat_pin">Épingler</string>
     <string name="chat_unpin">Désépingler</string>

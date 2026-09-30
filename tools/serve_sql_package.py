@@ -44,6 +44,8 @@ ORDER = [
     ("14_redeem_codes.sql", "14_redeem_codes.sql", "أكواد هدايا AC: جدول + دالتا توليد واستبدال"),
     ("16_language_room_names.sql", "16_language_room_names.sql",
      "أسماء غرف اللغة بلغتها (العربية · Русский · 中文 …) والغرف الأساسية بلا إيموجي"),
+    ("17_message_delete_window.sql", "17_message_delete_window.sql",
+     "نافذة حذف الرسالة: ٣ دقائق فقط بعد الإرسال، وبعدها لا يستطيع المستخدم الحذف"),
     ("15_assets_v2.sql", "15_assets_v2.sql",
      "الأصول الجديدة: يستبدل كل الأفاتارات والملصقات والأدوات بـ492 أصلاً في 21 قسماً"),
     ("08_admin_bootstrap.sql", "08_admin_bootstrap_example.sql", "النسخة العامة (you@example.com)"),
@@ -120,6 +122,7 @@ README_TEMPLATE = """AddonStation Mobile — حزمة SQL الجاهزة لمش�
    01_schema → 02_functions_core → 03_functions_chat → 04_rls
    → 05_storage → 06_seed → 07_seed_assets → 12_avatars
    → 10_realtime → 11_grants → 13_channels_icons → 14_redeem_codes
+   → 15_assets_v2 → 16_language_room_names → 17_message_delete_window
 
 الخطوة 2) تحقّق (الصق هذا الاستعلام وحده)
 -----------------------------------------------------------------
@@ -150,6 +153,17 @@ select
    أو من الحاسوب: python3 tools/make_redeem_codes.py -n 5
 
 الخطوة 6) (اختياري) بوابات الدفع — نفّذ 09_gateway_functions.sql لاحقاً.
+
+مشمول تلقائياً في 00_ALL_IN_ONE.sql (لا خطوة إضافية)
+-----------------------------------------------------------------
+• حذف الرسالة في الشات: خلال ٣ دقائق فقط بعد الإرسال، وبعدها لا يستطيع المستخدم
+  حذفها (17_message_delete_window.sql) — والإدارة تُخفي/تحذف بلا حدّ زمني.
+• أسماء غرف اللغة بلغتها: العربية · English · Español · Français · Português ·
+  Русский · Türkçe · 中文 (16_language_room_names.sql).
+• الأصول الجديدة: 492 أصلاً في 21 قسماً بدل القديمة (15_assets_v2.sql).
+
+للتحقق من نافذة الحذف بعد التنفيذ، الصق هذا في SQL Editor:
+    select public.chat_delete_window_seconds();   -- المتوقّع: 180
 
 أخطاء شائعة
 -----------------------------------------------------------------

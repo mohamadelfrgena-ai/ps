@@ -340,6 +340,10 @@ fun MessageActionsSheet(
     ui: ChatMessageUi,
     myId: String?,
     isStaff: Boolean,
+    /** هل ما زال صاحب الرسالة داخل مدة الحذف (٣ دقائق)؟ يُحسب في الشات من وقت الإرسال. */
+    canDeleteMine: Boolean = false,
+    /** ما تبقّى من مهلته بصيغة جاهزة (مثل «متبقٍ دقيقتان») — يُعرض تحت خيار الحذف. */
+    deleteLeftText: String? = null,
     onDismiss: () -> Unit,
     onReply: () -> Unit,
     onCopy: () -> Unit,
@@ -378,8 +382,28 @@ fun MessageActionsSheet(
             ActionRow(Icons.Filled.Reply, stringResource(R.string.chat_reply), onReply)
             ActionRow(Icons.Filled.ContentCopy, stringResource(R.string.chat_copy_text), onCopy)
             ActionRow(Icons.Filled.Flag, stringResource(R.string.chat_report), onClick = { showReport = true })
-            if (ui.message.userId == myId) {
-                ActionRow(Icons.Filled.Delete, stringResource(R.string.chat_delete_mine), onDeleteMine, AppColors.Red)
+            // خيار الحذف: للرسالة التي أرسلها المستخدم نفسه **وفي أول ٣ دقائق فقط**.
+            // بعد انتهاء المدة يختفي الخيار تماماً (والقاعدة ترفضه من جهة الخادم أيضاً).
+            if (ui.message.userId == myId && ui.message.status != "deleted") {
+                if (canDeleteMine) {
+                    ActionRow(Icons.Filled.Delete, stringResource(R.string.chat_delete_mine), onDeleteMine, AppColors.Red)
+                    if (deleteLeftText != null) {
+                        Text(
+                            deleteLeftText,
+                            style = AppText.tiny,
+                            color = AppColors.Dim,
+                            modifier = Modifier.padding(start = 38.dp, bottom = 6.dp),
+                        )
+                    }
+                } else {
+                    // انتهت المدة: نوضّح السبب بلطف بدل إخفاء الأمر بلا تفسير
+                    Text(
+                        stringResource(R.string.chat_delete_expired),
+                        style = AppText.tiny,
+                        color = AppColors.Dim,
+                        modifier = Modifier.padding(start = 10.dp, bottom = 8.dp),
+                    )
+                }
             }
             if (isStaff) {
                 ActionRow(Icons.Filled.Visibility, stringResource(R.string.chat_hide_message), onModerate)

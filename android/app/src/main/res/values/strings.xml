@@ -259,6 +259,9 @@
     <string name="chat_reason_other">Other</string>
     <string name="chat_report_sent">Report sent ✅</string>
     <string name="chat_delete_mine">Delete my message</string>
+    <string name="chat_delete_expired">Delete window ended: messages can only be deleted within 3 minutes of sending.</string>
+    <string name="chat_delete_left">%1$d min left to delete</string>
+    <string name="chat_delete_done">Message deleted.</string>
     <string name="chat_hide_message">Hide message</string>
     <string name="chat_pin">Pin</string>
     <string name="chat_unpin">Unpin</string>
