@@ -1,7 +1,9 @@
 package com.addonstation.mobile.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontSynthesis
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -68,3 +70,40 @@ val AppTypography = Typography(
 )
 
 val CenterCenter = TextAlign.Center
+
+
+// ---------------------------------------------------------------------------------
+// خطوط العرض الكبيرة (شاشة الترحيب وأمثالها)
+// ---------------------------------------------------------------------------------
+
+/**
+ * هل يُظهر خط البكسل هذا النص أصلاً؟ الخط يغطي اللاتيني فقط، فالعربية والصينية
+ * والسيريلية تُرسم بخط النظام — ويجب أن تُرسم **عريضة** مثل الإنجليزية تماماً.
+ */
+fun usesPixelGlyphs(text: String): Boolean =
+    text.all { ch -> !ch.isLetter() || ch.code < 0x0250 }
+
+/**
+ * نمط كلمات العرض الكبيرة: خط البكسل للاتيني (كما في الوثيقة)، وخط النظام **العريض**
+ * لبقية اللغات — فتبدو الكلمة عريضة في العربية والروسية والصينية مثل الإنجليزية.
+ *
+ * @param sizeSp حجم الخط بالنقاط (sp)
+ * @param letterSpacing تباعد الحروف للاتيني فقط (العربية تتصل حروفها فلا تباعد)
+ */
+fun displayStyle(
+    text: String,
+    sizeSp: Float,
+    color: Color = Color.Unspecified,
+    latinLetterSpacingSp: Float = 1.2f,
+): TextStyle {
+    val latin = usesPixelGlyphs(text)
+    return TextStyle(
+        fontFamily = if (latin) PixelFont else FontFamily.Default,
+        fontSize = sizeSp.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = if (latin) latinLetterSpacingSp.sp else 0.sp,
+        color = color,
+        // يسمح بالسماكة الاصطناعية إن لم يوجد وجه عريض في الخط — فلا يعود النص رفيعاً أبداً
+        fontSynthesis = FontSynthesis.All,
+    )
+}

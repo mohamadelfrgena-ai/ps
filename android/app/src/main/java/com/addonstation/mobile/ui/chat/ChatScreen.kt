@@ -9,6 +9,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +21,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -183,7 +189,9 @@ fun ChatScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .imePadding(),
+            // الأسفل = الأكبر بين شريط التنقّل ولوحة المفاتيح: يبقى مربع الإرسال فوق
+            // شريط النظام حين تُغلق اللوحة، وفوق اللوحة حين تُفتح — بلا تداخل ولا فراغ.
+            .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
     ) {
         ChatHeader(
             channel = channel,
@@ -584,7 +592,9 @@ private fun ChatHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AppColors.Bg.copy(alpha = 0.95f))
+            // ترويسة الشات كانت تمتد تحت شريط الحالة؛ الآن تحجز مساحته وتحته يبدأ المحتوى.
+            .background(AppColors.Bg.copy(alpha = 0.96f))
+            .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),

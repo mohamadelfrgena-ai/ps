@@ -148,9 +148,9 @@ fun SplashScreen(onFinished: () -> Unit) {
             Spacer(Modifier.height(34.dp))
 
             SplashLine(stringResource(R.string.splash_dream_it)) { line1.value }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(16.dp))
             SplashLine(stringResource(R.string.splash_build_it)) { line2.value }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(16.dp))
             SplashLine(stringResource(R.string.splash_create_it)) { line3.value }
 
             Spacer(Modifier.height(44.dp))
@@ -187,10 +187,14 @@ fun SplashScreen(onFinished: () -> Unit) {
 private fun SplashLine(text: String, progress: () -> Float) {
     Text(
         text = text,
-        style = androidx.compose.ui.text.TextStyle(
-            fontFamily = PixelFont,
-            fontSize = 20.sp,
+        // كلمات الشاشة **عريضة في كل اللغات**: خط البكسل للاتيني، وخط النظام العريض
+        // للعربية والروسية والصينية — فلا تظهر رفيعة في لغة دون أخرى (انظر displayStyle).
+        style = com.addonstation.mobile.ui.theme.displayStyle(
+            text = text,
+            sizeSp = 24f,
             color = Color.White,
+            latinLetterSpacingSp = 2f,
+        ).copy(
             textAlign = TextAlign.Center,
             shadow = androidx.compose.ui.graphics.Shadow(
                 color = Color.Black,

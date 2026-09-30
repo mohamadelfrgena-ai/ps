@@ -46,13 +46,18 @@ fun PixelTopBar(
     icon: ImageVector = Icons.Filled.Star,
     showWallet: Boolean = true,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    // الخلفية تُرسم على كامل الشريط **بما فيه منطقة شريط الحالة** (البطارية والواي فاي)،
+    // والصف نفسه (56dp) يبدأ أسفل تلك المنطقة — فلا يعلو المحتوى على أيقونات النظام.
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppColors.Bg.copy(alpha = 0.96f))
+            .windowInsetsPadding(WindowInsets.statusBars),
+    ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets.statusBars)
             .height(56.dp)
-            .background(AppColors.Bg.copy(alpha = 0.88f))
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

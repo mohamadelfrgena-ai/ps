@@ -48,9 +48,12 @@ fun BottomNavBar(
     current: MainTab,
     onSelect: (MainTab) -> Unit,
 ) {
+    // الحاوية تحجز مساحة شريط التنقّل (Navigation Bar) وتلوّنها بلون التطبيق،
+    // والشريط نفسه (62dp) يبقى **فوق** تلك المنطقة — فلا يتداخل مع أزرار النظام.
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .background(AppColors.Bg)
             .windowInsetsPadding(WindowInsets.navigationBars),
     ) {
         Box(
