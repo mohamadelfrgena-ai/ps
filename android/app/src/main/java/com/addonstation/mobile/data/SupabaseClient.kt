@@ -213,35 +213,37 @@ class SupabaseClient(
         table: String,
         query: String = "select=*",
         token: String? = sessionStore.current()?.accessToken,
-    ): JsonElement {
+    ): JsonElement = withContext(Dispatchers.IO) {
         val text = exec("GET", "${config().restUrl}/$table?$query", token, null)
-        return if (text.isBlank()) JsonArray(emptyList()) else json.parseToJsonElement(text)
+        if (text.isBlank()) JsonArray(emptyList()) else json.parseToJsonElement(text)
     }
 
-    suspend fun insert(table: String, body: JsonElement): JsonElement {
+    suspend fun insert(table: String, body: JsonElement): JsonElement = withContext(Dispatchers.IO) {
         val text = exec(
             "POST", "${config().restUrl}/$table",
             sessionStore.current()?.accessToken, body.toString().toRequestBody(JSON_MEDIA),
             extra = mapOf("Prefer" to "return=representation"),
         )
-        return if (text.isBlank()) JsonNull else json.parseToJsonElement(text)
+        if (text.isBlank()) JsonNull else json.parseToJsonElement(text)
     }
 
-    suspend fun update(table: String, query: String, body: JsonElement): JsonElement {
+    suspend fun update(table: String, query: String, body: JsonElement): JsonElement = withContext(Dispatchers.IO) {
         val text = exec(
             "PATCH", "${config().restUrl}/$table?$query",
             sessionStore.current()?.accessToken, body.toString().toRequestBody(JSON_MEDIA),
             extra = mapOf("Prefer" to "return=representation"),
         )
-        return if (text.isBlank()) JsonNull else json.parseToJsonElement(text)
+        if (text.isBlank()) JsonNull else json.parseToJsonElement(text)
     }
 
     suspend fun delete(table: String, query: String) {
-        exec("DELETE", "${config().restUrl}/$table?$query", sessionStore.current()?.accessToken, null)
+        withContext(Dispatchers.IO) {
+            exec("DELETE", "${config().restUrl}/$table?$query", sessionStore.current()?.accessToken, null)
+        }
     }
 
     /** استدعاء دالة قاعدة بيانات (RPC). */
-    suspend fun rpc(function: String, params: Map<String, JsonElement?> = emptyMap(), signedOnly: Boolean = false): JsonElement? {
+    suspend fun rpc(function: String, params: Map<String, JsonElement?> = emptyMap(), signedOnly: Boolean = false): JsonElement? = withContext(Dispatchers.IO) {
         val token = sessionStore.current()?.accessToken
         if (signedOnly && token == null) throw ApiError(ApiErrorKind.NOT_SIGNED_IN)
         val body = buildJsonObject {
@@ -251,7 +253,7 @@ class SupabaseClient(
             "POST", "${config().restUrl}/rpc/$function", token,
             body.toString().toRequestBody(JSON_MEDIA),
         )
-        return if (text.isBlank() || text == "null") null else json.parseToJsonElement(text)
+        if (text.isBlank() || text == "null") null else json.parseToJsonElement(text)
     }
 
     // --------------------------------------------------------------- Storage
@@ -260,17 +262,19 @@ class SupabaseClient(
         "${config().storageUrl}/object/public/$bucket/${path.trimStart('/')}"
 
     suspend fun upload(bucket: String, path: String, bytes: ByteArray, contentType: String, upsert: Boolean = true) {
-        val media = contentType.toMediaType()
-        exec(
-            "POST", "${config().storageUrl}/object/$bucket/${path.trimStart('/')}",
-            sessionStore.current()?.accessToken,
-            bytes.toRequestBody(media),
-            extra = mapOf("x-upsert" to upsert.toString(), "cache-control" to "3600"),
-        )
+        withContext(Dispatchers.IO) {
+            val media = contentType.toMediaType()
+            exec(
+                "POST", "${config().storageUrl}/object/$bucket/${path.trimStart('/')}",
+                sessionStore.current()?.accessToken,
+                bytes.toRequestBody(media),
+                extra = mapOf("x-upsert" to upsert.toString(), "cache-control" to "3600"),
+            )
+        }
     }
 
     /** رابط موقّع قصير العمر (60 ثانية للمحتوى والإيصالات، 300 لوسائط الشات). */
-    suspend fun signedUrl(bucket: String, path: String, expiresInSeconds: Int = 60): String {
+    suspend fun signedUrl(bucket: String, path: String, expiresInSeconds: Int = 60): String = withContext(Dispatchers.IO) {
         val body = buildJsonObject { put("expiresIn", expiresInSeconds) }
         val text = exec(
             "POST", "${config().storageUrl}/object/sign/$bucket/${path.trimStart('/')}",
@@ -281,10 +285,10 @@ class SupabaseClient(
         val signed = obj["signedURL"]?.jsonPrimitive?.contentOrNull()
             ?: obj["signedUrl"]?.jsonPrimitive?.contentOrNull()
             ?: throw ApiError(ApiErrorKind.NO_PERMISSION, "no signed url")
-        return if (signed.startsWith("http")) signed else "${config().storageUrl}$signed"
+        if (signed.startsWith("http")) signed else "${config().storageUrl}$signed"
     }
 
-    suspend fun listObjects(bucket: String, prefix: String = "", token: String? = sessionStore.current()?.accessToken): JsonElement {
+    suspend fun listObjects(bucket: String, prefix: String = "", token: String? = sessionStore.current()?.accessToken): JsonElement = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
             put("prefix", prefix)
             put("limit", 200)
@@ -298,7 +302,7 @@ class SupabaseClient(
             "POST", "${config().storageUrl}/object/list/$bucket", token,
             body.toString().toRequestBody(JSON_MEDIA),
         )
-        return if (text.isBlank()) JsonArray(emptyList()) else json.parseToJsonElement(text)
+        if (text.isBlank()) JsonArray(emptyList()) else json.parseToJsonElement(text)
     }
 
     suspend fun downloadBytes(url: String): ByteArray {

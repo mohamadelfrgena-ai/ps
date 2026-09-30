@@ -32,7 +32,9 @@ import com.addonstation.mobile.ui.store.ContentDetailScreen
 import com.addonstation.mobile.ui.settings.SettingsScreen
 import com.addonstation.mobile.ui.profile.ProfileScreen
 import com.addonstation.mobile.ui.common.SetupScreen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** مسارات التنقل كلها في مكان واحد. */
 object Routes {
@@ -92,18 +94,22 @@ fun AppRoot(
 
     // استعادة الجلسة عند الإقلاع + معالجة رابط الاستعادة addonstation://recovery
     LaunchedEffect(Unit) {
-        runCatching {
-            if (recoveryLink != null && container.auth.acceptRecoveryLink(recoveryLink)) {
-                deepLinkSession = true
+        // كل عمل الإقلاع (شبكة + فك ترميز JSON) على خيط الإدخال/الإخراج،
+        // حتى لا يتجمّد الخيط الرئيسي أثناء شاشة الترحيب (كان سبب «اللاق»).
+        val recovered = runCatching {
+            withContext(Dispatchers.IO) {
+                val linked = recoveryLink != null && container.auth.acceptRecoveryLink(recoveryLink)
+                if (container.auth.isSignedIn()) {
+                    container.auth.ensureFreshSession()
+                    container.state.refreshAll()
+                    container.assets.all()
+                }
+                container.plans.loadPlans()
+                container.plans.loadPaymentMethods()
+                linked
             }
-            if (container.auth.isSignedIn()) {
-                container.auth.ensureFreshSession()
-                container.state.refreshAll()
-                container.assets.all()
-            }
-            container.plans.loadPlans()
-            container.plans.loadPaymentMethods()
-        }
+        }.getOrDefault(false)
+        deepLinkSession = recovered
         configured = container.isConfigured
         onRecoveryConsumed()
     }
