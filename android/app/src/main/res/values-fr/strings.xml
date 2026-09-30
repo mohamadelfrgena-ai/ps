@@ -350,7 +350,29 @@
     <string name="ac_history">Historique des transactions</string>
     <string name="ac_no_transactions">Aucune transaction AC pour l’instant.</string>
     <string name="ac_not_enough">AC insuffisants</string>
-    <string name="ac_unlocked">Débloqué ✅</string>
+    <string name="ac_redeem_title">Code cadeau AC</string>
+    <string name="ac_redeem_hint">8 caractères : majuscules, minuscules et deux chiffres</string>
+    <string name="ac_redeem_action">Utiliser le code</string>
+    <string name="ac_redeem_success">%1$s AC ajoutés à ton solde.</string>
+    <string name="ac_redeem_invalid">Ce code n’est pas valide. Vérifie les lettres et les chiffres.</string>
+    <string name="ac_redeem_used">Tu as déjà utilisé ce code.</string>
+    <string name="ac_redeem_expired">Ce code a expiré.</string>
+    <string name="ac_redeem_off">Ce code est désactivé pour le moment.</string>
+    <string name="ac_redeem_exhausted">Ce code a atteint sa limite d’utilisation.</string>
+    <string name="ac_redeem_sign_in">Connecte-toi d’abord pour utiliser un code.</string>
+    <string name="ac_freq_once">une fois</string>
+    <string name="ac_freq_daily">quotidien</string>
+    <string name="ac_freq_streak">série de jours</string>
+    <string name="ac_freq_manual">manuel</string>
+    <string name="ac_kind_code">Code cadeau</string>
+    <string name="ac_kind_task">Tâche AC</string>
+    <string name="ac_kind_daily">Récompense quotidienne</string>
+    <string name="ac_kind_streak">Récompense de série</string>
+    <string name="ac_kind_admin">Accordé par l’admin</string>
+    <string name="ac_kind_unlock">Déblocage</string>
+    <string name="ac_kind_event">Récompense d’événement</string>
+    <string name="ac_kind_welcome">Bonus de bienvenue</string>
+    <string name="ac_unlocked">Débloqué</string>
 
     <string name="notif_title">Notifications</string>
     <string name="notif_empty">🔕 Aucune notification — lorsqu’on te mentionne ou t’envoie une demande d’ami, elle apparaîtra ici.</string>
@@ -408,6 +430,13 @@
     <string name="admin_give">+ Donner</string>
     <string name="admin_remove">− Retirer</string>
     <string name="admin_reward">Récompense administrateur</string>
+    <string name="admin_codes_title">Codes cadeaux AC</string>
+    <string name="admin_codes_amount">Valeur du code (AC)</string>
+    <string name="admin_codes_count">Nombre de codes</string>
+    <string name="admin_codes_generate">Générer les codes</string>
+    <string name="admin_codes_created">%1$s codes générés — copie-les maintenant :</string>
+    <string name="admin_codes_hint">Copie les codes et envoie-les à qui tu veux. Chaque code sert une fois par membre.</string>
+    <string name="admin_codes_latest">Derniers codes</string>
     <string name="admin_adjustment">Ajustement administrateur</string>
     <string name="admin_no_permission">Tu n’as pas la permission pour cette action</string>
 

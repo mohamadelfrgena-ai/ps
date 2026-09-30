@@ -12,6 +12,7 @@ import com.addonstation.mobile.data.model.SubscriptionPlan
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -313,6 +314,34 @@ class AdminRepository(private val supabase: SupabaseClient) {
     suspend fun acTransactions(limit: Int = 200): List<Map<String, JsonElement>> = runCatching {
         supabase.decodeList<Map<String, JsonElement>>(
             supabase.select("ac_transactions", "select=*&order=created_at.desc&limit=$limit")
+        )
+    }.getOrElse { emptyList() }
+
+    /** يولّد أكواد هدايا AC (8 خانات: حروف كبيرة/صغيرة + رقمان) ويعيد قائمتها. */
+    suspend fun acCreateCodes(
+        amount: Int,
+        count: Int = 5,
+        maxUses: Int = 1,
+        note: String? = null,
+    ): Result<List<String>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val outcome = supabase.rpc(
+                "ac_admin_create_codes",
+                mapOf(
+                    "p_amount" to JsonPrimitive(amount),
+                    "p_count" to JsonPrimitive(count),
+                    "p_max_uses" to JsonPrimitive(maxUses),
+                    "p_note" to (note?.let { JsonPrimitive(it) } ?: JsonNull),
+                ),
+            ).asOutcome().requireOk()
+            outcome.data["codes"]?.asArray()?.mapNotNull { it.asString() } ?: emptyList()
+        }
+    }
+
+    /** كل الأكواد المولَّدة (لإدارتها من اللوحة). */
+    suspend fun acCodes(limit: Int = 100): List<Map<String, JsonElement>> = runCatching {
+        supabase.decodeList<Map<String, JsonElement>>(
+            supabase.select("ac_redeem_codes", "select=*&order=created_at.desc&limit=$limit")
         )
     }.getOrElse { emptyList() }
 

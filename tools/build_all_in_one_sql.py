@@ -29,6 +29,7 @@ ORDER = [
     "10_realtime.sql",
     "11_grants.sql",
     "13_channels_icons.sql",
+    "14_redeem_codes.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -40,6 +41,7 @@ HEADER = """-- =================================================================
 --      01_schema → 02_functions_core → 03_functions_chat → 04_rls
 --      → 05_storage → 06_seed → 07_seed_assets → 12_avatars → 10_realtime → 11_grants
 --      → 13_channels_icons (أسماء الغرف بلا إيموجي)
+--      → 14_redeem_codes (أكواد هدايا AC: توليد واستبدال)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --

@@ -343,14 +343,36 @@
 
     <string name="ac_title">محفظة AC</string>
     <string name="ac_balance">الرصيد الحالي</string>
-    <string name="ac_desc">AC هي عملة مكافأة داخلية. اكسبها من خلال النشاط وتستخدمها لفتح الإضافات والعوالم المؤهلة. لا يوجد شراء أو سحب نقدي.</string>
+    <string name="ac_desc">AC هي عملة مكافآت داخلية. اكسبها من النشاط اليومي، واستخدمها لفتح الإضافات والعوالم المؤهَّلة. لا يمكن شراء AC بالنقود ولا تحويلها إلى نقود.</string>
     <string name="ac_tasks">كيف تكسب AC</string>
-    <string name="ac_claim">المطالبة</string>
-    <string name="ac_claimed">تمت المطالبة</string>
-    <string name="ac_history">سجل المعاملات</string>
-    <string name="ac_no_transactions">لا توجد معاملات AC حتى الآن.</string>
+    <string name="ac_claim">استلام</string>
+    <string name="ac_claimed">تم الاستلام</string>
+    <string name="ac_history">سجل العمليات</string>
+    <string name="ac_no_transactions">لا توجد عمليات على AC حتى الآن.</string>
     <string name="ac_not_enough">رصيد AC غير كافٍ</string>
-    <string name="ac_unlocked">تم الفتح ✅</string>
+    <string name="ac_redeem_title">كود هدية AC</string>
+    <string name="ac_redeem_hint">الكود من 8 خانات: حروف كبيرة وصغيرة ورقمان</string>
+    <string name="ac_redeem_action">استبدال الكود</string>
+    <string name="ac_redeem_success">تمت إضافة %1$s AC إلى رصيدك.</string>
+    <string name="ac_redeem_invalid">الكود غير صحيح. تحقّق من الحروف والأرقام.</string>
+    <string name="ac_redeem_used">لقد استبدلت هذا الكود من قبل.</string>
+    <string name="ac_redeem_expired">انتهت صلاحية هذا الكود.</string>
+    <string name="ac_redeem_off">هذا الكود غير مُفعَّل حالياً.</string>
+    <string name="ac_redeem_exhausted">انتهى عدد مرات استخدام هذا الكود.</string>
+    <string name="ac_redeem_sign_in">سجّل الدخول أولاً لاستبدال الكود.</string>
+    <string name="ac_freq_once">مرة واحدة</string>
+    <string name="ac_freq_daily">يومياً</string>
+    <string name="ac_freq_streak">سلسلة أيام</string>
+    <string name="ac_freq_manual">من الإدارة</string>
+    <string name="ac_kind_code">كود هدية</string>
+    <string name="ac_kind_task">مهمة AC</string>
+    <string name="ac_kind_daily">مكافأة يومية</string>
+    <string name="ac_kind_streak">مكافأة سلسلة</string>
+    <string name="ac_kind_admin">من الإدارة</string>
+    <string name="ac_kind_unlock">فتح محتوى</string>
+    <string name="ac_kind_event">مكافأة حدث</string>
+    <string name="ac_kind_welcome">مكافأة ترحيب</string>
+    <string name="ac_unlocked">تم فتحه</string>
 
     <string name="notif_title">التنبيهات</string>
     <string name="notif_empty">🔕 لا توجد تنبيهات — عندما يذكرك أحد أو يرسل لك طلب صداقة، سيظهر هنا.</string>
@@ -408,6 +430,13 @@
     <string name="admin_give">+ منح</string>
     <string name="admin_remove">− خصم</string>
     <string name="admin_reward">مكافأة إدارية</string>
+    <string name="admin_codes_title">أكواد هدايا AC</string>
+    <string name="admin_codes_amount">قيمة الكود (AC)</string>
+    <string name="admin_codes_count">عدد الأكواد</string>
+    <string name="admin_codes_generate">توليد الأكواد</string>
+    <string name="admin_codes_created">تم توليد %1$s كوداً — انسخها الآن:</string>
+    <string name="admin_codes_hint">انسخ الأكواد وأرسلها لمن تريد. كل كود يُستخدم مرة واحدة لكل مستخدم.</string>
+    <string name="admin_codes_latest">أحدث الأكواد</string>
     <string name="admin_adjustment">تعديل إداري</string>
     <string name="admin_no_permission">لا تملك صلاحية هذا الإجراء</string>
 

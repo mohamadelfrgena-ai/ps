@@ -254,6 +254,19 @@ fun PlanChip(plan: String, modifier: Modifier = Modifier) {
 
 /* ================================ الصور ================================ */
 
+/** رمز لغة التطبيق الحالية (ar · en · …) — لاختيار النص العربي أو الإنجليزي القادم من الخادم. */
+@Composable
+fun appLocaleCode(): String {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val locale = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+        configuration.locales[0]
+    } else {
+        @Suppress("DEPRECATION")
+        configuration.locale
+    }
+    return locale.language.ifBlank { "en" }
+}
+
 /** علم دائري مرسوم لكل لغة مدعومة (بدل إيموجي العلم). */
 @androidx.annotation.DrawableRes
 fun langFlagRes(languageCode: String): Int = when (languageCode.lowercase()) {

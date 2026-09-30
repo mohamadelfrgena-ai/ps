@@ -350,7 +350,29 @@
     <string name="ac_history">İşlem geçmişi</string>
     <string name="ac_no_transactions">Henüz AC işlemi yok.</string>
     <string name="ac_not_enough">Yeterli AC yok</string>
-    <string name="ac_unlocked">Açıldı ✅</string>
+    <string name="ac_redeem_title">AC hediye kodu</string>
+    <string name="ac_redeem_hint">8 karakter: büyük, küçük harf ve iki rakam</string>
+    <string name="ac_redeem_action">Kodu kullan</string>
+    <string name="ac_redeem_success">Bakiyene %1$s AC eklendi.</string>
+    <string name="ac_redeem_invalid">Bu kod geçerli değil. Harf ve rakamları kontrol et.</string>
+    <string name="ac_redeem_used">Bu kodu zaten kullandın.</string>
+    <string name="ac_redeem_expired">Bu kodun süresi doldu.</string>
+    <string name="ac_redeem_off">Bu kod şu anda devre dışı.</string>
+    <string name="ac_redeem_exhausted">Bu kod kullanım sınırına ulaştı.</string>
+    <string name="ac_redeem_sign_in">Kodu kullanmak için önce giriş yap.</string>
+    <string name="ac_freq_once">bir kez</string>
+    <string name="ac_freq_daily">günlük</string>
+    <string name="ac_freq_streak">gün serisi</string>
+    <string name="ac_freq_manual">elle</string>
+    <string name="ac_kind_code">Hediye kodu</string>
+    <string name="ac_kind_task">AC görevi</string>
+    <string name="ac_kind_daily">Günlük ödül</string>
+    <string name="ac_kind_streak">Seri ödülü</string>
+    <string name="ac_kind_admin">Yönetici verdi</string>
+    <string name="ac_kind_unlock">İçerik açma</string>
+    <string name="ac_kind_event">Etkinlik ödülü</string>
+    <string name="ac_kind_welcome">Hoş geldin bonusu</string>
+    <string name="ac_unlocked">Açıldı</string>
 
     <string name="notif_title">Bildirimler</string>
     <string name="notif_empty">🔕 Bildirim yok — biri senden bahsettiğinde veya arkadaşlık isteği gönderdiğinde burada görünecek.</string>
@@ -408,6 +430,13 @@
     <string name="admin_give">+ Ver</string>
     <string name="admin_remove">− Kaldır</string>
     <string name="admin_reward">Yönetici ödülü</string>
+    <string name="admin_codes_title">AC hediye kodları</string>
+    <string name="admin_codes_amount">Kod değeri (AC)</string>
+    <string name="admin_codes_count">Kod sayısı</string>
+    <string name="admin_codes_generate">Kod üret</string>
+    <string name="admin_codes_created">%1$s kod üretildi — şimdi kopyala:</string>
+    <string name="admin_codes_hint">Kodları kopyala ve istediğin kişiye gönder. Her kod üye başına bir kez çalışır.</string>
+    <string name="admin_codes_latest">Son kodlar</string>
     <string name="admin_adjustment">Yönetici düzeltmesi</string>
     <string name="admin_no_permission">Bu işlem için yetkin yok</string>
 

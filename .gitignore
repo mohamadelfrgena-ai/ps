@@ -17,9 +17,16 @@ android/captures/
 *.z02
 !supabase/functions/**
 
+# بايثون (أدوات المشروع)
+__pycache__/
+*.pyc
+
 # نظام
 .DS_Store
 Thumbs.db
 
 # حزمة SQL الجاهزة (مقصود تعقّبها لتوفير رابط تحميل مباشر)
 !sql-package/**
+
+# أكواد هدايا AC المولَّدة (تبقى خاصة بك — لا تُرفع إلى مستودع عام)
+redeem-codes/

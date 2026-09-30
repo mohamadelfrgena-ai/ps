@@ -53,6 +53,26 @@ class AcRepository(
         }
     }
 
+    /**
+     * استبدال كود هدية AC (من محفظة AC).
+     * يعيد قيمة الكود عند النجاح، ويرمي خطأً مفهوماً عند الفشل
+     * (code_invalid · code_used · code_expired · code_inactive · code_exhausted).
+     */
+    suspend fun redeemCode(code: String): Result<Int> = withContext(Dispatchers.IO) {
+        runCatching {
+            val clean = code.trim()
+            if (clean.length < 4) throw com.addonstation.mobile.data.ApiError(
+                com.addonstation.mobile.data.ApiErrorKind.GENERIC,
+                "code_invalid",
+            )
+            val outcome = supabase.rpc("ac_redeem_code", mapOf("p_code" to JsonPrimitive(clean)))
+                .asOutcome().requireOk()
+            val amount = outcome.data["amount"]?.asInt() ?: 0
+            refreshWallet()
+            amount
+        }
+    }
+
     suspend fun unlockedItemIds(): Set<String> = withContext(Dispatchers.IO) {
         val uid = supabase.session()?.userId ?: return@withContext emptySet()
         runCatching {

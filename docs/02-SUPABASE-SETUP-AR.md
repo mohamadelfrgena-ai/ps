@@ -14,7 +14,7 @@
 | 1 | إنشاء حساب Supabase | 3 د | حساب مسجّل |
 | 2 | إنشاء المشروع | 3 د | مشروع جاهز (Active) |
 | 3 | نسخ **الرابط + المفتاح العام** | 2 د | `https://xxx.supabase.co` + `sb_publishable_…` |
-| 4 | تنفيذ ملف SQL الشامل | 5 د | 33 جدولاً + 65 دالة + 6 مخازن + بيانات أولية |
+| 4 | تنفيذ ملف SQL الشامل | 5 د | 35 جدولاً + 68 دالة + 78 سياسة + 6 مخازن + بيانات أولية |
 | 5 | ضبط المصادقة (Auth) | 4 د | تسجيل/دخول/استعادة كلمة مرور تعمل |
 | 6 | رفع الأصول 311 ملفاً | 10 د | أدوات + ملصقات + أفاتارات تظهر في التطبيق |
 | 7 | تشغيل المزامنة اللحظية | 1 د | شات لحظي مثل Discord |
@@ -89,7 +89,7 @@
 
 ### الطريقة (أ) — الأسرع: ملف واحد جامع ✨
 1. من القائمة الجانبية اضغط **SQL Editor** → **New query**.
-2. افتح ملف **`supabase/00_ALL_IN_ONE.sql`** (173 KB — يحتوي 33 جدولاً و65 دالة و76 سياسة أمنية و6 مخازن والبيانات الأولية):
+2. افتح ملف **`supabase/00_ALL_IN_ONE.sql`** (200 KB — يحتوي 35 جدولاً و68 دالة و78 سياسة أمنية و6 مخازن والبيانات الأولية، ومنها أكواد هدايا AC):
    - على الحاسوب: افتح الملف من المودع، اضغط **Raw** في GitHub ثم **Ctrl+A** ثم **Ctrl+C**.
    - على الجوال: افتح الملف في تطبيق GitHub أو المتصفح بنمط **Raw** ثم علّم الكل وانسخ.
 3. الصق في نافذة SQL Editor ثم اضغط **Run** (أو `Ctrl+Enter`).
@@ -110,6 +110,8 @@
 | 7ب | `supabase/12_avatars.sql` | **25 أفاتاراً** (1 مجاني · 12 Epic · 12 Legendary) — إجمالي `site_assets` = **311** |
 | 8 | `supabase/10_realtime.sql` | تشغيل المزامنة اللحظية لستة جداول |
 | 9 | `supabase/11_grants.sql` | **إلزامي في المشاريع الجديدة:** منح صلاحيات `anon`/`authenticated` على الجداول (بدونه: `permission denied for table …`) |
+| 10 | `supabase/13_channels_icons.sql` | أسماء غرف الشات بلا إيموجي (الأيقونات تُرسم داخل التطبيق) |
+| 11 | `supabase/14_redeem_codes.sql` | **أكواد هدايا AC:** جدول الأكواد + دالتا التوليد (`ac_admin_create_codes`) والاستبدال (`ac_redeem_code`) |
 
 > الملفان `08_admin_bootstrap.sql` (المدير) و`09_gateway_functions.sql` (بوابات الدفع) لهما توقيت خاص — انظر المرحلتين 8 و12.
 
@@ -136,6 +138,41 @@ select (select count(*) from public.ac_tasks)      as tasks,         -- 6
 -- 5) المخازن الستة
 select id, public, file_size_limit from storage.buckets order by id;
 ```
+
+---
+
+## المرحلة 4.5 — أكواد هدايا AC (اختيارية لكن موصى بها) 🎁
+
+الميزة تسمح لك بتوزيع أرصدة مجانية بكتابة **كود** في: **الإعدادات → المحفظة (AC wallet) → كود هدية AC**
+(الخانة أعلى قسم «كيف تكسب AC» مباشرة). القيم الجاهزة: **5,000 · 15,000 · 30,000 · 100,000 AC**.
+
+1. **نفّذ الملف** `supabase/14_redeem_codes.sql` في SQL Editor (وهو مضمَّن أصلاً في الملف الجامع).
+   - ✅ المتوقّع: جدول `codes_total = 0` و`functions_total = 3` + كود تجريبي مطبوع في النتيجة (مثل `Ac7Kp2Qm`).
+2. **ولّد الأكواد** بإحدى طريقتين:
+
+   **أ) من داخل التطبيق (الأسهل):** لوحة الإدارة → **AC Management** → قسم «أكواد هدايا AC» →
+   اختر القيمة (5,000 / 15,000 / 30,000 / 100,000) → اكتب العدد → **توليد الأكواد** → انسخها من الشاشة.
+
+   **ب) من الحاسوب:** شغّل الأداة الجاهزة ثم الصق ناتجها في SQL Editor:
+   ```bash
+   python3 tools/make_redeem_codes.py -n 5            # 5 أكواد من كل فئة قيمة
+   python3 tools/make_redeem_codes.py --amount 30000 -n 20
+   # الناتج: redeem-codes/redeem_codes.sql  +  redeem-codes/redeem_codes.csv
+   ```
+   افتح `redeem-codes/redeem_codes.sql` → Ctrl+A/Ctrl+C → الصقه في **SQL Editor** → **Run**.
+
+3. **تنسيق الكود:** 8 خانات = **6 حروف كبيرة وصغيرة + رقمان** (مثال `Ac7Kp2Qm`)،
+   واستُبعدت الحروف المتشابهة `I O l o` والأرقام `0 1` حتى لا يخطئ المستخدم في الكتابة.
+   الكتابة **غير حسّاسة لحالة الأحرف** (يكتب المستخدم `ac7kp2qm` فيُقبل).
+4. **قواعد الاستخدام:** كل كود يُستخدم **مرة واحدة لكل مستخدم**، و`max_uses` تحدّد عدد المستخدمين المسموح لهم،
+   ويمكن تحديد تاريخ انتهاء (`expires_at`) أو إيقاف كود (`active = false`) — والتطبيق يعرض سبب الرفض بالعربية صراحةً.
+5. **تحقق سريع:**
+   ```sql
+   select amount, count(*) as codes, sum(used_count) as uses
+     from public.ac_redeem_codes group by amount order by amount;
+   ```
+
+> 💡 مجلد `redeem-codes/` **مستثنى من Git** — الأكواد تبقى عندك ولا تُرفع إلى المستودع العام.
 
 ---
 
@@ -463,13 +500,14 @@ psql "…" -c "select asset_type, count(*) from public.site_assets group by 1;"
 
 | الملف | الجداول/الدوال | أمثلة |
 |---|---|---|
-| `01_schema.sql` | 33 جدولاً: `profiles` · `subscription_plans` · `payment_orders` · `content_items` · `ac_wallets/ac_transactions/ac_tasks` · `chat_channels/messages/reactions/mutes/bans/reports/rules/typing/read_state/notifications` · `user_friends` · `creator_applications/submissions/tips/follows` · `featured_creators` · `sticker_packs` · `site_assets` · `app_settings` · `admin_audit_log` | + مشغّل (trigger) ينشئ الملف الشخصي والمحفظة تلقائياً لكل مستخدم جديد |
+| `01_schema.sql` | 33 جدولاً أساسياً (+ جدولا أكواد الهدايا في `14_redeem_codes.sql`): `profiles` · `subscription_plans` · `payment_orders` · `content_items` · `ac_wallets/ac_transactions/ac_tasks` · `chat_channels/messages/reactions/mutes/bans/reports/rules/typing/read_state/notifications` · `user_friends` · `creator_applications/submissions/tips/follows` · `featured_creators` · `sticker_packs` · `site_assets` · `app_settings` · `admin_audit_log` | + مشغّل (trigger) ينشئ الملف الشخصي والمحفظة تلقائياً لكل مستخدم جديد |
 | `02_functions_core.sql` | 40 دالة: `effective_plan` · `can_access_item` · `record_content_download` · `toggle_favorite` · `ac_claim_task` · `ac_unlock_content` · `create_payment_order` · `submit_payment_receipt` · `update_my_profile` · `set_profile_asset` · `admin_*` … | كل عملية حساسة تُنفَّذ هنا بـ`SECURITY DEFINER` مع تحقق الدور والخطة |
 | `03_functions_chat.sql` | 25 دالة: `send_chat_message` (مع فلترة تلقائية) · `chat_toggle_reaction` · `chat_mute_user/ban` · `chat_report_message` · `chat_mark_read` · `chat_set_typing` · `chat_unread_counts` · `my_chat_status` · `admin_upsert_content/plan/settings` · `submit_creator_application/tip/content` … | تحدد الأدوار والصلاحيات والإعلانات و«يكتب الآن…» |
 | `04_rls.sql` | 58 سياسة | أمثلة: `content_select_public` (المحتوى المنشور للجميع) · `orders_select_own` (الطلب لصاحبه فقط) · `ac_wallet_own` · `messages_read` (حسب عضوية الغرفة) · `audit_admin_read` (سجل الإدارة للأدمن فقط) |
 | `05_storage.sql` | 6 مخازن + سياسات الملفات | إيصال كل مستخدم في مجلده · المحتوى المدفوع بصلاحية الخطة · الأصول العامة للقراءة للجميع · أغلفة المبدعين في `items/<uid>/` داخل `site-assets` |
 | `06_seed.sql` | بيانات أولية | 3 خطط · 8 طرق دفع · 6 مهام AC · 5 حزم ملصقات · 13 غرفة · قواعد بـ8 لغات · إعدادات الفلترة التلقائية |
 | `07_seed_assets.sql` | 286 صفاً في `site_assets` | 105 أدوات (104 أسطورية + Enchanted Bedrock للإدارة) و181 ملصقاً موزعة على 5 حزم |
+| `14_redeem_codes.sql` | جدولان: `ac_redeem_codes` · `ac_redeem_uses` + 3 دوال: `ac_random_code` · `ac_admin_create_codes` · `ac_redeem_code` | مفعّل من واجهة **محفظة AC** (خانة الكود) ومن **لوحة الإدارة → AC Management** (توليد الأكواد) |
 | `12_avatars.sql` | 25 صفاً في `site_assets` | 25 أفاتاراً: onefree (مجاني/الافتراضي) + 12 Epic + 12 Legendary — يرفعها إلى `profiles/` |
 
 ## ما بعد هذا الدليل

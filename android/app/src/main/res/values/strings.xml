@@ -359,10 +359,32 @@
     <string name="ac_tasks">How to earn AC</string>
     <string name="ac_claim">Claim</string>
     <string name="ac_claimed">Claimed</string>
-    <string name="ac_history">Transactions log</string>
+    <string name="ac_history">Transaction history</string>
     <string name="ac_no_transactions">No AC transactions yet.</string>
     <string name="ac_not_enough">Not enough AC</string>
-    <string name="ac_unlocked">Unlocked ✅</string>
+    <string name="ac_redeem_title">AC gift code</string>
+    <string name="ac_redeem_hint">8 characters: uppercase, lowercase and two digits</string>
+    <string name="ac_redeem_action">Redeem code</string>
+    <string name="ac_redeem_success">Added %1$s AC to your balance.</string>
+    <string name="ac_redeem_invalid">This code is not valid. Check the letters and digits.</string>
+    <string name="ac_redeem_used">You have already redeemed this code.</string>
+    <string name="ac_redeem_expired">This code has expired.</string>
+    <string name="ac_redeem_off">This code is currently disabled.</string>
+    <string name="ac_redeem_exhausted">This code reached its usage limit.</string>
+    <string name="ac_redeem_sign_in">Sign in first to redeem a code.</string>
+    <string name="ac_freq_once">one time</string>
+    <string name="ac_freq_daily">daily</string>
+    <string name="ac_freq_streak">day streak</string>
+    <string name="ac_freq_manual">manual</string>
+    <string name="ac_kind_code">Gift code</string>
+    <string name="ac_kind_task">AC task</string>
+    <string name="ac_kind_daily">Daily reward</string>
+    <string name="ac_kind_streak">Streak reward</string>
+    <string name="ac_kind_admin">Admin grant</string>
+    <string name="ac_kind_unlock">Content unlock</string>
+    <string name="ac_kind_event">Event reward</string>
+    <string name="ac_kind_welcome">Welcome bonus</string>
+    <string name="ac_unlocked">Unlocked</string>
 
     <!-- Notifications -->
     <string name="notif_title">Notifications</string>
@@ -423,6 +445,13 @@
     <string name="admin_give">+ Give</string>
     <string name="admin_remove">− Remove</string>
     <string name="admin_reward">Admin Reward</string>
+    <string name="admin_codes_title">AC gift codes</string>
+    <string name="admin_codes_amount">Code value (AC)</string>
+    <string name="admin_codes_count">Number of codes</string>
+    <string name="admin_codes_generate">Generate codes</string>
+    <string name="admin_codes_created">Generated %1$s codes — copy them now:</string>
+    <string name="admin_codes_hint">Copy the codes and send them to whoever you want. Each code works once per member.</string>
+    <string name="admin_codes_latest">Latest codes</string>
     <string name="admin_adjustment">Admin Adjustment</string>
     <string name="admin_no_permission">You do not have permission for this action</string>
 

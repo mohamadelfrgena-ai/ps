@@ -29,7 +29,7 @@ SUPABASE = os.path.join(ROOT, "supabase")
 # ترتيب الملفات في الحزمة:  (اسم الملف داخل مجلد supabase، الاسم داخل الحزمة، الوصف)
 ORDER = [
     ("00_ALL_IN_ONE.sql", "00_ALL_IN_ONE.sql",
-     "الملف الأساسي — 33 جدولاً و65 دالة و76 سياسة و6 مخازن والبيانات الأولية"),
+     "الملف الأساسي — 35 جدولاً و68 دالة و78 سياسة و6 مخازن والبيانات الأولية"),
     ("01_schema.sql", "01_schema.sql", "بديل: الجداول والمشغّلات"),
     ("02_functions_core.sql", "02_functions_core.sql", "بديل: 27 دالة أساسية"),
     ("03_functions_chat.sql", "03_functions_chat.sql", "بديل: 33 دالة الشات والمبدعين"),
@@ -41,6 +41,7 @@ ORDER = [
     ("10_realtime.sql", "10_realtime.sql", "بديل: تشغيل المزامنة اللحظية"),
     ("11_grants.sql", "11_grants.sql", "⚠️ إلزامي للمشاريع الجديدة: منح صلاحيات anon/authenticated"),
     ("13_channels_icons.sql", "13_channels_icons.sql", "أسماء غرف الشات بلا إيموجي (الأيقونات داخل التطبيق)"),
+    ("14_redeem_codes.sql", "14_redeem_codes.sql", "أكواد هدايا AC: جدول + دالتا توليد واستبدال"),
     ("08_admin_bootstrap.sql", "08_admin_bootstrap_example.sql", "النسخة العامة (you@example.com)"),
     ("09_gateway_functions.sql", "09_gateway_functions.sql", "اختياري: بوابات الدفع الإلكتروني"),
 ]
@@ -113,14 +114,15 @@ README_TEMPLATE = """AddonStation Mobile — حزمة SQL الجاهزة لمش�
 ❌ إن ظهر خطأ أحمر: توقّف وأرسل نص الخطأ حرفياً مع رقم السطر.
    البديل: نفّذ الملفات المنفصلة بهذا الترتيب:
    01_schema → 02_functions_core → 03_functions_chat → 04_rls
-   → 05_storage → 06_seed → 07_seed_assets → 10_realtime
+   → 05_storage → 06_seed → 07_seed_assets → 12_avatars
+   → 10_realtime → 11_grants → 13_channels_icons → 14_redeem_codes
 
 الخطوة 2) تحقّق (الصق هذا الاستعلام وحده)
 -----------------------------------------------------------------
 select
-  (select count(*) from information_schema.tables where table_schema='public') as tables,    -- 33
+  (select count(*) from information_schema.tables where table_schema='public') as tables,    -- 35
   (select count(*) from storage.buckets)                                       as buckets,   -- 6
-  (select count(*) from pg_policies where schemaname in ('public','storage'))  as policies,  -- 76
+  (select count(*) from pg_policies where schemaname in ('public','storage'))  as policies,  -- 78
   (select count(*) from public.subscription_plans)                             as plans,     -- 3
   (select count(*) from public.chat_channels)                                  as rooms,     -- 13
   (select count(*) from public.ac_tasks)                                       as tasks,     -- 6
@@ -139,7 +141,11 @@ select
 افتح 08_admin_bootstrap_READY.sql → Ctrl+A → Ctrl+C → الصقه في SQL Editor → RUN
 المتوقّع: تم تعيين {email} مديراً (Admin) ✅
 
-الخطوة 5) (اختياري) بوابات الدفع — نفّذ 09_gateway_functions.sql لاحقاً.
+الخطوة 5) (اختياري) أكواد هدايا AC — مضمَّنة في 14_redeem_codes.sql :
+   ولّد الأكواد من: لوحة الإدارة → AC Management → «أكواد هدايا AC» → توليد الأكواد
+   أو من الحاسوب: python3 tools/make_redeem_codes.py -n 5
+
+الخطوة 6) (اختياري) بوابات الدفع — نفّذ 09_gateway_functions.sql لاحقاً.
 
 أخطاء شائعة
 -----------------------------------------------------------------

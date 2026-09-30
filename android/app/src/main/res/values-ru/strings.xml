@@ -350,7 +350,29 @@
     <string name="ac_history">История операций</string>
     <string name="ac_no_transactions">Операций AC пока нет.</string>
     <string name="ac_not_enough">Недостаточно AC</string>
-    <string name="ac_unlocked">Открыто ✅</string>
+    <string name="ac_redeem_title">Подарочный код AC</string>
+    <string name="ac_redeem_hint">8 символов: заглавные, строчные и две цифры</string>
+    <string name="ac_redeem_action">Применить код</string>
+    <string name="ac_redeem_success">На баланс добавлено %1$s AC.</string>
+    <string name="ac_redeem_invalid">Неверный код. Проверьте буквы и цифры.</string>
+    <string name="ac_redeem_used">Вы уже использовали этот код.</string>
+    <string name="ac_redeem_expired">Срок действия кода истёк.</string>
+    <string name="ac_redeem_off">Этот код сейчас отключён.</string>
+    <string name="ac_redeem_exhausted">Код достиг лимита использований.</string>
+    <string name="ac_redeem_sign_in">Войдите в аккаунт, чтобы применить код.</string>
+    <string name="ac_freq_once">один раз</string>
+    <string name="ac_freq_daily">ежедневно</string>
+    <string name="ac_freq_streak">серия дней</string>
+    <string name="ac_freq_manual">вручную</string>
+    <string name="ac_kind_code">Подарочный код</string>
+    <string name="ac_kind_task">Задание AC</string>
+    <string name="ac_kind_daily">Ежедневная награда</string>
+    <string name="ac_kind_streak">Награда за серию</string>
+    <string name="ac_kind_admin">Начислено админом</string>
+    <string name="ac_kind_unlock">Открытие контента</string>
+    <string name="ac_kind_event">Награда за событие</string>
+    <string name="ac_kind_welcome">Приветственный бонус</string>
+    <string name="ac_unlocked">Открыто</string>
 
     <string name="notif_title">Уведомления</string>
     <string name="notif_empty">🔕 Уведомлений нет — когда вас упомянут или отправят запрос в друзья, это появится здесь.</string>
@@ -408,6 +430,13 @@
     <string name="admin_give">+ Выдать</string>
     <string name="admin_remove">− Списать</string>
     <string name="admin_reward">Награда администратора</string>
+    <string name="admin_codes_title">Подарочные коды AC</string>
+    <string name="admin_codes_amount">Номинал кода (AC)</string>
+    <string name="admin_codes_count">Количество кодов</string>
+    <string name="admin_codes_generate">Создать коды</string>
+    <string name="admin_codes_created">Создано кодов: %1$s — скопируйте сейчас:</string>
+    <string name="admin_codes_hint">Скопируйте коды и отправьте кому нужно. Каждый код работает один раз на участника.</string>
+    <string name="admin_codes_latest">Последние коды</string>
     <string name="admin_adjustment">Корректировка администратора</string>
     <string name="admin_no_permission">У вас нет прав на это действие</string>
 
