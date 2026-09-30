@@ -124,11 +124,21 @@ fun SettingsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     AvatarImage(url = assetUrl(container, profile?.avatarUrl), size = 54.dp, borderColor = AppColors.Green)
                     Column(Modifier.weight(1f)) {
-                        Text(
-                            profile?.displayName ?: profile?.username ?: stringResource(R.string.common_guest),
-                            style = AppText.sectionTitle,
-                            color = AppColors.Text,
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_user),
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Text(
+                                profile?.displayName ?: profile?.username ?: stringResource(R.string.common_guest),
+                                style = AppText.sectionTitle,
+                                color = AppColors.Text,
+                            )
+                        }
                         Text(
                             container.supabase.session()?.email ?: stringResource(R.string.set_email_note),
                             style = AppText.tiny,
