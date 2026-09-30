@@ -159,15 +159,15 @@ def build(manifest: dict) -> str:
     add("-- ---------------------------------------------------------------------------")
     add("-- تحقق: يجب أن ترى 21 قسماً والأعداد كما في الجدول أدناه")
     add("-- ---------------------------------------------------------------------------")
-    add("select asset_type as النوع, collection as القسم, count(*) as العدد,")
-    add("       count(*) filter (where animated) as متحرك")
+    add('select asset_type as "النوع", collection as "القسم", count(*) as "العدد",')
+    add('       count(*) filter (where animated) as "متحرك"')
     add("  from public.site_assets")
     add(" group by asset_type, collection, collection_order")
     add(" order by asset_type, collection_order;")
     add("")
     add("-- الإجمالي المتوقّع: avatar = {a} · sticker = {s} · item = {i}".format(
         a=len(grouped["avatars"]), s=len(grouped["stickers"]), i=len(grouped["items"])))
-    add("select asset_type, count(*) as total, count(*) filter (where animated) as animated")
+    add('select asset_type, count(*) as total, count(*) filter (where animated) as animated')
     add("  from public.site_assets group by asset_type order by asset_type;")
     add("")
     return "\n".join(lines) + "\n"

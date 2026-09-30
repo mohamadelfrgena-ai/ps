@@ -4740,8 +4740,8 @@ on conflict (file_url) do update
 -- ---------------------------------------------------------------------------
 -- تحقق: يجب أن ترى 21 قسماً والأعداد كما في الجدول أدناه
 -- ---------------------------------------------------------------------------
-select asset_type as النوع, collection as القسم, count(*) as العدد,
-       count(*) filter (where animated) as متحرك
+select asset_type as "النوع", collection as "القسم", count(*) as "العدد",
+       count(*) filter (where animated) as "متحرك"
   from public.site_assets
  group by asset_type, collection, collection_order
  order by asset_type, collection_order;
