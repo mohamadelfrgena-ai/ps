@@ -3,6 +3,7 @@ package com.addonstation.mobile.ui.profile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -577,61 +578,66 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                 Text(lockedHint, style = AppText.tiny, color = AppColors.Dim)
             }
             Spacer(Modifier.height(8.dp))
-            // شبكة عمودية (3 أعمدة) بدل الشريط الأفقي — تعرض كل الأصول دون تمرير جانبي.
+            // شبكة ثنائية الاتجاه: صفوف أفقية × أعمدة، تُمرَّر يميناً/يساراً وأعلى/أسفل معاً.
+            // النافذة تعرض ~3 أعمدة و~3 صفوف وبقية الشبكة تُكشف بالسحب (خلية مقطوعة = دلالة على وجود تمرير).
             if (assets.isEmpty()) {
                 EmptyState(text = stringResource(R.string.common_loading))
                 Spacer(Modifier.height(12.dp))
             } else {
-                val gridRows = (assets.size + GRID_COLUMNS - 1) / GRID_COLUMNS
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(GRID_COLUMNS),
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height((gridRows * GRID_CELL_HEIGHT + (gridRows - 1) * GRID_SPACING).dp),
-                    horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
-                    verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
+                        .height(GRID_VIEWPORT_HEIGHT.dp)
+                        .verticalScroll(rememberScrollState()),
                 ) {
-                    items(assets, key = { it.id }) { asset ->
-                        val unlocked = container.profile.canUseAsset(asset.requiredPlan, me)
-                        val selected = when (kind) {
-                            "avatar" -> me?.avatarUrl == asset.fileUrl
-                            "banner" -> me?.bannerUrl == asset.fileUrl
-                            else -> me?.equippedItemId == asset.name
-                        }
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(GRID_CELL_HEIGHT.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(AppColors.Elevated)
-                                .border(
-                                    1.dp,
-                                    if (selected) AppColors.Green else AppColors.Border,
-                                    RoundedCornerShape(14.dp),
-                                )
-                                .clickable(enabled = unlocked) {
-                                    scope.launch {
-                                        val value = if (kind == "item") asset.name else asset.fileUrl
-                                        container.profile.setProfileAsset(kind, value)
-                                        message = if (unlocked) null else lockedHint
+                    Column(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                        assets.chunked(GRID_COLUMNS).forEachIndexed { rowIndex, rowAssets ->
+                            if (rowIndex > 0) Spacer(Modifier.height(GRID_SPACING.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp)) {
+                                rowAssets.forEach { asset ->
+                                    val unlocked = container.profile.canUseAsset(asset.requiredPlan, me)
+                                    val selected = when (kind) {
+                                        "avatar" -> me?.avatarUrl == asset.fileUrl
+                                        "banner" -> me?.bannerUrl == asset.fileUrl
+                                        else -> me?.equippedItemId == asset.name
+                                    }
+                                    Column(
+                                        modifier = Modifier
+                                            .width(GRID_CELL_WIDTH.dp)
+                                            .height(GRID_CELL_HEIGHT.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(AppColors.Elevated)
+                                            .border(
+                                                1.dp,
+                                                if (selected) AppColors.Green else AppColors.Border,
+                                                RoundedCornerShape(14.dp),
+                                            )
+                                            .clickable(enabled = unlocked) {
+                                                scope.launch {
+                                                    val value = if (kind == "item") asset.name else asset.fileUrl
+                                                    container.profile.setProfileAsset(kind, value)
+                                                    message = if (unlocked) null else lockedHint
+                                                }
+                                            }
+                                            .padding(6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                            AvatarImage(url = assetUrl(container, asset.fileUrl), size = 58.dp)
+                                            if (!unlocked) {
+                                                Text("🔒", style = AppText.bodySmall)
+                                            }
+                                        }
+                                        Text(
+                                            asset.name,
+                                            style = AppText.tiny,
+                                            color = if (selected) AppColors.Green else AppColors.Muted,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
                                     }
                                 }
-                                .padding(6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                AvatarImage(url = assetUrl(container, asset.fileUrl), size = 62.dp)
-                                if (!unlocked) {
-                                    Text("🔒", style = AppText.bodySmall)
-                                }
                             }
-                            Text(
-                                asset.name,
-                                style = AppText.tiny,
-                                color = if (selected) AppColors.Green else AppColors.Muted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
                         }
                     }
                 }
@@ -660,10 +666,13 @@ private fun OutlinedTextFieldBidi(
     )
 }
 
-// مقاسات شبكة اختيار الأصول في شاشة تعديل الملف (3 أعمدة)
-private const val GRID_COLUMNS = 3
+// مقاسات شبكة اختيار الأصول في شاشة تعديل الملف.
+// 4 أعمدة أفقياً + نافذة بارتفاع ~3 صفوف → الشبكة تُمرَّر في الاتجاهين معاً.
+private const val GRID_COLUMNS = 4
+private const val GRID_CELL_WIDTH = 92
 private const val GRID_CELL_HEIGHT = 104
-private const val GRID_SPACING = 10
+private const val GRID_SPACING = 8
+private const val GRID_VIEWPORT_HEIGHT = 306
 
 /** ملف مستخدم عام (يُفتح من الشات أو من بطاقة المبدع). */
 @Composable
