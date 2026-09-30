@@ -387,12 +387,26 @@ class ChatRepository(
     }.getOrElse { emptyList() }
 
     suspend fun stickers(): List<SiteAsset> = runCatching {
-        supabase.decodeList<SiteAsset>(
-            supabase.select(
-                "site_assets",
-                "select=*&asset_type=eq.sticker&enabled=eq.true&order=collection_order.asc,sort_order.asc&limit=500",
+        // الترتيب حسب القسم أولاً (فقرات الملصقات) مع ترميز احتياطي قبل تنفيذ
+        // supabase/15_assets_v2.sql — فلا تختفي الملصقات إن لم يكن العمود موجوداً بعد.
+        val ordered = runCatching {
+            supabase.decodeList<SiteAsset>(
+                supabase.select(
+                    "site_assets",
+                    "select=*&asset_type=eq.sticker&enabled=eq.true&order=collection_order.asc,sort_order.asc&limit=500",
+                )
             )
-        )
+        }.getOrElse { emptyList() }
+        if (ordered.isNotEmpty()) {
+            ordered
+        } else {
+            supabase.decodeList<SiteAsset>(
+                supabase.select(
+                    "site_assets",
+                    "select=*&asset_type=eq.sticker&enabled=eq.true&order=sort_order.asc&limit=500",
+                )
+            )
+        }
     }.getOrElse { emptyList() }
 
     // --------------------------------------------------------- الإشراف والبلاغات
