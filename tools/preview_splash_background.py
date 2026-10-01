@@ -20,7 +20,7 @@ LOGO = os.path.join(RES, "drawable-nodpi", "splash_logo.png")
 OUT = os.path.join(ROOT, "splash_background_preview.png")
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-SCURVE = [(0.0, 140), (0.26, 79), (0.45, 90), (0.65, 107), (0.85, 122), (1.0, 146)]
+SCURVE = [(0.0, 140), (0.26, 69), (0.45, 80), (0.65, 94), (0.85, 107), (1.0, 134)]
 
 
 def rtl(t):
@@ -126,7 +126,7 @@ def main() -> int:
     note = [
         "الصورة: drawable-nodpi/splash_bg.jpg (%d×%d · %d KB) — مقصوصة من المنتصف (Center) ليبقى الأفق والشمس والقرية في أي مقاس شاشة."
         % (bw, bh, round(bkb)),
-        "تعتيم متدرّج (شفافية 31%–55%) فوقها ليقرأ الشعار الأبيض والكلمات بوضوح، مع بقاء حركات التلاشي والتكبير وخطوط المسح والجسيمات كما هي.",
+        "تعت림 متدرّج (شفافية 27%–55%) فوقها ليقرأ الشعار الأبيض والكلمات بوضوح، مع بقاء حركات التلاشي والتكبير وخطوط المسح والجسيمات كما هي.",
     ]
     for i, line in enumerate(note):
         d.text((W - 22, top + h + 48 + i * 20), rtl(line), font=ImageFont.truetype(FONT_BOLD, 14),

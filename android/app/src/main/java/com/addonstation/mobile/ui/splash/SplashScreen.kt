@@ -122,11 +122,11 @@ fun SplashScreen(onFinished: () -> Unit) {
                 .background(
                     Brush.verticalGradient(
                         0.00f to Color(0x8C000000),
-                        0.26f to Color(0x4F000000),
-                        0.45f to Color(0x5A000000),
-                        0.65f to Color(0x6B000000),
-                        0.85f to Color(0x7A000000),
-                        1.00f to Color(0x92000000),
+                        0.26f to Color(0x45000000),
+                        0.45f to Color(0x50000000),
+                        0.65f to Color(0x5E000000),
+                        0.85f to Color(0x6B000000),
+                        1.00f to Color(0x86000000),
                     )
                 ),
         )
