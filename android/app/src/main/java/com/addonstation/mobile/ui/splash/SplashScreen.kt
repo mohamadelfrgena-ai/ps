@@ -99,12 +99,13 @@ fun SplashScreen(onFinished: () -> Unit) {
             },
     ) {
         // الطبقة 1: صورة البداية — قرية بنمط ماينكرافت عند الغروب (splash_bg.jpg)،
-        // تتلاشى وتكبر قليلاً، مقصوصة من الأعلى ليبقى الأفق والشمس ظاهرين في أي مقاس شاشة.
+        // تتلاشى وتكبر قليلاً، مقصوصة من المنتصف (Center) ليبقى الأفق والشمس والقرية
+        // ظاهرين في أي مقاس شاشة — طولية أو عريضة.
         Image(
             painter = painterResource(R.drawable.splash_bg),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            alignment = Alignment.TopCenter,
+            alignment = Alignment.Center,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {

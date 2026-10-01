@@ -60,7 +60,7 @@ def screen(locale, label, w=430, h=880):
     k = max(w / base.width, h / base.height)
     nw, nh = int(base.width * k + 1), int(base.height * k + 1)
     base = base.resize((nw, nh), Image.LANCZOS)
-    base = base.crop(((nw - w) // 2, 0, (nw - w) // 2 + w, h))
+    base = base.crop(((nw - w) // 2, (nh - h) // 2, (nw - w) // 2 + w, (nh - h) // 2 + h))
     black, mask = scrim(w, h)
     img = Image.composite(black, base, mask)
 
@@ -121,9 +121,12 @@ def main() -> int:
         d.rounded_rectangle((x - 2, top - 2, x + w + 2, top + h + 2), radius=26, outline="#263240", width=2)
         d.text((x + w // 2, top + h + 22), label, font=ImageFont.truetype(FONT_BOLD, 16),
                fill="#8EA0B3", anchor="mm")
+    bw, bh = Image.open(BG).size
+    bkb = os.path.getsize(BG) / 1024
     note = [
-        "الصورة: drawable-nodpi/splash_bg.jpg (854×1280 · 184 KB) — مقصوصة من الأعلى (TopCenter) ليبقى الأفق والشمس في أي مقاس شاشة.",
-        "تعتيم متدرّج (شفافية 55%–90%) فوقها ليقرأ الشعار الأبيض والكلمات بوضوح، مع بقاء حركات التلاشي والتكبير وخطوط المسح والجسيمات كما هي.",
+        "الصورة: drawable-nodpi/splash_bg.jpg (%d×%d · %d KB) — مقصوصة من المنتصف (Center) ليبقى الأفق والشمس والقرية في أي مقاس شاشة."
+        % (bw, bh, round(bkb)),
+        "تعتيم متدرّج (شفافية 31%–55%) فوقها ليقرأ الشعار الأبيض والكلمات بوضوح، مع بقاء حركات التلاشي والتكبير وخطوط المسح والجسيمات كما هي.",
     ]
     for i, line in enumerate(note):
         d.text((W - 22, top + h + 48 + i * 20), rtl(line), font=ImageFont.truetype(FONT_BOLD, 14),
