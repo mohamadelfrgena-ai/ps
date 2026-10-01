@@ -5,7 +5,7 @@ import android.content.Context
 import android.os.Build
 import coil.ImageLoader
 import coil.ImageLoaderFactory
-import coil.decode.AnimatedImageDecoder
+import coil.decode.ImageDecoderDecoder
 import coil.decode.GifDecoder
 import com.addonstation.mobile.data.AppContainer
 
@@ -32,14 +32,14 @@ class AddonStationApp : Application(), ImageLoaderFactory {
 
     /**
      * مُحمِّل الصور العام: يُسجّل مفكّك GIF المتحرّك فيعمل التحريك في كل الشاشات تلقائياً.
-     * • أندرويد 9 (API 28) وأحدث → AnimatedImageDecoder (الأسرع والأخف).
+     * • أندرويد 9 (API 28) وأحدث → ImageDecoderDecoder (يدعم GIF وWebP متحرّك، الأخف).
      * • ما قبله → GifDecoder (يعمل على كل الإصدارات).
      */
     override fun newImageLoader(): ImageLoader =
         ImageLoader.Builder(this)
             .components {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    add(AnimatedImageDecoder.Factory())
+                    add(ImageDecoderDecoder.Factory())
                 } else {
                     add(GifDecoder.Factory())
                 }

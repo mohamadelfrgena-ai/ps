@@ -179,7 +179,7 @@ fun AdminPanelScreen(
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
+                    androidx.compose.material3.Icon(
                         Icons.Filled.Lock,
                         contentDescription = stringResource(R.string.admin_lock_now),
                         tint = AppColors.Gold,
