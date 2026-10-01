@@ -85,12 +85,8 @@ fun EmojiStickerSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var tab by remember { mutableStateOf(0) }
     var selectedPack by remember { mutableStateOf<String?>(null) }
-    var search by remember { mutableStateOf("") }
     val recentRaw by container.prefs.recentEmojis.collectAsState(initial = "")
     val recent = recentRaw.split(' ').filter { it.isNotBlank() }
-
-    val filtered = if (search.isBlank()) ChatViewModel_Emojis
-    else ChatViewModel_Emojis.filter { it.contains(search) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -104,13 +100,6 @@ fun EmojiStickerSheet(
             }
             Spacer(Modifier.height(10.dp))
             if (tab == 0) {
-                androidx.compose.material3.OutlinedTextField(
-                    value = search,
-                    onValueChange = { search = it },
-                    placeholder = { Text(stringResource(R.string.chat_search_emoji), style = AppText.bodySmall) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 if (recent.isNotEmpty()) {
                     Text(stringResource(R.string.chat_recent), style = AppText.tiny, color = AppColors.Muted)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -138,7 +127,7 @@ fun EmojiStickerSheet(
                     ),
                     contentPadding = PaddingValues(vertical = 6.dp),
                 ) {
-                    items(filtered) { emoji ->
+                    items(ChatViewModel_Emojis) { emoji ->
                         Text(
                             emoji,
                             style = AppText.welcomeName,

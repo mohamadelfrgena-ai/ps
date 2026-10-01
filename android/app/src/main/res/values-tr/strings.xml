@@ -286,7 +286,6 @@
     <string name="chat_emoji">Emoji</string>
     <string name="chat_stickers_tab">Çıkartmalar</string>
     <string name="chat_recent">Son kullanılan</string>
-    <string name="chat_search_emoji">Emoji ara</string>
     <string name="chat_pinned">📌 Sabitlenmiş mesajlar</string>
     <string name="chat_no_pinned">Sabitlenmiş mesaj yok</string>
     <string name="role_admin">TheKing ✦</string>

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""فحص إزالة أداة البحث من داخل الشات (طلب المستخدم) — ويمنع رجوعها.
+"""فحص إزالة أدوات البحث من داخل الشات (طلب المستخدم) — ويمنع رجوعها.
 
 يفشل إذا:
   • ظهرت أيقونة البحث أو معامل onSearch في ترويسة الشات.
   • بقي حقل «بحث في الغرفة» أو تصفية الرسائل بالبحث في ChatScreen.kt.
-  • بقي مفتاح chat_search_in_room في أي ملف لغة (٨ لغات).
-  • حُذف بحث الإيموجي بالخطأ (يجب أن يبقى داخل منتقي الرموز).
+  • بقي حقل «ابحث عن إيموجي» أو تصفية القائمة في منتقي الرموز (ChatSheets.kt).
+  • بقي مفتاح chat_search_in_room أو chat_search_emoji في أي ملف لغة (٨ لغات).
 """
 import io
 import glob
@@ -42,19 +42,23 @@ for needle, label in (
 if re.search(r"messages\.filter\s*\{", chat):
     problems.append("ChatScreen.kt ما زال يصفّي الرسائل (فلترة بحث)")
 
-# 3) المفتاح محذوف من كل ملفات اللغات
+# 3) بحث منتقي الرموز أيضاً أُزيل
+for needle, label in (
+    ("search", "حالة/حقل البحث"),
+    ("filtered", "تصفية قائمة الإيموجي"),
+    ("chat_search_emoji", "نص «ابحث عن إيموجي»"),
+):
+    if needle in sheets:
+        problems.append(f"ChatSheets.kt (منتقي الرموز) ما زال يحوي {label}")
+
+# 4) المفتاحان محذوفان من كل ملفات اللغات
 left = []
 for path in sorted(glob.glob(os.path.join(RES, "values*", "strings.xml"))):
     text = io.open(path, encoding="utf-8").read()
-    if "chat_search_in_room" in text:
+    if "chat_search_in_room" in text or "chat_search_emoji" in text:
         left.append(os.path.basename(os.path.dirname(path)))
 if left:
-    problems.append("مفتاح chat_search_in_room باقٍ في: " + " · ".join(left))
-
-# 4) بحث الإيموجي باقٍ (لم نحذف أكثر من المطلوب)
-if "chat_search_emoji" not in sheets and "chat_search_emoji" not in io.open(
-        os.path.join(RES, "values", "strings.xml"), encoding="utf-8").read():
-    problems.append("بحث الإيموجي حُذف بالخطأ — يجب أن يبقى داخل منتقي الرموز")
+    problems.append("مفتاح بحث باقٍ في: " + " · ".join(left))
 
 print("الفحص | النتيجة")
 print("-" * 46)
@@ -62,8 +66,8 @@ rows = [
     ("لا أيقونة بحث في ترويسة الشات", "Icons.Filled.Search" not in chat),
     ("لا حقل «بحث في الغرفة»", "chat_search_in_room" not in chat),
     ("لا تصفية رسائل بالبحث", not re.search(r"messages\.filter\s*\{", chat)),
-    ("المفتاح محذوف من 8 لغات", not left),
-    ("بحث الإيموجي باقٍ (منتقي الرموز)", "chat_search_emoji" in sheets),
+    ("منتقي الرموز بلا بحث", not any(x in sheets for x in ("search", "filtered"))),
+    ("المفتاحان محذوفان من 8 لغات", not left),
 ]
 for name, ok in rows:
     print(f"{name:<38} | {'✅' if ok else '❌'}")
@@ -74,4 +78,4 @@ if problems:
         print("✗", p)
     print(f"\n✗ عدد المشاكل: {len(problems)}")
     sys.exit(1)
-print("🟢 أداة البحث أُزيلت من الشات بالكامل (ترويسة وحقل وتصفية)، وبحث الإيموجي باقٍ.")
+print("🟢 لا أداة بحث في الشات إطلاقاً: لا في الترويسة ولا في الرسائل ولا في منتقي الرموز — وبلا أي نص بحث في اللغات الثماني.")

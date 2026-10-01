@@ -224,6 +224,10 @@ Limits (**[ORIGINAL]**):
 ### C6. Emoji + Sticker picker (bottom sheet)
 - Two tabs: **Emoji** and **Stickers**.
 - Emoji tab: grid of emojis (the original list of 48: 😀 😃 😄 😍 😂 🥰 😎 🤣 😅 😇 😉 🤔 😴 🤯 🥳 😢 😭 😡 🤩 👍 👎 👏 🙏 💪 🔥 ❤️ 💔 💎 👑 🍃 ⭐ 🎮 🕹 🧊 🏆 ⚽ 🚀 ✨ 🎉 💬 ✅ ❌ 😊 😁 🤝 🧡 💛 💜). Add a search field and "recent" row **[NEW]**.
+
+> تحديث بناءً على طلب المستخدم: **حُذفت كل أدوات البحث من الشات** — أيقونة 🔍 في
+> الترويسة، وحقل «بحث في الغرفة»، وتصفية الرسائل، وحقل «ابحث عن إيموجي» في منتقي
+> الرموز (الشبكة تُعرض كاملة، وصف «الأخيرة» باقٍ). ولا يبقى أي نص بحث في اللغات الثماني.
 - Stickers tab: pack icons row at the bottom (each pack shows its first sticker as icon), grid of stickers of the selected pack above (4 columns). Tap a sticker = send immediately. **[ORIGINAL]**
 - The 5 original packs (names and counts): `meme` (47), `Minecraft Memes1` (21), `Minecraft Memes2` (87), `Minecraft Memes3` (20), `Minecraft Movie` (6). Stickers are 128–256 px WEBP/PNG/GIF. Replace with your own art before publishing.
 - New packs are added by the admin from the panel (Assets → Sticker), not by editing the app.

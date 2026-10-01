@@ -286,7 +286,6 @@
     <string name="chat_emoji">Emoji</string>
     <string name="chat_stickers_tab">Pegatinas</string>
     <string name="chat_recent">Recientes</string>
-    <string name="chat_search_emoji">Buscar emoji</string>
     <string name="chat_pinned">📌 Mensajes fijados</string>
     <string name="chat_no_pinned">No hay mensajes fijados</string>
     <string name="role_admin">TheKing ✦</string>

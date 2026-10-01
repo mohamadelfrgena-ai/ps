@@ -97,7 +97,7 @@ def header(img, d, f_name, f_desc, x, y, w, title, desc, icons, highlight=None):
 
 
 def main() -> int:
-    W, H = 1180, 560
+    W, H = 1180, 700
     img = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(img)
     f_big = ImageFont.truetype(FONT_BOLD, 25)
@@ -125,16 +125,35 @@ def main() -> int:
            "English", "Talk in English here",
            ["members", "pin"])
 
-    y = 396
-    d.rounded_rectangle((20, y, W - 20, y + 130), radius=16, fill=CARD, outline=BORDER)
-    d.text((W - 34, y + 14), rtl("ما أُزيل بالضبط"), font=f_h, fill=BLUE, anchor="ra")
+    # منتقي الرموز: قبل (بحقل البحث) ← بعد (بلا حقل)
+    d.text((W - 24, 392), rtl("منتقي الرموز 😊 — قُبل: حقل «ابحث عن إيموجي» · بعد: شبكة كاملة بلا بحث"),
+           font=f_h, fill=BLUE, anchor="ra")
+    py = 420
+    for label, with_search, accent in (("قبل", True, RED), ("بعد", False, GREEN)):
+        d.rounded_rectangle((20, py, W - 20, py + 66), radius=14, fill=CARD, outline=BORDER)
+        d.text((W - 34, py + 8), rtl(label), font=f_small, fill=accent, anchor="ra")
+        d.text((W - 96, py + 6), rtl("😊 إيموجي   |   🎨 ملصقات"), font=f_small, fill=MUTED, anchor="ra")
+        if with_search:
+            d.rounded_rectangle((W // 2 - 190, py + 32, W // 2 + 190, py + 60), radius=10,
+                                fill="#101720", outline=BORDER)
+            d.text((W // 2 + 6, py + 46), rtl("ابحث عن إيموجي"), font=f_small, fill=DIM, anchor="mm")
+            mg = mini_icon("search", 14, "#5A6B7D")
+            img.paste(mg, (W // 2 - 180, py + 39), mg)
+        else:
+            d.text((W // 2, py + 46), rtl("الشبكة كاملة (48 إيموجي) + صف «الأخيرة»"),
+                   font=f_small, fill=MUTED, anchor="mm")
+        py += 74
+
+    y = py + 6
+    d.rounded_rectangle((20, y, W - 20, y + 112), radius=16, fill=CARD, outline=BORDER)
+    d.text((W - 34, y + 12), rtl("ما أُزيل بالضبط — لا أداة بحث في الشات إطلاقاً"), font=f_h, fill=BLUE, anchor="ra")
     for i, line in enumerate([
-        "١) أيقونة البحث 🔍 من ترويسة الشات (ChatHeader · HeaderIcon).",
-        "٢) حقل «بحث في الغرفة» (OutlinedTextField · chat_search_in_room) — وحُذف نصه من اللغات الثماني.",
-        "٣) تصفية قائمة الرسائل بالبحث — القائمة تُعرض الآن كما هي كاملة.",
-        "وبحث الإيموجي داخل منتقي الرموز باقٍ كما هو (ليس أداة بحث في الشات).",
+        "١) أيقونة البحث من ترويسة الشات (ChatHeader · HeaderIcon).",
+        "٢) حقل «بحث في الغرفة» (chat_search_in_room) وحُذف نصه من اللغات الثماني.",
+        "٣) تصفية قائمة الرسائل بالبحث — القائمة تُعرض كاملة دائماً.",
+        "٤) حقل «ابحث عن إيموجي» من منتقي الرموز (chat_search_emoji) — وحُذف نصه أيضاً.",
     ]):
-        d.text((W - 34, y + 44 + i * 22), rtl(line), font=f_small, fill=MUTED, anchor="ra")
+        d.text((W - 34, y + 42 + i * 22), rtl(line), font=f_small, fill=MUTED, anchor="ra")
 
     img.save(OUT)
     print(f"✓ {OUT} ({W}×{H})")
