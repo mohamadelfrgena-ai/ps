@@ -478,4 +478,15 @@
     <string name="creator_field_title">Título</string>
     <string name="creator_field_version">Versão</string>
     <string name="setup_secret_warning">Isto parece uma chave secreta (sb_secret_…). Nunca coloque no app — use apenas a chave pública.</string>
+    <string name="admin_gate_title">O painel de administração está protegido</string>
+    <string name="admin_gate_hint">Este painel é só para o administrador. Digite a senha da sua conta para continuar.</string>
+    <string name="admin_gate_password">Senha da conta</string>
+    <string name="admin_gate_unlock">Desbloquear painel</string>
+    <string name="admin_gate_wrong">Senha incorreta. Tente novamente.</string>
+    <string name="admin_gate_too_many">Muitas tentativas erradas — tente novamente em alguns minutos.</string>
+    <string name="admin_gate_checking">Verificando permissão…</string>
+    <string name="admin_gate_cooldown">Bloqueado por %1$d segundos.</string>
+    <string name="admin_gate_locked_note">O painel bloqueia automaticamente após 15 minutos e pede a senha novamente.</string>
+    <string name="admin_gate_denied_body">Este painel é apenas para a conta de administrador. Sua conta não é admin.</string>
+    <string name="admin_lock_now">Bloquear painel agora</string>
 </resources>

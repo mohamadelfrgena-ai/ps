@@ -36,6 +36,7 @@ ORDER = [
     "16_language_room_names.sql",
     "17_message_delete_window.sql",
     "18_media_admin_only.sql",
+    "19_admin_panel_guard.sql",
 ]
 
 HEADER = """-- ============================================================================

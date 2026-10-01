@@ -30,6 +30,7 @@ https://github.com/mohamadelfrgena-ai/ps/blob/arena/01a0e97c-ps/sql-package/Addo
 | `16_language_room_names.sql` | أسماء غرف اللغة بلغتها (العربية · Русский · 中文 …) |
 | `17_message_delete_window.sql` | **حذف الرسالة خلال ٣ دقائق فقط** بعد الإرسال (`chat_delete_window_seconds()` = 180) |
 | `18_media_admin_only.sql` | **الوسائط للأدمن فقط**: الفيديو والملفات الصوتية والتسجيلات الصوتية (`admin_only_media`) + منع الرفع للمخزن من غير الأدمن |
+| `19_admin_panel_guard.sql` | **حماية لوحة الإدارة**: بوابة `admin_panel_access()` + سجلّ تدقيق للفتح والمحاولات + منع الزائر من أي دالة إدارية |
 | `08_admin_bootstrap_READY.sql` | تعيين الأدمن — البريد مكتوب داخله |
 | `08_admin_bootstrap_example.sql` | النسخة العامة (`you@example.com`) |
 | `09_gateway_functions.sql` | اختياري: بوابات الدفع الإلكتروني |

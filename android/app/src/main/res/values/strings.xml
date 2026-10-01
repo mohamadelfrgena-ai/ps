@@ -494,4 +494,15 @@
     <string name="creator_field_title">Title</string>
     <string name="creator_field_version">Version</string>
     <string name="setup_secret_warning">That looks like a secret key (sb_secret_…). Never put it in the app — use the public key only.</string>
+    <string name="admin_gate_title">Admin panel is protected</string>
+    <string name="admin_gate_hint">This panel is for the admin only. Enter your account password to continue.</string>
+    <string name="admin_gate_password">Account password</string>
+    <string name="admin_gate_unlock">Unlock panel</string>
+    <string name="admin_gate_wrong">Wrong password. Try again.</string>
+    <string name="admin_gate_too_many">Too many wrong attempts — try again in a couple of minutes.</string>
+    <string name="admin_gate_checking">Checking permission…</string>
+    <string name="admin_gate_cooldown">Locked for %1$d seconds.</string>
+    <string name="admin_gate_locked_note">The panel locks automatically after 15 minutes and asks for the password again.</string>
+    <string name="admin_gate_denied_body">This panel is for the admin account only. Your account is not an admin.</string>
+    <string name="admin_lock_now">Lock panel now</string>
 </resources>

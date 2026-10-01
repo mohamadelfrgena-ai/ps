@@ -478,4 +478,15 @@
     <string name="creator_field_title">Başlık</string>
     <string name="creator_field_version">Sürüm</string>
     <string name="setup_secret_warning">Bu bir gizli anahtar gibi görünüyor (sb_secret_…). Uygulamaya asla koyma — yalnızca genel anahtarı kullan.</string>
+    <string name="admin_gate_title">Yönetici paneli korumalı</string>
+    <string name="admin_gate_hint">Bu panel yalnızca yönetici içindir. Devam etmek için hesap parolanızı girin.</string>
+    <string name="admin_gate_password">Hesap parolası</string>
+    <string name="admin_gate_unlock">Paneli aç</string>
+    <string name="admin_gate_wrong">Parola yanlış. Tekrar deneyin.</string>
+    <string name="admin_gate_too_many">Çok fazla hatalı deneme — birkaç dakika sonra tekrar deneyin.</string>
+    <string name="admin_gate_checking">Yetki kontrol ediliyor…</string>
+    <string name="admin_gate_cooldown">%1$d saniye kilitli.</string>
+    <string name="admin_gate_locked_note">Panel 15 dakika sonra otomatik kilitlenir ve parolayı yeniden ister.</string>
+    <string name="admin_gate_denied_body">Bu panel yalnızca yönetici hesabı içindir. Hesabınız yönetici değil.</string>
+    <string name="admin_lock_now">Paneli şimdi kilitle</string>
 </resources>

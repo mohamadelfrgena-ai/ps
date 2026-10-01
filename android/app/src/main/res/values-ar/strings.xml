@@ -478,4 +478,15 @@
     <string name="creator_field_title">العنوان</string>
     <string name="creator_field_version">الإصدار</string>
     <string name="setup_secret_warning">هذا يبدو مفتاحاً سرياً (sb_secret_…). لا تضعه في التطبيق أبداً — استخدم المفتاح العام فقط.</string>
+    <string name="admin_gate_title">لوحة الإدارة محمية</string>
+    <string name="admin_gate_hint">هذه اللوحة للأدمن فقط. أدخل كلمة مرور حسابك للمتابعة.</string>
+    <string name="admin_gate_password">كلمة مرور الحساب</string>
+    <string name="admin_gate_unlock">فتح اللوحة</string>
+    <string name="admin_gate_wrong">كلمة المرور غير صحيحة. حاول مرة أخرى.</string>
+    <string name="admin_gate_too_many">محاولات خاطئة كثيرة — أعد المحاولة بعد دقيقتين.</string>
+    <string name="admin_gate_checking">جارٍ التحقق من الصلاحية…</string>
+    <string name="admin_gate_cooldown">موقوف مؤقتاً %1$d ثانية.</string>
+    <string name="admin_gate_locked_note">تُقفل اللوحة تلقائياً بعد ١٥ دقيقة وتطلب كلمة المرور من جديد.</string>
+    <string name="admin_gate_denied_body">هذه اللوحة لحساب الأدمن فقط — حسابك ليس Admin.</string>
+    <string name="admin_lock_now">قفل اللوحة الآن</string>
 </resources>

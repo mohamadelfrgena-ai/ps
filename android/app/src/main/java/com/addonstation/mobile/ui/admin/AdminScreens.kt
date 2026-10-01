@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
@@ -165,6 +166,27 @@ fun AdminPanelScreen(
             walletBalance = wallet?.balance,
             onWalletClick = { },
             icon = Icons.Filled.AdminPanelSettings,
+            actions = {
+                // قفل فوري: يُخفي اللوحة ويعيد طلب كلمة المرور عند الدخول التالي
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(AppColors.Elevated2)
+                        .clickable {
+                            AdminSession.lock()
+                            onBackToApp()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.Lock,
+                        contentDescription = stringResource(R.string.admin_lock_now),
+                        tint = AppColors.Gold,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            },
         )
         Box(Modifier.weight(1f)) {
             when (tab) {

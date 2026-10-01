@@ -478,4 +478,15 @@
     <string name="creator_field_title">Título</string>
     <string name="creator_field_version">Versión</string>
     <string name="setup_secret_warning">Esto parece una clave secreta (sb_secret_…). Nunca la pongas en la app: usa solo la clave pública.</string>
+    <string name="admin_gate_title">El panel de administración está protegido</string>
+    <string name="admin_gate_hint">Este panel es solo para el administrador. Introduce la contraseña de tu cuenta para continuar.</string>
+    <string name="admin_gate_password">Contraseña de la cuenta</string>
+    <string name="admin_gate_unlock">Desbloquear panel</string>
+    <string name="admin_gate_wrong">Contraseña incorrecta. Inténtalo de nuevo.</string>
+    <string name="admin_gate_too_many">Demasiados intentos fallidos: vuelve a intentarlo en un par de minutos.</string>
+    <string name="admin_gate_checking">Comprobando permiso…</string>
+    <string name="admin_gate_cooldown">Bloqueado durante %1$d segundos.</string>
+    <string name="admin_gate_locked_note">El panel se bloquea automáticamente a los 15 minutos y vuelve a pedir la contraseña.</string>
+    <string name="admin_gate_denied_body">Este panel es solo para la cuenta de administrador. Tu cuenta no es admin.</string>
+    <string name="admin_lock_now">Bloquear el panel ahora</string>
 </resources>

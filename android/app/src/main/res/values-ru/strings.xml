@@ -478,4 +478,15 @@
     <string name="creator_field_title">Название</string>
     <string name="creator_field_version">Версия</string>
     <string name="setup_secret_warning">Похоже на секретный ключ (sb_secret_…). Никогда не вставляй его в приложение — только публичный ключ.</string>
+    <string name="admin_gate_title">Панель администратора защищена</string>
+    <string name="admin_gate_hint">Эта панель только для администратора. Введите пароль своей учётной записи, чтобы продолжить.</string>
+    <string name="admin_gate_password">Пароль учётной записи</string>
+    <string name="admin_gate_unlock">Открыть панель</string>
+    <string name="admin_gate_wrong">Неверный пароль. Попробуйте снова.</string>
+    <string name="admin_gate_too_many">Слишком много неверных попыток — повторите через пару минут.</string>
+    <string name="admin_gate_checking">Проверка прав…</string>
+    <string name="admin_gate_cooldown">Заблокировано на %1$d секунд.</string>
+    <string name="admin_gate_locked_note">Панель автоматически блокируется через 15 минут и снова запрашивает пароль.</string>
+    <string name="admin_gate_denied_body">Эта панель только для учётной записи администратора. Ваша учётная запись не админ.</string>
+    <string name="admin_lock_now">Заблокировать панель</string>
 </resources>

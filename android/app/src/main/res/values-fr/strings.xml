@@ -478,4 +478,15 @@
     <string name="creator_field_title">Titre</string>
     <string name="creator_field_version">Version</string>
     <string name="setup_secret_warning">Cela ressemble à une clé secrète (sb_secret_…). Ne la mets jamais dans l\'app — utilise seulement la clé publique.</string>
+    <string name="admin_gate_title">Le panneau d\'administration est protégé</string>
+    <string name="admin_gate_hint">Ce panneau est réservé à l\'administrateur. Saisissez le mot de passe de votre compte pour continuer.</string>
+    <string name="admin_gate_password">Mot de passe du compte</string>
+    <string name="admin_gate_unlock">Déverrouiller le panneau</string>
+    <string name="admin_gate_wrong">Mot de passe incorrect. Réessayez.</string>
+    <string name="admin_gate_too_many">Trop de tentatives incorrectes — réessayez dans quelques minutes.</string>
+    <string name="admin_gate_checking">Vérification de l\'autorisation…</string>
+    <string name="admin_gate_cooldown">Bloqué pendant %1$d secondes.</string>
+    <string name="admin_gate_locked_note">Le panneau se verrouille automatiquement après 15 minutes et redemande le mot de passe.</string>
+    <string name="admin_gate_denied_body">Ce panneau est réservé au compte administrateur. Votre compte n\'est pas admin.</string>
+    <string name="admin_lock_now">Verrouiller le panneau maintenant</string>
 </resources>

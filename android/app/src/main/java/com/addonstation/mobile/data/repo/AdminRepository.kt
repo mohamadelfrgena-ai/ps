@@ -1,5 +1,7 @@
 package com.addonstation.mobile.data.repo
 
+import com.addonstation.mobile.data.ApiError
+import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.SupabaseClient
 import com.addonstation.mobile.data.model.AdminStats
 import com.addonstation.mobile.data.model.ContentItem
@@ -21,6 +23,20 @@ import kotlinx.serialization.json.JsonPrimitive
  * أي محاولة من غير الأدمن تُرفض من قاعدة البيانات.
  */
 class AdminRepository(private val supabase: SupabaseClient) {
+
+    /**
+     * بوابة لوحة الإدارة: يتحقق **الخادم** أن الدور admin (لا الواجهة فقط)، ويُسجّل
+     * فتح اللوحة في سجلّ التدقيق. أي رد غير ناجح = الباب مغلق.
+     */
+    suspend fun panelAccess(): Result<Boolean> = withContext(Dispatchers.IO) {
+        runCatching {
+            val outcome = supabase.rpc("admin_panel_access").asOutcome()
+            if (!outcome.ok) {
+                throw ApiError(ApiErrorKind.NOT_ADMIN, outcome.message ?: "not_admin")
+            }
+            outcome.data["is_admin"]?.asBool() == true
+        }
+    }
 
     suspend fun stats(): AdminStats = withContext(Dispatchers.IO) {
         runCatching {

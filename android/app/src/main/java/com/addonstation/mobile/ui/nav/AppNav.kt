@@ -423,8 +423,10 @@ private fun MainNavigation(startAtReset: Boolean) {
                     )
                 }
 
-                // لوحة الإدارة
+                // لوحة الإدارة — كل شاشاتها خلف بوابة AdminGate (حساب الأدمن + تحقق
+                // الخادم + كلمة المرور)، فلا تُفتح برابط أو رجوع في التنقّل.
                 composable(Routes.ADMIN) {
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { goTab(MainTab.Home) }) {
                     com.addonstation.mobile.ui.admin.AdminPanelScreen(
                         onBackToApp = { goTab(MainTab.Home) },
                         onOpenChat = { go(Routes.ADMIN_CHAT) },
@@ -438,24 +440,37 @@ private fun MainNavigation(startAtReset: Boolean) {
                         onOpenAudit = { go(Routes.ADMIN_AUDIT) },
                         onOpenSettings = { go(Routes.ADMIN_SETTINGS) },
                     )
+                    }
                 }
                 composable(Routes.ADMIN_ASSETS) {
-                    com.addonstation.mobile.ui.admin.AdminAssetsScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
+                        com.addonstation.mobile.ui.admin.AdminAssetsScreen(onBack = { navController.popBackStack() })
+                    }
                 }
                 composable(Routes.ADMIN_CREATORS) {
-                    com.addonstation.mobile.ui.admin.AdminCreatorReviewScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
+                        com.addonstation.mobile.ui.admin.AdminCreatorReviewScreen(onBack = { navController.popBackStack() })
+                    }
                 }
                 composable(Routes.ADMIN_AC) {
-                    com.addonstation.mobile.ui.admin.AdminAcScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
+                        com.addonstation.mobile.ui.admin.AdminAcScreen(onBack = { navController.popBackStack() })
+                    }
                 }
                 composable(Routes.ADMIN_SETTINGS) {
-                    com.addonstation.mobile.ui.admin.AdminSettingsScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
+                        com.addonstation.mobile.ui.admin.AdminSettingsScreen(onBack = { navController.popBackStack() })
+                    }
                 }
                 composable(Routes.ADMIN_AUDIT) {
-                    com.addonstation.mobile.ui.admin.AdminAuditScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
+                        com.addonstation.mobile.ui.admin.AdminAuditScreen(onBack = { navController.popBackStack() })
+                    }
                 }
                 composable(Routes.ADMIN_CHAT) {
-                    com.addonstation.mobile.ui.admin.AdminChatScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
+                        com.addonstation.mobile.ui.admin.AdminChatScreen(onBack = { navController.popBackStack() })
+                    }
                 }
             }
         }

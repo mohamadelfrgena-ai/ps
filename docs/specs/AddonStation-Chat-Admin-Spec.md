@@ -264,6 +264,18 @@ Same visual language as D1 with a larger banner (140dp). Own profile keeps the m
 - **Moderator**: no access to the panel. Moderators only get the in-chat tools (delete/hide message, mute user, review reports from the message sheet). Keep this setting easy to change later.
 - Ask for re-login/biometric before opening the panel **[NEW, optional]**.
 
+> تنفيذ «تأمين لوحة الإدارة» (طلب المستخدم) — أربعة أقفال متراكبة:
+> **(١) الدور:** لا يظهر زر «لوحة» ولا يُفتح أي مسار إداري لغير `role == admin`
+> (البوابة `ui/admin/AdminGate.kt` ملفوفة على **كل** مسارات الإدارة السبعة في `AppNav`).
+> **(٢) الخادم:** البوابة تستدعي `admin_panel_access()` التي تتحقق من الدور في قاعدة
+> البيانات وتُسجّل كل فتح (`panel_opened`) وكل محاولة غير مصرّح بها (`panel_denied`)
+> في `admin_audit_log` — فلا ينفع التلاعب بحالة التطبيق محلياً.
+> **(٣) كلمة المرور (إعادة الدخول):** فتح اللوحة يتطلب إدخال كلمة مرور الحساب
+> (عبر Supabase نفسها)، مع إيقاف مؤقت بعد ٥ محاولات خاطئة.
+> **(٤) القفل التلقائي:** تبقى اللوحة مفتوحة ١٥ دقيقة ثم تُقفل، مع زر «قفل اللوحة الآن»
+> في شريط اللوحة. كل دوال `admin_*` تُرفض من الخادم بـ`not_admin` لغير الأدمن،
+> والزائر (anon) لا يستطيع نداءها إطلاقاً (`19_admin_panel_guard.sql`).
+
 ### E2. Panel layout **[ORIGINAL structure]**
 Bottom bar with 5 items: **الرئيسية (Overview)** · **المحتوى (Content)** · **المدفوعات (Payments)** · **الإشراف (Moderation)** · **المزيد (More)**.
 "المزيد" opens a sheet titled "أدوات الإدارة" with: 🖼️ الأصول · 🎬 المبدعون (مراجعة طلبات المحتوى) · ⚙️ الإعدادات (الخطط وطرق الدفع) · 🪙 AC Management · 💛 Creator Tips · 🧑‍🎨 Creator Applications · ↩ تطبيق AddonStation (back to the app).

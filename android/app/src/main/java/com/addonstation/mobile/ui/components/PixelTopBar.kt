@@ -45,6 +45,8 @@ fun PixelTopBar(
     onWalletClick: () -> Unit = {},
     icon: ImageVector = Icons.Filled.Star,
     showWallet: Boolean = true,
+    /** أزرار إضافية في الطرف (مثل زر قفل لوحة الإدارة) — لا تؤثر على بقية الشاشات. */
+    actions: (@Composable () -> Unit)? = null,
 ) {
     // الخلفية تُرسم على كامل الشريط **بما فيه منطقة شريط الحالة** (البطارية والواي فاي)،
     // والصف نفسه (56dp) يبدأ أسفل تلك المنطقة — فلا يعلو المحتوى على أيقونات النظام.
@@ -92,6 +94,8 @@ fun PixelTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+
+        actions?.invoke()
 
         if (showWallet) {
             Row(
