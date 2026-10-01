@@ -54,7 +54,8 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 /**
- * الإطلاق السينمائي: خلفية #020406، توهج، خطوط مسح، 7 جسيمات، شعار التطبيق (صورة)،
+ * الإطلاق السينمائي: صورة البداية (قرية ماينكرافت عند الغروب · splash_bg.jpg) مع تعتيم
+ * متدرّج، ثم خطوط مسح، 7 جسيمات، شعار التطبيق (صورة)،
  * ثم الكلمات DREAM IT. (0.4s) · BUILD IT. (1.3s) · CREATE IT. (2.2s) والعلامة التجارية (3.0s)،
  * ثم خروج بتلاشي/انزلاق 0.5s مع كشف الشاشة الرئيسية.
  *
@@ -97,18 +98,34 @@ fun SplashScreen(onFinished: () -> Unit) {
                 translationY = (1f - exit.value) * -70f
             },
     ) {
-        // الطبقة 1: سماء داكنة متدرجة
-        Box(
+        // الطبقة 1: صورة البداية — قرية بنمط ماينكرافت عند الغروب (splash_bg.jpg)،
+        // تتلاشى وتكبر قليلاً، مقصوصة من الأعلى ليبقى الأفق والشمس ظاهرين في أي مقاس شاشة.
+        Image(
+            painter = painterResource(R.drawable.splash_bg),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     alpha = alphaSky.value
                     scaleX = scaleSky.value
                     scaleY = scaleSky.value
-                }
+                },
+        )
+        // الطبقة 1ب: تعتيم متدرّج يحفظ وضوح الشعار والكلمات البيضاء فوق الصورة
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = alphaSky.value }
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color(0xFF10202F), Color(0xFF050A10), Color(0xFF020406)),
+                        0.00f to Color(0x8C000000),
+                        0.26f to Color(0x4F000000),
+                        0.45f to Color(0x5A000000),
+                        0.65f to Color(0x6B000000),
+                        0.85f to Color(0x7A000000),
+                        1.00f to Color(0x92000000),
                     )
                 ),
         )
