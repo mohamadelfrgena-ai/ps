@@ -27,6 +27,7 @@ enum class ApiErrorKind {
     INVALID_STATUS,
     MUTED_OR_BANNED,
     DELETE_WINDOW_EXPIRED,
+    MEDIA_ADMIN_ONLY,
     ALREADY_DELETED,
     RULES_REQUIRED,
     INVALID_IMAGE_FORMAT,
@@ -64,6 +65,7 @@ fun apiErrorFromMessage(message: String?, status: Int = 0): ApiError {
         m.contains("already_claimed") -> ApiErrorKind.ALREADY_CLAIMED
         m.contains("already_unlocked") || m.contains("not_priced") -> ApiErrorKind.ALREADY_UNLOCKED
         m.contains("invalid_status") -> ApiErrorKind.INVALID_STATUS
+        m.contains("admin_only_media") -> ApiErrorKind.MEDIA_ADMIN_ONLY
         m.contains("delete_window_expired") -> ApiErrorKind.DELETE_WINDOW_EXPIRED
         m.contains("already_deleted") -> ApiErrorKind.ALREADY_DELETED
         m.contains("muted") || m.contains("banned") -> ApiErrorKind.MUTED_OR_BANNED

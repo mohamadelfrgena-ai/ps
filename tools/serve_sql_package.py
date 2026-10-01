@@ -46,6 +46,8 @@ ORDER = [
      "أسماء غرف اللغة بلغتها (العربية · Русский · 中文 …) والغرف الأساسية بلا إيموجي"),
     ("17_message_delete_window.sql", "17_message_delete_window.sql",
      "نافذة حذف الرسالة: ٣ دقائق فقط بعد الإرسال، وبعدها لا يستطيع المستخدم الحذف"),
+    ("18_media_admin_only.sql", "18_media_admin_only.sql",
+     "الوسائط للأدمن فقط: الفيديو والملفات الصوتية والتسجيلات الصوتية"),
     ("15_assets_v2.sql", "15_assets_v2.sql",
      "الأصول الجديدة: يستبدل كل الأفاتارات والملصقات والأدوات بـ492 أصلاً في 21 قسماً"),
     ("08_admin_bootstrap.sql", "08_admin_bootstrap_example.sql", "النسخة العامة (you@example.com)"),
@@ -123,6 +125,7 @@ README_TEMPLATE = """AddonStation Mobile — حزمة SQL الجاهزة لمش�
    → 05_storage → 06_seed → 07_seed_assets → 12_avatars
    → 10_realtime → 11_grants → 13_channels_icons → 14_redeem_codes
    → 15_assets_v2 → 16_language_room_names → 17_message_delete_window
+   → 18_media_admin_only
 
 الخطوة 2) تحقّق (الصق هذا الاستعلام وحده)
 -----------------------------------------------------------------
@@ -161,6 +164,8 @@ select
 • أسماء غرف اللغة بلغتها: العربية · English · Español · Français · Português ·
   Русский · Türkçe · 中文 (16_language_room_names.sql).
 • الأصول الجديدة: 492 أصلاً في 21 قسماً بدل القديمة (15_assets_v2.sql).
+• الوسائط للأدمن فقط: مقاطع الفيديو والملفات الصوتية والتسجيلات الصوتية لا يرسلها
+  غير الأدمن (18_media_admin_only.sql) — والصورة والنص والملصق للجميع.
 
 للتحقق من نافذة الحذف بعد التنفيذ، الصق هذا في SQL Editor:
     select public.chat_delete_window_seconds();   -- المتوقّع: 180

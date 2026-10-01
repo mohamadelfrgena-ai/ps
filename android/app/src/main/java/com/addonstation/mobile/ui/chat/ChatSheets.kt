@@ -213,13 +213,30 @@ private val ChatViewModel_Emojis: List<String> = listOf(
     "🚀", "✨", "🎉", "💬", "✅", "❌", "😊", "😁", "🤝", "🧡", "💛", "💜",
 )
 
-/** نافذة الإرفاق: صورة من المعرض أو ملف صوت/فيديو. */
+/**
+ * نافذة الإرفاق: صورة من المعرض (للجميع) أو ملف صوت/فيديو (**للأدمن فقط**).
+ * غير الأدمن لا يرى خيار الوسائط إطلاقاً — والقاعدة ترفضه من جهة الخادم أيضاً.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AttachSheet(onDismiss: () -> Unit, onPhoto: () -> Unit, onAudioVideo: () -> Unit) {
+fun AttachSheet(
+    onDismiss: () -> Unit,
+    onPhoto: () -> Unit,
+    onAudioVideo: () -> Unit,
+    isAdmin: Boolean = false,
+) {
     SheetScaffold(onDismiss) {
         SheetRow("🖼", stringResource(R.string.chat_attach_photo), onPhoto)
-        SheetRow("🎬", stringResource(R.string.chat_attach_media), onAudioVideo)
+        if (isAdmin) {
+            SheetRow("🎬", stringResource(R.string.chat_attach_media), onAudioVideo)
+        } else {
+            Text(
+                stringResource(R.string.chat_media_admin_only),
+                style = AppText.tiny,
+                color = AppColors.Muted,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            )
+        }
     }
 }
 

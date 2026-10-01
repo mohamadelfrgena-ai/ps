@@ -249,6 +249,7 @@
     <string name="chat_add_photo">Add photo</string>
     <string name="chat_attach_photo">Photo</string>
     <string name="chat_attach_media">Audio / Video file</string>
+    <string name="chat_media_admin_only">Video clips, audio files and voice recordings can only be sent by the admin.</string>
     <string name="chat_reply">Reply</string>
     <string name="chat_replying_to">↩ Replying to %1$s</string>
     <string name="chat_report">Report</string>

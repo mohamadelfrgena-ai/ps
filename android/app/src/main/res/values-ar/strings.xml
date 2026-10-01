@@ -239,6 +239,7 @@
     <string name="chat_add_photo">إضافة صورة</string>
     <string name="chat_attach_photo">صورة</string>
     <string name="chat_attach_media">ملف صوتي / مرئي</string>
+    <string name="chat_media_admin_only">مقاطع الفيديو والملفات الصوتية والتسجيلات الصوتية يرسلها الأدمن فقط.</string>
     <string name="chat_reply">رد</string>
     <string name="chat_replying_to">↩ الرد على %1$s</string>
     <string name="chat_report">إبلاغ</string>

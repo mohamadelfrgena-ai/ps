@@ -191,6 +191,14 @@ Report opens a small form with reasons (spam, insult, inappropriate, other) **[O
 ### C5. Input bar (bottom) — must include: send button, stickers, add image
 Layout, from start to end:
 1. **➕ button** (round, elevated2): opens a sheet with **Photo** (image from gallery) and **Audio / Video file**. **[ORIGINAL]**
+
+> تنفيذ «الوسائط للأدمن فقط» (طلب المستخدم): مقاطع الفيديو والملفات الصوتية
+> والتسجيلات الصوتية **لا يرسلها إلا الأدمن** (role = admin) — ولا حتى المشرف.
+> `send_chat_message` ترد بـ`admin_only_media` (`supabase/03_functions_chat.sql`)،
+> ومشغّل `trg_chat_media_admin_only` يمنعها على مستوى الجدول
+> (`supabase/18_media_admin_only.sql`). التطبيق لا يعرض خيار «ملف صوتي / مرئي»
+> لغير الأدمن ويعرض نص «مقاطع الفيديو … يرسلها الأدمن فقط» (`ChatSheets.kt` ·
+> `ChatScreen.kt`). الصور والنصوص والملصقات تبقى متاحة للجميع.
 2. **Text field** (rounded pill, elevated, max 4 lines, placeholder "Message 🌐 General" translated).
 3. **😊 button**: opens the **Emoji + Sticker picker** (see C6).
 4. **Send button**: round green gradient button with an arrow icon. Disabled (dim) when the field is empty and nothing is attached. Sending an empty message is not allowed.

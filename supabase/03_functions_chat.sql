@@ -165,6 +165,14 @@ begin
     v_mentions := coalesce(array(select distinct unnest(v_mentions) where unnest is not null), '{}');
   end if;
 
+  -- ==========================================================================
+  --  الوسائط الثقيلة **للأدمن فقط**: مقاطع الفيديو · الملفات الصوتية · التسجيلات
+  --  الصوتية. أي مستخدم آخر (حتى المشرف moderator) يُرفض طلبه من الخادم.
+  -- ==========================================================================
+  if p_message_type in ('audio','video') and v_role <> 'admin' then
+    return jsonb_build_object('ok', false, 'message', 'admin_only_media');
+  end if;
+
   if p_message_type = 'image' and coalesce(p_image_path,'') = '' then
     return jsonb_build_object('ok', false, 'message', 'missing_image');
   end if;

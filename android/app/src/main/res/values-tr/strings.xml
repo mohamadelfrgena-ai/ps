@@ -239,6 +239,7 @@
     <string name="chat_add_photo">Fotoğraf ekle</string>
     <string name="chat_attach_photo">Fotoğraf</string>
     <string name="chat_attach_media">Ses / video dosyası</string>
+    <string name="chat_media_admin_only">Video klipler, ses dosyaları ve ses kayıtları yalnızca yönetici tarafından gönderilebilir.</string>
     <string name="chat_reply">Yanıtla</string>
     <string name="chat_replying_to">↩ %1$s kullanıcısına yanıt</string>
     <string name="chat_report">Bildir</string>

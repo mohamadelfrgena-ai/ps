@@ -239,6 +239,7 @@
     <string name="chat_add_photo">添加照片</string>
     <string name="chat_attach_photo">照片</string>
     <string name="chat_attach_media">音频 / 视频文件</string>
+    <string name="chat_media_admin_only">视频片段、音频文件和录音只能由管理员发送。</string>
     <string name="chat_reply">回复</string>
     <string name="chat_replying_to">↩ 回复 %1$s</string>
     <string name="chat_report">举报</string>

@@ -131,6 +131,9 @@ fun ChatScreen(
     val sendLabel = stringResource(R.string.chat_send)
     val reportSentMsg = stringResource(R.string.chat_report_sent)
     val deleteExpiredMsg = stringResource(R.string.chat_delete_expired)
+    val mediaAdminMsg = stringResource(R.string.chat_media_admin_only)
+    // الأدمن وحده يرسل الفيديو والصوت والتسجيل الصوتي (القاعدة هي الحكم)
+    val isAdmin = profile?.role == "admin"
     val pinMsg = stringResource(R.string.chat_pin)
     val unpinMsg = stringResource(R.string.chat_unpin)
     val imageFormatsMsg = stringResource(R.string.chat_image_formats)
@@ -171,6 +174,12 @@ fun ChatScreen(
     val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
+            // الوسائط (فيديو · صوت · تسجيل صوتي) للأدمن فقط — لا تُرفع ولو وصل الطلب
+            // من عميل قديم لا يعرف القاعدة؛ والخادم يرفضها مرّة أخرى عند الإرسال.
+            if (!isAdmin) {
+                statusMessage = mediaAdminMsg
+                return@launch
+            }
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@launch
             val mime = context.contentResolver.getType(uri) ?: "audio/mpeg"
             val isVideo = mime.startsWith("video")
@@ -496,8 +505,10 @@ fun ChatScreen(
             },
             onAudioVideo = {
                 showAttach = false
-                mediaSheet = true
+                // الوسائط (فيديو · صوت · تسجيل صوتي) للأدمن فقط — حماية مزدوجة مع الخادم
+                if (isAdmin) mediaSheet = true else statusMessage = mediaAdminMsg
             },
+            isAdmin = isAdmin,
         )
     }
 
@@ -506,11 +517,11 @@ fun ChatScreen(
             onDismiss = { mediaSheet = false },
             onAudio = {
                 mediaSheet = false
-                mediaPicker.launch("audio/*")
+                if (isAdmin) mediaPicker.launch("audio/*") else statusMessage = mediaAdminMsg
             },
             onVideo = {
                 mediaSheet = false
-                mediaPicker.launch("video/*")
+                if (isAdmin) mediaPicker.launch("video/*") else statusMessage = mediaAdminMsg
             },
         )
     }
