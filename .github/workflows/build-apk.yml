@@ -173,8 +173,8 @@ jobs:
   # ==========================================================================
   # 1b) تسجيل آخر APK ناجح داخل المستودع (apk-debug.apk)
   #     task: apk-commit — ينزّل مُخرَج آخر بناء ناجح من مُخرَجات GitHub Actions
-  #     (نفس المستودع الذي يقرأه المستخدم) ويضيفه في جذر المستودع باسم apk-debug.apk،
-  #     فيستطيع المستخدم تنزيله من المستودع مباشرة. لا يبني شيئاً ولا يمسّ Supabase.
+  #     (نفس المستودع الذي يقرأه المالك) ويضيفه في الجذر باسم apk-debug.apk.
+  #     لا يبني شيئاً ولا يمسّ Supabase. وأي خطأ يُنشر كتعليق على العمولة.
   # ==========================================================================
   commit-apk:
     needs: request
@@ -183,35 +183,69 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: تنزيل آخر APK ناجح من مُخرَجات آخر تشغيل
+      - name: تنزيل آخر APK ناجح وتسجيله
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -e
+          set -o pipefail
           mkdir -p /tmp/apk
-          AID=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=addonstation-debug-apk&per_page=1" \
-                --jq '.artifacts[0].id')
-          [ -n "$AID" ] || { echo "::error::لا يوجد مُخرَج APK محفوظ"; exit 1; }
+          exec > >(tee /tmp/diag.log) 2>&1
+          echo "المستودع: ${{ github.repository }} · الفرع: ${{ github.ref_name }} · مساحة العمل: $GITHUB_WORKSPACE"
+
+          echo "## 1) أحدث مُخرَج APK"
+          curl -sS -H "Authorization: token $GITHUB_TOKEN" \
+               -H "Accept: application/vnd.github+json" \
+               "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?name=addonstation-debug-apk&per_page=1" \
+               -o /tmp/apk/list.json
+          head -c 400 /tmp/apk/list.json; echo
+          AID=$(python3 -c "import json;d=json.load(open('/tmp/apk/list.json'));print(d['artifacts'][0]['id'] if d.get('artifacts') else '')")
+          [ -n "$AID" ] || { echo "::error::لا يوجد مُخرَج addonstation-debug-apk"; exit 1; }
           echo "معرّف المُخرَج: $AID"
-          gh api "repos/${{ github.repository }}/actions/artifacts/$AID/zip" > /tmp/apk/a.zip
+
+          echo "## 2) تنزيل الأرشيف"
+          curl -sSL -H "Authorization: token $GITHUB_TOKEN" \
+               "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$AID/zip" \
+               -o /tmp/apk/a.zip
           ls -la /tmp/apk/a.zip
-          cd /tmp/apk && unzip -o a.zip >/dev/null && ls -la
-          APK=$(ls /tmp/apk/*.apk | head -1)
+          file /tmp/apk/a.zip || true
+
+          echo "## 3) فكّ الضغط"
+          cd /tmp/apk && unzip -o a.zip
+          APK=$(find /tmp/apk -maxdepth 2 -name "*.apk" | head -1)
           [ -n "$APK" ] || { echo "::error::لا ملف APK داخل المُخرَج"; exit 1; }
-          cp "$APK" /home/runner/work/ps/ps/apk-debug.apk
+          echo "ملف APK: $APK"
+          ls -la "$APK"
+          sha256sum "$APK"
+          cp "$APK" "$GITHUB_WORKSPACE/apk-debug.apk"
 
       - name: تسجيل الملف في المستودع
         run: |
-          set -e
+          set -o pipefail
           cd "$GITHUB_WORKSPACE"
           ls -la apk-debug.apk
-          sha256sum apk-debug.apk
+          sha256sum apk-debug.apk | tee -a /tmp/diag.log
           git config user.name "AddonStation CI"
           git config user.email "ci@users.noreply.github.com"
           git add -f apk-debug.apk
           git -c core.quotepath=false commit -m "APK: debug build $(date -u +%Y-%m-%dT%H:%MZ) ($(du -h apk-debug.apk | cut -f1))"
           git push origin HEAD:${{ github.ref_name }}
           echo "✓ سُجّل apk-debug.apk في الفرع ${{ github.ref_name }}"
+
+      - name: نشر التشخيص كتعليق على العمولة
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f /tmp/diag.log ] || exit 0
+          {
+            echo "### 📦 apk-commit — سجل المهمة"
+            echo ""
+            echo '```'
+            tail -60 /tmp/diag.log
+            echo '```'
+          } > /tmp/body.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@/tmp/body.md >/dev/null \
+            && echo "✓ نُشر السجل كتعليق" || echo "تعذّر نشر التعليق"
 
   # ==========================================================================
   # 2) رفع أصول site-assets الجديدة (492 ملفاً · 21 قسماً) — يدوياً فقط
