@@ -40,6 +40,7 @@ on:
         type: choice
         options:
           - apk
+          - apk-commit
           - assets-dry-run
           - assets-upload
   # هذا المحفّز لا يعمل إلا إذا تغيّر ملف طلب البناء (.build-request).
@@ -167,6 +168,50 @@ jobs:
           name: addonstation-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+
+  # ==========================================================================
+  # 1b) تسجيل آخر APK ناجح داخل المستودع (apk-debug.apk)
+  #     task: apk-commit — ينزّل مُخرَج آخر بناء ناجح من مُخرَجات GitHub Actions
+  #     (نفس المستودع الذي يقرأه المستخدم) ويضيفه في جذر المستودع باسم apk-debug.apk،
+  #     فيستطيع المستخدم تنزيله من المستودع مباشرة. لا يبني شيئاً ولا يمسّ Supabase.
+  # ==========================================================================
+  commit-apk:
+    needs: request
+    if: needs.request.outputs.task == 'apk-commit'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تنزيل آخر APK ناجح من مُخرَجات آخر تشغيل
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p /tmp/apk
+          AID=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=addonstation-debug-apk&per_page=1" \
+                --jq '.artifacts[0].id')
+          [ -n "$AID" ] || { echo "::error::لا يوجد مُخرَج APK محفوظ"; exit 1; }
+          echo "معرّف المُخرَج: $AID"
+          gh api "repos/${{ github.repository }}/actions/artifacts/$AID/zip" > /tmp/apk/a.zip
+          ls -la /tmp/apk/a.zip
+          cd /tmp/apk && unzip -o a.zip >/dev/null && ls -la
+          APK=$(ls /tmp/apk/*.apk | head -1)
+          [ -n "$APK" ] || { echo "::error::لا ملف APK داخل المُخرَج"; exit 1; }
+          cp "$APK" /home/runner/work/ps/ps/apk-debug.apk
+
+      - name: تسجيل الملف في المستودع
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          ls -la apk-debug.apk
+          sha256sum apk-debug.apk
+          git config user.name "AddonStation CI"
+          git config user.email "ci@users.noreply.github.com"
+          git add -f apk-debug.apk
+          git -c core.quotepath=false commit -m "APK: debug build $(date -u +%Y-%m-%dT%H:%MZ) ($(du -h apk-debug.apk | cut -f1))"
+          git push origin HEAD:${{ github.ref_name }}
+          echo "✓ سُجّل apk-debug.apk في الفرع ${{ github.ref_name }}"
 
   # ==========================================================================
   # 2) رفع أصول site-assets الجديدة (492 ملفاً · 21 قسماً) — يدوياً فقط

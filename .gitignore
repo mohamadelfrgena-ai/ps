@@ -7,6 +7,8 @@ android/.idea/
 android/*.iml
 android/captures/
 *.apk
+# ملف APK الذي يسجّله سير العمل (apk-commit) ليتمكّن المالك من تنزيله من المستودع
+!/apk-debug.apk
 *.aab
 *.keystore
 *.jks
