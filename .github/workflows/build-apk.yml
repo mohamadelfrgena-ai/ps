@@ -186,6 +186,7 @@ jobs:
       - name: تنزيل آخر APK ناجح وتسجيله
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}   # ضروري: curl لا يقرأ GH_TOKEN تلقائياً
         run: |
           set -o pipefail
           mkdir -p /tmp/apk
