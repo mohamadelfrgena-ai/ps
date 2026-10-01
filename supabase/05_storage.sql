@@ -95,10 +95,16 @@ create policy "chat_images_read" on storage.objects
   for select to authenticated
   using (bucket_id = 'chat-images');
 
+-- الوسائط (فيديو · صوت · تسجيل صوتي) للأدمن فقط: لا يقبل المخزن رفعها من غيره،
+-- فيُمنع الإرسال من أصله حتى لو تجاوز أحد الواجهة. (طلب المستخدم)
 drop policy if exists "chat_media_insert" on storage.objects;
 create policy "chat_media_insert" on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'chat-media' and (storage.foldername(name))[1] = auth.uid()::text);
+  with check (
+    bucket_id = 'chat-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+    and public.is_admin(auth.uid())
+  );
 
 drop policy if exists "chat_media_read" on storage.objects;
 create policy "chat_media_read" on storage.objects

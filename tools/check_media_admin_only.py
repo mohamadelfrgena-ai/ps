@@ -61,6 +61,15 @@ if not re.search(r"new\.message_type in \('audio','video'\)", guard_sql):
 if "18_media_admin_only.sql" not in all_in_one:
     problems.append("الملف الجامع 00_ALL_IN_ONE.sql لا يتضمن 18_media_admin_only.sql")
 
+# 2ب) المخزن: رفع الوسائط للأدمن فقط (حماية ثالثة)
+STORAGE = os.path.join(ROOT, "supabase", "05_storage.sql")
+storage = read(STORAGE)
+pat = r"chat_media_insert[\s\S]{0,320}is_admin\(auth\.uid\(\)\)"
+if not re.search(pat, storage):
+    problems.append("05_storage.sql: سياسة رفع chat-media غير مقيَّدة بالأدمن")
+if not re.search(pat, guard_sql):
+    problems.append("18_media_admin_only.sql: لا يعيد تعريف سياسة رفع المخزن للأدمن")
+
 # 3) التطبيق: الخيار للأدمن فقط + منع المسارين
 if not re.search(r"if \(isAdmin\) \{\s*\n\s*SheetRow\(\"🎬\", stringResource\(R\.string\.chat_attach_media\)",
                  sheets):
@@ -99,6 +108,7 @@ checks = [
     ("ترد بسبب admin_only_media", "'admin_only_media'" in chat_sql),
     ("مشغّل الحماية على الجدول", "trg_chat_media_admin_only" in guard_sql),
     ("الملف 18 داخل الجامع", "18_media_admin_only.sql" in all_in_one),
+    ("رفع الوسائط للأدمن فقط في المخزن", bool(re.search(pat, storage))),
     ("خيار الوسائط للأدمن فقط في التطبيق", "isAdmin: Boolean = false" in sheets),
     ("isAdmin = admin فقط (لا مشرف)", 'profile?.role == "admin"' in screen),
     ("نص المنع في 8 لغات", not missing),

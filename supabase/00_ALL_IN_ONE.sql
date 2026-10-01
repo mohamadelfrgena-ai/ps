@@ -3110,10 +3110,16 @@ create policy "chat_images_read" on storage.objects
   for select to authenticated
   using (bucket_id = 'chat-images');
 
+-- الوسائط (فيديو · صوت · تسجيل صوتي) للأدمن فقط: لا يقبل المخزن رفعها من غيره،
+-- فيُمنع الإرسال من أصله حتى لو تجاوز أحد الواجهة. (طلب المستخدم)
 drop policy if exists "chat_media_insert" on storage.objects;
 create policy "chat_media_insert" on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'chat-media' and (storage.foldername(name))[1] = auth.uid()::text);
+  with check (
+    bucket_id = 'chat-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+    and public.is_admin(auth.uid())
+  );
 
 drop policy if exists "chat_media_read" on storage.objects;
 create policy "chat_media_read" on storage.objects
@@ -5026,8 +5032,11 @@ $$;
 --
 --  ملف 03_functions_chat.sql يمنعها داخل send_chat_message رسالةً واضحة:
 --      { "ok": false, "message": "admin_only_media" }
---  وهذا الملف يضيف **شبكة أمان** على مستوى الجدول: مشغّل قبل الإدراج يرفض أي
---  صف وسائط من غير الأدمن مهما كانت طريقة الإدراج (حتى المباشرة أو من عميل قديم).
+--  وهذا الملف يضيف طبقتين إضافيتين:
+--      1) مشغّل قبل الإدراج على جدول الرسائل يرفض أي صف وسائط من غير الأدمن
+--         مهما كانت طريقة الإدراج (حتى المباشرة أو من عميل قديم).
+--      2) سياسة مخزن chat-media: لا يُقبل رفع ملف الوسائط إلا من الأدمن،
+--         فيُمنع الأمر من أصله قبل وصوله إلى جدول الرسائل.
 --
 --  التطبيق مطابق: خيار «ملف صوتي / مرئي» لا يظهر لغير الأدمن في نافذة الإرفاق.
 --
@@ -5066,10 +5075,21 @@ create trigger trg_chat_media_admin_only
   for each row
   execute function public.chat_media_admin_only_guard();
 
--- 3) صلاحيات (الدالة تعمل ضمن الجدول، لكن نمنح التنفيذ صراحةً كما في 11_grants).
+-- 3) تقوية المخزن: لا يقبل مخزن chat-media رفع أي ملف من غير الأدمن،
+--    فيُمنع الإرسال من أصله (حماية ثالثة فوق الدالة والمشغّل).
+drop policy if exists "chat_media_insert" on storage.objects;
+create policy "chat_media_insert" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'chat-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+    and public.is_admin(auth.uid())
+  );
+
+-- 4) صلاحيات (الدالة تعمل ضمن الجدول، لكن نمنح التنفيذ صراحةً كما في 11_grants).
 grant execute on function public.chat_media_admin_only_guard() to authenticated, service_role;
 
--- 4) تحقّق: يعرض عدد رسائل الفيديو/الصوت الموجودة لكل مرسل (للمراجعة فقط).
+-- 5) تحقّق: يعرض عدد رسائل الفيديو/الصوت الموجودة لكل مرسل (للمراجعة فقط).
 do $$
 declare
   v_bad integer;
