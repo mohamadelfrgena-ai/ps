@@ -288,7 +288,6 @@
     <string name="chat_recent">الأحدث</string>
     <string name="chat_search_emoji">ابحث عن إيموجي</string>
     <string name="chat_pinned">📌 الرسائل المثبتة</string>
-    <string name="chat_search_in_room">بحث في الغرفة</string>
     <string name="chat_no_pinned">لا توجد رسائل مثبتة</string>
     <string name="role_admin">TheKing ✦</string>
     <string name="role_moderator">Manager ✦</string>

@@ -288,7 +288,6 @@
     <string name="chat_recent">Недавние</string>
     <string name="chat_search_emoji">Поиск эмодзи</string>
     <string name="chat_pinned">📌 Закреплённые сообщения</string>
-    <string name="chat_search_in_room">Поиск в комнате</string>
     <string name="chat_no_pinned">Закреплённых сообщений нет</string>
     <string name="role_admin">TheKing ✦</string>
     <string name="role_moderator">Manager ✦</string>

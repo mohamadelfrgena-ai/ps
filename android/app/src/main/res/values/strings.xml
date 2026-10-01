@@ -298,7 +298,6 @@
     <string name="chat_recent">Recent</string>
     <string name="chat_search_emoji">Search emoji</string>
     <string name="chat_pinned">📌 Pinned messages</string>
-    <string name="chat_search_in_room">Search in room</string>
     <string name="chat_no_pinned">No pinned messages</string>
     <string name="role_admin">TheKing ✦</string>
     <string name="role_moderator">Manager ✦</string>

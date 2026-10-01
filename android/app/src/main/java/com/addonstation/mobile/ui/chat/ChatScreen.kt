@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -112,8 +111,6 @@ fun ChatScreen(
     var showAttach by remember { mutableStateOf(false) }
     var showMembers by remember { mutableStateOf(false) }
     var showPinned by remember { mutableStateOf(false) }
-    var showSearch by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
     var actionsFor by remember { mutableStateOf<ChatMessageUi?>(null) }
     var mediaSheet by remember { mutableStateOf(false) }
     var imageViewerUrl by remember { mutableStateOf<String?>(null) }
@@ -207,7 +204,6 @@ fun ChatScreen(
             channel = channel,
             onBack = onBack,
             onMembers = { showMembers = true },
-            onSearch = { showSearch = !showSearch },
             onPinned = {
                 scope.launch {
                     pinnedMessages = container.chat.pinned(channel.id)
@@ -216,18 +212,6 @@ fun ChatScreen(
             },
             onSettings = onOpenSettings,
         )
-
-        if (showSearch) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text(stringResource(R.string.chat_search_in_room), style = AppText.bodySmall) },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            )
-        }
 
         Box(Modifier.weight(1f)) {
             when {
@@ -238,11 +222,8 @@ fun ChatScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 ) {
-                    val visible = if (searchQuery.isBlank()) messages else messages.filter {
-                        it.message.content?.contains(searchQuery, ignoreCase = true) == true
-                    }
-                    itemsIndexedCompat(visible) { index, ui ->
-                        val previous = visible.getOrNull(index - 1)
+                    itemsIndexedCompat(messages) { index, ui ->
+                        val previous = messages.getOrNull(index - 1)
                         MessageBlock(
                             ui = ui,
                             previous = previous,
@@ -610,7 +591,6 @@ private fun ChatHeader(
     channel: ChatChannel,
     onBack: () -> Unit,
     onMembers: () -> Unit,
-    onSearch: () -> Unit,
     onPinned: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -658,7 +638,6 @@ private fun ChatHeader(
             }
         }
         HeaderIcon(Icons.Filled.Group, onMembers)
-        HeaderIcon(Icons.Filled.Search, onSearch)
         HeaderIcon(Icons.Filled.PushPin, onPinned)
     }
 }

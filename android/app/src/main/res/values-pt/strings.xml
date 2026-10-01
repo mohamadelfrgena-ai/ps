@@ -288,7 +288,6 @@
     <string name="chat_recent">Recentes</string>
     <string name="chat_search_emoji">Buscar emoji</string>
     <string name="chat_pinned">📌 Mensagens fixadas</string>
-    <string name="chat_search_in_room">Buscar na sala</string>
     <string name="chat_no_pinned">Nenhuma mensagem fixada</string>
     <string name="role_admin">TheKing ✦</string>
     <string name="role_moderator">Manager ✦</string>

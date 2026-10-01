@@ -153,6 +153,11 @@ bg `#0B0F14`, surface `#131A24`, elevated `#1A2330`, elevated2 `#212D3D`, border
 ### C2. Header bar
 Back arrow, room icon + name (bold), the room description under it (small, muted), and on the far side: 👥 members button, 🔍 search in room **[NEW]**, 📌 pinned messages **[NEW]**.
 
+> تحديث بناءً على طلب المستخدم: **أُزيلت أداة البحث من داخل الشات** (أيقونة 🔍 في
+> الترويسة وحقل «بحث في الغرفة» وتصفية الرسائل) — فالترويسة الآن: رجوع · أيقونة الغرفة
+> واسمها ووصفها · أعضاء 👥 · الرسائل المثبّتة 📌. (بحث الإيموجي داخل منتقي الرموز باقٍ
+> لأنه جزء من المنتقي لا من الشات.)
+
 ### C3. Message list
 Rendering rules (Discord-like):
 - **Round avatar 40dp** (circle) at the start side, small status dot (green online / gray offline) at its bottom corner. Respect the user's "show online status" setting.
