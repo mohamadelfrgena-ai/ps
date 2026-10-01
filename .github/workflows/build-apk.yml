@@ -29,6 +29,7 @@ name: Build APK
 
 permissions:
   contents: write
+  actions: read        # يلزم لوظيفة apk-commit لقراءة مُخرَج آخر بناء (بدونه 403)
 
 on:
   workflow_dispatch:
