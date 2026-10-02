@@ -499,4 +499,25 @@
     <string name="admin_download_limit_label">Limite de téléchargements (vide = illimité)</string>
     <string name="admin_method_code_label">Code</string>
     <string name="admin_method_name_label">Nom</string>
+    <string name="admin_give_ac_title">Donner des AC à un utilisateur</string>
+    <string name="admin_give_ac_amount">Montant (n\'importe quel nombre)</string>
+    <string name="admin_give_ac_note">Motif (visible par l\'utilisateur)</string>
+    <string name="admin_give_ac_quick">Montants rapides</string>
+    <string name="admin_give_ac_give">Donner</string>
+    <string name="admin_give_ac_deduct">Retirer</string>
+    <string name="admin_give_ac_all">Donner à tous les utilisateurs</string>
+    <string name="admin_give_ac_select">Choisissez un utilisateur dans la liste</string>
+    <string name="admin_give_ac_confirm">Donner %1$d AC à %2$s ?</string>
+    <string name="admin_give_ac_confirm_deduct">Retirer %1$d AC à %2$s ?</string>
+    <string name="admin_give_ac_confirm_all">Donner %1$d AC à tous les utilisateurs ?</string>
+    <string name="admin_give_ac_done">+%1$d AC · solde %2$d</string>
+    <string name="admin_give_ac_done_deduct">−%1$d AC · solde %2$d</string>
+    <string name="admin_give_ac_done_all">%1$d AC donnés à %2$d utilisateurs</string>
+    <string name="admin_give_ac_invalid">Saisissez un montant valide</string>
+    <string name="admin_give_ac_history">Dernières opérations AC</string>
+    <string name="admin_give_ac_balance_after">solde</string>
+    <string name="admin_give_ac_none">Aucune opération AC</string>
+    <string name="admin_reason_reward">Récompense admin</string>
+    <string name="admin_reason_adjust">Ajustement admin</string>
+    <string name="admin_give_ac_no_users">Aucun utilisateur trouvé</string>
 </resources>

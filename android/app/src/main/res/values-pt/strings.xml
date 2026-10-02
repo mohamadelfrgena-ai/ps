@@ -499,4 +499,25 @@
     <string name="admin_download_limit_label">Limite de downloads (vazio = ilimitado)</string>
     <string name="admin_method_code_label">Código</string>
     <string name="admin_method_name_label">Nome</string>
+    <string name="admin_give_ac_title">Dar AC a um usuário</string>
+    <string name="admin_give_ac_amount">Valor (qualquer número)</string>
+    <string name="admin_give_ac_note">Motivo (o usuário vê)</string>
+    <string name="admin_give_ac_quick">Valores rápidos</string>
+    <string name="admin_give_ac_give">Dar</string>
+    <string name="admin_give_ac_deduct">Descontar</string>
+    <string name="admin_give_ac_all">Dar a todos os usuários</string>
+    <string name="admin_give_ac_select">Escolha um usuário da lista</string>
+    <string name="admin_give_ac_confirm">Dar %1$d AC a %2$s?</string>
+    <string name="admin_give_ac_confirm_deduct">Descontar %1$d AC de %2$s?</string>
+    <string name="admin_give_ac_confirm_all">Dar %1$d AC a todos os usuários?</string>
+    <string name="admin_give_ac_done">+%1$d AC · saldo %2$d</string>
+    <string name="admin_give_ac_done_deduct">−%1$d AC · saldo %2$d</string>
+    <string name="admin_give_ac_done_all">%1$d AC dados a %2$d usuários</string>
+    <string name="admin_give_ac_invalid">Escreva um valor válido</string>
+    <string name="admin_give_ac_history">Últimas operações AC</string>
+    <string name="admin_give_ac_balance_after">saldo</string>
+    <string name="admin_give_ac_none">Ainda não há operações AC</string>
+    <string name="admin_reason_reward">Recompensa do admin</string>
+    <string name="admin_reason_adjust">Ajuste do admin</string>
+    <string name="admin_give_ac_no_users">Nenhum utilizador encontrado</string>
 </resources>

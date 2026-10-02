@@ -499,4 +499,25 @@
     <string name="admin_download_limit_label">下载上限（留空 = 不限）</string>
     <string name="admin_method_code_label">代码</string>
     <string name="admin_method_name_label">名称</string>
+    <string name="admin_give_ac_title">给用户发放 AC</string>
+    <string name="admin_give_ac_amount">金额（任意数字）</string>
+    <string name="admin_give_ac_note">原因（用户可见）</string>
+    <string name="admin_give_ac_quick">快捷金额</string>
+    <string name="admin_give_ac_give">发放</string>
+    <string name="admin_give_ac_deduct">扣除</string>
+    <string name="admin_give_ac_all">发给所有用户</string>
+    <string name="admin_give_ac_select">从下方列表中选择用户</string>
+    <string name="admin_give_ac_confirm">给 %2$s 发放 %1$d AC？</string>
+    <string name="admin_give_ac_confirm_deduct">从 %2$s 扣除 %1$d AC？</string>
+    <string name="admin_give_ac_confirm_all">给所有用户发放 %1$d AC？</string>
+    <string name="admin_give_ac_done">+%1$d AC · 余额 %2$d</string>
+    <string name="admin_give_ac_done_deduct">−%1$d AC · 余额 %2$d</string>
+    <string name="admin_give_ac_done_all">已向 %2$d 位用户发放 %1$d AC</string>
+    <string name="admin_give_ac_invalid">请输入有效金额</string>
+    <string name="admin_give_ac_history">最近的 AC 操作</string>
+    <string name="admin_give_ac_balance_after">余额</string>
+    <string name="admin_give_ac_none">暂无 AC 操作</string>
+    <string name="admin_reason_reward">管理员奖励</string>
+    <string name="admin_reason_adjust">管理员调整</string>
+    <string name="admin_give_ac_no_users">没有匹配的用户</string>
 </resources>

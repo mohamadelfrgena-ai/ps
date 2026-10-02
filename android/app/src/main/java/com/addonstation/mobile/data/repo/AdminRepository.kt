@@ -302,9 +302,13 @@ class AdminRepository(private val supabase: SupabaseClient) {
 
     // ------------------------------------------------------------ AC Management
 
-    suspend fun acAdjust(userId: String, amount: Int, reason: String): Result<Unit> = withContext(Dispatchers.IO) {
+    /**
+     * يمنح (أو يخصم) أي مبلغ لمستخدم — دالة الخادم_ac_admin_adjust.
+     * يعيد رصيد المستخدم بعد العملية لتُعرض النتيجة في لوحة التحكم.
+     */
+    suspend fun acAdjust(userId: String, amount: Int, reason: String): Result<Int> = withContext(Dispatchers.IO) {
         runCatching {
-            supabase.rpc(
+            val outcome = supabase.rpc(
                 "ac_admin_adjust",
                 mapOf(
                     "p_user_id" to JsonPrimitive(userId),
@@ -313,7 +317,7 @@ class AdminRepository(private val supabase: SupabaseClient) {
                     "p_request_key" to JsonPrimitive("admin:${java.util.UUID.randomUUID()}"),
                 ),
             ).asOutcome().requireOk()
-            Unit
+            outcome.data["balance"]?.asInt() ?: 0
         }
     }
 

@@ -515,4 +515,25 @@
     <string name="admin_download_limit_label">Download limit (empty = unlimited)</string>
     <string name="admin_method_code_label">Code</string>
     <string name="admin_method_name_label">Name</string>
+    <string name="admin_give_ac_title">Give AC to a user</string>
+    <string name="admin_give_ac_amount">Amount (any number)</string>
+    <string name="admin_give_ac_note">Reason (the user sees it)</string>
+    <string name="admin_give_ac_quick">Quick amounts</string>
+    <string name="admin_give_ac_give">Give</string>
+    <string name="admin_give_ac_deduct">Deduct</string>
+    <string name="admin_give_ac_all">Give to every user</string>
+    <string name="admin_give_ac_select">Pick a user from the list below</string>
+    <string name="admin_give_ac_confirm">Give %1$d AC to %2$s?</string>
+    <string name="admin_give_ac_confirm_deduct">Deduct %1$d AC from %2$s?</string>
+    <string name="admin_give_ac_confirm_all">Give %1$d AC to every user?</string>
+    <string name="admin_give_ac_done">+%1$d AC · balance %2$d</string>
+    <string name="admin_give_ac_done_deduct">−%1$d AC · balance %2$d</string>
+    <string name="admin_give_ac_done_all">%1$d AC given to %2$d users</string>
+    <string name="admin_give_ac_invalid">Type a valid amount</string>
+    <string name="admin_give_ac_history">Latest AC operations</string>
+    <string name="admin_give_ac_balance_after">balance</string>
+    <string name="admin_give_ac_none">No AC operations yet</string>
+    <string name="admin_reason_reward">Admin reward</string>
+    <string name="admin_reason_adjust">Admin adjustment</string>
+    <string name="admin_give_ac_no_users">No matching user</string>
 </resources>

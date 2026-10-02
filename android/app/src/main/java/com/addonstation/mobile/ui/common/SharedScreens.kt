@@ -202,7 +202,15 @@ fun InfoDialog(title: String, text: String, onClose: () -> Unit) {
 }
 
 @Composable
-fun ConfirmDialog(title: String, text: String, confirmText: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+fun ConfirmDialog(
+    title: String,
+    text: String,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    /** لون زر التأكيد — أحمر افتراضياً (إجراء حسّاس)، وأخضر للمنح. */
+    confirmColor: Color = AppColors.Red,
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = AppColors.Surface,
@@ -211,7 +219,7 @@ fun ConfirmDialog(title: String, text: String, confirmText: String, onConfirm: (
         title = { Text(title, style = AppText.sectionTitle) },
         text = { Text(text, style = AppText.bodySmall) },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text(confirmText, color = AppColors.Red) }
+            TextButton(onClick = onConfirm) { Text(confirmText, color = confirmColor) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel), color = AppColors.Muted) }

@@ -499,4 +499,25 @@
     <string name="admin_download_limit_label">İndirme sınırı (boş = sınırsız)</string>
     <string name="admin_method_code_label">Kod</string>
     <string name="admin_method_name_label">Ad</string>
+    <string name="admin_give_ac_title">Bir kullanıcıya AC ver</string>
+    <string name="admin_give_ac_amount">Miktar (herhangi bir sayı)</string>
+    <string name="admin_give_ac_note">Sebep (kullanıcı görür)</string>
+    <string name="admin_give_ac_quick">Hızlı miktarlar</string>
+    <string name="admin_give_ac_give">Ver</string>
+    <string name="admin_give_ac_deduct">Düş</string>
+    <string name="admin_give_ac_all">Tüm kullanıcılara ver</string>
+    <string name="admin_give_ac_select">Listeden bir kullanıcı seçin</string>
+    <string name="admin_give_ac_confirm">%2$s kullanıcısına %1$d AC verilsin mi?</string>
+    <string name="admin_give_ac_confirm_deduct">%2$s kullanıcısından %1$d AC düşülsün mü?</string>
+    <string name="admin_give_ac_confirm_all">Tüm kullanıcılara %1$d AC verilsin mi?</string>
+    <string name="admin_give_ac_done">+%1$d AC · bakiye %2$d</string>
+    <string name="admin_give_ac_done_deduct">−%1$d AC · bakiye %2$d</string>
+    <string name="admin_give_ac_done_all">%2$d kullanıcıya %1$d AC verildi</string>
+    <string name="admin_give_ac_invalid">Geçerli bir miktar yazın</string>
+    <string name="admin_give_ac_history">Son AC işlemleri</string>
+    <string name="admin_give_ac_balance_after">bakiye</string>
+    <string name="admin_give_ac_none">Henüz AC işlemi yok</string>
+    <string name="admin_reason_reward">Yönetici ödülü</string>
+    <string name="admin_reason_adjust">Yönetici düzeltmesi</string>
+    <string name="admin_give_ac_no_users">Eşleşen kullanıcı yok</string>
 </resources>

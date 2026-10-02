@@ -499,4 +499,25 @@
     <string name="admin_download_limit_label">حد التنزيل (فارغ = بلا حد)</string>
     <string name="admin_method_code_label">الرمز</string>
     <string name="admin_method_name_label">الاسم</string>
+    <string name="admin_give_ac_title">منح AC لمستخدم</string>
+    <string name="admin_give_ac_amount">المبلغ (أي رقم)</string>
+    <string name="admin_give_ac_note">السبب (يظهر للمستخدم)</string>
+    <string name="admin_give_ac_quick">مبالغ سريعة</string>
+    <string name="admin_give_ac_give">منح</string>
+    <string name="admin_give_ac_deduct">خصم</string>
+    <string name="admin_give_ac_all">منح لكل المستخدمين</string>
+    <string name="admin_give_ac_select">اختر مستخدماً من القائمة بالأسفل</string>
+    <string name="admin_give_ac_confirm">منح %1$d AC للمستخدم %2$s؟</string>
+    <string name="admin_give_ac_confirm_deduct">خصم %1$d AC من %2$s؟</string>
+    <string name="admin_give_ac_confirm_all">منح %1$d AC لكل المستخدمين؟</string>
+    <string name="admin_give_ac_done">+%1$d AC · الرصيد %2$d</string>
+    <string name="admin_give_ac_done_deduct">−%1$d AC · الرصيد %2$d</string>
+    <string name="admin_give_ac_done_all">تم منح %1$d AC لـ %2$d مستخدم</string>
+    <string name="admin_give_ac_invalid">اكتب مبلغاً صحيحاً</string>
+    <string name="admin_give_ac_history">آخر عمليات AC</string>
+    <string name="admin_give_ac_balance_after">الرصيد</string>
+    <string name="admin_give_ac_none">لا توجد عمليات AC بعد</string>
+    <string name="admin_reason_reward">مكافأة من الإدارة</string>
+    <string name="admin_reason_adjust">تعديل من الإدارة</string>
+    <string name="admin_give_ac_no_users">لا يوجد مستخدم مطابق</string>
 </resources>

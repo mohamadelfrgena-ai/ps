@@ -499,4 +499,25 @@
     <string name="admin_download_limit_label">Лимит загрузок (пусто = без лимита)</string>
     <string name="admin_method_code_label">Код</string>
     <string name="admin_method_name_label">Название</string>
+    <string name="admin_give_ac_title">Выдать AC пользователю</string>
+    <string name="admin_give_ac_amount">Сумма (любое число)</string>
+    <string name="admin_give_ac_note">Причина (видна пользователю)</string>
+    <string name="admin_give_ac_quick">Быстрые суммы</string>
+    <string name="admin_give_ac_give">Выдать</string>
+    <string name="admin_give_ac_deduct">Списать</string>
+    <string name="admin_give_ac_all">Выдать всем пользователям</string>
+    <string name="admin_give_ac_select">Выберите пользователя из списка</string>
+    <string name="admin_give_ac_confirm">Выдать %1$d AC пользователю %2$s?</string>
+    <string name="admin_give_ac_confirm_deduct">Списать %1$d AC у %2$s?</string>
+    <string name="admin_give_ac_confirm_all">Выдать %1$d AC всем пользователям?</string>
+    <string name="admin_give_ac_done">+%1$d AC · баланс %2$d</string>
+    <string name="admin_give_ac_done_deduct">−%1$d AC · баланс %2$d</string>
+    <string name="admin_give_ac_done_all">%1$d AC выдано %2$d пользователям</string>
+    <string name="admin_give_ac_invalid">Введите корректную сумму</string>
+    <string name="admin_give_ac_history">Последние операции AC</string>
+    <string name="admin_give_ac_balance_after">баланс</string>
+    <string name="admin_give_ac_none">Операций AC пока нет</string>
+    <string name="admin_reason_reward">Награда от администратора</string>
+    <string name="admin_reason_adjust">Корректировка администратора</string>
+    <string name="admin_give_ac_no_users">Подходящих пользователей нет</string>
 </resources>
