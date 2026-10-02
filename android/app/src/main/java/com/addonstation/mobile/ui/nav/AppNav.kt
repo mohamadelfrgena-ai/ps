@@ -80,6 +80,9 @@ object Routes {
     const val ADMIN_ASSETS = "admin-assets"
     const val ADMIN_CREATORS = "admin-creators"
     const val ADMIN_AC = "admin-ac"
+    /** شاشة AC مع مستخدم محدَّد مسبقاً (زر «+AC» في بطاقة المستخدم). */
+    const val ADMIN_AC_USER = "admin-ac/user/{userId}"
+    fun adminAcUser(id: String) = "admin-ac/user/$id"
     const val ADMIN_SETTINGS = "admin-settings"
     const val ADMIN_AUDIT = "admin-audit"
     const val ADMIN_CHAT = "admin-chat"
@@ -458,7 +461,9 @@ private fun MainNavigation(startAtReset: Boolean) {
                         onOpenAssets = { go(Routes.ADMIN_ASSETS) },
                         onOpenCreatorApps = { go(Routes.ADMIN_CREATORS) },
                         onOpenTips = { go(Routes.ADMIN_CREATORS) },
-                        onOpenAc = { go(Routes.ADMIN_AC) },
+                        onOpenAc = { userId ->
+                            go(if (userId.isNullOrBlank()) Routes.ADMIN_AC else Routes.adminAcUser(userId))
+                        },
                         onOpenAudit = { go(Routes.ADMIN_AUDIT) },
                         onOpenSettings = { go(Routes.ADMIN_SETTINGS) },
                     )
@@ -477,6 +482,18 @@ private fun MainNavigation(startAtReset: Boolean) {
                 composable(Routes.ADMIN_AC) {
                     com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
                         com.addonstation.mobile.ui.admin.AdminAcScreen(onBack = { navController.popBackStack() })
+                    }
+                }
+                // نفس الشاشة لكن مع مستخدم محدَّد (فتحها زر «+AC» من بطاقة المستخدم)
+                composable(
+                    Routes.ADMIN_AC_USER,
+                    arguments = listOf(navArgument("userId") { type = NavType.StringType }),
+                ) { entry ->
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
+                        com.addonstation.mobile.ui.admin.AdminAcScreen(
+                            onBack = { navController.popBackStack() },
+                            preselectUserId = entry.arguments?.getString("userId"),
+                        )
                     }
                 }
                 composable(Routes.ADMIN_SETTINGS) {

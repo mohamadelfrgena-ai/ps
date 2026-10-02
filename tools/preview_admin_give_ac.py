@@ -161,9 +161,35 @@ def dialog(x0, y0):
     d.text((x0 + 90, y0 + h - 46), rtl("إلغاء"), font=font(14), fill=MUTED, anchor="mm")
 
 
+def user_card(x0, y0):
+    """بطاقة المستخدم في تبويب لوحة الإدارة — فيها زر «+AC» الجديد."""
+    w, h = 420, 190
+    rounded((x0, y0, x0 + w, y0 + h), 16, fill=SURFACE, outline=BORDER)
+    d.ellipse((x0 + w - 56, y0 + 16, x0 + w - 20, y0 + 52), fill=ELEV2, outline=GREEN, width=2)
+    d.text((x0 + w - 38, y0 + 34), "M", font=font(13, True), fill=MUTED, anchor="mm")
+    d.text((x0 + w - 68, y0 + 26), "Mrforest", font=font(14, True), fill=TEXT, anchor="rm")
+    d.text((x0 + w - 68, y0 + 46), "Free · user", font=font(11), fill=MUTED, anchor="rm")
+    for i, t in enumerate(("free", "epic", "legendary")):
+        chip = (x0 + 20 + i * 78, y0 + 66, x0 + 90 + i * 78, y0 + 92)
+        rounded(chip, 9, fill=ELEV2, outline=BORDER)
+        d.text(((chip[0] + chip[2]) // 2, (chip[1] + chip[3]) // 2), t, font=font(11),
+               fill=GREEN if t == "free" else MUTED, anchor="mm")
+    for i, t in enumerate(("user", "creator", "moderator", "admin")):
+        chip = (x0 + 20 + i * 78, y0 + 98, x0 + 90 + i * 78, y0 + 124)
+        rounded(chip, 9, fill=ELEV2, outline=BORDER)
+        d.text(((chip[0] + chip[2]) // 2, (chip[1] + chip[3]) // 2), t, font=font(11),
+               fill=GREEN if t == "user" else MUTED, anchor="mm")
+    bw = (w - 52) // 3
+    button((x0 + 18, y0 + 136, x0 + 18 + bw, y0 + 176), "حفظ", fill=GREEN, text_color=ONGREEN, size=13)
+    button((x0 + 26 + bw, y0 + 136, x0 + 26 + 2 * bw, y0 + 176), "+AC", fill="#128A48", text_color=ONGREEN, size=14)
+    button((x0 + 34 + 2 * bw, y0 + 136, x0 + w - 18, y0 + 176), "+30 يوم", fill=ELEV2,
+           outline=BORDER2, size=12)
+    return (x0 + 26 + bw + bw // 2, y0 + 156)
+
+
 def main():
     global img, d
-    img = Image.new("RGB", (1300, 1180), "#F7F9FC")
+    img = Image.new("RGB", (1300, 1440), "#F7F9FC")
     d = ImageDraw.Draw(img)
     d.text((650, 34), rtl("لوحة التحكم: منح أي مبلغ AC لأي مستخدم — والنتيجة ترجع في اللوحة"),
            font=font(24, True), fill="#0F1B26", anchor="mm")
@@ -194,9 +220,18 @@ def main():
     dialog(820, 640)
     note(1020, 600, "#128A48", "تأكيد قبل التنفيذ", size=17)
 
-    d.text((650, TOP + H + 46), rtl("العملية تُسجَّل في سجل التدقيق وإشعار للمستخدم · والنصوص مترجمة إلى اللغات الثماني"),
+    # بطاقة المستخدم في تبويب الإدارة (نقطة الدخول الجديدة)
+    bx, by = 70, TOP + H + 120
+    card_btn = user_card(bx, by)
+    d.text((bx + W // 2, by - 22), rtl("من قائمة المستخدمين: زر «+AC» يفتح شاشة AC بهذا المستخدم محدَّداً"),
+           font=font(15, True), fill="#0F1B26", anchor="mm")
+    note(NX, by + 60, GREEN, "الزر كان «+30» فقط (30 يوم اشتراك) — ما كان فيه أي زر{AC}",
+         anchor="lm", size=16)
+    arrow(NX - 12, by + 60, card_btn[0], card_btn[1], GREEN, w=2)
+
+    d.text((650, 1400), rtl("العملية تُسجَّل في سجل التدقيق وإشعار للمستخدم · والنصوص مترجمة إلى اللغات الثماني"),
            font=font(17, True), fill="#0F1B26", anchor="mm")
-    d.text((650, TOP + H + 76), rtl("ولا يمكن تنفيذها بالخطأ: زر التأكيد أولاً، وأي مبلغ أكبر من 9 أرقام مرفوض"),
+    d.text((650, 1426), rtl("ولا يمكن تنفيذها بالخطأ: زر التأكيد أولاً، وأي مبلغ أكبر من 9 أرقام مرفوض"),
            font=font(15), fill="#56697C", anchor="mm")
     img.save(OUT)
     print("✔", OUT, img.size)

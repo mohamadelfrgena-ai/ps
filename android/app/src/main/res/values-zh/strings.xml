@@ -520,4 +520,8 @@
     <string name="admin_reason_reward">管理员奖励</string>
     <string name="admin_reason_adjust">管理员调整</string>
     <string name="admin_give_ac_no_users">没有匹配的用户</string>
+    <string name="admin_give_ac_short">+AC</string>
+    <string name="admin_plan_days">+30 天</string>
+    <string name="admin_ac_tools">AC 管理与发放</string>
+    <string name="admin_tips_title">创作者小费</string>
 </resources>

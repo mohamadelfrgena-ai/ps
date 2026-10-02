@@ -520,4 +520,8 @@
     <string name="admin_reason_reward">مكافأة من الإدارة</string>
     <string name="admin_reason_adjust">تعديل من الإدارة</string>
     <string name="admin_give_ac_no_users">لا يوجد مستخدم مطابق</string>
+    <string name="admin_give_ac_short">+AC</string>
+    <string name="admin_plan_days">+30 يوم</string>
+    <string name="admin_ac_tools">إدارة AC ومنح الأرصدة</string>
+    <string name="admin_tips_title">نصائح صنّاع المحتوى</string>
 </resources>

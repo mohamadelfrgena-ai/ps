@@ -520,4 +520,8 @@
     <string name="admin_reason_reward">Recompensa del admin</string>
     <string name="admin_reason_adjust">Ajuste del admin</string>
     <string name="admin_give_ac_no_users">Ningún usuario coincide</string>
+    <string name="admin_give_ac_short">+AC</string>
+    <string name="admin_plan_days">+30 días</string>
+    <string name="admin_ac_tools">Gestión de AC y concesiones</string>
+    <string name="admin_tips_title">Propinas de creadores</string>
 </resources>

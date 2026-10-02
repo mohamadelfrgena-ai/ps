@@ -120,6 +120,27 @@ T = {
         "values-pt": "Ainda não há operações AC", "values-ru": "Операций AC пока нет",
         "values-tr": "Henüz AC işlemi yok", "values-zh": "暂无 AC 操作",
     },
+    "admin_give_ac_short": {
+        "values": "+AC", "values-ar": "+AC", "values-es": "+AC", "values-fr": "+AC",
+        "values-pt": "+AC", "values-ru": "+AC", "values-tr": "+AC", "values-zh": "+AC",
+    },
+    "admin_plan_days": {
+        "values": "+30 days", "values-ar": "+30 يوم", "values-es": "+30 días",
+        "values-fr": "+30 jours", "values-pt": "+30 dias", "values-ru": "+30 дней",
+        "values-tr": "+30 gün", "values-zh": "+30 天",
+    },
+    "admin_ac_tools": {
+        "values": "AC management and grants", "values-ar": "إدارة AC ومنح الأرصدة",
+        "values-es": "Gestión de AC y concesiones", "values-fr": "Gestion des AC et attributions",
+        "values-pt": "Gestão de AC e concessões", "values-ru": "Управление AC и начисления",
+        "values-tr": "AC yönetimi ve hediyeler", "values-zh": "AC 管理与发放",
+    },
+    "admin_tips_title": {
+        "values": "Creator tips", "values-ar": "نصائح صنّاع المحتوى",
+        "values-es": "Propinas de creadores", "values-fr": "Pourboires des créateurs",
+        "values-pt": "Gorjetas de criadores", "values-ru": "Чаевые создателям",
+        "values-tr": "İçerik üreticisi bahşişleri", "values-zh": "创作者小费",
+    },
     "admin_give_ac_no_users": {
         "values": "No matching user", "values-ar": "لا يوجد مستخدم مطابق",
         "values-es": "Ningún usuario coincide", "values-fr": "Aucun utilisateur trouvé",
@@ -142,7 +163,7 @@ T = {
 
 
 def esc(v: str) -> str:
-    return v.replace("'", "\\'")
+    return v.replace("'", "\\'").replace("&", "&amp;").replace("<", "&lt;")
 
 
 def main():

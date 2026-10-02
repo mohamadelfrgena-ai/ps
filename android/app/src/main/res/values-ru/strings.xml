@@ -520,4 +520,8 @@
     <string name="admin_reason_reward">Награда от администратора</string>
     <string name="admin_reason_adjust">Корректировка администратора</string>
     <string name="admin_give_ac_no_users">Подходящих пользователей нет</string>
+    <string name="admin_give_ac_short">+AC</string>
+    <string name="admin_plan_days">+30 дней</string>
+    <string name="admin_ac_tools">Управление AC и начисления</string>
+    <string name="admin_tips_title">Чаевые создателям</string>
 </resources>

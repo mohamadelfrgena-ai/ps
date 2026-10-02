@@ -108,7 +108,7 @@ fun AdminPanelScreen(
     onOpenAssets: () -> Unit,
     onOpenCreatorApps: () -> Unit,
     onOpenTips: () -> Unit,
-    onOpenAc: () -> Unit,
+    onOpenAc: (String?) -> Unit,
     onOpenAudit: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -205,6 +205,7 @@ fun AdminPanelScreen(
                     roleFilter = roleFilter,
                     onRoleFilter = { roleFilter = it },
                     loading = loading,
+                    onGiveAc = { userId -> onOpenAc(userId) },
                     onSaveUser = { user, plan, role, grantDays ->
                         scope.launch {
                             container.admin.updateUserPlanRole(
@@ -375,6 +376,7 @@ private fun OverviewTab(
     roleFilter: String,
     onRoleFilter: (String) -> Unit,
     loading: Boolean,
+    onGiveAc: (String) -> Unit,
     onSaveUser: (Profile, String?, String?, Int?) -> Unit,
     onEditContent: () -> Unit,
     onDeleteContent: (ContentItem) -> Unit,
@@ -435,7 +437,7 @@ private fun OverviewTab(
             LoadingBox()
         } else {
             users.take(40).forEach { user ->
-                AdminUserRow(user = user, onSave = onSaveUser)
+                AdminUserRow(user = user, onGiveAc = onGiveAc, onSave = onSaveUser)
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -516,7 +518,11 @@ private fun LazyRowQuick(onQuick: (Int) -> Unit) {
 }
 
 @Composable
-private fun AdminUserRow(user: Profile, onSave: (Profile, String?, String?, Int?) -> Unit) {
+private fun AdminUserRow(
+    user: Profile,
+    onGiveAc: (String) -> Unit,
+    onSave: (Profile, String?, String?, Int?) -> Unit,
+) {
     val container = rememberContainer()
     var plan by remember(user.id) { mutableStateOf(user.plan) }
     var role by remember(user.id) { mutableStateOf(user.role) }
@@ -547,7 +553,14 @@ private fun AdminUserRow(user: Profile, onSave: (Profile, String?, String?, Int?
                 modifier = Modifier.weight(1f),
             )
             GhostButton(
-                text = "＋30",
+                // يمنح هذا المستخدم أي مبلغ AC — يفتح شاشة AC وهو محدَّد مسبقاً
+                text = stringResource(R.string.admin_give_ac_short),
+                onClick = { onGiveAc(user.id) },
+                modifier = Modifier.weight(1f),
+            )
+            GhostButton(
+                // +30 يوماً للاشتراك (ليس رصيد AC)
+                text = stringResource(R.string.admin_plan_days),
                 onClick = { onSave(user, plan, role, 30) },
                 modifier = Modifier.weight(1f),
             )
@@ -754,8 +767,8 @@ private fun MoreTab(onOpen: (String) -> Unit) {
             RowItem(Icons.Filled.Image, stringResource(R.string.admin_assets), onClick = { onOpen("assets") }, tint = AppColors.Blue)
             RowItem(Icons.Filled.Person, stringResource(R.string.admin_creator_requests), onClick = { onOpen("creators") }, tint = AppColors.Purple)
             RowItem(Icons.Filled.Settings, stringResource(R.string.admin_plans_and_payment), onClick = { onOpen("settings") }, tint = AppColors.Gold)
-            RowItem(Icons.Filled.MonetizationOn, "AC Management", onClick = { onOpen("ac") }, tint = AppColors.Green)
-            RowItem(Icons.Filled.Receipt, "Creator Tips", onClick = { onOpen("tips") }, tint = AppColors.Gold)
+            RowItem(Icons.Filled.MonetizationOn, stringResource(R.string.admin_ac_tools), onClick = { onOpen("ac") }, tint = AppColors.Green)
+            RowItem(Icons.Filled.Receipt, stringResource(R.string.admin_tips_title), onClick = { onOpen("tips") }, tint = AppColors.Gold)
             RowItem(Icons.Filled.Chat, stringResource(R.string.admin_chat), onClick = { onOpen("chat") }, tint = AppColors.Blue)
             RowItem(Icons.Filled.History, stringResource(R.string.admin_audit_log), onClick = { onOpen("audit") }, tint = AppColors.Muted)
             RowItem(Icons.Filled.AdminPanelSettings, stringResource(R.string.admin_title), onClick = { onOpen("back") }, tint = AppColors.Red)
@@ -1113,7 +1126,7 @@ fun AdminCreatorReviewScreen(onBack: () -> Unit) {
 
 /** لوحة AC: منح أي مبلغ لأي مستخدم + أكواد الهدايا + سجل العمليات. */
 @Composable
-fun AdminAcScreen(onBack: () -> Unit) {
+fun AdminAcScreen(onBack: () -> Unit, preselectUserId: String? = null) {
     val container = rememberContainer()
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
@@ -1121,7 +1134,8 @@ fun AdminAcScreen(onBack: () -> Unit) {
     var names by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var amount by remember { mutableStateOf("100") }
     var note by remember { mutableStateOf("") }
-    var selectedId by remember { mutableStateOf<String?>(null) }
+    // مستخدم قادم من زر «+AC» في قائمة المستخدمين → يبقى محدَّداً عند فتح الشاشة
+    var selectedId by remember { mutableStateOf<String?>(preselectUserId) }
     var pending by remember { mutableStateOf<Pair<String, Int>?>(null) }
     var pendingAll by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -1149,8 +1163,9 @@ fun AdminAcScreen(onBack: () -> Unit) {
         ?: p.id.take(8)
 
     val amountValue = amount.toIntOrNull() ?: 0
-    val targetId = users.firstOrNull { it.id == selectedId }?.id
-    val targetLabel = users.firstOrNull { it.id == selectedId }?.let { label(it) } ?: ""
+    val fromList = users.firstOrNull { it.id == selectedId }
+    val targetId = fromList?.id ?: selectedId
+    val targetLabel = fromList?.let { label(it) } ?: names[selectedId] ?: selectedId?.take(8) ?: ""
 
     LaunchedEffect(query) {
         users = container.admin.users(query, null, 20)

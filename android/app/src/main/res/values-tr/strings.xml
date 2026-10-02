@@ -520,4 +520,8 @@
     <string name="admin_reason_reward">Yönetici ödülü</string>
     <string name="admin_reason_adjust">Yönetici düzeltmesi</string>
     <string name="admin_give_ac_no_users">Eşleşen kullanıcı yok</string>
+    <string name="admin_give_ac_short">+AC</string>
+    <string name="admin_plan_days">+30 gün</string>
+    <string name="admin_ac_tools">AC yönetimi ve hediyeler</string>
+    <string name="admin_tips_title">İçerik üreticisi bahşişleri</string>
 </resources>
