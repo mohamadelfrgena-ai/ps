@@ -335,7 +335,7 @@ fun NotificationsScreen(
     var items by remember { mutableStateOf<List<ChatNotification>>(emptyList()) }
     var requests by remember { mutableStateOf<List<FriendEntry>>(emptyList()) }
     // معرّف الطلب قيد القبول ⇒ تعطيل الزر أثناء التنفيذ (نقرة مزدوجة = طلب واحد)
-    var acceptingId by remember { mutableStateOf<String?>(null) }
+    var acceptingId by remember { mutableStateOf<Long?>(null) }   // نوع المعرّف Long
     var profiles by remember { mutableStateOf<Map<String, com.addonstation.mobile.data.model.Profile>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
 
