@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""معاينة زر تبديل الوضع الداكن/الفاتح + نقل أيقونة المستخدم إلى حقل الاسم.
+"""معاينة نقل أيقونة المستخدم: من رأس الحساب ← إلى حقل اسم المستخدم + زر تبديل الوضع.
 
-يرسم نفس شاشة الإعدادات مرّتين:
-  1) بالوضع الداكن (الألوان كما هي في وثيقة التصميم).
-  2) بالوضع الفاتح (اللوحة الفاتحة الجديدة) — لإثبات أن التبديل يغيّر كل
-     الألوان فعلاً (الخلفية، البطاقات، النصوص، الأيقونات، شريط الحالة).
-ويضع أسهماً مطابقة للقبّطة: الأحمر عند رأس الحساب (أُزيلت منه الأيقونة)،
-والأزرق عند حقل تغيير الاسم (صارت أيقونة المستخدم بجواره).
-المصدر: Color.kt · Theme.kt · SettingsScreen.kt · AppNav.kt
+المحاكاة تطابق شاشة الإعدادات في لقطة المالك (نفس النصوص الإنجليزية ونفس الترتيب):
+  ① رأس الحساب: الأيقونة أُزيلت (يظهر مكانها ظلّها عليه خط أحمر).
+  ② حقل Username: أيقونة المستخدم صارت ملاصقة لاسم المستخدم المكتوب داخل الحقل.
+  ③ صف App theme: مفتاح تبديل فوري بين Dark و Light (والاختيار يُحفظ).
+ويمينها نفس الشاشة بالألوان الفاتحة لإثبات أن تبديل الوضع يغيّر كل الألوان.
+المصدر: SettingsScreen.kt · Color.kt · Theme.kt · AppNav.kt
 """
 import math
 import os
@@ -29,15 +28,17 @@ DARK = {
     "bg": "#0B0F14", "surface": "#131A24", "elev": "#1A2330", "elev2": "#212D3D",
     "border": "#263240", "border2": "#334152", "text": "#E8EEF5", "muted": "#8EA0B3",
     "dim": "#5C6F82", "green": "#3DDC84", "green2": "#2FAE67", "ongreen": "#04210F",
+    "blue": "#6FB8FF",
 }
 LIGHT = {
     "bg": "#F2F5F9", "surface": "#FFFFFF", "elev": "#FFFFFF", "elev2": "#E7EDF4",
     "border": "#DCE4EC", "border2": "#C4D1DF", "text": "#0F1B26", "muted": "#56697C",
     "dim": "#7B8EA1", "green": "#17A75A", "green2": "#128A48", "ongreen": "#FFFFFF",
+    "blue": "#1E6FD9",
 }
 
-W, H, TOP = 380, 800, 168
-RED, BLUE = "#D93838", "#1E6FD9"
+W, H, TOP = 392, 800, 176
+RED, BLUE, GRN = "#D93838", "#1E6FD9", "#17A75A"
 img = None
 d = None
 
@@ -61,105 +62,139 @@ def arrow(x1, y1, x2, y2, color, w=4):
         d.line([(x2, y2), (x2 - 15 * math.cos(a - s), y2 - 15 * math.sin(a - s))], fill=color, width=w)
 
 
-def note(x, y, color, text, anchor="mm"):
-    d.text((x, y), rtl(text), font=font(19, True), fill=color, anchor=anchor)
+def note(x, y, color, text, anchor="mm", size=19):
+    d.text((x, y), rtl(text), font=font(size, True), fill=color, anchor=anchor)
 
 
-def screen(x0, pal, mode, dark=True):
-    """هاتف بهيئة الوضع المطلوب (نفس المحتوى في اللقطتين)."""
-    w = W
-    x1 = x0 + w
-    rounded((x0, TOP, x1, TOP + H), 30, fill=pal["bg"], outline=pal["border2"], width=2)
+def icon(name, size):
+    im = Image.open(os.path.join(DRAW, name + ".png")).convert("RGBA")
+    return im.resize((size, size), Image.LANCZOS)
 
-    # شريط الحالة: أيقوناته تتبع الوضع (داكنة فوق خلفية فاتحة)
-    d.rectangle((x0 + 3, TOP + 3, x1 - 3, TOP + 46), fill=pal["bg"])
+
+def screen(x0, pal, dark=True, show_ghost=True):
+    """هاتف بنفس أقسام شاشة الإعدادات في لقطة المالك."""
+    x1 = x0 + W
+    rounded((x0, TOP, x1, TOP + H), 26, fill=pal["bg"], outline=pal["border2"], width=2)
+    d.rectangle((x0 + 3, TOP + 3, x1 - 3, TOP + 44), fill=pal["bg"])
     stat = pal["text"] if dark else "#10171F"
-    d.text((x0 + 20, TOP + 24), "9:41", font=font(13), fill=stat, anchor="lm")
-    d.text((x1 - 20, TOP + 24), "▮▮", font=font(12), fill=stat, anchor="rm")
+    d.text((x0 + 18, TOP + 22), "2:37", font=font(12), fill=stat, anchor="lm")
+    d.text((x1 - 18, TOP + 22), "▮▮", font=font(11), fill=stat, anchor="rm")
 
-    y = TOP + 46
-    d.text((x0 + 20, y + 22), "‹", font=font(24, True), fill=pal["text"], anchor="mm")
-    d.text((x0 + 44, y + 22), rtl("الإعدادات"), font=font(19, True), fill=pal["text"], anchor="lm")
-    d.text((x1 - 22, y + 22), rtl("1,240 رصيد"), font=font(15, True), fill=pal["green"], anchor="rm")
-    d.text((x0 + w // 2, TOP + H - 30), rtl(mode), font=font(19, True), fill=pal["muted"], anchor="mm")
+    y = TOP + 44
+    # شريط التطبيق
+    gb = icon("ic_set_appearance", 34)
+    img.paste(gb, (int(x0 + 16), int(y + 6)), gb)
+    d.text((x0 + 62, y + 23), "Settings", font=font(20, True), fill=pal["text"], anchor="lm")
+    rounded((x1 - 104, y + 6, x1 - 16, y + 40), 18, fill=pal["elev2"], outline=pal["border"])
+    coin = icon("coin_ac", 20)
+    img.paste(coin, (int(x1 - 98), int(y + 16)), coin)
+    d.text((x1 - 26, y + 23), "80 AC", font=font(13, True), fill=pal["text"], anchor="rm")
+    y += 62
+
+    # ① رأس الحساب — بلا أيقونة المستخدم (مكانها ظاهر بخط أحمر)
+    head_y = y
+    rounded((x0 + 14, y, x1 - 14, y + 78), 14, fill=pal["surface"], outline=pal["border"])
+    d.ellipse((x1 - 66, y + 16, x1 - 18, y + 64), fill=pal["elev2"], outline=pal["green"], width=2)
+    d.text((x1 - 42, y + 40), "M", font=font(17, True), fill=pal["muted"], anchor="mm")
+    # ظلّ الأيقونة القديمة + خط أحمر = مكانها الذي حُذفت منه
+    if show_ghost:
+        gh = icon("ic_user", 26).copy()
+        gh.putalpha(gh.getchannel("A").point(lambda v: int(v * 0.25)))
+        img.paste(gh, (int(x1 - 128), int(y + 20)), gh)
+        d.line([(x1 - 132, y + 16), (x1 - 98, y + 50)], fill=RED, width=3)
+        d.line([(x1 - 98, y + 16), (x1 - 132, y + 50)], fill=RED, width=3)
+    d.text((x1 - 74, y + 28), "Mrforest", font=font(17, True), fill=pal["text"], anchor="rm")
+    d.text((x1 - 74, y + 50), "mohamadelfrgena@gmail.com", font=font(11), fill=pal["muted"], anchor="rm")
+    rounded((x1 - 108, y + 58, x1 - 62, y + 74), 7, fill=pal["elev2"], outline=pal["border"])
+    d.text((x1 - 85, y + 66), "Free", font=font(10), fill=pal["text"], anchor="mm")
+    y += 100
+
+    # ② بطاقة الحساب — حقل اسم المستخدم وأيقونته ملاصقة للاسم
+    d.text((x0 + 18, y), "Account", font=font(17, True), fill=pal["text"], anchor="lt")
+    y += 28
+    rounded((x0 + 14, y, x1 - 14, y + 172), 14, fill=pal["surface"], outline=pal["border"])
+    fy = y + 50
+    d.rounded_rectangle((x0 + 28, fy - 26, x1 - 28, fy + 26), radius=9, outline=pal["border2"], width=2)
+    d.text((x0 + 38, fy - 16), "Username", font=font(11), fill=pal["muted"], anchor="lm")
+    # الأيقونة ملاصقة لاسم المستخدم المكتوب داخل الحقل
+    ic = icon("ic_user", 24)
+    img.paste(ic, (int(x0 + 40), int(fy - 11)), ic)
+    d.text((x0 + 72, fy + 2), "Mrforest", font=font(15), fill=pal["text"], anchor="lm")
+    y += 90
+    rounded((x0 + 28, y, x1 - 28, y + 50), 12, fill=pal["green"])
+    d.text(((x0 + x1) // 2, y + 25), "Save username", font=font(15, True), fill=pal["ongreen"], anchor="mm")
+    y += 62
+    em = icon("ic_set_email", 34)
+    img.paste(em, (int(x0 + 30), int(y)), em)
+    d.text((x0 + 76, y + 10), "Email", font=font(15, True), fill=pal["text"], anchor="lm")
+    d.text((x0 + 76, y + 30), "mohamadelfrgena@gmail.com", font=font(11), fill=pal["muted"], anchor="lm")
+    d.text((x1 - 32, y + 20), "›", font=font(22), fill=pal["dim"], anchor="mm")
     y += 58
 
-    # ① رأس الحساب — بلا أيقونة المستخدم
-    head_y = y
-    rounded((x0 + 14, y, x1 - 14, y + 74), 16, fill=pal["surface"], outline=pal["border"])
-    d.ellipse((x1 - 66, y + 15, x1 - 18, y + 63), fill=pal["elev2"], outline=pal["green"], width=2)
-    d.text((x1 - 42, y + 39), "MF", font=font(14, True), fill=pal["muted"], anchor="mm")
-    d.text((x1 - 80, y + 28), rtl("Mrforest"), font=font(17, True), fill=pal["text"], anchor="rm")
-    d.text((x1 - 80, y + 50), "email@gmail.com", font=font(12), fill=pal["muted"], anchor="rm")
-    rounded((x0 + 26, y + 30, x0 + 86, y + 52), 8, fill=pal["green"])
-    d.text((x0 + 56, y + 41), rtl("أونلاين"), font=font(11), fill=pal["ongreen"], anchor="mm")
-    y += 96
-
-    # ② بطاقة الحساب: حقل اسم المستخدم + أيقونة المستخدم
-    d.text((x0 + 20, y), rtl("الحساب"), font=font(14, True), fill=pal["muted"], anchor="lt")
-    y += 26
-    rounded((x0 + 14, y, x1 - 14, y + 150), 16, fill=pal["surface"], outline=pal["border"])
-    fy = y + 46
-    d.rounded_rectangle((x0 + 28, fy - 24, x1 - 28, fy + 26), radius=10, outline=pal["border2"], width=2)
-    icon = Image.open(os.path.join(DRAW, "ic_user.png")).convert("RGBA").resize((24, 24), Image.LANCZOS)
-    img.paste(icon, (int(x1 - 60), int(fy - 11)), icon)
-    d.text((x1 - 78, fy + 2), rtl("اسم المستخدم"), font=font(15), fill=pal["text"], anchor="rm")
-    d.text((x0 + 38, fy - 14), rtl("الاسم"), font=font(11), fill=pal["muted"], anchor="lm")
-    rounded((x0 + 28, y + 88, x1 - 28, y + 136), 13, fill=pal["green"])
-    d.text(((x0 + x1) // 2, y + 112), rtl("حفظ الاسم"), font=font(15, True), fill=pal["ongreen"], anchor="mm")
-    field_y = fy
-    y += 172
-
-    # ③ زر التبديل في صف «مظهر التطبيق»
-    d.text((x0 + 20, y), rtl("التفضيلات"), font=font(14, True), fill=pal["muted"], anchor="lt")
-    y += 26
-    switch_y = y
-    for label, sub, on, icon_name in (
-        (("مظهر التطبيق", "فاتح", True, "ic_set_appearance")),
-        (("اللغة", "العربية", False, "ic_set_language")),
-    ):
+    # ③ التفضيلات: مفتاح التبديل في صف App theme
+    d.text((x0 + 18, y), "Preferences", font=font(17, True), fill=pal["text"], anchor="lt")
+    y += 28
+    switch_y = None
+    for name, sub, ic_name, on in (("Notifications", "", "ic_set_notifications", False),
+                                   ("App language", "English", "ic_set_language", False),
+                                   ("App theme", "Dark" if dark else "Light", "ic_set_appearance", True)):
         rounded((x0 + 14, y, x1 - 14, y + 58), 14, fill=pal["surface"], outline=pal["border"])
-        im = Image.open(os.path.join(DRAW, icon_name + ".png")).convert("RGBA").resize((30, 30), Image.LANCZOS)
-        img.paste(im, (int(x0 + 24), int(y + 14)), im)
-        d.text((x1 - 68, y + 21), rtl(label), font=font(15, True), fill=pal["text"], anchor="rm")
-        d.text((x1 - 68, y + 42), rtl(sub), font=font(12), fill=pal["muted"], anchor="rm")
-        tw, th, tx, ty = 48, 27, x0 + 26, y + 16
-        rounded((tx, ty, tx + tw, ty + th), th // 2,
-                fill=pal["green"] if on else pal["elev2"],
-                outline=None if on else pal["border2"], width=2)
-        d.ellipse((tx + (tw - 21 if on else 3), ty + 3, tx + (tw - 3 if on else 21), ty + 24), fill="#FFFFFF")
-        y += 68
-    return {"head": (x0 + 44, head_y + 30), "field": (x0 + w - 62, field_y),
-            "switch": (x0 + 50, switch_y + 30)}
+        im = icon(ic_name, 30)
+        img.paste(im, (int(x0 + 26), int(y + 14)), im)
+        d.text((x0 + 68, y + 20), name, font=font(15, True), fill=pal["text"], anchor="lm")
+        if sub:
+            d.text((x0 + 68, y + 41), sub, font=font(11), fill=pal["muted"], anchor="lm")
+        else:
+            d.text((x1 - 30, y + 29), "›", font=font(22), fill=pal["dim"], anchor="mm")
+        if name == "App theme":
+            switch_y = y + 29
+            tw, th, tx, ty = 48, 27, x1 - 74, y + 16
+            rounded((tx, ty, tx + tw, ty + th), th // 2, fill=pal["green"] if on else pal["elev2"],
+                    outline=None if on else pal["border2"], width=2)
+            d.ellipse((tx + (tw - 21 if on else 3), ty + 3, tx + (tw - 3 if on else 21), ty + 24), fill="#FFFFFF")
+            d.text((x1 - 86, y + 29), "›", font=font(22), fill=pal["dim"], anchor="rm")
+        y += 66
+
+    # الدعم
+    d.text((x0 + 18, y), "Support", font=font(17, True), fill=pal["text"], anchor="lt")
+    y += 28
+    rounded((x0 + 14, y, x1 - 14, y + 54), 14, fill=pal["surface"], outline=pal["border"])
+    hc = icon("ic_set_help", 30)
+    img.paste(hc, (int(x0 + 26), int(y + 12)), hc)
+    d.text((x0 + 68, y + 27), "Help center", font=font(15, True), fill=pal["text"], anchor="lm")
+    y += 62
+    d.text((x0 + 18, y), rtl("الوضع %s" % ("الداكن" if dark else "الفاتح")),
+           font=font(15, True), fill=pal["muted"], anchor="lt")
+
+    return {"ghost": (x1 - 114, head_y + 33), "field": (x0 + 52, fy), "switch": (x1 - 50, switch_y)}
 
 
 def main():
     global img, d
-    img = Image.new("RGB", (1080, 1120), "#F7F9FC")
+    img = Image.new("RGB", (1180, 1120), "#F7F9FC")
     d = ImageDraw.Draw(img)
-    d.text((540, 34), rtl("شاشة الإعدادات — أيقونة المستخدم تنتقل إلى حقل الاسم + زر تبديل الوضع"),
-           font=font(24, True), fill="#0F1B26", anchor="mm")
-    d.text((540, 68), rtl("الألوان صارت مرتبطة بالوضع المختار، فالتبديل يغيّر الخلفية والبطاقات والنصوص والأيقونات"),
+    d.text((590, 34), rtl("نقل أيقونة المستخدم: من رأس الحساب ← إلى حقل اسم المستخدم"),
+           font=font(25, True), fill="#0F1B26", anchor="mm")
+    d.text((590, 70), rtl("نفس شاشة الإعدادات في صورتك — الأيقونة صارت ملاصقة للاسم داخل الحقل، وزر تبديل الوضع في صف App theme"),
            font=font(15), fill="#56697C", anchor="mm")
 
-    left = screen(60, DARK, rtl("الوضع الداكن"), dark=True)
-    right = screen(640, LIGHT, rtl("الوضع الفاتح"), dark=False)
+    left = screen(70, DARK, dark=True)
+    right = screen(660, LIGHT, dark=False, show_ghost=False)
 
-    # ① سهم أحمر: الأيقونة أُزيلت من رأس الحساب
-    note(150, 120, RED, "1. أزلت الأيقونة من هنا")
-    arrow(150, 132, left["head"][0], left["head"][1], RED)
-    # ② سهم أزرق: أيقونة المستخدم بجانب حقل الاسم
-    note(560, 120, BLUE, "2. أيقونة المستخدم هنا")
-    arrow(560, 132, left["field"][0], left["field"][1], BLUE)
-    # ③ زر التبديل
-    note(left["switch"][0] + 170, left["switch"][1] + 150, "#3DDC84", "3. زر التبديل يحفظ الاختيار", anchor="lm")
-    arrow(left["switch"][0] + 130, left["switch"][1] + 128, left["switch"][0] + 6, left["switch"][1] + 30, "#3DDC84", w=3)
-    note(850, 120, "#128A48", "نفس الشاشة بالألوان الفاتحة")
-    arrow(850, 134, right["head"][0] + 6, right["head"][1] - 52, "#128A48", w=3)
+    note(215, 126, RED, "1. الأيقونة حُذفت من هنا")
+    arrow(215, 140, left["ghost"][0], left["ghost"][1] - 26, RED)
+    arrow(left["ghost"][0] - 6, left["ghost"][1] - 26, left["ghost"][0], left["ghost"][1] - 2, RED, w=3)
+    note(640, 126, BLUE, "2. الأيقونة صارت هنا", anchor="rm")
+    arrow(626, 140, right["field"][0], right["field"][1] - 24, BLUE)
+    arrow(right["field"][0] + 2, right["field"][1] - 24, right["field"][0] + 2, right["field"][1] - 2, BLUE, w=3)
+    note(560, left["switch"][1], GRN, "3. زر التبديل", anchor="lm", size=18)
+    arrow(546, left["switch"][1], left["switch"][0] + 2, left["switch"][1], GRN, w=3)
+    note(1030, 126, GRN, "ونفس الشاشة\nبالألوان الفاتحة")
+    arrow(1050, 158, right["field"][0] + 250, right["field"][1] + 30, GRN, w=3)
 
-    d.text((540, TOP + H + 44), rtl("زر واحد في صف «مظهر التطبيق» يبدّل بين الوضعين والاختيار يبقى بعد إغلاق التطبيق"),
+    d.text((590, TOP + H + 48), rtl("الاختيار يُحفظ على الجهاز، وأيقونات شريط الحالة تتبع الوضع المختار"),
            font=font(18, True), fill="#0F1B26", anchor="mm")
-    d.text((540, TOP + H + 74), rtl("وأيقونات شريط الحالة تتبع الوضع المختار لا وضع الجهاز"),
+    d.text((590, TOP + H + 78), rtl("الوضع الداكن بقي كما هو تماماً (بقيمه الأصلية)، والفاتح لوحة جديدة بنفس أسماء الألوان"),
            font=font(15), fill="#56697C", anchor="mm")
     img.save(OUT)
     print("✔", OUT, img.size)
