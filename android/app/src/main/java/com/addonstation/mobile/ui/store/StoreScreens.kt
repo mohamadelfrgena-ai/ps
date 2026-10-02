@@ -75,8 +75,10 @@ import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.ui.theme.PixelFont
 import kotlinx.coroutines.launch
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /** شاشة المتجر: تبويبان (إضافات/عوالم) + بحث + شرائح ترتيب + شبكة حتى 60 عنصراً. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun StoreScreen(
     onOpenItem: (ContentItem) -> Unit,
@@ -104,6 +106,19 @@ fun StoreScreen(
 
     LaunchedEffect(type, sort, query) { reload() }
 
+    // سحب للأسفل للتحديث — سلوك متوقّع في كل التطبيقات، ويجعل المستخدم
+    // يسحب بدل الضغط على زرّ مخفي. لا يغيّر شيئاً آخر في الشاشة.
+    var refreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(refreshing) {
+        if (!refreshing) return@LaunchedEffect
+        reload()
+        refreshing = false
+    }
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = { refreshing = true },
+        modifier = Modifier.fillMaxSize(),
+    ) {
     Column(Modifier.fillMaxSize()) {
         PixelTopBar(
             title = stringResource(R.string.nav_store),
@@ -186,6 +201,7 @@ fun StoreScreen(
             }
             Spacer(Modifier.height(96.dp))
         }
+    }
     }
 }
 

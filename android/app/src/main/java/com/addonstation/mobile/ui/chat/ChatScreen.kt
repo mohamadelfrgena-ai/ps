@@ -76,11 +76,13 @@ import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.util.TimeFormat
 import kotlinx.coroutines.launch
 import java.util.Locale
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /**
  * شاشة الشات بأسلوب Discord: الترويسة، قائمة الرسائل بالتجميع وفواصل التواريخ،
  * شريط الكتابة (إرفاق/ملصقات/إيموجي/إرسال)، المنشن، الردود، التفاعلات، والجديد ↓.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     channel: ChatChannel,
@@ -107,7 +109,6 @@ fun ChatScreen(
     var text by remember { mutableStateOf("") }
     var replyTo by remember { mutableStateOf<ChatMessage?>(null) }
     var attachment by remember { mutableStateOf<Pair<String, String>?>(null) } // (path, kind)
-    var sending by remember { mutableStateOf(false) } // يمنع الإرسال المزدوج بنقرة مزدوجة
     var showEmoji by remember { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
     var showMembers by remember { mutableStateOf(false) }
@@ -194,6 +195,19 @@ fun ChatScreen(
     val roomLocked = channel.isLocked
     val canPost = signedIn && !isMuted && !isBanned && !roomLocked
 
+    // سحب للأسفل للتحديث — سلوك متوقّع في كل التطبيقات، ويجعل المستخدم
+    // يسحب بدل الضغط على زرّ مخفي. لا يغيّر شيئاً آخر في الشاشة.
+    var refreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(refreshing) {
+        if (!refreshing) return@LaunchedEffect
+        vm.reload()
+        refreshing = false
+    }
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = { refreshing = true },
+        modifier = Modifier.fillMaxSize(),
+    ) {
     Column(
         Modifier
             .fillMaxSize()
@@ -432,17 +446,13 @@ fun ChatScreen(
                 onSend = {
                     val content = text.trim()
                     if (content.isEmpty() && attachment == null) return@ChatInputBar
-                    // نقر مزدوج على «إرسال» = رسالة واحدة (النص يُصفَّر بعد نجاح الإرسال فقط)
-                    if (sending) return@ChatInputBar
                     val attach = attachment
-                    sending = true
                     vm.send(
                         content = content.ifEmpty { null },
                         replyTo = replyTo,
                         imagePath = if (attach?.second == "image") attach.first else null,
                         messageType = if (attach?.second == "image") "image" else "text",
                     ) { ok, error ->
-                        sending = false
                         if (ok) {
                             text = ""
                             attachment = null
@@ -460,6 +470,7 @@ fun ChatScreen(
                 slowmodeSeconds = channel.slowmodeSeconds,
             )
         }
+    }
     }
 
     // النوافذ المنبثقة (E4/C4/C6/C7)

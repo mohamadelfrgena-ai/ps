@@ -71,6 +71,7 @@ import com.addonstation.mobile.ui.theme.PixelFont
 import com.addonstation.mobile.util.LocaleManager
 import com.addonstation.mobile.util.TimeFormat
 import java.util.Locale
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /** الأقسام التي تنتقل إليها بطاقات الرئيسية. */
 data class HomeActions(
@@ -91,6 +92,7 @@ data class HomeActions(
     val openCreatorProfile: (String) -> Unit,
 )
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     actions: HomeActions,
@@ -107,7 +109,7 @@ fun HomeScreen(
     var recommended by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var creators by remember { mutableStateOf<List<CreatorCard>>(emptyList()) }
 
-    LaunchedEffect(profile?.id) {
+    suspend fun reload() {
         loading = true
         runCatching {
             featured = container.content.featured(8)
@@ -118,10 +120,25 @@ fun HomeScreen(
         loading = false
     }
 
+    LaunchedEffect(profile?.id) { reload() }
+
     val locale = Locale.getDefault()
     val morning = TimeFormat.isMorning()
     val greeting = stringResource(TimeFormat.greetingRes(morning))
 
+    // سحب للأسفل للتحديث — سلوك متوقّع في كل التطبيقات، ويجعل المستخدم
+    // يسحب بدل الضغط على زرّ مخفي. لا يغيّر شيئاً آخر في الشاشة.
+    var refreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(refreshing) {
+        if (!refreshing) return@LaunchedEffect
+        reload()
+        refreshing = false
+    }
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = { refreshing = true },
+        modifier = Modifier.fillMaxSize(),
+    ) {
     Column(modifier = modifier.fillMaxSize()) {
         PixelTopBar(
             title = stringResource(R.string.nav_home),
@@ -386,6 +403,7 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(96.dp))
         }
+    }
     }
 }
 

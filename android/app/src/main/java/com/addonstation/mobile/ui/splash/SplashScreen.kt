@@ -61,7 +61,8 @@ import kotlin.random.Random
  *
  * الأداء: الخطوط والجسيمات تُرسم في Canvas واحد لكل طبقة (بدل ~100 عنصر Compose)،
  * وكل الحركات داخل LaunchedEffect واحد بمهام متوازية — فلا «لاق» ولا تقطيع.
- * تُعرض مرة واحدة في كل تشغيل للتطبيق.
+ * تُعرض مرة واحدة في كل تشغيل للتطبيق، ومّدتها ٢٫٨ ثانية (كانت ٤٫١).
+ * الشعار والكلمات تظهر متتابعة، والصورة كاملة الوضوح من البداية.
  */
 @Composable
 fun SplashScreen(onFinished: () -> Unit) {
@@ -76,14 +77,16 @@ fun SplashScreen(onFinished: () -> Unit) {
 
     LaunchedEffect(Unit) {
         coroutineScope {
-            launch { alphaSky.animateTo(0.38f, tween(900, easing = FastOutSlowInEasing)) }
-            launch { scaleSky.animateTo(1.05f, tween(900, easing = FastOutSlowInEasing)) }
-            launch { logo.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
-            launch { delay(400); line1.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
-            launch { delay(1300); line2.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
-            launch { delay(2200); line3.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
-            launch { delay(3000); brand.animateTo(1f, tween(480, easing = FastOutSlowInEasing)) }
-            launch { delay(3600); exit.animateTo(0f, tween(500, easing = FastOutSlowInEasing)) }
+            // الصورة تظهر كاملة (1f) — لا 0.38: كانت نسبة السماء القديمة، وهي تحوّل
+            // صورة القرية إلى طبقة باهتة على خلفية سوداء. التعتيم يتم بطبقة التدرّج.
+            launch { alphaSky.animateTo(1f, tween(760, easing = FastOutSlowInEasing)) }
+            launch { scaleSky.animateTo(1.05f, tween(1500, easing = FastOutSlowInEasing)) }
+            launch { logo.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
+            launch { delay(280); line1.animateTo(1f, tween(340, easing = FastOutSlowInEasing)) }
+            launch { delay(850); line2.animateTo(1f, tween(340, easing = FastOutSlowInEasing)) }
+            launch { delay(1400); line3.animateTo(1f, tween(340, easing = FastOutSlowInEasing)) }
+            launch { delay(1950); brand.animateTo(1f, tween(430, easing = FastOutSlowInEasing)) }
+            launch { delay(2400); exit.animateTo(0f, tween(450, easing = FastOutSlowInEasing)) }
         }
         onFinished()
     }
