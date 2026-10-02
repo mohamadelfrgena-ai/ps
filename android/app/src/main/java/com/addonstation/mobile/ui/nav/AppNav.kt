@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +13,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -32,6 +35,8 @@ import com.addonstation.mobile.ui.store.ContentDetailScreen
 import com.addonstation.mobile.ui.settings.SettingsScreen
 import com.addonstation.mobile.ui.profile.ProfileScreen
 import com.addonstation.mobile.ui.common.SetupScreen
+import android.app.Activity
+import android.content.ContextWrapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -90,6 +95,23 @@ fun AppRoot(
 
     var splashDone by remember { mutableStateOf(false) }
     var configured by remember { mutableStateOf(container.isConfigured) }
+
+    // أيقونات شريط الحالة تتبع وضع التطبيق نفسه (لا وضع الجهاز):
+    // في الوضع الفاتح تصير الأيقونات داكنة فوق الخلفية الفاتحة.
+    // (شاشة البداية داكنة دائماً، فتبقى الأيقونات فاتحة عليها إلى أن تنتهي.)
+    val rootView = LocalView.current
+    if (!rootView.isInEditMode) {
+        SideEffect {
+            val activity = generateSequence(rootView.context) { (it as? ContextWrapper)?.baseContext }
+                .filterIsInstance<Activity>()
+                .firstOrNull() ?: return@SideEffect
+            val window = activity.window
+            val bars = WindowCompat.getInsetsController(window, rootView)
+            val light = !dark && splashDone
+            bars.isAppearanceLightStatusBars = light
+            bars.isAppearanceLightNavigationBars = light
+        }
+    }
     var deepLinkSession by remember { mutableStateOf(false) }
 
     // استعادة الجلسة عند الإقلاع + معالجة رابط الاستعادة addonstation://recovery

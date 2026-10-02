@@ -1,65 +1,142 @@
 package com.addonstation.mobile.ui.theme
 
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 
 /**
- * لوحة ألوان AddonStation كما في وثيقة التصميم (القسم «الألوان») — حرفياً.
+ * لوحة ألوان واحدة كاملة للوضع الداكن أو الفاتح.
+ *
+ * ملاحظة: قيم الوضع الداكن هي قيم وثيقة التصميم **حرفياً** (لم تتغيّر).
+ */
+@Immutable
+data class AppPalette(
+    val bg: Color, val surface: Color, val elevated: Color, val elevated2: Color,
+    val border: Color, val border2: Color,
+    val text: Color, val muted: Color, val dim: Color,
+    val green: Color, val green2: Color, val greenLight: Color, val greenDark: Color,
+    val gold: Color, val goldDark: Color, val goldLight: Color, val goldText: Color,
+    val blue: Color, val blueDark: Color, val blueLight: Color, val blueText: Color,
+    val red: Color, val redDark: Color, val redLight: Color,
+    val purple: Color, val adminBlue: Color, val freeGray: Color,
+    val greenGlow: Color, val blueGlow: Color,
+    val purpleBadgeBg: Color, val goldBadgeBg: Color, val adminBadgeBg: Color,
+    val grayBadgeBg: Color, val mentionTint: Color, val announcementBg: Color,
+    val dangerBg: Color, val onGreen: Color,
+)
+
+/**
+ * ألوان التطبيق — تُقرأ من اللوحة النشطة (داكنة أو فاتحة).
+ *
+ * كل الألوان `val` لها `get()` يقرأ حالة التركيب، فأي composable يقرأ أي لون
+ * يُعاد تركيبه تلقائياً عند التبديل بين الوضعين (بلا `key` وبلا فقدان حالة).
+ * أسماء الخصائص لم تتغيّر، فكل مواضع الاستدعاء في الشاشات تعمل بلا تعديل.
  */
 object AppColors {
-    val Bg = Color(0xFF0B0F14)
-    val Surface = Color(0xFF131A24)
-    val Elevated = Color(0xFF1A2330)
-    val Elevated2 = Color(0xFF212D3D)
-    val Border = Color(0xFF263240)
-    val Border2 = Color(0xFF334152)
 
-    val Text = Color(0xFFE8EEF5)
-    val Muted = Color(0xFF8EA0B3)
-    val Dim = Color(0xFF5C6F82)
+    /** اللوحة الداكنة = قيم وثيقة التصميم حرفياً (لم تتغيّر حرفاً). */
+    val DarkPalette = AppPalette(
+        Bg = Color(0xFF0B0F14), Surface = Color(0xFF131A24),
+        Elevated = Color(0xFF1A2330), Elevated2 = Color(0xFF212D3D),
+        Border = Color(0xFF263240), Border2 = Color(0xFF334152),
+        Text = Color(0xFFE8EEF5), Muted = Color(0xFF8EA0B3),
+        Dim = Color(0xFF5C6F82), Green = Color(0xFF3DDC84),
+        Green2 = Color(0xFF2FAE67), GreenLight = Color(0xFF58F29B),
+        GreenDark = Color(0xFF197046), Gold = Color(0xFFFFD479),
+        GoldDark = Color(0xFFE0A93C), GoldLight = Color(0xFFFFE39A),
+        GoldText = Color(0xFF3A2802), Blue = Color(0xFF6FB8FF),
+        BlueDark = Color(0xFF3A7BD5), BlueLight = Color(0xFF7EC2FF),
+        BlueText = Color(0xFF041A30), Red = Color(0xFFFF5A5A),
+        RedDark = Color(0xFFD63A3A), RedLight = Color(0xFFFF7A7A),
+        Purple = Color(0xFFB98CFF), AdminBlue = Color(0xFF7FD4FF),
+        FreeGray = Color(0xFFAAB9C8), GreenGlow = Color(0x1F3DDC84),
+        BlueGlow = Color(0x0F6FB8FF), PurpleBadgeBg = Color(0x29B98CFF),
+        GoldBadgeBg = Color(0x24FFD479), AdminBadgeBg = Color(0x247FD4FF),
+        GrayBadgeBg = Color(0x1FAAB9C8), MentionTint = Color(0x1A6FB8FF),
+        AnnouncementBg = Color(0x14FFD479), DangerBg = Color(0x1AFF5A5A),
+        OnGreen = Color(0xFF04210F),
+    )
 
-    val Green = Color(0xFF3DDC84)
-    val Green2 = Color(0xFF2FAE67)
-    val GreenLight = Color(0xFF58F29B)
-    val GreenDark = Color(0xFF197046)
+    /** اللوحة الفاتحة: خلفية فاتحة، نصوص داكنة، وألوان أعمق لتباين كافٍ. */
+    val LightPalette = AppPalette(
+        Bg = Color(0xFFF2F5F9), Surface = Color(0xFFFFFFFF),
+        Elevated = Color(0xFFFFFFFF), Elevated2 = Color(0xFFE7EDF4),
+        Border = Color(0xFFDCE4EC), Border2 = Color(0xFFC4D1DF),
+        Text = Color(0xFF0F1B26), Muted = Color(0xFF56697C),
+        Dim = Color(0xFF7B8EA1), Green = Color(0xFF17A75A),
+        Green2 = Color(0xFF128A48), GreenLight = Color(0xFF3ED07E),
+        GreenDark = Color(0xFF0C6133), Gold = Color(0xFFC79309),
+        GoldDark = Color(0xFF9A6F06), GoldLight = Color(0xFFE8B93B),
+        GoldText = Color(0xFFFFFFFF), Blue = Color(0xFF1E6FD9),
+        BlueDark = Color(0xFF1455AE), BlueLight = Color(0xFF4E9BF0),
+        BlueText = Color(0xFFFFFFFF), Red = Color(0xFFD93838),
+        RedDark = Color(0xFFB32626), RedLight = Color(0xFFE86969),
+        Purple = Color(0xFF7B4FD1), AdminBlue = Color(0xFF0E7C9B),
+        FreeGray = Color(0xFF64798D), GreenGlow = Color(0x1A17A75A),
+        BlueGlow = Color(0x1A1E6FD9), PurpleBadgeBg = Color(0x267B4FD1),
+        GoldBadgeBg = Color(0x26C79309), AdminBadgeBg = Color(0x260E7C9B),
+        GrayBadgeBg = Color(0x1F64798D), MentionTint = Color(0x1A1E6FD9),
+        AnnouncementBg = Color(0x26C79309), DangerBg = Color(0x1AD93838),
+        OnGreen = Color(0xFFFFFFFF),
+    )
 
-    val Gold = Color(0xFFFFD479)
-    val GoldDark = Color(0xFFE0A93C)
-    val GoldLight = Color(0xFFFFE39A)
-    val GoldText = Color(0xFF3A2802)
+    private var active: AppPalette by mutableStateOf(DarkPalette)
 
-    val Blue = Color(0xFF6FB8FF)
-    val BlueDark = Color(0xFF3A7BD5)
-    val BlueLight = Color(0xFF7EC2FF)
-    val BlueText = Color(0xFF041A30)
+    /** يفعّل لوحة الوضع المطلوب (يستدعيه AddonStationTheme). */
+    fun apply(darkTheme: Boolean) {
+        val next = if (darkTheme) DarkPalette else LightPalette
+        if (next !== active) active = next
+    }
 
-    val Red = Color(0xFFFF5A5A)
-    val RedDark = Color(0xFFD63A3A)
-    val RedLight = Color(0xFFFF7A7A)
+    /** الوضع النشط الآن (dark = الوضع الداكن). */
+    val isDark: Boolean get() = active === DarkPalette
 
-    val Purple = Color(0xFFB98CFF)
-    val AdminBlue = Color(0xFF7FD4FF)
-    val FreeGray = Color(0xFFAAB9C8)
+    val Bg: Color get() = active.bg
+    val Surface: Color get() = active.surface
+    val Elevated: Color get() = active.elevated
+    val Elevated2: Color get() = active.elevated2
+    val Border: Color get() = active.border
+    val Border2: Color get() = active.border2
+    val Text: Color get() = active.text
+    val Muted: Color get() = active.muted
+    val Dim: Color get() = active.dim
+    val Green: Color get() = active.green
+    val Green2: Color get() = active.green2
+    val GreenLight: Color get() = active.greenLight
+    val GreenDark: Color get() = active.greenDark
+    val Gold: Color get() = active.gold
+    val GoldDark: Color get() = active.goldDark
+    val GoldLight: Color get() = active.goldLight
+    val GoldText: Color get() = active.goldText
+    val Blue: Color get() = active.blue
+    val BlueDark: Color get() = active.blueDark
+    val BlueLight: Color get() = active.blueLight
+    val BlueText: Color get() = active.blueText
+    val Red: Color get() = active.red
+    val RedDark: Color get() = active.redDark
+    val RedLight: Color get() = active.redLight
+    val Purple: Color get() = active.purple
+    val AdminBlue: Color get() = active.adminBlue
+    val FreeGray: Color get() = active.freeGray
+    val GreenGlow: Color get() = active.greenGlow
+    val BlueGlow: Color get() = active.blueGlow
+    val PurpleBadgeBg: Color get() = active.purpleBadgeBg
+    val GoldBadgeBg: Color get() = active.goldBadgeBg
+    val AdminBadgeBg: Color get() = active.adminBadgeBg
+    val GrayBadgeBg: Color get() = active.grayBadgeBg
+    val MentionTint: Color get() = active.mentionTint
+    val AnnouncementBg: Color get() = active.announcementBg
+    val DangerBg: Color get() = active.dangerBg
+    val OnGreen: Color get() = active.onGreen
 
-    // خلفيات شفافة جاهزة (نِسَب الوثيقة)
-    val GreenGlow = Color(0x1F3DDC84)
-    val BlueGlow = Color(0x0F6FB8FF)
-    val PurpleBadgeBg = Color(0x29B98CFF)
-    val GoldBadgeBg = Color(0x24FFD479)
-    val AdminBadgeBg = Color(0x247FD4FF)
-    val GrayBadgeBg = Color(0x1FAAB9C8)
-    val MentionTint = Color(0x1A6FB8FF)
-    val AnnouncementBg = Color(0x14FFD479)
-    val DangerBg = Color(0x1AFF5A5A)
-
-    // نصوص داكنة فوق الأزرار الملوّنة
-    val OnGreen = Color(0xFF04210F)
-
-    // ثيم فاتح اختياري
-    val LightBg = Color(0xFFF5F7FA)
-    val LightSurface = Color(0xFFFFFFFF)
-    val LightElevated = Color(0xFFEDF1F6)
-    val LightBorder = Color(0xFFD6DEE8)
-    val LightText = Color(0xFF14202B)
+    // أسماء الوضع الفاتح (مرجعية سريعة للوحة الفاتحة نفسها — مصدر واحد للألوان)
+    val LightBg: Color get() = LightPalette.bg
+    val LightSurface: Color get() = LightPalette.surface
+    val LightElevated: Color get() = LightPalette.elevated2
+    val LightBorder: Color get() = LightPalette.border
+    val LightText: Color get() = LightPalette.text
 }
 
 /** ألوان شارات الرتب حسب الوثيقة. */

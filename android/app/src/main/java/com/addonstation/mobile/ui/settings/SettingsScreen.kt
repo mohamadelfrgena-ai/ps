@@ -41,6 +41,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -175,21 +177,12 @@ fun SettingsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     AvatarImage(url = assetUrl(container, profile?.avatarUrl), size = 54.dp, borderColor = AppColors.Green)
                     Column(Modifier.weight(1f)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Image(
-                                painter = painterResource(R.drawable.ic_user),
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Text(
-                                profile?.displayName ?: profile?.username ?: stringResource(R.string.common_guest),
-                                style = AppText.sectionTitle,
-                                color = AppColors.Text,
-                            )
-                        }
+                        // رأس الحساب: الاسم فقط — أيقونة المستخدم انتقلت إلى حقل تغيير الاسم بالأسفل
+                        Text(
+                            profile?.displayName ?: profile?.username ?: stringResource(R.string.common_guest),
+                            style = AppText.sectionTitle,
+                            color = AppColors.Text,
+                        )
                         Text(
                             container.supabase.session()?.email ?: stringResource(R.string.set_email_note),
                             style = AppText.tiny,
@@ -221,6 +214,13 @@ fun SettingsScreen(
                         value = username,
                         onValueChange = { username = it },
                         label = { Text(stringResource(R.string.auth_username)) },
+                        leadingIcon = {
+                            Image(
+                                painter = painterResource(R.drawable.ic_user),
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -302,16 +302,31 @@ fun SettingsScreen(
                         }
                     }
                 }
+                val toggleTheme = {
+                    scope.launch {
+                        container.prefs.setDarkTheme(!dark)
+                        AppPrefs.writeDark(context, !dark)
+                    }
+                }
                 RowItem(
                     iconRes = R.drawable.ic_set_appearance,
                     title = stringResource(R.string.set_theme),
                     subtitle = if (dark) stringResource(R.string.set_theme_dark)
                     else stringResource(R.string.set_theme_light),
-                    onClick = {
-                        scope.launch {
-                            container.prefs.setDarkTheme(!dark)
-                            AppPrefs.writeDark(context, !dark)
-                        }
+                    onClick = toggleTheme,
+                    showChevron = false,
+                    trailing = {
+                        Switch(
+                            checked = dark,
+                            onCheckedChange = { toggleTheme() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = AppColors.OnGreen,
+                                checkedTrackColor = AppColors.Green,
+                                uncheckedThumbColor = AppColors.Muted,
+                                uncheckedTrackColor = AppColors.Elevated2,
+                                uncheckedBorderColor = AppColors.Border2,
+                            ),
+                        )
                     },
                 )
             }

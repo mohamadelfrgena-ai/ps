@@ -23,7 +23,7 @@ val AppShapes = Shapes(
     extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
 )
 
-private val DarkScheme = darkColorScheme(
+private fun darkScheme() = darkColorScheme(
     primary = AppColors.Green,
     onPrimary = AppColors.OnGreen,
     primaryContainer = AppColors.Green2,
@@ -45,7 +45,7 @@ private val DarkScheme = darkColorScheme(
     scrim = Color(0xCC000000),
 )
 
-private val LightScheme = lightColorScheme(
+private fun lightScheme() = lightColorScheme(
     primary = AppColors.Green2,
     onPrimary = Color.White,
     secondary = AppColors.BlueDark,
@@ -69,9 +69,14 @@ fun AddonStationTheme(
 ) {
     // كل شاشات التطبيق تمرّ من هنا، فتُضبط المقاسات على مقاس شاشة الهاتف مرة واحدة:
     // الأحجام والخطوط والمسافات كلها بنسبة واحدة (انظر Sizing.kt).
+    // الألوان تُقرأ من اللوحة النشطة (داكنة/فاتحة) قبل بناء نظام Material،
+    // فتتبدّل كل الشاشات لأن AppColors نفسه مرتبط بالوضع.
+    AppColors.apply(darkTheme)
+    val scheme = if (darkTheme) darkScheme() else lightScheme()
+
     ProvideAppSizing {
         MaterialTheme(
-            colorScheme = if (darkTheme) DarkScheme else LightScheme,
+            colorScheme = scheme,
             typography = AppTypography,
             shapes = AppShapes,
             content = content,
