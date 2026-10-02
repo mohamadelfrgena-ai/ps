@@ -182,6 +182,7 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = recoveryEmail,
                         onValueChange = { recoveryEmail = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                         label = { Text(stringResource(R.string.auth_email)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -270,6 +271,7 @@ fun SignUpScreen(
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
                 label = { Text(stringResource(R.string.auth_username)) },
                 leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null, tint = AppColors.Muted) },
                 singleLine = true,
@@ -410,6 +412,7 @@ fun ResetPasswordScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
                 label = { Text(stringResource(R.string.auth_new_password)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
@@ -419,6 +422,7 @@ fun ResetPasswordScreen(
             OutlinedTextField(
                 value = confirm,
                 onValueChange = { confirm = it },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                 label = { Text(stringResource(R.string.auth_confirm_password)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),

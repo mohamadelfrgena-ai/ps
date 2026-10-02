@@ -7,6 +7,7 @@
 2) شاشات فيها حقول نص بلا imePadding ⇒ لوحة المفاتيح تحجب النموذج.
    (الاستثناء: شاشة الشات — هي الوحيد الذي يتعامل مع لوحة المفاتيح بنفسه.)
 3) استيراد مكرر في نفس الملف.
+4) حقول نص بلا keyboardOptions ⇒ لوحة مفاتيح الحروف فوق حقل أرقام أو بريد.
 """
 import io
 import os
@@ -68,6 +69,22 @@ for path in files:
     for d in sorted(dup):
         problems.append(f"استيراد مكرر · {rel} → {d}")
 
+    # 4) كل حقل نص يحدّد نوع لوحة المفاتيح (رقم · بريد · كلمة مرور · رابط)
+    for i, line in enumerate(lines):
+        if "OutlinedTextField(" not in line and not re.search(r"\bTextField\(", line):
+            continue
+        depth, started, end = 0, False, i
+        for k in range(i, min(i + 30, len(lines))):
+            depth += lines[k].count("(") - lines[k].count(")")
+            if "(" in lines[k]:
+                started = True
+            if started and depth <= 0:
+                end = k
+                break
+        block = "\n".join(lines[i:end + 1])
+        if "keyboardOptions" not in block:
+            problems.append(f"حقل نص بلا نوع لوحة مفاتيح · {rel}:{i + 1}")
+
     # 3) حقول نص بلا imePadding
     if rel in IME_EXEMPT:
         continue
@@ -85,4 +102,4 @@ if problems:
         print("✗", p)
     print(f"\n✗ عدد المشاكل: {len(problems)}")
     sys.exit(1)
-print("🟢 لا نصوص ثابتة في الواجهة · لا استيرادات مكرّرة · كل شاشات حقول النص تتعامل مع لوحة المفاتيح.")
+print("🟢 لا نصوص ثابتة في الواجهة · لا استيرادات مكرّرة · كل الحقول لها نوع لوحة مفاتيح · كل الشاشات تعالج لوحة المفاتيح.")

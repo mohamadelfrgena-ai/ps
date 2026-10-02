@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -43,6 +44,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.addonstation.mobile.R
@@ -244,6 +247,7 @@ fun SetupScreen(onDone: () -> Unit) {
         OutlinedTextField(
             value = url,
             onValueChange = { url = it },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
             label = { Text(stringResource(R.string.setup_url)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
@@ -252,6 +256,7 @@ fun SetupScreen(onDone: () -> Unit) {
         OutlinedTextField(
             value = key,
             onValueChange = { key = it },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
             label = { Text(stringResource(R.string.setup_anon)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),

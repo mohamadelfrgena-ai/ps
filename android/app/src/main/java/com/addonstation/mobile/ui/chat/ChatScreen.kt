@@ -31,6 +31,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -58,6 +60,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.R
@@ -719,6 +723,9 @@ private fun ChatInputBar(
                 OutlinedTextField(
                     value = text,
                     onValueChange = { if (it.length <= 500) onTextChange(it) },
+                    // Enter على لوحة المفاتيح يُرسل الرسالة (زر الإرسال يبقى موجوداً)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { if (text.isNotBlank()) onSend() }),
                     placeholder = {
                         Text(
                             stringResource(

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -55,6 +56,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.R
@@ -408,6 +411,7 @@ private fun OverviewTab(
         OutlinedTextField(
             value = userQuery,
             onValueChange = onUserQuery,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Search),
             label = { Text(stringResource(R.string.admin_search_users)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
@@ -843,6 +847,7 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
                 label = { Text(stringResource(R.string.auth_username)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -851,6 +856,7 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
                 OutlinedTextField(
                     value = packId,
                     onValueChange = { packId = it },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
                     label = { Text(stringResource(R.string.admin_pack_id_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -1140,6 +1146,7 @@ fun AdminAcScreen(onBack: () -> Unit) {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Search),
                 label = { Text(stringResource(R.string.admin_search_users)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -1148,6 +1155,7 @@ fun AdminAcScreen(onBack: () -> Unit) {
             OutlinedTextField(
                 value = amount,
                 onValueChange = { amount = it.filter { ch -> ch.isDigit() } },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 label = { Text(stringResource(R.string.admin_amount_ac_label)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -1209,6 +1217,7 @@ fun AdminAcScreen(onBack: () -> Unit) {
                     OutlinedTextField(
                         value = codeAmountText,
                         onValueChange = { codeAmountText = it.filter { ch -> ch.isDigit() }.take(8) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         label = { Text(stringResource(R.string.admin_codes_amount)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
@@ -1216,6 +1225,7 @@ fun AdminAcScreen(onBack: () -> Unit) {
                     OutlinedTextField(
                         value = codeCountText,
                         onValueChange = { codeCountText = it.filter { ch -> ch.isDigit() }.take(3) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         label = { Text(stringResource(R.string.admin_codes_count)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
@@ -1406,6 +1416,7 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
                     OutlinedTextField(
                         value = price,
                         onValueChange = { price = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                         label = { Text(stringResource(R.string.admin_price_lyd_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -1413,6 +1424,7 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
                     OutlinedTextField(
                         value = days,
                         onValueChange = { days = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         label = { Text(stringResource(R.string.admin_duration_days_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -1420,6 +1432,7 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
                     OutlinedTextField(
                         value = limit,
                         onValueChange = { limit = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         label = { Text(stringResource(R.string.admin_download_limit_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -1493,11 +1506,11 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(10.dp))
             GlassCard(padding = 10.dp) {
                 Text("+ " + stringResource(R.string.plan_payment_method), style = AppText.sectionTitle, color = AppColors.Text)
-                OutlinedTextField(methodCode, { methodCode = it }, label = { Text(stringResource(R.string.admin_method_code_label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(methodName, { methodName = it }, label = { Text(stringResource(R.string.admin_method_name_label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(accountName, { accountName = it }, label = { Text(stringResource(R.string.plan_beneficiary)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(accountId, { accountId = it }, label = { Text(stringResource(R.string.plan_account_number)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(instructions, { instructions = it }, label = { Text(stringResource(R.string.plan_order_instructions)) }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(methodCode, { methodCode = it }, label = { Text(stringResource(R.string.admin_method_code_label)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next), singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(methodName, { methodName = it }, label = { Text(stringResource(R.string.admin_method_name_label)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next), singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(accountName, { accountName = it }, label = { Text(stringResource(R.string.plan_beneficiary)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next), singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(accountId, { accountId = it }, label = { Text(stringResource(R.string.plan_account_number)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next), singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(instructions, { instructions = it }, label = { Text(stringResource(R.string.plan_order_instructions)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next), modifier = Modifier.fillMaxWidth())
                 GradientButton(
                     text = stringResource(R.string.admin_save),
                     onClick = {
@@ -1686,6 +1699,7 @@ fun AdminChatScreen(onBack: () -> Unit) {
             OutlinedTextField(
                 value = announcement,
                 onValueChange = { announcement = it },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
                 label = { Text(stringResource(R.string.chat_announcement)) },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -1725,6 +1739,7 @@ fun AdminChatScreen(onBack: () -> Unit) {
             OutlinedTextField(
                 value = rulesText,
                 onValueChange = { rulesText = it },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp),

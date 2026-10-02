@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
@@ -41,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.R
@@ -110,6 +113,7 @@ fun CreatorsScreen(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Search),
                 placeholder = { Text(stringResource(R.string.creator_search), style = AppText.bodySmall) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -264,6 +268,7 @@ fun CreatorProfileScreen(
                     OutlinedTextField(
                         value = amount,
                         onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         label = { Text(stringResource(R.string.creator_tip_amount)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -281,6 +286,7 @@ fun CreatorProfileScreen(
                     OutlinedTextField(
                         value = message,
                         onValueChange = { if (it.length <= 200) message = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
                         label = { Text(stringResource(R.string.creator_tip_message)) },
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -459,6 +465,7 @@ private fun Field(label: String, value: String, lines: Int = 1, onChange: (Strin
         value = value,
         onValueChange = onChange,
         label = { Text(label) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
         minLines = lines,
         maxLines = if (lines > 1) lines + 3 else 1,
         singleLine = lines == 1,
