@@ -201,6 +201,7 @@ fun CheckoutScreen(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    val copiedMsg = stringResource(R.string.msg_copied)
     val profile by container.state.profile.collectAsState()
     val plans by container.state.plans.collectAsState()
     val methods by container.state.paymentMethods.collectAsState()
@@ -361,7 +362,7 @@ fun CheckoutScreen(
                                 .size(18.dp)
                                 .clickable {
                             clipboard.setText(AnnotatedString(current.referenceCode))
-                            Toasts.show(stringResource(R.string.msg_copied))
+                            Toasts.show(copiedMsg)
                         },
                         )
                     }
@@ -438,6 +439,7 @@ fun CheckoutScreen(
 
 @Composable
 private fun DetailLine(label: String, value: String, clipboard: androidx.compose.ui.platform.ClipboardManager?) {
+    val copiedMsg = stringResource(R.string.msg_copied)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(label, style = AppText.tiny, color = AppColors.Muted)
         Text(value, style = AppText.bodySmall, color = AppColors.Text, modifier = Modifier.weight(1f))
@@ -450,7 +452,7 @@ private fun DetailLine(label: String, value: String, clipboard: androidx.compose
                     .size(16.dp)
                     .clickable {
                     clipboard.setText(AnnotatedString(value))
-                    Toasts.show(stringResource(R.string.msg_copied))
+                    Toasts.show(copiedMsg)
                 },
             )
         }
