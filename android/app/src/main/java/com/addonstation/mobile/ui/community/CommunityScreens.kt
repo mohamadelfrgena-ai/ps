@@ -59,6 +59,7 @@ import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.util.LocaleManager
+import com.addonstation.mobile.ui.components.RetryState
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
@@ -185,10 +186,15 @@ fun RoomListScreen(
     // لغة الواجهة الحالية (طبّقناها في MainActivity) — لتظليل غرفة اللغة المناسبة
     val appLanguage = LocaleManager.byCode(java.util.Locale.getDefault().language).code
 
+    // الفشل كان يمرّ بلا التقاط فيُسقط التطبيق عند انقطاع الشبكة.
+    var failed by remember { mutableStateOf(false) }
+
     suspend fun reload() {
         loading = true
-        channels = container.chat.channels()
-        container.chat.refreshUnread()
+        failed = runCatching {
+            channels = container.chat.channels()
+            container.chat.refreshUnread()
+        }.isFailure
         loading = false
     }
 
@@ -202,6 +208,7 @@ fun RoomListScreen(
         reload()
         refreshing = false
     }
+    val retryLoad = { refreshing = true }
     PullToRefreshBox(
         isRefreshing = refreshing,
         onRefresh = { refreshing = true },
@@ -215,7 +222,12 @@ fun RoomListScreen(
     },
             icon = Icons.Filled.Group,
         )
-        if (loading) {
+        if (failed) {
+            RetryState(
+                text = stringResource(R.string.msg_network_error),
+                onRetry = retryLoad,
+            )
+        } else if (loading) {
             LoadingBox(text = stringResource(R.string.common_loading))
         } else {
             LazyColumn(

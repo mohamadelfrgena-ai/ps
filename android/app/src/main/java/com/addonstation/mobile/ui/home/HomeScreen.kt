@@ -58,6 +58,7 @@ import com.addonstation.mobile.ui.components.GlassCard
 import com.addonstation.mobile.ui.components.IconTile
 import com.addonstation.mobile.ui.components.LinkRow
 import com.addonstation.mobile.ui.components.LoadingBox
+import com.addonstation.mobile.ui.components.RetryState
 import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.components.PromoCard
 import com.addonstation.mobile.ui.components.RankBadge
@@ -104,6 +105,7 @@ fun HomeScreen(
     val plans by container.state.plans.collectAsState()
 
     var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
     var featured by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var latest by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var recommended by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
@@ -111,12 +113,12 @@ fun HomeScreen(
 
     suspend fun reload() {
         loading = true
-        runCatching {
+        failed = runCatching {
             featured = container.content.featured(8)
             latest = container.content.latest(6)
             recommended = container.content.recommended(6)
             creators = container.creators.creators().take(4)
-        }
+        }.isFailure
         loading = false
     }
 
@@ -134,6 +136,8 @@ fun HomeScreen(
         reload()
         refreshing = false
     }
+    // زرّ «إعادة المحاولة» في حالة الفشل يستعمل نفس مسار السحب للتحديث
+    val retryLoad = { refreshing = true }
     PullToRefreshBox(
         isRefreshing = refreshing,
         onRefresh = { refreshing = true },
@@ -269,7 +273,12 @@ fun HomeScreen(
                 onAction = actions.openStore,
                 leadingEmoji = "⭐",
             )
-            if (loading) {
+            if (failed) {
+                RetryState(
+                    text = stringResource(R.string.msg_network_error),
+                    onRetry = retryLoad,
+                )
+            } else if (loading) {
                 LoadingBox()
             } else {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

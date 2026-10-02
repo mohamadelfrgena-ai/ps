@@ -74,6 +74,7 @@ import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.ui.theme.PixelFont
+import com.addonstation.mobile.ui.components.RetryState
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
@@ -96,11 +97,16 @@ fun StoreScreen(
     var items by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var favourites by remember { mutableStateOf<Set<String>>(emptySet()) }
 
+    // الفشل كان يمرّ بلا التقاط فيُسقط التطبيق عند انقطاع الشبكة أثناء التصفّح.
+    var failed by remember { mutableStateOf(false) }
+
     suspend fun reload() {
         loading = true
-        items = container.content.browse(type, sort, query, 60)
-        favourites = if (container.supabase.session() == null) emptySet()
-        else container.content.favorites().map { it.id }.toSet()
+        failed = runCatching {
+            items = container.content.browse(type, sort, query, 60)
+            favourites = if (container.supabase.session() == null) emptySet()
+            else container.content.favorites().map { it.id }.toSet()
+        }.isFailure
         loading = false
     }
 
@@ -114,6 +120,7 @@ fun StoreScreen(
         reload()
         refreshing = false
     }
+    val retryLoad = { refreshing = true }
     PullToRefreshBox(
         isRefreshing = refreshing,
         onRefresh = { refreshing = true },
@@ -176,6 +183,10 @@ fun StoreScreen(
 
             Spacer(Modifier.height(12.dp))
             when {
+                failed -> RetryState(
+                    text = stringResource(R.string.msg_network_error),
+                    onRetry = retryLoad,
+                )
                 loading -> LoadingBox(text = stringResource(R.string.common_loading))
                 items.isEmpty() -> EmptyState(
                     stringResource(R.string.store_empty) + "\n" + stringResource(R.string.store_empty_hint)
