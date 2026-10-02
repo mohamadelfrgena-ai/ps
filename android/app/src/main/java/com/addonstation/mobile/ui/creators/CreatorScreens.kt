@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -99,6 +100,7 @@ fun CreatorsScreen(
         Column(
             Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {
@@ -220,6 +222,7 @@ fun CreatorProfileScreen(
         Column(
             Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {
@@ -374,6 +377,7 @@ fun CreatorApplicationScreen(onBack: () -> Unit, onSubmitted: () -> Unit) {
         Column(
             Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {
@@ -520,6 +524,7 @@ fun CreatorStudioScreen(
         Column(
             Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {

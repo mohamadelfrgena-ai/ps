@@ -487,6 +487,16 @@
     <string name="admin_gate_locked_note">تُقفل اللوحة تلقائياً بعد ١٥ دقيقة وتطلب كلمة المرور من جديد.</string>
     <string name="admin_gate_denied_body">هذه اللوحة لحساب الأدمن فقط — حسابك ليس Admin.</string>
     <string name="admin_lock_now">قفل اللوحة الآن</string>
-    <string name="ux_load_failed">تعذّر تحميل المحتوى — تحقّق من اتصالك ثم أعد المحاولة</string>
-    <string name="ux_retry">إعادة المحاولة</string>
+    <string name="admin_kicker_dashboard">لوحة الإدارة</string>
+    <string name="admin_kicker_content">إدارة المحتوى</string>
+    <string name="admin_kicker_payments">المدفوعات</string>
+    <string name="admin_kicker_chat">إدارة الشات</string>
+    <string name="admin_kicker_assets">إدارة الأصول</string>
+    <string name="admin_pack_id_label">معرّف الحزمة (meme / Minecraft_Memes1 …)</string>
+    <string name="admin_amount_ac_label">المبلغ بعملات AC</string>
+    <string name="admin_price_lyd_label">السعر بالدينار</string>
+    <string name="admin_duration_days_label">المدة (أيام)</string>
+    <string name="admin_download_limit_label">حد التنزيل (فارغ = بلا حد)</string>
+    <string name="admin_method_code_label">الرمز</string>
+    <string name="admin_method_name_label">الاسم</string>
 </resources>

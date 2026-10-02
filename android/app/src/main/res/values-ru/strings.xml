@@ -487,6 +487,16 @@
     <string name="admin_gate_locked_note">Панель автоматически блокируется через 15 минут и снова запрашивает пароль.</string>
     <string name="admin_gate_denied_body">Эта панель только для учётной записи администратора. Ваша учётная запись не админ.</string>
     <string name="admin_lock_now">Заблокировать панель</string>
-    <string name="ux_load_failed">Не удалось загрузить содержимое. Проверьте подключение и повторите попытку</string>
-    <string name="ux_retry">Повторить</string>
+    <string name="admin_kicker_dashboard">Панель администратора</string>
+    <string name="admin_kicker_content">Управление контентом</string>
+    <string name="admin_kicker_payments">Платежи</string>
+    <string name="admin_kicker_chat">Модерация чата</string>
+    <string name="admin_kicker_assets">Управление ресурсами</string>
+    <string name="admin_pack_id_label">Id пакета (meme / Minecraft_Memes1 …)</string>
+    <string name="admin_amount_ac_label">Сумма в AC</string>
+    <string name="admin_price_lyd_label">Цена в LYD</string>
+    <string name="admin_duration_days_label">Срок (дни)</string>
+    <string name="admin_download_limit_label">Лимит загрузок (пусто = без лимита)</string>
+    <string name="admin_method_code_label">Код</string>
+    <string name="admin_method_name_label">Название</string>
 </resources>

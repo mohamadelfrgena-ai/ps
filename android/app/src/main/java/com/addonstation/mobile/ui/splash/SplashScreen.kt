@@ -56,8 +56,8 @@ import kotlin.random.Random
 /**
  * الإطلاق السينمائي: صورة البداية (قرية ماينكرافت عند الغروب · splash_bg.jpg) مع تعتيم
  * متدرّج، ثم خطوط مسح، 7 جسيمات، شعار التطبيق (صورة)،
- * ثم الكلمات DREAM IT. · BUILD IT. · CREATE IT. والعلامة التجارية، ثم خروج بتلاشي/انزلاق
- * 0.4s مع كشف الشاشة الرئيسية — الإجمالي 2.4 ثانية (كانت 3.6 فكان المستخدم ينتظر طويلاً).
+ * ثم الكلمات DREAM IT. (0.4s) · BUILD IT. (1.3s) · CREATE IT. (2.2s) والعلامة التجارية (3.0s)،
+ * ثم خروج بتلاشي/انزلاق 0.5s مع كشف الشاشة الرئيسية.
  *
  * الأداء: الخطوط والجسيمات تُرسم في Canvas واحد لكل طبقة (بدل ~100 عنصر Compose)،
  * وكل الحركات داخل LaunchedEffect واحد بمهام متوازية — فلا «لاق» ولا تقطيع.
@@ -76,15 +76,14 @@ fun SplashScreen(onFinished: () -> Unit) {
 
     LaunchedEffect(Unit) {
         coroutineScope {
-            launch { alphaSky.animateTo(0.38f, tween(650, easing = FastOutSlowInEasing)) }
-            launch { scaleSky.animateTo(1.05f, tween(650, easing = FastOutSlowInEasing)) }
-            launch { logo.animateTo(1f, tween(320, easing = FastOutSlowInEasing)) }
-            // 2.4 ثانية بدل 3.6: التسلسل نفسه بوتيرة أسرع — المستخدم يرى التطبيق أسرع.
-            launch { delay(260); line1.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
-            launch { delay(820); line2.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
-            launch { delay(1380); line3.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
-            launch { delay(1900); brand.animateTo(1f, tween(340, easing = FastOutSlowInEasing)) }
-            launch { delay(2350); exit.animateTo(0f, tween(400, easing = FastOutSlowInEasing)) }
+            launch { alphaSky.animateTo(0.38f, tween(900, easing = FastOutSlowInEasing)) }
+            launch { scaleSky.animateTo(1.05f, tween(900, easing = FastOutSlowInEasing)) }
+            launch { logo.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
+            launch { delay(400); line1.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
+            launch { delay(1300); line2.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
+            launch { delay(2200); line3.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
+            launch { delay(3000); brand.animateTo(1f, tween(480, easing = FastOutSlowInEasing)) }
+            launch { delay(3600); exit.animateTo(0f, tween(500, easing = FastOutSlowInEasing)) }
         }
         onFinished()
     }

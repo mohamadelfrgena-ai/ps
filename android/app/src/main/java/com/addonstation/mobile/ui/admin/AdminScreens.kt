@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -378,11 +379,12 @@ private fun OverviewTab(
     Column(
         Modifier
             .fillMaxSize()
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 14.dp),
     ) {
         Spacer(Modifier.height(10.dp))
-        Text("ADMIN DASHBOARD", style = AppText.kicker, color = AppColors.Blue)
+        Text(stringResource(R.string.admin_kicker_dashboard), style = AppText.kicker, color = AppColors.Blue)
         Text(stringResource(R.string.admin_title), style = AppText.pageTitle, color = AppColors.Text)
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -558,11 +560,12 @@ private fun ContentTab(
     Column(
         Modifier
             .fillMaxSize()
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 14.dp),
     ) {
         Spacer(Modifier.height(10.dp))
-        Text("CONTENT ADMINISTRATION", style = AppText.kicker, color = AppColors.Blue)
+        Text(stringResource(R.string.admin_kicker_content), style = AppText.kicker, color = AppColors.Blue)
         GradientButton(
             text = stringResource(R.string.admin_add_content),
             onClick = onOpenContentAdmin,
@@ -618,11 +621,12 @@ private fun PaymentsTab(
     Column(
         Modifier
             .fillMaxSize()
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 14.dp),
     ) {
         Spacer(Modifier.height(10.dp))
-        Text("PAYMENTS", style = AppText.kicker, color = AppColors.Blue)
+        Text(stringResource(R.string.admin_kicker_payments), style = AppText.kicker, color = AppColors.Blue)
         if (loading) {
             LoadingBox()
         } else if (orders.isEmpty()) {
@@ -680,11 +684,12 @@ private fun ModerationTab(
     Column(
         Modifier
             .fillMaxSize()
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 14.dp),
     ) {
         Spacer(Modifier.height(10.dp))
-        Text("CHAT MODERATION", style = AppText.kicker, color = AppColors.Blue)
+        Text(stringResource(R.string.admin_kicker_chat), style = AppText.kicker, color = AppColors.Blue)
         if (loading) {
             LoadingBox()
         } else if (reports.isEmpty()) {
@@ -732,6 +737,7 @@ private fun MoreTab(onOpen: (String) -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 14.dp),
     ) {
@@ -817,10 +823,11 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
         Column(
             Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {
-            Text("ASSET MANAGEMENT", style = AppText.kicker, color = AppColors.Blue)
+            Text(stringResource(R.string.admin_kicker_assets), style = AppText.kicker, color = AppColors.Blue)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("avatar", "banner", "sticker", "item").forEach { t ->
                     FilterChip(t, type == t, { type = t })
@@ -844,7 +851,7 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
                 OutlinedTextField(
                     value = packId,
                     onValueChange = { packId = it },
-                    label = { Text("Pack id (meme / Minecraft_Memes1 …)") },
+                    label = { Text(stringResource(R.string.admin_pack_id_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -940,6 +947,7 @@ fun AdminCreatorReviewScreen(onBack: () -> Unit) {
         Column(
             Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {
@@ -1125,6 +1133,7 @@ fun AdminAcScreen(onBack: () -> Unit) {
         Column(
             Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {
@@ -1139,7 +1148,7 @@ fun AdminAcScreen(onBack: () -> Unit) {
             OutlinedTextField(
                 value = amount,
                 onValueChange = { amount = it.filter { ch -> ch.isDigit() } },
-                label = { Text("AC") },
+                label = { Text(stringResource(R.string.admin_amount_ac_label)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -1379,6 +1388,7 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
         Column(
             Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {
@@ -1396,21 +1406,21 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
                     OutlinedTextField(
                         value = price,
                         onValueChange = { price = it },
-                        label = { Text("Price LYD") },
+                        label = { Text(stringResource(R.string.admin_price_lyd_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = days,
                         onValueChange = { days = it },
-                        label = { Text("Duration (days)") },
+                        label = { Text(stringResource(R.string.admin_duration_days_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = limit,
                         onValueChange = { limit = it },
-                        label = { Text("Download limit (empty = ∞)") },
+                        label = { Text(stringResource(R.string.admin_download_limit_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -1483,8 +1493,8 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(10.dp))
             GlassCard(padding = 10.dp) {
                 Text("+ " + stringResource(R.string.plan_payment_method), style = AppText.sectionTitle, color = AppColors.Text)
-                OutlinedTextField(methodCode, { methodCode = it }, label = { Text("code") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(methodName, { methodName = it }, label = { Text("name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(methodCode, { methodCode = it }, label = { Text(stringResource(R.string.admin_method_code_label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(methodName, { methodName = it }, label = { Text(stringResource(R.string.admin_method_name_label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(accountName, { accountName = it }, label = { Text(stringResource(R.string.plan_beneficiary)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(accountId, { accountId = it }, label = { Text(stringResource(R.string.plan_account_number)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(instructions, { instructions = it }, label = { Text(stringResource(R.string.plan_order_instructions)) }, modifier = Modifier.fillMaxWidth())
@@ -1588,6 +1598,7 @@ fun AdminChatScreen(onBack: () -> Unit) {
         Column(
             Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {

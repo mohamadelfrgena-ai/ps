@@ -503,6 +503,16 @@
     <string name="admin_gate_locked_note">The panel locks automatically after 15 minutes and asks for the password again.</string>
     <string name="admin_gate_denied_body">This panel is for the admin account only. Your account is not an admin.</string>
     <string name="admin_lock_now">Lock panel now</string>
-    <string name="ux_load_failed">Couldn\'t load content — check your connection and try again</string>
-    <string name="ux_retry">Try again</string>
+    <string name="admin_kicker_dashboard">Admin dashboard</string>
+    <string name="admin_kicker_content">Content administration</string>
+    <string name="admin_kicker_payments">Payments</string>
+    <string name="admin_kicker_chat">Chat moderation</string>
+    <string name="admin_kicker_assets">Asset management</string>
+    <string name="admin_pack_id_label">Pack id (meme / Minecraft_Memes1 …)</string>
+    <string name="admin_amount_ac_label">Amount in AC</string>
+    <string name="admin_price_lyd_label">Price in LYD</string>
+    <string name="admin_duration_days_label">Duration (days)</string>
+    <string name="admin_download_limit_label">Download limit (empty = unlimited)</string>
+    <string name="admin_method_code_label">Code</string>
+    <string name="admin_method_name_label">Name</string>
 </resources>

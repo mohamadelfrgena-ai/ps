@@ -487,6 +487,16 @@
     <string name="admin_gate_locked_note">O painel bloqueia automaticamente após 15 minutos e pede a senha novamente.</string>
     <string name="admin_gate_denied_body">Este painel é apenas para a conta de administrador. Sua conta não é admin.</string>
     <string name="admin_lock_now">Bloquear painel agora</string>
-    <string name="ux_load_failed">Não foi possível carregar o conteúdo: verifique sua conexão e tente de novo</string>
-    <string name="ux_retry">Tentar de novo</string>
+    <string name="admin_kicker_dashboard">Painel de administração</string>
+    <string name="admin_kicker_content">Gestão de conteúdo</string>
+    <string name="admin_kicker_payments">Pagamentos</string>
+    <string name="admin_kicker_chat">Moderação do chat</string>
+    <string name="admin_kicker_assets">Gestão de recursos</string>
+    <string name="admin_pack_id_label">Id do pack (meme / Minecraft_Memes1 …)</string>
+    <string name="admin_amount_ac_label">Valor em AC</string>
+    <string name="admin_price_lyd_label">Preço em LYD</string>
+    <string name="admin_duration_days_label">Duração (dias)</string>
+    <string name="admin_download_limit_label">Limite de downloads (vazio = ilimitado)</string>
+    <string name="admin_method_code_label">Código</string>
+    <string name="admin_method_name_label">Nome</string>
 </resources>

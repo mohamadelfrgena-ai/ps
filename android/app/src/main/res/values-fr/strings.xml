@@ -487,6 +487,16 @@
     <string name="admin_gate_locked_note">Le panneau se verrouille automatiquement après 15 minutes et redemande le mot de passe.</string>
     <string name="admin_gate_denied_body">Ce panneau est réservé au compte administrateur. Votre compte n\'est pas admin.</string>
     <string name="admin_lock_now">Verrouiller le panneau maintenant</string>
-    <string name="ux_load_failed">Impossible de charger le contenu : vérifiez votre connexion et réessayez</string>
-    <string name="ux_retry">Réessayer</string>
+    <string name="admin_kicker_dashboard">Tableau de bord admin</string>
+    <string name="admin_kicker_content">Gestion du contenu</string>
+    <string name="admin_kicker_payments">Paiements</string>
+    <string name="admin_kicker_chat">Modération du chat</string>
+    <string name="admin_kicker_assets">Gestion des ressources</string>
+    <string name="admin_pack_id_label">Id du pack (meme / Minecraft_Memes1 …)</string>
+    <string name="admin_amount_ac_label">Montant en AC</string>
+    <string name="admin_price_lyd_label">Prix en LYD</string>
+    <string name="admin_duration_days_label">Durée (jours)</string>
+    <string name="admin_download_limit_label">Limite de téléchargements (vide = illimité)</string>
+    <string name="admin_method_code_label">Code</string>
+    <string name="admin_method_name_label">Nom</string>
 </resources>

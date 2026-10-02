@@ -487,6 +487,16 @@
     <string name="admin_gate_locked_note">Panel 15 dakika sonra otomatik kilitlenir ve parolayı yeniden ister.</string>
     <string name="admin_gate_denied_body">Bu panel yalnızca yönetici hesabı içindir. Hesabınız yönetici değil.</string>
     <string name="admin_lock_now">Paneli şimdi kilitle</string>
-    <string name="ux_load_failed">İçerik yüklenemedi — bağlantınızı kontrol edip tekrar deneyin</string>
-    <string name="ux_retry">Tekrar dene</string>
+    <string name="admin_kicker_dashboard">Yönetim paneli</string>
+    <string name="admin_kicker_content">İçerik yönetimi</string>
+    <string name="admin_kicker_payments">Ödemeler</string>
+    <string name="admin_kicker_chat">Sohbet moderasyonu</string>
+    <string name="admin_kicker_assets">Kaynak yönetimi</string>
+    <string name="admin_pack_id_label">Paket kimliği (meme / Minecraft_Memes1 …)</string>
+    <string name="admin_amount_ac_label">AC cinsinden tutar</string>
+    <string name="admin_price_lyd_label">Fiyat (LYD)</string>
+    <string name="admin_duration_days_label">Süre (gün)</string>
+    <string name="admin_download_limit_label">İndirme sınırı (boş = sınırsız)</string>
+    <string name="admin_method_code_label">Kod</string>
+    <string name="admin_method_name_label">Ad</string>
 </resources>

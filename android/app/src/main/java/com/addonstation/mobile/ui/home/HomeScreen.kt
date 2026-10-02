@@ -53,13 +53,10 @@ import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.ContentItem
 import com.addonstation.mobile.data.model.CreatorCard
 import com.addonstation.mobile.ui.assetUrl
-import com.addonstation.mobile.data.toApiError
-import com.addonstation.mobile.ui.apiErrorText
 import com.addonstation.mobile.ui.components.ContentCard
 import com.addonstation.mobile.ui.components.GlassCard
 import com.addonstation.mobile.ui.components.IconTile
 import com.addonstation.mobile.ui.components.LinkRow
-import com.addonstation.mobile.ui.components.LoadErrorPanel
 import com.addonstation.mobile.ui.components.LoadingBox
 import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.components.PromoCard
@@ -105,26 +102,18 @@ fun HomeScreen(
     val plans by container.state.plans.collectAsState()
 
     var loading by remember { mutableStateOf(true) }
-    var loadError by remember { mutableStateOf<String?>(null) }
     var featured by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var latest by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var recommended by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var creators by remember { mutableStateOf<List<CreatorCard>>(emptyList()) }
 
-    // إعادة التحميل يدوياً عبر زر «إعادة المحاولة» ⇒ المفتاح يتغيّر فيُعاد تشغيل التأثير.
-    var reloadKey by remember { mutableStateOf(0) }
-
-    LaunchedEffect(profile?.id, reloadKey) {
+    LaunchedEffect(profile?.id) {
         loading = true
-        loadError = null
         runCatching {
             featured = container.content.featured(8)
             latest = container.content.latest(6)
             recommended = container.content.recommended(6)
             creators = container.creators.creators().take(4)
-        }.onFailure { e ->
-            // رسالة واضحة + زر إعادة محاولة بدل شاشة فارغة صامتة.
-            loadError = apiErrorText(e.toApiError().kind)
         }
         loading = false
     }
@@ -140,13 +129,6 @@ fun HomeScreen(
             onWalletClick = actions.openWallet,
             icon = Icons.Filled.Games,
         )
-        val errorMsg = loadError
-        if (errorMsg != null) {
-            LoadErrorPanel(
-                message = "$errorMsg\n" + stringResource(R.string.ux_load_failed),
-                onRetry = { reloadKey++ },
-            )
-        }
         Column(
             Modifier
                 .fillMaxSize()

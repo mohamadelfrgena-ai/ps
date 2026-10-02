@@ -121,6 +121,13 @@ jobs:
             exit 1
           }
 
+      - name: فحص جودة التجربة قبل البناء
+        run: |
+          python3 tools/check_ux_quality.py || {
+            echo "::error::مشاكل جودة تجربة — نصوص ثابتة أو حجب لوحة المفاتيح (التفاصيل أعلاه)"
+            exit 1
+          }
+
       - name: Build debug APK
         working-directory: android
         run: |

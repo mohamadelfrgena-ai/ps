@@ -487,6 +487,16 @@
     <string name="admin_gate_locked_note">面板会在 15 分钟后自动锁定并重新要求输入密码。</string>
     <string name="admin_gate_denied_body">此面板仅限管理员账户。您的账户不是管理员。</string>
     <string name="admin_lock_now">立即锁定面板</string>
-    <string name="ux_load_failed">无法加载内容 — 请检查网络连接后重试</string>
-    <string name="ux_retry">重试</string>
+    <string name="admin_kicker_dashboard">管理面板</string>
+    <string name="admin_kicker_content">内容管理</string>
+    <string name="admin_kicker_payments">支付</string>
+    <string name="admin_kicker_chat">聊天管理</string>
+    <string name="admin_kicker_assets">资源管理</string>
+    <string name="admin_pack_id_label">包 ID (meme / Minecraft_Memes1 …)</string>
+    <string name="admin_amount_ac_label">AC 金额</string>
+    <string name="admin_price_lyd_label">价格（LYD）</string>
+    <string name="admin_duration_days_label">时长（天）</string>
+    <string name="admin_download_limit_label">下载上限（留空 = 不限）</string>
+    <string name="admin_method_code_label">代码</string>
+    <string name="admin_method_name_label">名称</string>
 </resources>

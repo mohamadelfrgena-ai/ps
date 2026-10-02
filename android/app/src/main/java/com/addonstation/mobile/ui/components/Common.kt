@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BrokenImage
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -429,43 +428,6 @@ fun EmptyState(text: String, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = AppText.bodySmall, color = AppColors.Muted, textAlign = TextAlign.Center)
-    }
-}
-
-/**
- * لوحة «تعذّر التحميل» + زر إعادة المحاولة.
- *
- * قبلها كانت الشاشات تبتلع أخطاء الشبكة بصمت فيظهر المستخدم شاشة فارغة بلا سبب
- * ولا طريقة للتعافي — فصار الخطأ يُشرح والزر يعيد المحاولة بضغطة.
- */
-@Composable
-fun LoadErrorPanel(
-    message: String,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-    retryText: String = stringResource(R.string.ux_retry),
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 26.dp, horizontal = 18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text("⚠", style = AppText.pageTitle, color = AppColors.Gold)
-        Text(
-            message,
-            style = AppText.bodySmall,
-            color = AppColors.Muted,
-            textAlign = TextAlign.Center,
-        )
-        GhostButton(
-            text = retryText,
-            onClick = onRetry,
-            icon = Icons.Filled.Refresh,
-            modifier = Modifier.width(180.dp),
-            borderColor = AppColors.Gold.copy(alpha = 0.55f),
-        )
     }
 }
 
