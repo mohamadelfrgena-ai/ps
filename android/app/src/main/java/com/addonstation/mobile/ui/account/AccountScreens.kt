@@ -49,7 +49,6 @@ import com.addonstation.mobile.ui.components.appLocaleCode
 import com.addonstation.mobile.ui.components.AvatarImage
 import com.addonstation.mobile.ui.components.CoinIcon
 import com.addonstation.mobile.ui.components.EmptyState
-import com.addonstation.mobile.ui.components.Toasts
 import com.addonstation.mobile.ui.components.GhostButton
 import com.addonstation.mobile.ui.components.GlassCard
 import com.addonstation.mobile.ui.components.GradientButton
@@ -159,12 +158,13 @@ fun AcWalletScreen(
                 Text(stringResource(R.string.ac_desc), style = AppText.tiny, color = AppColors.Muted)
             }
 
-            // نخبة بدل سطر داخل الصفحة (ToastHost في AppNav)
-            LaunchedEffect(message) {
-                message?.let {
-                    Toasts.show(it)
-                    message = null
-                }
+            message?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    it,
+                    style = AppText.bodySmall,
+                    color = if (messageOk) AppColors.Green else AppColors.Red,
+                )
             }
 
             // ------------------------------------------------ كود هدية AC
@@ -334,8 +334,6 @@ fun NotificationsScreen(
 
     var items by remember { mutableStateOf<List<ChatNotification>>(emptyList()) }
     var requests by remember { mutableStateOf<List<FriendEntry>>(emptyList()) }
-    // معرّف الطلب قيد القبول ⇒ تعطيل الزر أثناء التنفيذ (نقرة مزدوجة = طلب واحد)
-    var acceptingId by remember { mutableStateOf<String?>(null) }
     var profiles by remember { mutableStateOf<Map<String, com.addonstation.mobile.data.model.Profile>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
 
@@ -385,16 +383,11 @@ fun NotificationsScreen(
                                 GradientButton(
                                     text = stringResource(R.string.notif_accept),
                                     onClick = {
-                                        // نقرتان لا يُرسلا طلبَي صداقة
-                                        if (acceptingId != null) return@GradientButton
-                                        acceptingId = request.id
                                         scope.launch {
                                             container.notifications.respond(request.id, true)
                                             requests = container.notifications.incomingFriendRequests()
-                                            acceptingId = null
                                         }
                                     },
-                                    enabled = acceptingId == null,
                                     modifier = Modifier.weight(1f),
                                 )
                                 GhostButton(

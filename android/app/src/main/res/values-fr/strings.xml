@@ -487,4 +487,6 @@
     <string name="admin_gate_locked_note">Le panneau se verrouille automatiquement après 15 minutes et redemande le mot de passe.</string>
     <string name="admin_gate_denied_body">Ce panneau est réservé au compte administrateur. Votre compte n\'est pas admin.</string>
     <string name="admin_lock_now">Verrouiller le panneau maintenant</string>
+    <string name="ux_load_failed">Impossible de charger le contenu : vérifiez votre connexion et réessayez</string>
+    <string name="ux_retry">Réessayer</string>
 </resources>

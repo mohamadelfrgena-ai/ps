@@ -487,4 +487,6 @@
     <string name="admin_gate_locked_note">Панель автоматически блокируется через 15 минут и снова запрашивает пароль.</string>
     <string name="admin_gate_denied_body">Эта панель только для учётной записи администратора. Ваша учётная запись не админ.</string>
     <string name="admin_lock_now">Заблокировать панель</string>
+    <string name="ux_load_failed">Не удалось загрузить содержимое. Проверьте подключение и повторите попытку</string>
+    <string name="ux_retry">Повторить</string>
 </resources>

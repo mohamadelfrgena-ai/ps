@@ -487,4 +487,6 @@
     <string name="admin_gate_locked_note">面板会在 15 分钟后自动锁定并重新要求输入密码。</string>
     <string name="admin_gate_denied_body">此面板仅限管理员账户。您的账户不是管理员。</string>
     <string name="admin_lock_now">立即锁定面板</string>
+    <string name="ux_load_failed">无法加载内容 — 请检查网络连接后重试</string>
+    <string name="ux_retry">重试</string>
 </resources>

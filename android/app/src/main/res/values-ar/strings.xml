@@ -487,4 +487,6 @@
     <string name="admin_gate_locked_note">تُقفل اللوحة تلقائياً بعد ١٥ دقيقة وتطلب كلمة المرور من جديد.</string>
     <string name="admin_gate_denied_body">هذه اللوحة لحساب الأدمن فقط — حسابك ليس Admin.</string>
     <string name="admin_lock_now">قفل اللوحة الآن</string>
+    <string name="ux_load_failed">تعذّر تحميل المحتوى — تحقّق من اتصالك ثم أعد المحاولة</string>
+    <string name="ux_retry">إعادة المحاولة</string>
 </resources>

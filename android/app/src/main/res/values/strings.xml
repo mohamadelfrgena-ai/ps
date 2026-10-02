@@ -503,4 +503,6 @@
     <string name="admin_gate_locked_note">The panel locks automatically after 15 minutes and asks for the password again.</string>
     <string name="admin_gate_denied_body">This panel is for the admin account only. Your account is not an admin.</string>
     <string name="admin_lock_now">Lock panel now</string>
+    <string name="ux_load_failed">Couldn\'t load content — check your connection and try again</string>
+    <string name="ux_retry">Try again</string>
 </resources>

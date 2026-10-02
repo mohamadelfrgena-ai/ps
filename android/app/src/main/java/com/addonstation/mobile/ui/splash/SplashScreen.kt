@@ -56,13 +56,12 @@ import kotlin.random.Random
 /**
  * الإطلاق السينمائي: صورة البداية (قرية ماينكرافت عند الغروب · splash_bg.jpg) مع تعتيم
  * متدرّج، ثم خطوط مسح، 7 جسيمات، شعار التطبيق (صورة)،
- * ثم الكلمات DREAM IT. (0.4s) · BUILD IT. (1.3s) · CREATE IT. (2.2s) والعلامة التجارية (3.0s)،
- * ثم خروج بتلاشي/انزلاق 0.5s مع كشف الشاشة الرئيسية.
+ * ثم الكلمات DREAM IT. · BUILD IT. · CREATE IT. والعلامة التجارية، ثم خروج بتلاشي/انزلاق
+ * 0.4s مع كشف الشاشة الرئيسية — الإجمالي 2.4 ثانية (كانت 3.6 فكان المستخدم ينتظر طويلاً).
  *
  * الأداء: الخطوط والجسيمات تُرسم في Canvas واحد لكل طبقة (بدل ~100 عنصر Compose)،
  * وكل الحركات داخل LaunchedEffect واحد بمهام متوازية — فلا «لاق» ولا تقطيع.
- * تُعرض مرة واحدة في كل تشغيل للتطبيق، ومّدتها ٢٫٨ ثانية (كانت ٤٫١).
- * الشعار والكلمات تظهر متتابعة، والصورة كاملة الوضوح من البداية.
+ * تُعرض مرة واحدة في كل تشغيل للتطبيق.
  */
 @Composable
 fun SplashScreen(onFinished: () -> Unit) {
@@ -77,16 +76,15 @@ fun SplashScreen(onFinished: () -> Unit) {
 
     LaunchedEffect(Unit) {
         coroutineScope {
-            // الصورة تظهر كاملة (1f) — لا 0.38: كانت نسبة السماء القديمة، وهي تحوّل
-            // صورة القرية إلى طبقة باهتة على خلفية سوداء. التعتيم يتم بطبقة التدرّج.
-            launch { alphaSky.animateTo(1f, tween(760, easing = FastOutSlowInEasing)) }
-            launch { scaleSky.animateTo(1.05f, tween(1500, easing = FastOutSlowInEasing)) }
-            launch { logo.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
-            launch { delay(280); line1.animateTo(1f, tween(340, easing = FastOutSlowInEasing)) }
-            launch { delay(850); line2.animateTo(1f, tween(340, easing = FastOutSlowInEasing)) }
-            launch { delay(1400); line3.animateTo(1f, tween(340, easing = FastOutSlowInEasing)) }
-            launch { delay(1950); brand.animateTo(1f, tween(430, easing = FastOutSlowInEasing)) }
-            launch { delay(2400); exit.animateTo(0f, tween(450, easing = FastOutSlowInEasing)) }
+            launch { alphaSky.animateTo(0.38f, tween(650, easing = FastOutSlowInEasing)) }
+            launch { scaleSky.animateTo(1.05f, tween(650, easing = FastOutSlowInEasing)) }
+            launch { logo.animateTo(1f, tween(320, easing = FastOutSlowInEasing)) }
+            // 2.4 ثانية بدل 3.6: التسلسل نفسه بوتيرة أسرع — المستخدم يرى التطبيق أسرع.
+            launch { delay(260); line1.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
+            launch { delay(820); line2.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
+            launch { delay(1380); line3.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
+            launch { delay(1900); brand.animateTo(1f, tween(340, easing = FastOutSlowInEasing)) }
+            launch { delay(2350); exit.animateTo(0f, tween(400, easing = FastOutSlowInEasing)) }
         }
         onFinished()
     }

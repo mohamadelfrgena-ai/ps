@@ -487,4 +487,6 @@
     <string name="admin_gate_locked_note">Panel 15 dakika sonra otomatik kilitlenir ve parolayı yeniden ister.</string>
     <string name="admin_gate_denied_body">Bu panel yalnızca yönetici hesabı içindir. Hesabınız yönetici değil.</string>
     <string name="admin_lock_now">Paneli şimdi kilitle</string>
+    <string name="ux_load_failed">İçerik yüklenemedi — bağlantınızı kontrol edip tekrar deneyin</string>
+    <string name="ux_retry">Tekrar dene</string>
 </resources>

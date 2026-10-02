@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -63,7 +64,6 @@ import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.ui.theme.PixelFont
 import com.addonstation.mobile.ui.theme.rankColors
-import androidx.compose.material.icons.filled.Refresh
 
 /* ============================ البطاقات والعناوين ============================ */
 
@@ -420,39 +420,6 @@ fun LoadingBox(modifier: Modifier = Modifier, text: String? = null) {
     }
 }
 
-/**
- * فشل تحميل + زرّ إعادة محاولة.
- * قبلها كان فشل الشبكة يترك الشاشة فارغة صامتة (أو يُسقط التطبيق في المتجر والمجتمع)،
- * فصار المستخدم يرى سبباً ويستطيع إعادة المحاولة بنقرة.
- */
-@Composable
-fun RetryState(
-    text: String,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 26.dp, horizontal = 18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = text,
-            style = AppText.bodySmall,
-            color = AppColors.Muted,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-        GhostButton(
-            text = stringResource(R.string.common_retry),
-            onClick = onRetry,
-            modifier = Modifier.width(150.dp),
-            icon = Icons.Filled.Refresh,
-        )
-    }
-}
-
 @Composable
 fun EmptyState(text: String, modifier: Modifier = Modifier) {
     Box(
@@ -462,6 +429,43 @@ fun EmptyState(text: String, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = AppText.bodySmall, color = AppColors.Muted, textAlign = TextAlign.Center)
+    }
+}
+
+/**
+ * لوحة «تعذّر التحميل» + زر إعادة المحاولة.
+ *
+ * قبلها كانت الشاشات تبتلع أخطاء الشبكة بصمت فيظهر المستخدم شاشة فارغة بلا سبب
+ * ولا طريقة للتعافي — فصار الخطأ يُشرح والزر يعيد المحاولة بضغطة.
+ */
+@Composable
+fun LoadErrorPanel(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    retryText: String = stringResource(R.string.ux_retry),
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 26.dp, horizontal = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("⚠", style = AppText.pageTitle, color = AppColors.Gold)
+        Text(
+            message,
+            style = AppText.bodySmall,
+            color = AppColors.Muted,
+            textAlign = TextAlign.Center,
+        )
+        GhostButton(
+            text = retryText,
+            onClick = onRetry,
+            icon = Icons.Filled.Refresh,
+            modifier = Modifier.width(180.dp),
+            borderColor = AppColors.Gold.copy(alpha = 0.55f),
+        )
     }
 }
 

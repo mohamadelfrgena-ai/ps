@@ -487,4 +487,6 @@
     <string name="admin_gate_locked_note">O painel bloqueia automaticamente após 15 minutos e pede a senha novamente.</string>
     <string name="admin_gate_denied_body">Este painel é apenas para a conta de administrador. Sua conta não é admin.</string>
     <string name="admin_lock_now">Bloquear painel agora</string>
+    <string name="ux_load_failed">Não foi possível carregar o conteúdo: verifique sua conexão e tente de novo</string>
+    <string name="ux_retry">Tentar de novo</string>
 </resources>

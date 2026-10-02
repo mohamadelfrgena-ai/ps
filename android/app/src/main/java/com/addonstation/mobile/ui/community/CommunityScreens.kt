@@ -59,9 +59,7 @@ import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.util.LocaleManager
-import com.addonstation.mobile.ui.components.RetryState
 import kotlinx.coroutines.launch
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /**
  * بوابة المجتمع: قواعد المجتمع قبل الدخول الأول (مرة واحدة لكل مستخدم)،
@@ -166,7 +164,6 @@ fun RulesScreen(onAccepted: () -> Unit, onDecline: () -> Unit) {
 }
 
 /** قائمة الغرف: تصنيفان قابلان للطي + مؤشرات غير المقروء والمنشن + لوحة المستخدم أسفل الشاشة. */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun RoomListScreen(
     onOpenRoom: (ChatChannel) -> Unit,
@@ -186,48 +183,21 @@ fun RoomListScreen(
     // لغة الواجهة الحالية (طبّقناها في MainActivity) — لتظليل غرفة اللغة المناسبة
     val appLanguage = LocaleManager.byCode(java.util.Locale.getDefault().language).code
 
-    // الفشل كان يمرّ بلا التقاط فيُسقط التطبيق عند انقطاع الشبكة.
-    var failed by remember { mutableStateOf(false) }
-
-    suspend fun reload() {
+    LaunchedEffect(Unit) {
         loading = true
-        failed = runCatching {
-            channels = container.chat.channels()
-            container.chat.refreshUnread()
-        }.isFailure
+        channels = container.chat.channels()
+        container.chat.refreshUnread()
         loading = false
     }
 
-    LaunchedEffect(Unit) { reload() }
-
-    // سحب للأسفل للتحديث — سلوك متوقّع في كل التطبيقات، ويجعل المستخدم
-    // يسحب بدل الضغط على زرّ مخفي. لا يغيّر شيئاً آخر في الشاشة.
-    var refreshing by remember { mutableStateOf(false) }
-    LaunchedEffect(refreshing) {
-        if (!refreshing) return@LaunchedEffect
-        reload()
-        refreshing = false
-    }
-    val retryLoad = { refreshing = true }
-    PullToRefreshBox(
-        isRefreshing = refreshing,
-        onRefresh = { refreshing = true },
-        modifier = Modifier.fillMaxSize(),
-    ) {
     Column(Modifier.fillMaxSize()) {
         PixelTopBar(
             title = stringResource(R.string.nav_community),
             walletBalance = wallet?.balance,
-            onWalletClick = { onOpenWallet() }
-    },
+            onWalletClick = { onOpenWallet() },
             icon = Icons.Filled.Group,
         )
-        if (failed) {
-            RetryState(
-                text = stringResource(R.string.msg_network_error),
-                onRetry = retryLoad,
-            )
-        } else if (loading) {
+        if (loading) {
             LoadingBox(text = stringResource(R.string.common_loading))
         } else {
             LazyColumn(

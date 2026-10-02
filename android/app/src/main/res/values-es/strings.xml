@@ -487,4 +487,6 @@
     <string name="admin_gate_locked_note">El panel se bloquea automáticamente a los 15 minutos y vuelve a pedir la contraseña.</string>
     <string name="admin_gate_denied_body">Este panel es solo para la cuenta de administrador. Tu cuenta no es admin.</string>
     <string name="admin_lock_now">Bloquear el panel ahora</string>
+    <string name="ux_load_failed">No se pudo cargar el contenido: comprueba tu conexión e inténtalo de nuevo</string>
+    <string name="ux_retry">Reintentar</string>
 </resources>
