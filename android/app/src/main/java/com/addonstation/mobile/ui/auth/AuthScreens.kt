@@ -69,6 +69,7 @@ fun LoginScreen(
     var showRecovery by remember { mutableStateOf(false) }
     var recoveryEmail by remember { mutableStateOf("") }
     var recoveryStatus by remember { mutableStateOf<String?>(null) }
+    var recoveryBusy by remember { mutableStateOf(false) }
 
     val enterBoth = stringResource(R.string.msg_enter_email_password)
     val signingIn = stringResource(R.string.msg_signing_in)
@@ -130,12 +131,14 @@ fun LoginScreen(
             GradientButton(
                 text = "🔑 " + stringResource(R.string.auth_sign_in),
                 onClick = {
+                    // العلم يُرفع فوراً قبل الكوروتين: النقر الثاني لا ينفّذ
+                    if (busy) return@GradientButton
                     if (email.isBlank() || password.isBlank()) {
                         status = enterBoth
                         return@GradientButton
                     }
+                    busy = true
                     scope.launch {
-                        busy = true
                         status = signingIn
                         errorKind = null
                         container.auth.signIn(email, password)
@@ -187,17 +190,21 @@ fun LoginScreen(
                     GradientButton(
                         text = stringResource(R.string.auth_send_recovery),
                         onClick = {
+                            if (recoveryBusy) return@GradientButton   // بريد استعادة واحد فقط
                             if (recoveryEmail.isBlank()) {
                                 recoveryStatus = enterEmailFirst
                                 return@GradientButton
                             }
+                            recoveryBusy = true
                             scope.launch {
                                 recoveryStatus = sending
                                 container.auth.sendRecovery(recoveryEmail)
                                     .onSuccess { recoveryStatus = checkEmail }
                                     .onFailure { recoveryStatus = null; errorKind = it.toApiError().kind }
+                                recoveryBusy = false
                             }
                         },
+                        enabled = !recoveryBusy,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     recoveryStatus?.let {
@@ -310,27 +317,30 @@ fun SignUpScreen(
                     when {
                         username.trim().length < 3 -> status = shortUsername
                         password.length < 6 -> status = shortPassword
-                        else -> scope.launch {
-                            busy = true
-                            errorKind = null
-                            status = creating
-                            container.auth.signUp(username, email, password)
-                                .onSuccess {
-                                    if (container.supabase.session() != null) {
-                                        container.state.setSignedIn(true)
-                                        container.state.refreshAll()
-                                        status = null
-                                        onSuccess()
-                                    } else {
-                                        // تأكيد البريد مفعّل: لا جلسة حتى يفتح المستخدم الرابط
-                                        status = createdMsg
+                        busy -> Unit                            // نقرتان لا تنشئان حسابين
+                        else -> {
+                            busy = true                          // فوراً قبل تشغيل الكوروتين
+                            scope.launch {
+                                errorKind = null
+                                status = creating
+                                container.auth.signUp(username, email, password)
+                                    .onSuccess {
+                                        if (container.supabase.session() != null) {
+                                            container.state.setSignedIn(true)
+                                            container.state.refreshAll()
+                                            status = null
+                                            onSuccess()
+                                        } else {
+                                            // تأكيد البريد مفعّل: لا جلسة حتى يفتح المستخدم الرابط
+                                            status = createdMsg
+                                        }
                                     }
-                                }
-                                .onFailure { e ->
-                                    status = null
-                                    errorKind = e.toApiError().kind
-                                }
-                            busy = false
+                                    .onFailure { e ->
+                                        status = null
+                                        errorKind = e.toApiError().kind
+                                    }
+                                busy = false
+                            }
                         }
                     }
                 },

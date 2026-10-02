@@ -75,9 +75,12 @@ import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.ui.theme.PixelFont
+import com.addonstation.mobile.ui.components.RetryState
 import kotlinx.coroutines.launch
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /** شاشة المتجر: تبويبان (إضافات/عوالم) + بحث + شرائح ترتيب + شبكة حتى 60 عنصراً. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun StoreScreen(
     onOpenItem: (ContentItem) -> Unit,
@@ -95,16 +98,35 @@ fun StoreScreen(
     var items by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var favourites by remember { mutableStateOf<Set<String>>(emptySet()) }
 
+    // الفشل كان يمرّ بلا التقاط فيُسقط التطبيق عند انقطاع الشبكة أثناء التصفّح.
+    var failed by remember { mutableStateOf(false) }
+
     suspend fun reload() {
         loading = true
-        items = container.content.browse(type, sort, query, 60)
-        favourites = if (container.supabase.session() == null) emptySet()
-        else container.content.favorites().map { it.id }.toSet()
+        failed = runCatching {
+            items = container.content.browse(type, sort, query, 60)
+            favourites = if (container.supabase.session() == null) emptySet()
+            else container.content.favorites().map { it.id }.toSet()
+        }.isFailure
         loading = false
     }
 
     LaunchedEffect(type, sort, query) { reload() }
 
+    // سحب للأسفل للتحديث — سلوك متوقّع في كل التطبيقات، ويجعل المستخدم
+    // يسحب بدل الضغط على زرّ مخفي. لا يغيّر شيئاً آخر في الشاشة.
+    var refreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(refreshing) {
+        if (!refreshing) return@LaunchedEffect
+        reload()
+        refreshing = false
+    }
+    val retryLoad = { refreshing = true }
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = { refreshing = true },
+        modifier = Modifier.fillMaxSize(),
+    ) {
     Column(Modifier.fillMaxSize()) {
         PixelTopBar(
             title = stringResource(R.string.nav_store),
@@ -162,6 +184,10 @@ fun StoreScreen(
 
             Spacer(Modifier.height(12.dp))
             when {
+                failed -> RetryState(
+                    text = stringResource(R.string.msg_network_error),
+                    onRetry = retryLoad,
+                )
                 loading -> LoadingBox(text = stringResource(R.string.common_loading))
                 items.isEmpty() -> EmptyState(
                     stringResource(R.string.store_empty) + "\n" + stringResource(R.string.store_empty_hint)
@@ -187,6 +213,7 @@ fun StoreScreen(
             }
             Spacer(Modifier.height(96.dp))
         }
+    }
     }
 }
 
