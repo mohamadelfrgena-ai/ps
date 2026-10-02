@@ -107,6 +107,7 @@ fun ChatScreen(
     var text by remember { mutableStateOf("") }
     var replyTo by remember { mutableStateOf<ChatMessage?>(null) }
     var attachment by remember { mutableStateOf<Pair<String, String>?>(null) } // (path, kind)
+    var sending by remember { mutableStateOf(false) } // يمنع الإرسال المزدوج بنقرة مزدوجة
     var showEmoji by remember { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
     var showMembers by remember { mutableStateOf(false) }
@@ -431,13 +432,17 @@ fun ChatScreen(
                 onSend = {
                     val content = text.trim()
                     if (content.isEmpty() && attachment == null) return@ChatInputBar
+                    // نقر مزدوج على «إرسال» = رسالة واحدة (النص يُصفَّر بعد نجاح الإرسال فقط)
+                    if (sending) return@ChatInputBar
                     val attach = attachment
+                    sending = true
                     vm.send(
                         content = content.ifEmpty { null },
                         replyTo = replyTo,
                         imagePath = if (attach?.second == "image") attach.first else null,
                         messageType = if (attach?.second == "image") "image" else "text",
                     ) { ok, error ->
+                        sending = false
                         if (ok) {
                             text = ""
                             attachment = null
