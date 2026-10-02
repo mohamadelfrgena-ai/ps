@@ -58,7 +58,6 @@ import com.addonstation.mobile.ui.components.GlassCard
 import com.addonstation.mobile.ui.components.IconTile
 import com.addonstation.mobile.ui.components.LinkRow
 import com.addonstation.mobile.ui.components.LoadingBox
-import com.addonstation.mobile.ui.components.RetryState
 import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.components.PromoCard
 import com.addonstation.mobile.ui.components.RankBadge
@@ -72,7 +71,6 @@ import com.addonstation.mobile.ui.theme.PixelFont
 import com.addonstation.mobile.util.LocaleManager
 import com.addonstation.mobile.util.TimeFormat
 import java.util.Locale
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /** الأقسام التي تنتقل إليها بطاقات الرئيسية. */
 data class HomeActions(
@@ -93,7 +91,6 @@ data class HomeActions(
     val openCreatorProfile: (String) -> Unit,
 )
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     actions: HomeActions,
@@ -105,44 +102,26 @@ fun HomeScreen(
     val plans by container.state.plans.collectAsState()
 
     var loading by remember { mutableStateOf(true) }
-    var failed by remember { mutableStateOf(false) }
     var featured by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var latest by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var recommended by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var creators by remember { mutableStateOf<List<CreatorCard>>(emptyList()) }
 
-    suspend fun reload() {
+    LaunchedEffect(profile?.id) {
         loading = true
-        failed = runCatching {
+        runCatching {
             featured = container.content.featured(8)
             latest = container.content.latest(6)
             recommended = container.content.recommended(6)
             creators = container.creators.creators().take(4)
-        }.isFailure
+        }
         loading = false
     }
-
-    LaunchedEffect(profile?.id) { reload() }
 
     val locale = Locale.getDefault()
     val morning = TimeFormat.isMorning()
     val greeting = stringResource(TimeFormat.greetingRes(morning))
 
-    // سحب للأسفل للتحديث — سلوك متوقّع في كل التطبيقات، ويجعل المستخدم
-    // يسحب بدل الضغط على زرّ مخفي. لا يغيّر شيئاً آخر في الشاشة.
-    var refreshing by remember { mutableStateOf(false) }
-    LaunchedEffect(refreshing) {
-        if (!refreshing) return@LaunchedEffect
-        reload()
-        refreshing = false
-    }
-    // زرّ «إعادة المحاولة» في حالة الفشل يستعمل نفس مسار السحب للتحديث
-    val retryLoad = { refreshing = true }
-    PullToRefreshBox(
-        isRefreshing = refreshing,
-        onRefresh = { refreshing = true },
-        modifier = Modifier.fillMaxSize(),
-    ) {
     Column(modifier = modifier.fillMaxSize()) {
         PixelTopBar(
             title = stringResource(R.string.nav_home),
@@ -273,12 +252,7 @@ fun HomeScreen(
                 onAction = actions.openStore,
                 leadingEmoji = "⭐",
             )
-            if (failed) {
-                RetryState(
-                    text = stringResource(R.string.msg_network_error),
-                    onRetry = retryLoad,
-                )
-            } else if (loading) {
+            if (loading) {
                 LoadingBox()
             } else {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -412,7 +386,6 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(96.dp))
         }
-    }
     }
 }
 

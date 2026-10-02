@@ -478,5 +478,8 @@ private fun MainNavigation(startAtReset: Boolean) {
         if (tab != null) {
             BottomNavBar(current = tab, onSelect = { target -> goTab(target) })
         }
+
+        // نخب التطبيق: تظهر فوق كل الشاشات (المواصفة: «النخب/الرسائل»)
+        com.addonstation.mobile.ui.components.ToastHost(Modifier)
     }
 }

@@ -54,6 +54,7 @@ import com.addonstation.mobile.data.model.PaymentMethodSetting
 import com.addonstation.mobile.data.model.PaymentOrder
 import com.addonstation.mobile.data.model.SubscriptionPlan
 import com.addonstation.mobile.ui.components.EmptyState
+import com.addonstation.mobile.ui.components.Toasts
 import com.addonstation.mobile.ui.components.FilterChip
 import com.addonstation.mobile.ui.components.GhostButton
 import com.addonstation.mobile.ui.components.GlassCard
@@ -358,7 +359,10 @@ fun CheckoutScreen(
                             tint = AppColors.Blue,
                             modifier = Modifier
                                 .size(18.dp)
-                                .clickable { clipboard.setText(AnnotatedString(current.referenceCode)) },
+                                .clickable {
+                            clipboard.setText(AnnotatedString(current.referenceCode))
+                            Toasts.show(stringResource(R.string.msg_copied))
+                        },
                         )
                     }
                     Text(stringResource(R.string.plan_order_instructions), style = AppText.bodySmall, color = AppColors.Muted)
@@ -444,7 +448,10 @@ private fun DetailLine(label: String, value: String, clipboard: androidx.compose
                 tint = AppColors.Blue,
                 modifier = Modifier
                     .size(16.dp)
-                    .clickable { clipboard.setText(AnnotatedString(value)) },
+                    .clickable {
+                    clipboard.setText(AnnotatedString(value))
+                    Toasts.show(stringResource(R.string.msg_copied))
+                },
             )
         }
     }
