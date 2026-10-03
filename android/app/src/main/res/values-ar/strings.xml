@@ -528,4 +528,8 @@
     <string name="profile_offline_suffix"> · مخفية</string>
     <string name="admin_shrink_assets">تصغير كل صور الأصول</string>
     <string name="admin_shrink_assets_hint">يجعل شبكة الصور خفيفة وتظهر فوراً. مرة واحدة فقط.</string>
+    <string name="profile_assets_search">ابحث في الصور بالاسم…</string>
+    <string name="profile_assets_loading">جارٍ تحميل الصور…</string>
+    <string name="profile_assets_count">%1$d من %2$d صورة</string>
+    <string name="app_build_stamp">التطبيق %1$s · بناء %2$s</string>
 </resources>

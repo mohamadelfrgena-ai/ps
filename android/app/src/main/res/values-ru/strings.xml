@@ -528,4 +528,8 @@
     <string name="profile_offline_suffix"> · скрыт</string>
     <string name="admin_shrink_assets">Сжать все изображения ассетов</string>
     <string name="admin_shrink_assets_hint">Сетка изображений станет лёгкой и загрузится сразу. Один раз.</string>
+    <string name="profile_assets_search">Поиск картинок по названию…</string>
+    <string name="profile_assets_loading">Загрузка картинок…</string>
+    <string name="profile_assets_count">%1$d из %2$d картинок</string>
+    <string name="app_build_stamp">Приложение %1$s · сборка %2$s</string>
 </resources>

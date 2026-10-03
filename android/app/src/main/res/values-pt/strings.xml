@@ -528,4 +528,8 @@
     <string name="profile_offline_suffix"> · oculto</string>
     <string name="admin_shrink_assets">Reduzir todas as imagens de recursos</string>
     <string name="admin_shrink_assets_hint">A grade de imagens fica leve e instantânea. Só uma vez.</string>
+    <string name="profile_assets_search">Procurar imagens pelo nome…</string>
+    <string name="profile_assets_loading">A carregar imagens…</string>
+    <string name="profile_assets_count">%1$d de %2$d imagens</string>
+    <string name="app_build_stamp">App %1$s · build %2$s</string>
 </resources>

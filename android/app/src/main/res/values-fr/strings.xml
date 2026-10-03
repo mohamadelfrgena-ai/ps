@@ -528,4 +528,8 @@
     <string name="profile_offline_suffix"> · masqué</string>
     <string name="admin_shrink_assets">Réduire toutes les images d\'assets</string>
     <string name="admin_shrink_assets_hint">La galerie s\'affiche instantanément. Une seule fois.</string>
+    <string name="profile_assets_search">Rechercher des images par nom…</string>
+    <string name="profile_assets_loading">Chargement des images…</string>
+    <string name="profile_assets_count">%1$d images sur %2$d</string>
+    <string name="app_build_stamp">App %1$s · build %2$s</string>
 </resources>

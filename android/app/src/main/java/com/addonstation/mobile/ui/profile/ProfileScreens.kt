@@ -368,6 +368,19 @@ private fun AboutTab(me: Profile, onOpenSettings: () -> Unit, onSignOut: () -> U
         icon = Icons.Filled.Logout,
         modifier = Modifier.fillMaxWidth(),
     )
+    // نسخة التطبيق: سطر صغير يعرف به صاحب التطبيق أي بناء مثبّت عنده
+    Spacer(Modifier.height(8.dp))
+    Text(
+        text = stringResource(
+            R.string.app_build_stamp,
+            com.addonstation.mobile.BuildConfig.VERSION_NAME,
+            com.addonstation.mobile.BuildConfig.BUILD_STAMP,
+        ),
+        style = AppText.tiny,
+        color = AppColors.Muted,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(6.dp))
 }
 
 @Composable
@@ -494,6 +507,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
     var showOnline by remember { mutableStateOf(profile?.showOnlineStatus ?: false) }
     var message by remember { mutableStateOf<String?>(null) }
     var kind by remember { mutableStateOf("avatar") }
+    var assetQuery by remember { mutableStateOf("") }
     var assets by remember { mutableStateOf<List<com.addonstation.mobile.data.model.SiteAsset>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     val lockedHint = stringResource(R.string.plan_locked_avatars)
@@ -513,7 +527,12 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
         val gridContentWidth = appScreenWidthDp() - 28f - (gridColumns - 1) * GRID_SPACING
         val cellWidth = (gridContentWidth / gridColumns).coerceAtLeast(48f)
         val cellHeight = (cellWidth + 30f).coerceIn(74f, 104f).toInt()
-        val sections = remember(assets) { groupAssetsByCollection(assets) }
+        // بحث داخل الأصول: 500 أصل بلا بحث = كل صورة مرّة بعينها
+        val filteredAssets = remember(assets, assetQuery) {
+            val q = assetQuery.trim()
+            if (q.isBlank()) assets else assets.filter { it.name.contains(q, ignoreCase = true) }
+        }
+        val sections = remember(filteredAssets) { groupAssetsByCollection(filteredAssets) }
         val me = profile
 
         // **القفل**: كل الأصول (صور بروفايل · بانرات · items) مقفلة إلا الصورة المجانية،
@@ -532,6 +551,28 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
         ) {
             item {
                 Column {
+                    // بحث داخل صور البروفايل والبانرات والأدوات بالاسم
+                    OutlinedTextFieldBidi(
+                        value = assetQuery,
+                        onValueChange = { assetQuery = it },
+                        label = stringResource(R.string.profile_assets_search),
+                        singleLine = true,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = if (assets.isEmpty()) {
+                            stringResource(R.string.profile_assets_loading)
+                        } else {
+                            stringResource(
+                                R.string.profile_assets_count,
+                                filteredAssets.size,
+                                assets.size,
+                            )
+                        },
+                        style = AppText.tiny,
+                        color = AppColors.Muted,
+                    )
+                    Spacer(Modifier.height(10.dp))
                     OutlinedTextFieldBidi(
                         value = username,
                         onValueChange = { username = it },

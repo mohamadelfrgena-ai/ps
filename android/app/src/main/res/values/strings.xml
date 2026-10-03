@@ -544,4 +544,8 @@
     <string name="profile_offline_suffix"> · hidden</string>
     <string name="admin_shrink_assets">Shrink all asset images</string>
     <string name="admin_shrink_assets_hint">Makes the picture grid light and instant. One time only.</string>
+    <string name="profile_assets_search">Search pictures by name…</string>
+    <string name="profile_assets_loading">Loading pictures…</string>
+    <string name="profile_assets_count">%1$d of %2$d pictures</string>
+    <string name="app_build_stamp">App %1$s · build %2$s</string>
 </resources>

@@ -528,4 +528,8 @@
     <string name="profile_offline_suffix"> · 已隐藏</string>
     <string name="admin_shrink_assets">压缩全部资源图片</string>
     <string name="admin_shrink_assets_hint">图片网格会变轻并立即显示。只需执行一次。</string>
+    <string name="profile_assets_search">按名称搜索图片…</string>
+    <string name="profile_assets_loading">正在加载图片…</string>
+    <string name="profile_assets_count">%2$d 张图片中的 %1$d 张</string>
+    <string name="app_build_stamp">应用 %1$s · 构建 %2$s</string>
 </resources>
