@@ -532,4 +532,8 @@
     <string name="profile_assets_loading">جارٍ تحميل الصور…</string>
     <string name="profile_assets_count">%1$d من %2$d صورة</string>
     <string name="app_build_stamp">التطبيق %1$s · بناء %2$s</string>
+    <string name="chat_read_only">غرفة للقراءة فقط — الإدارة وحدها تنشر هنا</string>
+    <string name="admin_add_room">إضافة غرفة</string>
+    <string name="admin_room_name">اسم الغرفة</string>
+    <string name="admin_room_category">القسم</string>
 </resources>

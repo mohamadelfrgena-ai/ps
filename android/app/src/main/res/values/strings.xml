@@ -548,4 +548,8 @@
     <string name="profile_assets_loading">Loading pictures…</string>
     <string name="profile_assets_count">%1$d of %2$d pictures</string>
     <string name="app_build_stamp">App %1$s · build %2$s</string>
+    <string name="chat_read_only">Read-only room — only the admin can post</string>
+    <string name="admin_add_room">Add room</string>
+    <string name="admin_room_name">Room name</string>
+    <string name="admin_room_category">Category</string>
 </resources>

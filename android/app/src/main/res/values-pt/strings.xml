@@ -532,4 +532,8 @@
     <string name="profile_assets_loading">A carregar imagens…</string>
     <string name="profile_assets_count">%1$d de %2$d imagens</string>
     <string name="app_build_stamp">App %1$s · build %2$s</string>
+    <string name="chat_read_only">Sala só de leitura — só o admin publica</string>
+    <string name="admin_add_room">Adicionar sala</string>
+    <string name="admin_room_name">Nome da sala</string>
+    <string name="admin_room_category">Categoria</string>
 </resources>

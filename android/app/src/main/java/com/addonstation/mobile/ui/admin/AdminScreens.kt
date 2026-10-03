@@ -1900,6 +1900,12 @@ fun AdminChatScreen(onBack: () -> Unit) {
     var message by remember { mutableStateOf<String?>(null) }
     var rulesLang by remember { mutableStateOf("ar") }
     var rulesText by remember { mutableStateOf("") }
+    // نموذج إضافة غرفة
+    var newRoomName by remember { mutableStateOf("") }
+    var newRoomCategory by remember { mutableStateOf("main") }
+    var newRoomPerm by remember { mutableStateOf("admin_only") }
+    var addingRoom by remember { mutableStateOf(false) }
+    var messageIsError by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         channels = container.chat.channels()
@@ -1916,6 +1922,72 @@ fun AdminChatScreen(onBack: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {
+            // ── إضافة غرفة جديدة (مثال: «خدمات النقدية») ──
+            // تُنشأ مقفلة بصلاحية الأدمن وحده افتراضياً: يقرأ الجميع ولا يكتب إلا الأدمن.
+            SectionHeader(title = "➕ " + stringResource(R.string.admin_add_room), leadingEmoji = "➕")
+            OutlinedTextField(
+                value = newRoomName,
+                onValueChange = { newRoomName = it },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
+                label = { Text(stringResource(R.string.admin_room_name)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("main" to stringResource(R.string.comm_main_rooms),
+                       "lang" to stringResource(R.string.comm_lang_rooms)).forEach { (value, label) ->
+                    FilterChip(label, newRoomCategory == value, { newRoomCategory = value })
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip("🔒 admin_only", newRoomPerm == "admin_only", { newRoomPerm = "admin_only" })
+                FilterChip("🔓 everyone", newRoomPerm == "everyone", { newRoomPerm = "everyone" })
+            }
+            Spacer(Modifier.height(8.dp))
+            GradientButton(
+                text = stringResource(R.string.admin_add_room),
+                enabled = newRoomName.isNotBlank() && !addingRoom,
+                onClick = {
+                    scope.launch {
+                        addingRoom = true
+                        val name = newRoomName.trim()
+                        // المعرّف من الاسم: لاتيني، بلا مسافات ⇒ يعمل كمفتاح عربي أيضاً
+                        val id = name.lowercase()
+                            .replace(Regex("[^a-z0-9\\u0600-\\u06FF]+"), "-")
+                            .trim('-')
+                            .ifBlank { "room-${System.currentTimeMillis()}" }
+                        container.chat.upsertRoom(
+                            id = id,
+                            name = name,
+                            icon = null,
+                            category = newRoomCategory,
+                            description = null,
+                            sortOrder = (channels.maxOfOrNull { it.sortOrder } ?: 0) + 1,
+                            isLocked = newRoomPerm == "admin_only",
+                            slowmodeSeconds = 0,
+                            postPermission = newRoomPerm,
+                        ).onSuccess {
+                            message = "✓ $name"
+                            messageIsError = false
+                            newRoomName = ""
+                            channels = container.chat.channels()
+                        }.onFailure {
+                            message = "فشل الإضافة: ${it.message}"
+                            messageIsError = true
+                        }
+                        addingRoom = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            message?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(it, style = AppText.tiny, color = if (messageIsError) AppColors.Red else AppColors.Green)
+            }
+            Spacer(Modifier.height(8.dp))
+
             SectionHeader(title = stringResource(R.string.comm_main_rooms))
             channels.forEach { channel ->
                 var slow by remember(channel.id) { mutableStateOf(channel.slowmodeSeconds) }

@@ -377,7 +377,8 @@ private fun RoomRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        if (channel.isLocked) {
+        // قفل ظاهر لكل غرفة لا يملك صاحبُها حق الكتابة فيها (قراءة فقط)
+        if (channel.isLocked || channel.postPermission == "admin_only" || channel.postPermission == "creators_admin") {
             Icon(Icons.Filled.Lock, contentDescription = null, tint = AppColors.Dim, modifier = Modifier.size(15.dp))
         }
         if (mentions > 0) {

@@ -72,6 +72,7 @@ import com.addonstation.mobile.data.model.ChatMessage
 import com.addonstation.mobile.data.model.ChatMessageUi
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.ui.assetUrl
+import com.addonstation.mobile.ui.community.isReadOnlyFor
 import com.addonstation.mobile.ui.components.EmptyState
 import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.RoomIcon
@@ -110,6 +111,9 @@ fun ChatScreen(
     val packs by vm.packs.collectAsState()
     val profile by container.state.profile.collectAsState()
     val chatStatus by container.state.chatStatus.collectAsState()
+    // **القراءة فقط**: في الغرف المقفلة أو التي صلاحيتها admin_only لا يملك
+    // المستخدم حق الكتابة ⇒ نُخفي عنه شريط الكتابة بالكامل (بما فيه زر الإرسال).
+    val readOnlyRoom = isReadOnlyFor(channel, profile?.role)
 
     var text by remember { mutableStateOf("") }
     var replyTo by remember { mutableStateOf<ChatMessage?>(null) }
@@ -474,6 +478,23 @@ fun ChatScreen(
                         modifier = Modifier.widthIn(min = 110.dp),
                     )
                 }
+            }
+        } else if (readOnlyRoom) {
+            // لا حقل كتابة ولا زر إرسال: قراءة فقط، والإدارة وحدها تنشر هنا
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(AppColors.Bg.copy(alpha = 0.96f))
+                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("🔒", style = AppText.body)
+                Text(
+                    stringResource(R.string.chat_read_only),
+                    style = AppText.bodySmall,
+                    color = AppColors.Muted,
+                )
             }
         } else {
             ChatInputBar(

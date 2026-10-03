@@ -532,4 +532,8 @@
     <string name="profile_assets_loading">Resimler yükleniyor…</string>
     <string name="profile_assets_count">%2$d resimden %1$d tanesi</string>
     <string name="app_build_stamp">Uygulama %1$s · derleme %2$s</string>
+    <string name="chat_read_only">Yalnızca okunur oda — yalnızca yönetici yazar</string>
+    <string name="admin_add_room">Oda ekle</string>
+    <string name="admin_room_name">Oda adı</string>
+    <string name="admin_room_category">Kategori</string>
 </resources>

@@ -532,4 +532,8 @@
     <string name="profile_assets_loading">正在加载图片…</string>
     <string name="profile_assets_count">%2$d 张图片中的 %1$d 张</string>
     <string name="app_build_stamp">应用 %1$s · 构建 %2$s</string>
+    <string name="chat_read_only">仅阅读房间 — 只有管理员可发言</string>
+    <string name="admin_add_room">添加房间</string>
+    <string name="admin_room_name">房间名称</string>
+    <string name="admin_room_category">分类</string>
 </resources>
