@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -495,6 +497,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
     var assets by remember { mutableStateOf<List<com.addonstation.mobile.data.model.SiteAsset>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     val lockedHint = stringResource(R.string.plan_locked_avatars)
+    val onlineLockedHint = stringResource(R.string.plan_locked_online)
 
     LaunchedEffect(kind) {
         assets = container.assets.byType(kind)
@@ -516,6 +519,8 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
         // **القفل**: كل الأصول (صور بروفايل · بانرات · items) مقفلة إلا الصورة المجانية،
         // والقفل يختفي فقط مع اشتراك epic فما فوق.
         val epicUp = me != null && container.profile.planRank(me.effectivePlan) >= 2
+        // حالة الاتصال feature حصرية لـ legendary فقط
+        val legendaryUp = me != null && container.profile.planRank(me.effectivePlan) >= 3
 
         // قائمة كسولة: تُركَّب الصفوف الظاهرة فقط، فتفتح الشاشة فوراً بدل انتظار
         // تحميل مئات الصور دفعةً واحدة (كان التبديل بين الأنواع يتجمّد طويلاً).
@@ -547,17 +552,45 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                         label = stringResource(R.string.profile_custom_status),
                     )
                     Spacer(Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        FilterChip(
-                            label = stringResource(R.string.profile_online),
-                            selected = showOnline,
-                            onClick = { showOnline = true },
+                    // **حالة الاتصال الخضراء**: زر يطفئها ويشعلها، ومقفول إلا مع legendary 👑
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Switch(
+                            checked = showOnline,
+                            onCheckedChange = { on ->
+                                if (!legendaryUp) {
+                                    message = onlineLockedHint
+                                } else {
+                                    showOnline = on
+                                    scope.launch {
+                                        busy = true
+                                        container.profile.setShowOnline(on)
+                                            .onFailure { message = it.message }
+                                        busy = false
+                                    }
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = AppColors.OnGreen,
+                                checkedTrackColor = AppColors.Green,
+                                uncheckedThumbColor = AppColors.Muted,
+                                uncheckedTrackColor = AppColors.Elevated2,
+                                uncheckedBorderColor = AppColors.Border2,
+                            ),
                         )
-                        FilterChip(
-                            label = stringResource(R.string.profile_offline),
-                            selected = !showOnline,
-                            onClick = { showOnline = false },
+                        Text(
+                            text = stringResource(
+                                R.string.profile_online,
+                            ) + if (showOnline) "" else stringResource(R.string.profile_offline_suffix),
+                            style = AppText.bodyMedium,
+                            color = AppColors.TextPrimary,
                         )
+                        if (!legendaryUp) {
+                            Text("👑", style = AppText.bodyMedium)
+                        }
                     }
                     Spacer(Modifier.height(16.dp))
                     GradientButton(
@@ -569,7 +602,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                     username = username,
                                     bio = bio,
                                     customStatus = status,
-                                    showOnline = showOnline,
+                                    showOnline = if (legendaryUp) showOnline else null,
                                 ).onSuccess {
                                     message = null
                                     onSaved()

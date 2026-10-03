@@ -3,11 +3,21 @@ package com.addonstation.mobile
 import android.app.Application
 import android.content.Context
 import android.os.Build
+
 import coil.ImageLoader
 import coil.ImageLoaderFactory
-import coil.decode.ImageDecoderDecoder
 import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
+import coil.request.CachePolicy
+
 import com.addonstation.mobile.data.AppContainer
+
+import okhttp3.Dispatcher
+import okhttp3.OkHttpClient
+
+import java.io.File
 
 /**
  * نقطة بدء التطبيق: تُهيّئ الحاوية (Container) التي تحمل عميل Supabase، الجلسة، التفضيلات، والمستودعات.
@@ -45,6 +55,30 @@ class AddonStationApp : Application(), ImageLoaderFactory {
                 }
             }
             .crossfade(true)
+            // كل صور الموقع من نفس المضيف ⇒ الحد الافتراضي (5 تنزيلات معاً) يجعل
+            // شبكة الأصول تالافتراضي (5 معاً) كان يجعل شبكة الأصول تظهر ببطء شديد.提高到 16。
+            .okHttpClient {
+                OkHttpClient.Builder()
+                    .dispatcher(
+                        Dispatcher().apply {
+                            maxRequests = 48
+                            maxRequestsPerHost = 16
+                        }
+                    )
+                    .build()
+            }
+            // خادم التخزين لا يسمح أحياناً بالتخزين المؤقت ⇒ كنا نعيد تنزيل كل صورة
+            // في كل مرة نفتح فيها الشبكة. الآن تُحفظ على القرص.
+            .respectCacheHeaders(false)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .memoryCache { MemoryCache.Builder(this).maxSizePercent(0.25).build() }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(File(cacheDir, "site-images"))
+                    .maxSizeBytes(192L * 1024 * 1024)
+                    .build()
+            }
             .build()
 
     companion object {

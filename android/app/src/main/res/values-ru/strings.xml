@@ -524,4 +524,6 @@
     <string name="admin_plan_days">+30 дней</string>
     <string name="admin_ac_tools">Управление AC и начисления</string>
     <string name="admin_tips_title">Чаевые создателям</string>
+    <string name="plan_locked_online">Переключатель «в сети» доступен только подписчикам Legendary 👑.</string>
+    <string name="profile_offline_suffix"> · скрыт</string>
 </resources>

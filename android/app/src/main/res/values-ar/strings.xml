@@ -524,4 +524,6 @@
     <string name="admin_plan_days">+30 يوم</string>
     <string name="admin_ac_tools">إدارة AC ومنح الأرصدة</string>
     <string name="admin_tips_title">نصائح صنّاع المحتوى</string>
+    <string name="plan_locked_online">زر حالة الاتصال متاح لمشتركي Legendary 👑 فقط.</string>
+    <string name="profile_offline_suffix"> · مخفية</string>
 </resources>

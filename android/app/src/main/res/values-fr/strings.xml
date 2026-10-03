@@ -524,4 +524,6 @@
     <string name="admin_plan_days">+30 jours</string>
     <string name="admin_ac_tools">Gestion des AC et attributions</string>
     <string name="admin_tips_title">Pourboires des créateurs</string>
+    <string name="plan_locked_online">Le bouton d\'état en ligne est réservé aux abonnés Legendary 👑.</string>
+    <string name="profile_offline_suffix"> · masqué</string>
 </resources>

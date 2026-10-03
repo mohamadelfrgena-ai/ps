@@ -107,6 +107,21 @@ class ProfileRepository(
         refreshProfile()
     }
 
+    /**
+     * تشغيل/إطفاء حالة الاتصال الخضراء (عمود show_online_status الموجود أصلاً في الجدول).
+     * تغيير فوري بلا حفظ باقي الحقول.
+     */
+    suspend fun setShowOnline(value: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc(
+                "update_my_profile",
+                params("show_online" to p(value)),
+                signedOnly = true,
+            )
+            refreshProfile()
+        }
+    }
+
     /** اختيار أفاتار أو بانر من أصول الموقع (kind = avatar | banner). */
     suspend fun setProfileAsset(kind: String, value: String?): Result<Unit> = runCatching {
         supabase.rpc(

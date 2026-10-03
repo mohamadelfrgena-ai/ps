@@ -524,4 +524,6 @@
     <string name="admin_plan_days">+30 días</string>
     <string name="admin_ac_tools">Gestión de AC y concesiones</string>
     <string name="admin_tips_title">Propinas de creadores</string>
+    <string name="plan_locked_online">El interruptor de estado en línea es solo para suscriptores Legendary 👑.</string>
+    <string name="profile_offline_suffix"> · oculto</string>
 </resources>

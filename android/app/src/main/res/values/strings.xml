@@ -540,4 +540,6 @@
     <string name="admin_plan_days">+30 days</string>
     <string name="admin_ac_tools">AC management and grants</string>
     <string name="admin_tips_title">Creator tips</string>
+    <string name="plan_locked_online">The online status switch is for Legendary 👑 subscribers only.</string>
+    <string name="profile_offline_suffix"> · hidden</string>
 </resources>
