@@ -9,6 +9,7 @@
 import argparse
 import hashlib
 import os
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -34,11 +35,14 @@ PAGE = """<!doctype html>
 <div class="card">
   <h1>📦 تنزيل تطبيق AddonStation</h1>
   <p class="sub">نسخة debug مبنية من آخر كود (شاشة ترحيب بالقرية عند الغروب · بلا بحث في الشات · لوحة إدارة للأدمن فقط).</p>
-  <a class="btn" href="/apk-debug.apk" download>تحميل APK ({size})</a>
+  <a class="btn" href="/apk-debug.apk?v={tag}" download>تحميل APK ({size})</a>
   <div class="meta">
     الحجم: {size} · {mb} ميغابايت<br>
+    وقت البناء: <b>{built}</b><br>
     SHA-256: <code>{sha}</code>
   </div>
+  <div class="warn">⚠️ إذا لم تتغيّر symptoms بعد التنزيل: افتح هذه الصفحة من جديد (ولا تستخدم تحميلاً سابقاً محفوظاً في المتصفح)،<br>
+  وتأكّد أن وقت البناء أعلاه هو الأحدث. الرابط يحمل رقماً جديداً لكل نسخة فلا يعيد المتصفح الملف القديم.</div>
   <div class="warn">📱 على الهاتف: بعد التحميل فعّل «تثبيت من مصادر غير معروفة» لهاتفك ثم افتح الملف.<br>
   🖥️ على الكمبيوتر: فعّل «السماح بملفات من أي مصدر» في المتصفح إذا رفض التحميل.</div>
 </div></body></html>
@@ -49,13 +53,39 @@ class Handler(BaseHTTPRequestHandler):
     def _html(self, code=200):
         data = open(APK, "rb").read() if os.path.exists(APK) else b""
         sha = hashlib.sha256(data).hexdigest() if data else "—"
+        mtime = os.path.getmtime(APK) if os.path.exists(APK) else 0
+        built = time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime)) if mtime else "—"
         body = PAGE.format(size="%0.1f ميجابايت" % (len(data) / 1048576.0) if data else "غير متاح",
-                           mb=round(len(data) / 1048576.0, 2), sha=sha[:32] + "…").encode("utf-8")
+                           mb=round(len(data) / 1048576.0, 2), sha=sha[:32] + "…",
+                           built=built, tag=sha[:12] + "-" + str(int(mtime))).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def do_HEAD(self):
+        # نفس الترويسات بلا جسم: أدوات الفحص والمتصفحات تستعمله أيضاً
+        if self.path.split("?")[0] in ("/", "/index.html"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+            self.end_headers()
+        elif self.path.split("?")[0] == "/apk-debug.apk":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.android.package-archive")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+            self.send_header("Content-Length", str(os.path.getsize(APK) if os.path.exists(APK) else 0))
+            self.end_headers()
+        else:
+            self.send_error(404)
 
     def do_GET(self):
         path = self.path.split("?")[0]
@@ -68,6 +98,11 @@ class Handler(BaseHTTPRequestHandler):
             size = os.path.getsize(APK)
             self.send_response(200)
             self.send_header("Content-Type", "application/vnd.android.package-archive")
+            # **بدون هذا يأخذ المتصفح/الهاتف النسخة القديمة من ذاكرته المؤقتة**
+            # ويبقى المستخدم يجرّب نسخة قديمة بعد التحديث.
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
             self.send_header("Content-Disposition", 'attachment; filename="AddonStation-debug.apk"')
             self.send_header("Content-Length", str(size))
             self.end_headers()
