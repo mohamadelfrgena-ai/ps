@@ -121,9 +121,13 @@ class ChatViewModel(private val container: AppContainer) {
         pollJob = scope.launch {
             while (true) {
                 delay(2000)
-                refreshTails()
-                val names = container.chat.typingNames(channelId, container.supabase.session()?.userId)
-                _typing.value = names
+                // أي خطأ عابر في جلب واحد لا يجوز أن يُوقف الاستقبال كلّه
+                runCatching { refreshTails() }
+                runCatching {
+                    _typing.value = container.chat.typingNames(
+                        channelId, container.supabase.session()?.userId,
+                    )
+                }
             }
         }
     }
@@ -247,7 +251,14 @@ class ChatViewModel(private val container: AppContainer) {
                     mentionIds = mentions,
                 )
             }.onSuccess { sent ->
-                // ② نستبدل المؤقتة بالرسالة الحقيقية (أو نضيفها إن حُذفت المؤقتة بالـ polling)
+                // ② الخادم لم يُرجع رقماً ⇒ نحذف المؤقتة ونترك الاستطلاع يجلب النسخة الحقيقية
+                if (sent.id <= 0L) {
+                    _messages.value = _messages.value.filterNot { it.message.id == tempId }
+                    onDone(true, null)
+                    refreshTails()
+                    return@onSuccess
+                }
+                // ③ نستبدل المؤقتة بالرسالة الحقيقية (أو نضيفها إن حُذفت المؤقتة بالاستطلاع)
                 val current = _messages.value
                 if (current.any { it.message.id == tempId }) {
                     _messages.value = current.map {
