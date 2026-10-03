@@ -1,8 +1,7 @@
-import java.time.DateTimeFormatter
-import java.time.ZoneId
-import java.time.ZonedDateTime
-
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Properties
+import java.util.TimeZone
 
 plugins {
     id("com.android.application")
@@ -60,9 +59,9 @@ android {
 
         // ختم زمني للبناء: يعرضه التطبيق داخل الإعدادات حتى يعرف صاحب التطبيق
         // أي نسخة مثبّتة عنده بالضبط (نسخة كل تغيير تختلف).
-        val buildStamp = ZonedDateTime.now()
-            .withZoneSameInstant(ZoneId.of("Africa/Tripoli"))
-            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+        val buildStamp = SimpleDateFormat("yyyy-MM-dd HH:mm").apply {
+            timeZone = TimeZone.getTimeZone("Africa/Tripoli")
+        }.format(Date())
         buildConfigField("String", "BUILD_STAMP", "\"$buildStamp\"")
         buildConfigField("long", "BUILD_EPOCH_MILLIS", "${System.currentTimeMillis()}L")
     }
