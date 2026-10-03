@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsTopHeight
@@ -155,7 +156,10 @@ fun AppRoot(
                 Spacer(
                     Modifier
                         .fillMaxWidth()
-                        .windowInsetsTopHeight(WindowInsets.statusBars),
+                        // مع UNION مع فتحة الكاميرا: بعض الأجهزة (ثقب/شق في الأعلى)
+                        // تُبلّغ عن المنطقة عبر displayCutout لا عبر statusBars،
+                        // فكان الشريط يبقى متداخلاً مع الأيقونات هناك.
+                        .windowInsetsTopHeight(WindowInsets.statusBars.union(WindowInsets.displayCutout)),
                 )
                 Box(Modifier.fillMaxSize()) {
                     when {

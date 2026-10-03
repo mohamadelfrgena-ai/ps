@@ -13,7 +13,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UI = os.path.join(ROOT, "android/app/src/main/java/com/addonstation/mobile/ui")
 NAV = os.path.join(UI, "nav/AppNav.kt")
-EXPECTED_STAMP = "windowInsetsTopHeight(WindowInsets.statusBars)"
+EXPECTED_STAMP = "WindowInsets.statusBars.union(WindowInsets.displayCutout)"
 
 failures = []
 
