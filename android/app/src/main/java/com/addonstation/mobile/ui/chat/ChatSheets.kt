@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -259,7 +260,12 @@ private fun SheetScaffold(onDismiss: () -> Unit, content: @Composable () -> Unit
         sheetState = sheetState,
         containerColor = AppColors.Surface,
     ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) { content() }
+        // اللوح المنبثق نافذة مستقلة، فلا يصله حجز الجذر ⇒ نحجز شريط الحالة هنا
+        Column(
+            Modifier
+                .statusBarsPadding()
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        ) { content() }
         Spacer(Modifier.height(16.dp))
     }
 }
