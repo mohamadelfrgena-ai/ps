@@ -312,19 +312,57 @@ fun roomIconRes(channelId: String): Int = when (channelId) {
 
 /** بديل الأفاتار: يظهر عند غياب الرابط أو فشل تحميل الصورة. */
 @Composable
+/** الأصول الافتراضية في مكتبة الصور: المجاني للحساب، و«Default Profile» قبل الحساب. */
+private val ASSET_FREE_DEFAULT = listOf("profiles/profiles/onefree.png", "profiles/onefree.png")
+private val ASSET_AUTH_DEFAULT = listOf("profiles/profiles/default-profile.jpg")
+
 /**
- * البروفايل الافتراضي داخل التطبيق (المجاني): يظهر لكل حساب ما زال بلا صورة رفعها
- * صاحبه — بما فيها الحساب الجديد مباشرة بعد التسجيل أو إنشاء الحساب.
- * (شاشة الدخول/الإنشاء قبل الحساب تستعمل DefaultProfileAvatar، وهي صورة أخرى.)
+ * صورة من مكتبة الأصول (site-assets) مع نسخة محلية احتياطية: تظهر فوراً محلياً
+ * ثم تُستبدل بالأصل الحقيقي عند وصوله — فتعمل بلا إنترنت أيضاً.
+ */
+@Composable
+private fun SiteAssetOrLocal(
+    paths: List<String>,
+    local: Int,
+    size: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val container = com.addonstation.mobile.ui.rememberContainer()
+    val url = remember(paths) { paths.firstNotNullOfOrNull { container.siteAssetUrl(it) } }
+    val localImage: @Composable () -> Unit = {
+        Image(
+            painter = painterResource(local),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(size),
+        )
+    }
+    if (url.isNullOrBlank()) {
+        localImage()
+    } else {
+        SubcomposeAsyncImage(
+            model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                .data(url)
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier.size(size),
+            loading = { localImage() },
+            error = { localImage() },
+        )
+    }
+}
+
+/**
+ * البروفايل الافتراضي داخل التطبيق: الأصل المجاني `onefree` من مكتبة الصور —
+ * وهو نفسه الذي تعطيه القاعدة لأي حساب جديد (افتراضي عمود avatar_url)،
+ * فيظهر للحساب الجديد مباشرة بعد التسجيل أو إنشاء الحساب، ولكل من لم يرفع صورة.
+ * (شاشة الدخول/الإنشاء قبل وجود الحساب تستعمل DefaultProfileAvatar وهي صورة أخرى.)
  */
 @Composable
 fun AvatarFallback(size: Dp) {
-    Image(
-        painter = painterResource(R.drawable.ic_user),
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = Modifier.size(size),
-    )
+    SiteAssetOrLocal(ASSET_FREE_DEFAULT, R.drawable.ic_user, size)
 }
 
 /**
@@ -336,15 +374,14 @@ fun DefaultProfileAvatar(
     size: Dp = 96.dp,
     modifier: Modifier = Modifier,
 ) {
-    Image(
-        painter = painterResource(R.drawable.ic_default_profile),
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
+    Box(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
             .border(1.dp, AppColors.Border2, CircleShape),
-    )
+    ) {
+        SiteAssetOrLocal(ASSET_AUTH_DEFAULT, R.drawable.ic_default_profile, size)
+    }
 }
 
 /** صورة رمزية دائرية مع نقطة حالة اختيارية. */
