@@ -225,7 +225,7 @@ class ChatViewModel(private val container: AppContainer) {
             replyToId = replyTo?.id,
             createdAt = com.addonstation.mobile.util.TimeFormat.isoNow(),
         )
-        val meProfile = _authors.value[myId]
+        val meProfile = _authors.value[myId] ?: container.state.profile.value?.takeIf { it.id == myId }
         _messages.value = _messages.value + ChatMessageUi(
             message = draft,
             author = meProfile,
@@ -258,12 +258,12 @@ class ChatViewModel(private val container: AppContainer) {
                     refreshTails()
                     return@onSuccess
                 }
-                // ③ نستبدل المؤقتة بالرسالة الحقيقية (أو نضيفها إن حُذفت المؤقتة بالاستطلاع)
+                // ③ نستبدل المؤقتة بالرسالة الحقيقية — ولو سبقها الاستقبال نُبقي نسخة واحدة فقط
                 val current = _messages.value
                 if (current.any { it.message.id == tempId }) {
-                    _messages.value = current.map {
-                        if (it.message.id == tempId) it.copy(message = sent, pending = false) else it
-                    }
+                    _messages.value = current
+                        .filterNot { it.message.id == sent.id && it.message.id != tempId }
+                        .map { if (it.message.id == tempId) it.copy(message = sent, pending = false) else it }
                 } else if (current.none { it.message.id == sent.id }) {
                     _messages.value = current + ChatMessageUi(
                         message = sent,
