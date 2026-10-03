@@ -88,6 +88,9 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(18.dp))
+            // صورة البروفايل الافتراضية (صورة المالك) قبل تسجيل الدخول
+            com.addonstation.mobile.ui.components.DefaultProfileAvatar(size = 92.dp)
+            Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.brand_wordmark), style = AppText.pageTitle, color = AppColors.Text)
             Spacer(Modifier.height(6.dp))
             Text(
@@ -258,6 +261,9 @@ fun SignUpScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(16.dp))
+            // صورة البروفايل الافتراضية (صورة المالك) قبل إنشاء الحساب
+            com.addonstation.mobile.ui.components.DefaultProfileAvatar(size = 92.dp)
+            Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.auth_signup_title), style = AppText.pageTitle, color = AppColors.Text)
             Spacer(Modifier.height(6.dp))
             Text(

@@ -323,6 +323,26 @@ private fun AvatarFallback(size: Dp) {
     }
 }
 
+/**
+ * صورة البروفايل الافتراضية التي يطلبها المالك: تظهر في شاشة تسجيل الدخول
+ * وفي شاشة إنشاء الحساب (قبل أن يكون للمستخدم صورة).
+ */
+@Composable
+fun DefaultProfileAvatar(
+    size: Dp = 96.dp,
+    modifier: Modifier = Modifier,
+) {
+    Image(
+        painter = painterResource(R.drawable.ic_default_profile),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .border(1.dp, AppColors.Border2, CircleShape),
+    )
+}
+
 /** صورة رمزية دائرية مع نقطة حالة اختيارية. */
 @Composable
 fun AvatarImage(

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  صورة البروفايل الافتراضية (قبل تسجيل الدخول وعند إنشاء حساب).
+  نسخة متجهية (Vector) من صورة المالك: خلفية رمادية + ظلّ شخص فاتح بإطار أسود،
+  حادّة على أي كثافة شاشة وبدون أيloss في الجودة.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="94dp"
+    android:viewportWidth="750"
+    android:viewportHeight="730">
+
+    <!-- الخلفية الرمادية -->
+    <path
+        android:fillColor="#808080"
+        android:pathData="M0,0 H750 V730 H0 Z" />
+
+    <!-- ظلّ الشخص: الرأس + الكتفان -->
+    <path
+        android:fillColor="#D6D6D6"
+        android:strokeColor="#000000"
+        android:strokeWidth="11"
+        android:pathData="M375,189 A136,136 0 1 0 375,461 A136,136 0 1 0 375,189 Z" />
+    <path
+        android:fillColor="#D6D6D6"
+        android:strokeColor="#000000"
+        android:strokeWidth="11"
+        android:pathData="M105,730 L105,708 C105,566 228,492 375,492 C522,492 645,566 645,708 L645,730 Z" />
+</vector>
