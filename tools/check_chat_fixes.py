@@ -60,6 +60,7 @@ rows.append(("الشاشة تمرّر إلى رسالتي دائماً", "Launch
              and "if (scrollTick > 0 && messages.isNotEmpty())" in screen))
 rows.append(("شارة «رسائل بالأسفل» تُصفَّر عند الإرسال",
              "_newMessagesBelow.value = false\n        _scrollTick.value += 1" in vm))
+rows.append(("التمرير يتبع ما دمت في أسفل القائمة", "(atBottom || !newBelow)" in screen))
 rows.append(("بلوغ آخر رسالة يعيد تفعيل التمرير التلقائي",
              "snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }" in screen))
 

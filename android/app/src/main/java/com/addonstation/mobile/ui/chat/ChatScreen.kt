@@ -149,9 +149,12 @@ fun ChatScreen(
     LaunchedEffect(channel.id) { vm.open(channel) }
     DisposableEffect(channel.id) { onDispose { vm.close() } }
 
-    // تمرير تلقائي للأسفل عند وصول رسائل جديدة إذا كان المستخدم قريباً من الأسفل
+    // هل العرض ملتصق بالأسفل؟ (= المستخدم يقرأ آخر الرسائل)
+    var atBottom by remember { mutableStateOf(true) }
+
+    // تمرير تلقائي للأسفل: دائماً إن كان ملتصقاً بالأسفل، أو لم تُرفع شارة «رسائل بالأسفل» بعد
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty() && !newBelow) {
+        if (messages.isNotEmpty() && (atBottom || !newBelow)) {
             listState.animateScrollToItem(messages.lastIndex)
         }
     }
@@ -162,14 +165,15 @@ fun ChatScreen(
             listState.animateScrollToItem(messages.lastIndex)
         }
     }
-    // بلوغ آخر رسالة = قرأها ⇒ تعود التمرير التلقائي للرسائل الجديدة
+    // تتبّع موضع العرض: بلوغ آخر رسالة = قرأها ⇒ شارة «رسائل بالأسفل» تنزل والتمرير يعود
     LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
-            .collect { lastVisible ->
-                if (messages.isNotEmpty() && lastVisible >= messages.lastIndex) {
-                    vm.markReadUpToBottom()
-                }
-            }
+        snapshotFlow {
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            messages.isNotEmpty() && last >= messages.lastIndex
+        }.collect { bottom ->
+            atBottom = bottom
+            if (bottom) vm.markReadUpToBottom()
+        }
     }
     LaunchedEffect(newBelow) {
         if (!newBelow) vm.markReadUpToBottom()
