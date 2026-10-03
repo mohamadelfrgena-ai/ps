@@ -1,5 +1,8 @@
 package com.addonstation.mobile.ui.chat
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+
 import com.addonstation.mobile.data.AppContainer
 import com.addonstation.mobile.data.model.ChatChannel
 import com.addonstation.mobile.data.model.ChatMessage
@@ -79,12 +82,17 @@ class ChatViewModel(private val container: AppContainer) {
     }
 
     private suspend fun loadInitial(channelId: String) {
+        // الرسالة أولاً (نحتاج idsها)، ثم بقية الطلبات بالتوازي لا بالتتابع
         val list = container.chat.messages(channelId, limit = 100)
         lastReadId = list.lastOrNull()?.id ?: 0L
         val ids = list.map { it.userId }.toMutableSet()
-        val profiles = container.profile.loadProfiles(ids)
-        val reactions = container.chat.reactionsFor(list.map { it.id })
-        val myReactions = container.chat.myReactionsFor(list.map { it.id })
+        val messageIds = list.map { it.id }
+        val (profiles, reactions, myReactions) = coroutineScope {
+            val a = async { container.profile.loadProfiles(ids) }
+            val b = async { container.chat.reactionsFor(messageIds) }
+            val c = async { container.chat.myReactionsFor(messageIds) }
+            Triple(a.await(), b.await(), c.await())
+        }
         val byId = list.associateBy { it.id }
         _authors.value = profiles
         _messages.value = list.map { message ->

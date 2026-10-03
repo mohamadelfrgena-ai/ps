@@ -1,5 +1,8 @@
 package com.addonstation.mobile.ui.store
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -98,9 +101,16 @@ fun StoreScreen(
 
     suspend fun reload() {
         loading = true
-        items = container.content.browse(type, sort, query, 60)
-        favourites = if (container.supabase.session() == null) emptySet()
-        else container.content.favorites().map { it.id }.toSet()
+        // بالتوازي: المتصفح كان ينتظر جولتين شبكيتين متتاليتين
+        coroutineScope {
+            val list = async { container.content.browse(type, sort, query, 60) }
+            val fav = async {
+                if (container.supabase.session() == null) emptySet()
+                else container.content.favorites().map { it.id }.toSet()
+            }
+            items = list.await()
+            favourites = fav.await()
+        }
         loading = false
     }
 

@@ -1,5 +1,8 @@
 package com.addonstation.mobile.ui.home
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -110,10 +113,17 @@ fun HomeScreen(
     LaunchedEffect(profile?.id) {
         loading = true
         runCatching {
-            featured = container.content.featured(8)
-            latest = container.content.latest(6)
-            recommended = container.content.recommended(6)
-            creators = container.creators.creators().take(4)
+            // بالتوازي لا بالتتابع: الانتظار كان أربع جولات شبكة (زمنها مجموع)
+            coroutineScope {
+                val f = async { container.content.featured(8) }
+                val l = async { container.content.latest(6) }
+                val r = async { container.content.recommended(6) }
+                val c = async { container.creators.creators().take(4) }
+                featured = f.await()
+                latest = l.await()
+                recommended = r.await()
+                creators = c.await()
+            }
         }
         loading = false
     }
