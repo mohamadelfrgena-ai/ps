@@ -89,10 +89,22 @@ class AssetsRepository(
             for (asset in list) {
                 val path = cfg.normalizeStoragePath(asset.fileUrl)
                 val lower = path.lowercase()
-                if (lower.endsWith(".gif") || lower.endsWith(".svg") || asset.animated) continue
+                if (lower.endsWith(".svg")) continue
                 val original = runCatching {
                     supabase.downloadBytes(cfg.publicUrl("site-assets", asset.fileUrl))
                 }.getOrNull() ?: continue
+                // **المتحرّكة (GIF)**: لا نلمس الأصل (حركته مرغوبة)، بل نولّد لقطة
+                // ثابتة بجانبه بنفس المسار + ‎.thumb.jpg‎ تستعملها شبكة الأصول،
+                // فتكفي خانة العرض بلا تشغيل عشرات المتحرّكات معاً.
+                if (lower.endsWith(".gif") || asset.animated) {
+                    val frame = shrinkImageBytes(original, maxSide = 384, jpegQuality = 82, forceJpeg = true)
+                    if (frame != null) {
+                        runCatching {
+                            supabase.upload("site-assets", "$path.thumb.jpg", frame.bytes, "image/jpeg", upsert = true)
+                        }.onSuccess { done++ }
+                    }
+                    continue
+                }
                 // ما هو صغير أصلاً: نعدّه ولا نلمسه
                 if (original.size <= 120 * 1024) {
                     done++

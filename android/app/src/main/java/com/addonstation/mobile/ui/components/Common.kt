@@ -35,7 +35,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -399,12 +401,31 @@ fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier) {
         if (!url.isNullOrBlank()) {
             // نموذج الرابط مباشرة: بلا ImageRequest.Builder (بلا Crossfade ولا مقاس
             // يدوي) — أفتح الشاشات، وCoil يقرأ المقاس من مكان الخلية نفسه.
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(size),
-            )
+            //
+            // الصورة المتحركة (GIF) في شبكة Assets تُعرض كلقطة ثابتة: تشغيل عشرات
+            // المتحرّكات معاً يستهلك الذاكرة ويجعل التمرير يتهنّج. اللقطة الثابتة
+            // تُنتجها أداة «تصغير كل صور الأصول» بنفس المسار + ‎.thumb.jpg‎، فإن لم
+            // توجد نرجع إلى الأصل.
+            val thumb = remember(url) {
+                if (url.contains(".gif", ignoreCase = true)) "$url.thumb.jpg" else null
+            }
+            var thumbFailed by remember(url) { mutableStateOf(false) }
+            if (thumb != null && !thumbFailed) {
+                AsyncImage(
+                    model = thumb,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(size),
+                    onError = { thumbFailed = true },
+                )
+            } else {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(size),
+                )
+            }
         }
     }
 }

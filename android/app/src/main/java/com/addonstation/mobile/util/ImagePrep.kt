@@ -103,6 +103,7 @@ suspend fun shrinkImageBytes(
     bytes: ByteArray,
     maxSide: Int = 512,
     jpegQuality: Int = 85,
+    forceJpeg: Boolean = false,
 ): PreparedImage? = withContext(Dispatchers.IO) {
     runCatching {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -118,7 +119,7 @@ suspend fun shrinkImageBytes(
         val out = ByteArrayOutputStream()
         val mime: String
         val ext: String
-        if (scaled.hasAlpha()) {
+        if (scaled.hasAlpha() && !forceJpeg) {
             scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
             mime = "image/png"
             ext = "png"
