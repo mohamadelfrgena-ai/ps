@@ -50,7 +50,7 @@ def default_profile(size):
     return img, mask
 
 
-img = Image.new("RGB", (MARGIN * 2 + PW * 2 + GAP, TOP + PH + 96), BG)
+img = Image.new("RGB", (MARGIN * 2 + PW * 2 + GAP, TOP + PH + 210), BG)
 d = ImageDraw.Draw(img)
 
 
@@ -144,11 +144,21 @@ gradient_button(x0 + 18, x1 - 18, y, "إنشاء الحساب"); y += 64
 text((x0 + x1) // 2, y, "بإنشائك حساباً فأنت توافق على الشروط", 11, MUTED, anchor="mm")
 
 # ── تذييل ─────────────────────────────────────────────────────────────
-fy = TOP + PH + 42
-text(img.width / 2, fy, "الصورة تظهر أعلى الشاشتين — قبل تسجيل الدخول وعند إنشاء الحساب",
-     14, TEXT, True, "mm")
-text(img.width / 2, fy + 26, "نفس صورة البروفايل داخل التطبيق (دائرية بحدّ خفيف)",
-     12, MUTED, anchor="mm")
+# ── 3) بعد الحساب: البروفايل الافتراضي المجاني ───────────────────────
+y = TOP + PH + 24
+text(img.width / 2, y, "وبعد تسجيل الدخول أو إنشاء الحساب:", 14, TEXT, True, "mm")
+y += 34
+free = Image.open(os.path.join(ROOT, "android", "app", "src", "main", "res",
+                               "drawable-nodpi", "ic_user.png")).convert("RGBA").resize((96, 96))
+mask = Image.new("L", (96, 96), 0)
+ImageDraw.Draw(mask).ellipse((0, 0, 95, 95), fill=255)
+img.paste(free, (int(img.width / 2 - 48), int(y)), mask)
+d.ellipse((img.width / 2 - 48, y, img.width / 2 + 48, y + 96), outline=BORDER2, width=2)
+text(img.width / 2 + 64, y + 28, "الحساب الجديد يأخذ الصورة الافتراضية المجانية",
+     13, TEXT, True)
+text(img.width / 2 + 64, y + 54, "وتظهر لكل من ما زال بلا صورة رفعها (شات · ملف · أعضاء)",
+     12, MUTED)
+text(img.width / 2 + 64, y + 76, "وعند رفع صورة شخصية تُستبدل تلقائياً", 12, MUTED)
 
 img.save(OUT)
 print("saved", OUT, img.size)

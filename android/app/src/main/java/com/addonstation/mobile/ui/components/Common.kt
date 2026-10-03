@@ -312,15 +312,19 @@ fun roomIconRes(channelId: String): Int = when (channelId) {
 
 /** بديل الأفاتار: يظهر عند غياب الرابط أو فشل تحميل الصورة. */
 @Composable
-private fun AvatarFallback(size: Dp) {
-    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
-        Icon(
-            imageVector = Icons.Filled.Person,
-            contentDescription = null,
-            tint = AppColors.Muted,
-            modifier = Modifier.size(size * 0.55f),
-        )
-    }
+/**
+ * البروفايل الافتراضي داخل التطبيق (المجاني): يظهر لكل حساب ما زال بلا صورة رفعها
+ * صاحبه — بما فيها الحساب الجديد مباشرة بعد التسجيل أو إنشاء الحساب.
+ * (شاشة الدخول/الإنشاء قبل الحساب تستعمل DefaultProfileAvatar، وهي صورة أخرى.)
+ */
+@Composable
+fun AvatarFallback(size: Dp) {
+    Image(
+        painter = painterResource(R.drawable.ic_user),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.size(size),
+    )
 }
 
 /**
