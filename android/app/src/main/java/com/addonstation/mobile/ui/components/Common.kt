@@ -397,12 +397,10 @@ fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier) {
             .background(AppColors.Elevated2),
     ) {
         if (!url.isNullOrBlank()) {
+            // نموذج الرابط مباشرة: بلا ImageRequest.Builder (بلا Crossfade ولا مقاس
+            // يدوي) — أفتح الشاشات، وCoil يقرأ المقاس من مكان الخلية نفسه.
             AsyncImage(
-                model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                    .data(url)
-                    .size(size, size)      // Coil 2.7: العرض والارتفاع معاً
-                    .crossfade(false)
-                    .build(),
+                model = url,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.size(size),
