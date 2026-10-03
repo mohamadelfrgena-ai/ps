@@ -62,7 +62,8 @@ rows.append(("شارة «رسائل بالأسفل» تُصفَّر عند ال�
              "_newMessagesBelow.value = false\n        _scrollTick.value += 1" in vm))
 rows.append(("التمرير يتبع ما دمت في أسفل القائمة", "(atBottom || !newBelow)" in screen))
 rows.append(("بلوغ آخر رسالة يعيد تفعيل التمرير التلقائي",
-             "snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }" in screen))
+             "snapshotFlow {" in screen and "vm.markReadUpToBottom()" in screen
+             and "atBottom = bottom" in screen))
 
 # ── 2) الضغط المطوّل ⇒ إبلاغ + رد + حذف ───────────────────────────────
 actions = re.search(r"fun MessageActionsSheet\((?:.|\n)*?\n\}", sheets)
