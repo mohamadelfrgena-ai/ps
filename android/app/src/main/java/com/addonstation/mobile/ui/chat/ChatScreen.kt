@@ -263,6 +263,9 @@ fun ChatScreen(
                             myId = container.supabase.session()?.userId,
                             onLongPress = { actionsFor = ui },
                             onReply = { replyTo = ui.message },
+                            onOpenImage = { path ->
+                                scope.launch { container.chat.imageUrl(path)?.let { imageViewerUrl = it } }
+                            },
                             onStickerTap = {
                                 // ملصقي: ضغطة سريعة تُشيله من الشات وتعيده إلى لوحة الملصقات
                                 val myId = container.supabase.session()?.userId
@@ -282,9 +285,6 @@ fun ChatScreen(
                                 }
                             },
                             onToggleReaction = { emoji -> vm.toggleReaction(ui.message.id, emoji) },
-                            onOpenImage = { path ->
-                                scope.launch { container.chat.imageUrl(path)?.let { imageViewerUrl = it } }
-                            },
                             onOpenUser = { userId ->
                                 authors[userId]?.let { onOpenUser(it) }
                             },

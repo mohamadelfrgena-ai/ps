@@ -306,7 +306,7 @@ fun SettingsScreen(
                         }
                     }
                 }
-                val toggleTheme = {
+                val toggleTheme: () -> Unit = {
                     scope.launch {
                         container.prefs.setDarkTheme(!dark)
                         AppPrefs.writeDark(context, !dark)

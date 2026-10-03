@@ -299,7 +299,7 @@ fun AdminPanelScreen(
                             "assets" -> onOpenAssets()
                             "creators" -> onOpenCreatorApps()
                             "settings" -> onOpenSettings()
-                            "ac" -> onOpenAc()
+                            "ac" -> onOpenAc(null)
                             "tips" -> onOpenTips()
                             "chat" -> onOpenChat()
                             "audit" -> onOpenAudit()

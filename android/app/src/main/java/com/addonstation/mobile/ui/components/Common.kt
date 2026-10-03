@@ -310,8 +310,6 @@ fun roomIconRes(channelId: String): Int = when (channelId) {
     else -> R.drawable.ic_room_general
 }
 
-/** بديل الأفاتار: يظهر عند غياب الرابط أو فشل تحميل الصورة. */
-@Composable
 /** الأصول الافتراضية في مكتبة الصور: المجاني للحساب، و«Default Profile» قبل الحساب. */
 private val ASSET_FREE_DEFAULT = listOf("profiles/profiles/onefree.png", "profiles/onefree.png")
 private val ASSET_AUTH_DEFAULT = listOf("profiles/profiles/default-profile.jpg")
@@ -360,6 +358,7 @@ private fun SiteAssetOrLocal(
  * فيظهر للحساب الجديد مباشرة بعد التسجيل أو إنشاء الحساب، ولكل من لم يرفع صورة.
  * (شاشة الدخول/الإنشاء قبل وجود الحساب تستعمل DefaultProfileAvatar وهي صورة أخرى.)
  */
+/** بديل الأفاتار: يظهر عند غياب الرابط أو فشل تحميل الصورة. */
 @Composable
 fun AvatarFallback(size: Dp) {
     SiteAssetOrLocal(ASSET_FREE_DEFAULT, R.drawable.ic_user, size)
