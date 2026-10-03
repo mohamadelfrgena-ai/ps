@@ -53,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -103,6 +104,7 @@ fun ChatScreen(
     val authors by vm.authors.collectAsState()
     val loading by vm.loading.collectAsState()
     val newBelow by vm.newMessagesBelow.collectAsState()
+    val scrollTick by vm.scrollTick.collectAsState()
     val typing by vm.typing.collectAsState()
     val stickers by vm.stickers.collectAsState()
     val packs by vm.packs.collectAsState()
@@ -152,6 +154,22 @@ fun ChatScreen(
         if (messages.isNotEmpty() && !newBelow) {
             listState.animateScrollToItem(messages.lastIndex)
         }
+    }
+    // الرسالة التي أرسلها المستخدم: تُمرَّر إليها دائماً. بدون هذا تختفي تحت حافة الشاشة
+    // ما دامت شارة «رسائل بالأسفل» مفعّلة، فيظنّ صاحبها أن رسالته ضاعت.
+    LaunchedEffect(scrollTick) {
+        if (scrollTick > 0 && messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.lastIndex)
+        }
+    }
+    // بلوغ آخر رسالة = قرأها ⇒ تعود التمرير التلقائي للرسائل الجديدة
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .collect { lastVisible ->
+                if (messages.isNotEmpty() && lastVisible >= messages.lastIndex) {
+                    vm.markReadUpToBottom()
+                }
+            }
     }
     LaunchedEffect(newBelow) {
         if (!newBelow) vm.markReadUpToBottom()

@@ -44,6 +44,10 @@ class ChatViewModel(private val container: AppContainer) {
     private val _newMessagesBelow = MutableStateFlow(false)
     val newMessagesBelow: StateFlow<Boolean> = _newMessagesBelow.asStateFlow()
 
+    /** يزيد عند كل رسالة يرسلها المستخدم ⇒ الشاشة تمرّر إليها دائماً (حتى لو كانت فوق). */
+    private val _scrollTick = MutableStateFlow(0)
+    val scrollTick: StateFlow<Int> = _scrollTick.asStateFlow()
+
     private val _newDividerId = MutableStateFlow<Long?>(null)
     val newDividerId: StateFlow<Long?> = _newDividerId.asStateFlow()
 
@@ -233,6 +237,9 @@ class ChatViewModel(private val container: AppContainer) {
             replyAuthorName = replyTo?.let { _authors.value[it.userId]?.username },
             pending = true,
         )
+        // رسالتي أنا: تظهر دائماً وتُمرَّر إليها، والشارة «رسائل بالأسفل» تُصفَّر
+        _newMessagesBelow.value = false
+        _scrollTick.value += 1
 
         scope.launch {
             val members = _authors.value.values.toList()

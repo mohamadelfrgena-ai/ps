@@ -53,6 +53,15 @@ else:
 rows.append(("تحديث الذيل يتجاهل الرسالة المؤقتة", "it.message.id > 0L" in vm))
 rows.append(("حلقة التحديث لا تموت عند فشل واحد", "runCatching { refreshTails() }" in vm))
 rows.append(("لا تكرار عند سباق الاستقبال", "filterNot { it.message.id == sent.id && it.message.id != tempId }" in vm))
+#Message must also be *seen*: the list follows my own send even when the
+# "new messages below" flag is on (this was the "I have to leave the room" bug).
+rows.append(("عدّاد تمرير لكل رسالة أرسلها", "_scrollTick.value += 1" in vm and "val scrollTick" in vm))
+rows.append(("الشاشة تمرّر إلى رسالتي دائماً", "LaunchedEffect(scrollTick)" in screen
+             and "if (scrollTick > 0 && messages.isNotEmpty())" in screen))
+rows.append(("شارة «رسائل بالأسفل» تُصفَّر عند الإرسال",
+             "_newMessagesBelow.value = false\n        _scrollTick.value += 1" in vm))
+rows.append(("بلوغ آخر رسالة يعيد تفعيل التمرير التلقائي",
+             "snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }" in screen))
 
 # ── 2) الضغط المطوّل ⇒ إبلاغ + رد + حذف ───────────────────────────────
 actions = re.search(r"fun MessageActionsSheet\((?:.|\n)*?\n\}", sheets)
