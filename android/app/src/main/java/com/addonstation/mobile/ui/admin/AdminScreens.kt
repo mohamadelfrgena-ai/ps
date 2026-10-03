@@ -1,5 +1,7 @@
 package com.addonstation.mobile.ui.admin
 
+import coil.compose.AsyncImage
+
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -935,13 +937,28 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        AvatarImage(url = assetUrl(container, asset.fileUrl), size = 40.dp)
+                        // صورة الأصل + علامة ✗ حمراء إن لم تظهر، مع المسار:
+                        // هذا يبيّن فوراً أي ملف ناقص أو مسار خاطئ في المخزن
+                        var missing by remember(asset.id) { mutableStateOf(false) }
+                        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                            AsyncImage(
+                                model = assetUrl(container, asset.fileUrl),
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp),
+                                onError = { missing = true },
+                                onSuccess = { missing = false },
+                            )
+                            if (missing) {
+                                Text("✗", style = AppText.body, color = AppColors.Red)
+                            }
+                        }
                         Column(Modifier.weight(1f)) {
                             Text(asset.name, style = AppText.bodySmall, color = AppColors.Text, maxLines = 1)
                             Text(
-                                "${asset.assetType} · ${asset.requiredPlan}",
+                                if (missing) asset.fileUrl else "${asset.assetType} · ${asset.requiredPlan}",
                                 style = AppText.tiny,
-                                color = AppColors.Muted,
+                                color = if (missing) AppColors.Red else AppColors.Muted,
+                                maxLines = 1,
                             )
                         }
                         androidx.compose.material3.Icon(
