@@ -144,7 +144,8 @@ class ChatViewModel(private val container: AppContainer) {
     private suspend fun refreshTails() {
         val channelId = _channel.value?.id ?: return
         val current = _messages.value
-        val lastId = current.lastOrNull()?.message?.id ?: 0L
+        // آخر رسالة حقيقية فقط (الرسائل المؤقتة_optimistic رقمها سالب)
+        val lastId = current.lastOrNull { it.message.id > 0L }?.message?.id ?: 0L
         if (lastId > 0) {
             val newer = container.chat.messagesSince(channelId, lastId)
             if (newer.isNotEmpty()) {
@@ -201,6 +202,34 @@ class ChatViewModel(private val container: AppContainer) {
         onDone: (Boolean, String?) -> Unit,
     ) {
         val channel = _channel.value ?: return
+        val myId = container.supabase.session()?.userId.orEmpty()
+
+        // ① تظهر الرسالة فوراً (بلا انتظار رد الخادم) برقم مؤقت سالب (رقم فريد دائماً)
+        var tempId = -System.currentTimeMillis()
+        while (_messages.value.any { it.message.id == tempId }) tempId -= 1
+        val draft = ChatMessage(
+            id = tempId,
+            channelId = channel.id,
+            userId = myId,
+            content = content,
+            messageType = messageType,
+            stickerUrl = stickerUrl,
+            imagePath = imagePath,
+            mediaPath = mediaPath,
+            mediaMimeType = mediaMime,
+            mediaSize = mediaSize,
+            replyToId = replyTo?.id,
+            createdAt = com.addonstation.mobile.util.TimeFormat.isoNow(),
+        )
+        val meProfile = _authors.value[myId]
+        _messages.value = _messages.value + ChatMessageUi(
+            message = draft,
+            author = meProfile,
+            replyTo = replyTo,
+            replyAuthorName = replyTo?.let { _authors.value[it.userId]?.username },
+            pending = true,
+        )
+
         scope.launch {
             val members = _authors.value.values.toList()
             val mentions = content?.let { container.chat.mentionsIn(it, members) } ?: emptyList()
@@ -217,10 +246,26 @@ class ChatViewModel(private val container: AppContainer) {
                     mediaSize = mediaSize,
                     mentionIds = mentions,
                 )
-            }.onSuccess {
-                refreshTails()
+            }.onSuccess { sent ->
+                // ② نستبدل المؤقتة بالرسالة الحقيقية (أو نضيفها إن حُذفت المؤقتة بالـ polling)
+                val current = _messages.value
+                if (current.any { it.message.id == tempId }) {
+                    _messages.value = current.map {
+                        if (it.message.id == tempId) it.copy(message = sent, pending = false) else it
+                    }
+                } else if (current.none { it.message.id == sent.id }) {
+                    _messages.value = current + ChatMessageUi(
+                        message = sent,
+                        author = _authors.value[sent.userId] ?: meProfile,
+                        replyTo = replyTo,
+                        replyAuthorName = replyTo?.let { r -> _authors.value[r.userId]?.username },
+                    )
+                }
                 onDone(true, null)
+                refreshTails()
             }.onFailure { e ->
+                // ③ فشل الإرسال ⇒ تختفي الرسالة المؤقتة حتى لا تبقى معلّقة
+                _messages.value = _messages.value.filterNot { it.message.id == tempId }
                 onDone(false, e.message)
             }
         }

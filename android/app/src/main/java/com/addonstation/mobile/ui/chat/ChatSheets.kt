@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,10 +81,12 @@ fun EmojiStickerSheet(
     onDismiss: () -> Unit,
     onEmoji: (String) -> Unit,
     onSticker: (String) -> Unit,
+    /** ملصق أُعيد من الشات بضغطة سريعة ⇒ يُفتح على تبويب الملصقات ويظهر محدَّداً. */
+    focusSticker: String? = null,
 ) {
     val container = rememberContainer()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var tab by remember { mutableStateOf(0) }
+    var tab by remember(focusSticker) { mutableStateOf(if (focusSticker != null) 1 else 0) }
     var selectedPack by remember { mutableStateOf<String?>(null) }
     val recentRaw by container.prefs.recentEmojis.collectAsState(initial = "")
     val recent = recentRaw.split(' ').filter { it.isNotBlank() }
@@ -163,12 +166,21 @@ fun EmojiStickerSheet(
                             )
                         }
                         items(section.assets, key = { it.id }) { sticker ->
+                            val restored = focusSticker != null &&
+                                (sticker.fileUrl == focusSticker ||
+                                    resolvedStickerUrl(sticker.fileUrl)
+                                        ?.substringBefore('?')?.endsWith(focusSticker, ignoreCase = true) == true)
                             Box(
                                 modifier = Modifier
                                     .padding(4.dp)
                                     .height(84.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(AppColors.Elevated)
+                                    .border(
+                                        if (restored) 2.dp else 0.dp,
+                                        if (restored) AppColors.Green else Color.Transparent,
+                                        RoundedCornerShape(12.dp),
+                                    )
                                     .clickable { onSticker(sticker.fileUrl) },
                                 contentAlignment = Alignment.Center,
                             ) {

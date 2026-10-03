@@ -56,6 +56,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -110,6 +111,8 @@ fun ChatScreen(
 
     var text by remember { mutableStateOf("") }
     var replyTo by remember { mutableStateOf<ChatMessage?>(null) }
+    /** ملصق أُزيل بضغطة سريعة ⇒ لوحة الملصقات تُفتح عليه مباشرة (العودة لمكانه). */
+    var resentSticker by remember { mutableStateOf<String?>(null) }
     var attachment by remember { mutableStateOf<Pair<String, String>?>(null) } // (path, kind)
     var showEmoji by remember { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
@@ -237,6 +240,25 @@ fun ChatScreen(
                             isNewDivider = false,
                             myId = container.supabase.session()?.userId,
                             onLongPress = { actionsFor = ui },
+                            onReply = { replyTo = ui.message },
+                            onStickerTap = {
+                                // ملصقي: ضغطة سريعة تُشيله من الشات وتعيده إلى لوحة الملصقات
+                                val myId = container.supabase.session()?.userId
+                                if (ui.message.userId == myId) {
+                                    val sticker = ui.message.stickerUrl
+                                    vm.deleteMine(ui.message.id) { ok ->
+                                        if (ok && sticker != null) {
+                                            resentSticker = sticker
+                                            showEmoji = true
+                                        } else if (!ok) {
+                                            statusMessage = deleteExpiredMsg
+                                        }
+                                    }
+                                } else {
+                                    // ملصق غيري: ضغطة سريعة تفتحه بالحجم الكامل (لا تُحذف رسالة غيري)
+                                    ui.message.stickerUrl?.let(onOpenImage)
+                                }
+                            },
                             onToggleReaction = { emoji -> vm.toggleReaction(ui.message.id, emoji) },
                             onOpenImage = { path ->
                                 scope.launch { container.chat.imageUrl(path)?.let { imageViewerUrl = it } }
@@ -355,14 +377,17 @@ fun ChatScreen(
                     style = AppText.tiny,
                     color = AppColors.Green,
                     modifier = Modifier.clickable {
+                        // الوسائط مع أي كتابة ⇒ رسالة واحدة
+                        val body = text.trim()
                         vm.send(
-                            content = null,
+                            content = body.ifEmpty { null },
                             replyTo = replyTo,
                             messageType = type,
                             mediaPath = path,
                             mediaMime = mime,
-                        ) { _, error ->
-                            if (error == null) {
+                        ) { ok, error ->
+                            if (ok) {
+                                text = ""
                                 mediaToSend = null
                                 replyTo = null
                                 statusMessage = if (type == "video") videoSentMsg else audioSentMsg
@@ -472,9 +497,24 @@ fun ChatScreen(
                 text += emoji
                 showEmoji = false
             },
+            focusSticker = resentSticker,
             onSticker = { stickerUrl ->
-                vm.send(content = null, replyTo = replyTo, stickerUrl = stickerUrl, messageType = "sticker") { _, error ->
-                    statusMessage = error
+                // الملصق مع أي كتابة ⇒ رسالة واحدة (لا تنقسم)، والكتابة تُمسح بعد النجاح
+                val body = text.trim()
+                vm.send(
+                    content = body.ifEmpty { null },
+                    replyTo = replyTo,
+                    stickerUrl = stickerUrl,
+                    messageType = "sticker",
+                ) { ok, error ->
+                    if (ok) {
+                        text = ""
+                        replyTo = null
+                        resentSticker = null
+                        statusMessage = null
+                    } else {
+                        statusMessage = error
+                    }
                 }
                 showEmoji = false
             },
@@ -786,6 +826,10 @@ private fun MessageBlock(
     isNewDivider: Boolean,
     myId: String?,
     onLongPress: () -> Unit,
+    /** ضغطة بسيطة على الرسالة ⇒ الرد عليها مباشرة (الضغط المطوّل = قائمة الإبلاغ/الحذف). */
+    onReply: () -> Unit,
+    /** ضغطة سريعة على ملصقي ⇒ يُشال ويعود إلى لوحة الملصقات. */
+    onStickerTap: (() -> Unit)? = null,
     onToggleReaction: (String) -> Unit,
     onOpenImage: (String) -> Unit,
     onOpenUser: (String) -> Unit,
@@ -842,9 +886,10 @@ private fun MessageBlock(
                     else -> Color.Transparent
                 }
             )
-            .combinedClickable(onClick = onLongPress, onLongClick = onLongPress)
+            .combinedClickable(onClick = onReply, onLongClick = onLongPress)
+            .alpha(if (ui.pending) 0.55f else 1f)      // قيد الإرسال — تظهر فوراً
             .padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
+    ) messageBody@{
         if (message.isAnnouncement) {
             Text(
                 "📢 " + stringResource(R.string.chat_announcement),
@@ -905,13 +950,29 @@ private fun MessageBlock(
                         .background(AppColors.Dim),
                 )
                 Text(
-                    "@${ui.replyAuthorName ?: ""}: " + original.content.orEmpty().take(60),
+                    // مقتبس بلا نص (ملصق/صورة) ⇒ رمز بدل فراغ
+                    "@${ui.replyAuthorName ?: ""}: " +
+                        (if (original.content.isNullOrBlank() &&
+                            (original.stickerUrl != null || original.imagePath != null)
+                        ) "🖼 " else "") +
+                        original.content.orEmpty().take(60),
                     style = AppText.tiny,
                     color = AppColors.Muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+
+        // رسالة محذوفة أو مخفية: سطر واحد فقط لكل الأنواع (نص/ملصق/وسائط/صورة)
+        if (message.status == "hidden" || message.status == "deleted") {
+            Text(
+                "🚫 " + stringResource(R.string.chat_hidden_message),
+                style = AppText.bodySmall,
+                color = AppColors.Muted,
+                modifier = Modifier.padding(start = 48.dp),
+            )
+            return@messageBody
         }
 
         when (message.messageType) {
@@ -926,7 +987,11 @@ private fun MessageBlock(
                                 fraction = 0.38f, minDp = 108, maxDp = 180,
                             ),
                         )
-                        .clickable { message.stickerUrl?.let(onOpenImage) },
+                        .clickable {
+                            // ملصقي ⇒ ضغطة سريعة = إرجاعه للوحة الملصقات، وغيري = عرض بالحجم الكامل
+                            val takeBack = onStickerTap
+                            if (takeBack != null) takeBack() else message.stickerUrl?.let(onOpenImage)
+                        },
                 ) {
                     com.addonstation.mobile.ui.components.CoverImage(url = url, radius = 12.dp, modifier = Modifier.fillMaxSize())
                 }

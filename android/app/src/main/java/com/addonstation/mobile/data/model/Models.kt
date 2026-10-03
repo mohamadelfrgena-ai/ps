@@ -220,6 +220,8 @@ data class ChatMessageUi(
     val reactions: Map<String, Int> = emptyMap(),
     val myReactions: Set<String> = emptySet(),
     val isNew: Boolean = false,
+    /** رسالة أُظهرت محلياً قبل رد الخادم (رقمها سالب) — تُعرض باهتة حتى التأكيد. */
+    val pending: Boolean = false,
 )
 
 @Serializable
