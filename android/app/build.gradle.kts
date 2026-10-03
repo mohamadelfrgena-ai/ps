@@ -1,3 +1,7 @@
+import java.time.DateTimeFormatter
+import java.time.ZoneId
+import java.time.ZonedDateTime
+
 import java.util.Properties
 
 plugins {
@@ -56,9 +60,9 @@ android {
 
         // ختم زمني للبناء: يعرضه التطبيق داخل الإعدادات حتى يعرف صاحب التطبيق
         // أي نسخة مثبّتة عنده بالضبط (نسخة كل تغيير تختلف).
-        val buildStamp = java.time.ZonedDateTime.now()
-            .withZoneSameInstant(java.time.ZoneId.of("Africa/Tripoli"))
-            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+        val buildStamp = ZonedDateTime.now()
+            .withZoneSameInstant(ZoneId.of("Africa/Tripoli"))
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
         buildConfigField("String", "BUILD_STAMP", "\"$buildStamp\"")
         buildConfigField("long", "BUILD_EPOCH_MILLIS", "${System.currentTimeMillis()}L")
     }
