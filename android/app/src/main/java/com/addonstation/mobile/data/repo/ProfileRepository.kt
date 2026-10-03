@@ -1,5 +1,8 @@
 package com.addonstation.mobile.data.repo
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 import com.addonstation.mobile.data.AppState
 import com.addonstation.mobile.data.SupabaseClient
 import com.addonstation.mobile.data.model.AcWallet
@@ -30,20 +33,21 @@ class ProfileRepository(
         return profile
     }
 
-    suspend fun loadProfile(userId: String): Profile? =
+    suspend fun loadProfile(userId: String): Profile? = withContext(Dispatchers.IO) {
         supabase.decodeOne<Profile>(
             supabase.select("profiles", "select=*&id=eq.$userId&limit=1")
         )
+    }
 
-    suspend fun loadProfiles(ids: Collection<String>): Map<String, Profile> {
-        if (ids.isEmpty()) return emptyMap()
+    suspend fun loadProfiles(ids: Collection<String>): Map<String, Profile> = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext emptyMap()
         val list = ids.distinct().chunked(60).flatMap { chunk ->
             val filter = chunk.joinToString(",")
             supabase.decodeList<Profile>(
                 supabase.select("profiles", "select=*&id=in.($filter)")
             )
         }
-        return list.associateBy { it.id }
+        list.associateBy { it.id }
     }
 
     suspend fun searchUsers(query: String, limit: Int = 30): List<Profile> {

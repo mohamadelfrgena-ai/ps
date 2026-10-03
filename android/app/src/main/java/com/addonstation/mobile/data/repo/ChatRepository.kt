@@ -145,14 +145,14 @@ class ChatRepository(
         )
     }.getOrElse { emptyList() }
 
-    suspend fun pinned(channelId: String): List<ChatMessage> = runCatching {
+    suspend fun pinned(channelId: String): List<ChatMessage> = withContext(Dispatchers.IO) { runCatching {
         supabase.decodeList<ChatMessage>(
             supabase.select(
                 "chat_messages",
                 "select=*&channel_id=eq.$channelId&is_pinned=eq.true&order=created_at.desc&limit=50",
             )
         )
-    }.getOrElse { emptyList() }
+    }.getOrElse { emptyList() } }
 
     fun mentionsIn(content: String, members: List<Profile>): List<String> {
         if (!content.contains('@')) return emptyList()
@@ -229,7 +229,7 @@ class ChatRepository(
         return null
     }
 
-    suspend fun reactionsFor(messageIds: List<Long>): Map<Long, Map<String, Int>> = runCatching {
+    suspend fun reactionsFor(messageIds: List<Long>): Map<Long, Map<String, Int>> = withContext(Dispatchers.IO) { runCatching {
         if (messageIds.isEmpty()) return@runCatching emptyMap()
         val ids = messageIds.joinToString(",")
         val rows = supabase.decodeList<Map<String, kotlinx.serialization.json.JsonElement>>(
@@ -242,9 +242,9 @@ class ChatRepository(
             .mapValues { (_, list) ->
                 list.groupingBy { it["emoji"]?.asString().orEmpty() }.eachCount()
             }
-    }.getOrElse { emptyMap() }
+    }.getOrElse { emptyMap() } }
 
-    suspend fun myReactionsFor(messageIds: List<Long>): Set<Pair<Long, String>> = runCatching {
+    suspend fun myReactionsFor(messageIds: List<Long>): Set<Pair<Long, String>> = withContext(Dispatchers.IO) { runCatching {
         val uid = supabase.session()?.userId ?: return@runCatching emptySet()
         if (messageIds.isEmpty()) return@runCatching emptySet()
         val ids = messageIds.joinToString(",")
@@ -259,7 +259,7 @@ class ChatRepository(
             val emoji = row["emoji"]?.asString() ?: return@mapNotNull null
             mid to emoji
         }.toSet()
-    }.getOrElse { emptySet() }
+    }.getOrElse { emptySet() } }
 
     suspend fun toggleReaction(messageId: Long, emoji: String): Result<Boolean> = withContext(Dispatchers.IO) {
         runCatching {
