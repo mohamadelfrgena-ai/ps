@@ -88,7 +88,10 @@ rows.append(("التبويب يفتح على الملصقات", 'mutableStateOf(
 sticker_send = re.search(r"onSticker = \{ stickerUrl ->(?:.|\n)*?\n            \},", screen)
 sticker_send = sticker_send.group(0) if sticker_send else ""
 rows.append(("الملصق يحمل النص المكتوب", "content = body.ifEmpty { null }" in sticker_send))
-rows.append(("النص يُمسح بعد نجاح الإرسال", "text = \"\"" in sticker_send))
+rows.append(("النص يُمسح فوراً لا بعد النجاح", "text = \"\"            // مسح فوري" in screen
+             or "text = \"\"                // مسح فوري" in screen))
+rows.append(("ما كتبه يعود لو فشل الإرسال", screen.count("val replySnapshot = replyTo") >= 3
+             and "if (text.isEmpty()) text = body" in screen))
 media_send = re.search(r"vm\.send\(\n\s+content = body\.ifEmpty \{ null \},(?:.|\n)*?mediaMime = mime,", screen)
 rows.append(("الوسائط تحمل النص المكتوب", media_send is not None))
 rows.append(("الرسالة المحذوفة تختفي لكل الأنواع", "return@messageBody" in screen))

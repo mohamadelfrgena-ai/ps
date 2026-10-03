@@ -397,19 +397,22 @@ fun ChatScreen(
                     modifier = Modifier.clickable {
                         // الوسائط مع أي كتابة ⇒ رسالة واحدة
                         val body = text.trim()
+                        val replySnapshot = replyTo
+                        text = ""            // مسح فوري: يمنع الإرسال مرّتين بالضغط المتكرر
+                        replyTo = null
                         vm.send(
                             content = body.ifEmpty { null },
-                            replyTo = replyTo,
+                            replyTo = replySnapshot,
                             messageType = type,
                             mediaPath = path,
                             mediaMime = mime,
                         ) { ok, error ->
                             if (ok) {
-                                text = ""
                                 mediaToSend = null
-                                replyTo = null
                                 statusMessage = if (type == "video") videoSentMsg else audioSentMsg
                             } else {
+                                if (text.isEmpty()) text = body   // لا يضيع ما كتبه
+                                replyTo = replySnapshot
                                 statusMessage = error
                             }
                         }
@@ -479,18 +482,21 @@ fun ChatScreen(
                     val content = text.trim()
                     if (content.isEmpty() && attachment == null) return@ChatInputBar
                     val attach = attachment
+                    val replySnapshot = replyTo
+                    text = ""                // مسح فوري: الفقاعة تظهر الآن، ولا يمكن إرسالها مرّتين
+                    replyTo = null
                     vm.send(
                         content = content.ifEmpty { null },
-                        replyTo = replyTo,
+                        replyTo = replySnapshot,
                         imagePath = if (attach?.second == "image") attach.first else null,
                         messageType = if (attach?.second == "image") "image" else "text",
                     ) { ok, error ->
                         if (ok) {
-                            text = ""
                             attachment = null
-                            replyTo = null
                             statusMessage = null
                         } else {
+                            if (text.isEmpty()) text = content   // استرجاع ما كتبه إن فشل الإرسال
+                            replyTo = replySnapshot
                             statusMessage = error
                         }
                     }
@@ -519,18 +525,21 @@ fun ChatScreen(
             onSticker = { stickerUrl ->
                 // الملصق مع أي كتابة ⇒ رسالة واحدة (لا تنقسم)، والكتابة تُمسح بعد النجاح
                 val body = text.trim()
+                val replySnapshot = replyTo
+                text = ""                // مسح فوري (الملصق نفسه يُختار من اللوحة)
+                replyTo = null
                 vm.send(
                     content = body.ifEmpty { null },
-                    replyTo = replyTo,
+                    replyTo = replySnapshot,
                     stickerUrl = stickerUrl,
                     messageType = "sticker",
                 ) { ok, error ->
                     if (ok) {
-                        text = ""
-                        replyTo = null
                         resentSticker = null
                         statusMessage = null
                     } else {
+                        if (text.isEmpty()) text = body
+                        replyTo = replySnapshot
                         statusMessage = error
                     }
                 }
