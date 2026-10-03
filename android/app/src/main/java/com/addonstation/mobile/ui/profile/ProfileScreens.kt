@@ -62,6 +62,7 @@ import com.addonstation.mobile.ui.equippedItemUrl
 import com.addonstation.mobile.ui.groupAssetsByCollection
 import com.addonstation.mobile.ui.components.AvatarImage
 import com.addonstation.mobile.ui.components.AssetSectionHeader
+import com.addonstation.mobile.ui.components.AssetThumb
 import com.addonstation.mobile.ui.components.ContentCard
 import com.addonstation.mobile.ui.components.ContentColumn
 import com.addonstation.mobile.ui.components.EmptyState
@@ -661,7 +662,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                         verticalArrangement = Arrangement.Center,
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
-                                            com.addonstation.mobile.ui.components.AssetThumb(
+                                            AssetThumb(
                                                 url = assetUrl(container, asset.fileUrl),
                                                 size = 40.dp,
                                             )
