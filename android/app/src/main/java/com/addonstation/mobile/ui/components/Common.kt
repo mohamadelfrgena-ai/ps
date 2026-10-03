@@ -383,6 +383,62 @@ fun DefaultProfileAvatar(
     }
 }
 
+/**
+ * صورة أصل صغيرة داخل الشبكات (صور البروفايل · البانرات · الأدوات).
+ * أخفّ بكثير من [AvatarImage]: بلا توليف فرعي، وبلا مؤخّر متحرّك، وبحجم طلب
+ * مضبوط — ففتح قائمة الاختيار لا ينتظر تحميل مئات الصور دفعةً واحدة.
+ */
+@Composable
+fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(10.dp))
+            .background(AppColors.Elevated2),
+    ) {
+        if (!url.isNullOrBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(url)
+                    .size(size)
+                    .crossfade(false)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(size),
+            )
+        }
+    }
+}
+
+/**
+ * صورة أصل صغيرة داخل الشبكات (صور البروفايل · البانرات · الأدوات).
+ * أخفّ بكثير من [AvatarImage]: بلا توليف فرعي، وبلا مؤخّر متحرّك، وبحجم طلب
+ * مضبوط — ففتح قائمة الاختيار لا ينتظر تحميل مئات الصور دفعةً واحدة.
+ */
+@Composable
+fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(10.dp))
+            .background(AppColors.Elevated2),
+    ) {
+        if (!url.isNullOrBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(url)
+                    .size(size)
+                    .crossfade(false)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(size),
+            )
+        }
+    }
+}
+
 /** صورة رمزية دائرية مع نقطة حالة اختيارية. */
 @Composable
 fun AvatarImage(

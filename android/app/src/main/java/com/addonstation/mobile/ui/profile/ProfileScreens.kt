@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -500,180 +501,189 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         SubScreenHeader(title = stringResource(R.string.profile_edit), onBack = onBack)
-        Column(
-            Modifier
+        // عدد الأعمدة يتبع عرض شاشة الهاتف: 4 على الضيّق · 5 على المعتاد · 6 على الكبير
+        val gridColumns = adaptiveColumns(
+            minCellDp = 62, maxCellDp = 86, maxColumns = 6,
+            horizontalPaddingDp = 28, spacingDp = GRID_SPACING,
+        )
+        val gridContentWidth = appScreenWidthDp() - 28f - (gridColumns - 1) * GRID_SPACING
+        val cellWidth = (gridContentWidth / gridColumns).coerceAtLeast(48f)
+        val cellHeight = (cellWidth + 30f).coerceIn(74f, 104f).toInt()
+        val sections = remember(assets) { groupAssetsByCollection(assets) }
+        val me = profile
+
+        // **القفل**: كل الأصول (صور بروفايل · بانرات · items) مقفلة إلا الصورة المجانية،
+        // والقفل يختفي فقط مع اشتراك epic فما فوق.
+        val epicUp = me != null && container.profile.planRank(me.effectivePlan) >= 2
+
+        // قائمة كسولة: تُركَّب الصفوف الظاهرة فقط، فتفتح الشاشة فوراً بدل انتظار
+        // تحميل مئات الصور دفعةً واحدة (كان التبديل بين الأنواع يتجمّد طويلاً).
+        LazyColumn(
+            modifier = Modifier
                 .fillMaxSize()
                 .imePadding()
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {
-            OutlinedTextFieldBidi(
-                value = username,
-                onValueChange = { username = it },
-                label = stringResource(R.string.auth_username),
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextFieldBidi(
-                value = bio,
-                onValueChange = { if (it.length <= 400) bio = it },
-                label = stringResource(R.string.profile_about),
-                singleLine = false,
-                lines = 3,
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextFieldBidi(
-                value = status,
-                onValueChange = { if (it.length <= 60) status = it },
-                label = stringResource(R.string.profile_custom_status),
-            )
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FilterChip(
-                    label = stringResource(R.string.profile_online),
-                    selected = showOnline,
-                    onClick = { showOnline = true },
-                )
-                FilterChip(
-                    label = stringResource(R.string.profile_offline),
-                    selected = !showOnline,
-                    onClick = { showOnline = false },
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-            GradientButton(
-                text = stringResource(R.string.common_save),
-                onClick = {
-                    scope.launch {
-                        busy = true
-                        container.profile.updateMyProfile(
-                            username = username,
-                            bio = bio,
-                            customStatus = status,
-                            showOnline = showOnline,
-                        ).onSuccess {
-                            message = null
-                            onSaved()
-                        }.onFailure { message = it.message }
-                        busy = false
+            item {
+                Column {
+                    OutlinedTextFieldBidi(
+                        value = username,
+                        onValueChange = { username = it },
+                        label = stringResource(R.string.auth_username),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextFieldBidi(
+                        value = bio,
+                        onValueChange = { if (it.length <= 400) bio = it },
+                        label = stringResource(R.string.profile_about),
+                        singleLine = false,
+                        lines = 3,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextFieldBidi(
+                        value = status,
+                        onValueChange = { if (it.length <= 60) status = it },
+                        label = stringResource(R.string.profile_custom_status),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        FilterChip(
+                            label = stringResource(R.string.profile_online),
+                            selected = showOnline,
+                            onClick = { showOnline = true },
+                        )
+                        FilterChip(
+                            label = stringResource(R.string.profile_offline),
+                            selected = !showOnline,
+                            onClick = { showOnline = false },
+                        )
                     }
-                },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            message?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, style = AppText.bodySmall, color = AppColors.Red)
+                    Spacer(Modifier.height(16.dp))
+                    GradientButton(
+                        text = stringResource(R.string.common_save),
+                        onClick = {
+                            scope.launch {
+                                busy = true
+                                container.profile.updateMyProfile(
+                                    username = username,
+                                    bio = bio,
+                                    customStatus = status,
+                                    showOnline = showOnline,
+                                ).onSuccess {
+                                    message = null
+                                    onSaved()
+                                }.onFailure { message = it.message }
+                                busy = false
+                            }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    message?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, style = AppText.bodySmall, color = AppColors.Red)
+                    }
+                    Spacer(Modifier.height(18.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            label = stringResource(R.string.profile_avatar_item),
+                            selected = kind == "avatar",
+                            onClick = { kind = "avatar" },
+                        )
+                        FilterChip(
+                            label = stringResource(R.string.plan_locked_banners),
+                            selected = kind == "banner",
+                            onClick = { kind = "banner" },
+                        )
+                        FilterChip(
+                            label = stringResource(R.string.plan_item_section),
+                            selected = kind == "item",
+                            onClick = { kind = "item" },
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (!epicUp) {
+                        Text(lockedHint, style = AppText.tiny, color = AppColors.Dim)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
             }
 
-            Spacer(Modifier.height(18.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    label = stringResource(R.string.profile_avatar_item),
-                    selected = kind == "avatar",
-                    onClick = { kind = "avatar" },
-                )
-                FilterChip(
-                    label = stringResource(R.string.plan_locked_banners),
-                    selected = kind == "banner",
-                    onClick = { kind = "banner" },
-                )
-                FilterChip(
-                    label = stringResource(R.string.plan_item_section),
-                    selected = kind == "item",
-                    onClick = { kind = "item" },
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            val me = profile
-            val freeHint = me == null || me.effectivePlan == "free"
-            if (freeHint) {
-                Text(lockedHint, style = AppText.tiny, color = AppColors.Dim)
-            }
-            Spacer(Modifier.height(8.dp))
-            // ورقة أصول مصغّرة: 5 أعمدة × صفوف (أيقونة + الاسم تحتها) — **فقرات منفصلة**
-            // لكل قسم/مجلد مصدر (PFP · Animated · Memes · Minecraft Items …) بلا تمرير داخلي،
-            // تنساب مع تمرير الصفحة فتظهر كل الأقسام مرة واحدة كما في ورقة الأيقونات المرجعية.
             if (assets.isEmpty()) {
-                EmptyState(text = stringResource(R.string.common_loading))
-                Spacer(Modifier.height(12.dp))
+                item {
+                    EmptyState(text = stringResource(R.string.common_loading))
+                    Spacer(Modifier.height(12.dp))
+                }
             } else {
-                val sections = groupAssetsByCollection(assets)
-                // عدد الأعمدة يتبع عرض شاشة الهاتف: 4 على الضيّق · 5 على المعتاد · 6 على الكبير،
-                // وارتفاع الخلية يُحسب من عرض الخلية نفسه (أيقونة 40dp + سطرا الاسم) فلا يُقصّ النص.
-                val gridColumns = adaptiveColumns(
-                    minCellDp = 62, maxCellDp = 86, maxColumns = 6,
-                    horizontalPaddingDp = 28, spacingDp = GRID_SPACING,
-                )
-                val gridContentWidth = appScreenWidthDp() - 28f - (gridColumns - 1) * GRID_SPACING
-                val cellWidth = (gridContentWidth / gridColumns).coerceAtLeast(48f)
-                val cellHeight = (cellWidth + 30f).coerceIn(74f, 104f).toInt()
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    sections.forEach { section ->
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
-                        ) {
-                            AssetSectionHeader(title = section.title, count = section.assets.size)
-                            section.assets.chunked(gridColumns).forEach { rowAssets ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
-                                ) {
-                                    rowAssets.forEach { asset ->
-                                        val unlocked = container.profile.canUseAsset(asset.requiredPlan, me)
-                                        val selected = when (kind) {
-                                            "avatar" -> me?.avatarUrl == asset.fileUrl
-                                            "banner" -> me?.bannerUrl == asset.fileUrl
-                                            else -> me?.equippedItemId == asset.name
-                                        }
-                                        Column(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(cellHeight.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(AppColors.Elevated)
-                                                .border(
-                                                    1.dp,
-                                                    if (selected) AppColors.Green else AppColors.Border,
-                                                    RoundedCornerShape(12.dp),
-                                                )
-                                                .clickable(enabled = unlocked) {
-                                                    scope.launch {
-                                                        val value = if (kind == "item") asset.name else asset.fileUrl
-                                                        container.profile.setProfileAsset(kind, value)
-                                                        message = if (unlocked) null else lockedHint
-                                                    }
-                                                }
-                                                .padding(4.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center,
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                AvatarImage(url = assetUrl(container, asset.fileUrl), size = 40.dp)
-                                                if (!unlocked) {
-                                                    Text("🔒", style = AppText.tiny)
+                // المفاتيح بموقعها (لا بنص القسم) حتى لا تتصادم قسمان بنفس الاسم
+                sections.forEachIndexed { sectionIndex, section ->
+                    item(key = "h-$sectionIndex") {
+                        AssetSectionHeader(title = section.title, count = section.assets.size)
+                    }
+                    section.assets.chunked(gridColumns).forEachIndexed { rowIndex, rowAssets ->
+                        item(key = "r-$sectionIndex-$rowIndex") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = GRID_SPACING.dp / 2),
+                                horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
+                            ) {
+                                rowAssets.forEach { asset ->
+                                    // الصورة المجانية وحدها بلا قفل
+                                    val isFreeAvatar = kind == "avatar" &&
+                                        asset.fileUrl.contains("onefree", ignoreCase = true)
+                                    val unlocked = isFreeAvatar || epicUp
+                                    val selected = when (kind) {
+                                        "avatar" -> me?.avatarUrl == asset.fileUrl
+                                        "banner" -> me?.bannerUrl == asset.fileUrl
+                                        else -> me?.equippedItemId == asset.name
+                                    }
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(cellHeight.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(AppColors.Elevated)
+                                            .border(
+                                                1.dp,
+                                                if (selected) AppColors.Green else AppColors.Border,
+                                                RoundedCornerShape(12.dp),
+                                            )
+                                            .clickable(enabled = unlocked) {
+                                                scope.launch {
+                                                    val value = if (kind == "item") asset.name else asset.fileUrl
+                                                    container.profile.setProfileAsset(kind, value)
+                                                    message = null
                                                 }
                                             }
-                                            Spacer(Modifier.height(4.dp))
-                                            Text(
-                                                asset.name,
-                                                style = AppText.tiny,
-                                                color = if (selected) AppColors.Green else AppColors.Muted,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis,
-                                                textAlign = TextAlign.Center,
-                                                lineHeight = AppText.tiny.fontSize * 1.05f,
+                                            .padding(4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center,
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            com.addonstation.mobile.ui.components.AssetThumb(
+                                                url = assetUrl(container, asset.fileUrl),
+                                                size = 40.dp,
                                             )
+                                            if (!unlocked) {
+                                                Text("🔒", style = AppText.tiny)
+                                            }
                                         }
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            asset.name,
+                                            style = AppText.tiny,
+                                            color = if (selected) AppColors.Green else AppColors.Muted,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.Center,
+                                            lineHeight = AppText.tiny.fontSize * 1.05f,
+                                        )
                                     }
-                                    // خلايا فارغة تكمل الصف الأخير حتى تبقى الأعمدة متساوية
-                                    repeat(gridColumns - rowAssets.size) {
-                                        Spacer(Modifier.weight(1f))
-                                    }
+                                }
+                                // خلايا فارغة تكمل الصف الأخير حتى تبقى الأعمدة متساوية
+                                repeat(gridColumns - rowAssets.size) {
+                                    Spacer(Modifier.weight(1f))
                                 }
                             }
                         }
@@ -681,7 +691,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                 }
             }
 
-            Spacer(Modifier.height(96.dp))
+            item { Spacer(Modifier.height(96.dp)) }
         }
     }
 }
