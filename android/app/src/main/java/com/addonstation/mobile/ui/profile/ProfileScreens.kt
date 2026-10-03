@@ -585,11 +585,11 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                             text = stringResource(
                                 R.string.profile_online,
                             ) + if (showOnline) "" else stringResource(R.string.profile_offline_suffix),
-                            style = AppText.bodyMedium,
-                            color = AppColors.TextPrimary,
+                            style = AppText.body,
+                            color = AppColors.Text,
                         )
                         if (!legendaryUp) {
-                            Text("👑", style = AppText.bodyMedium)
+                            Text("👑", style = AppText.body)
                         }
                     }
                     Spacer(Modifier.height(16.dp))

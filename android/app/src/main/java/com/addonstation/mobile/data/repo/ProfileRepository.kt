@@ -119,6 +119,7 @@ class ProfileRepository(
                 signedOnly = true,
             )
             refreshProfile()
+            Unit
         }
     }
 
