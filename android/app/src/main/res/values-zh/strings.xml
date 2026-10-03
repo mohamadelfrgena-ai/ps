@@ -526,4 +526,6 @@
     <string name="admin_tips_title">创作者小费</string>
     <string name="plan_locked_online">在线状态开关仅对 Legendary 👑 订阅者开放。</string>
     <string name="profile_offline_suffix"> · 已隐藏</string>
+    <string name="admin_shrink_assets">压缩全部资源图片</string>
+    <string name="admin_shrink_assets_hint">图片网格会变轻并立即显示。只需执行一次。</string>
 </resources>

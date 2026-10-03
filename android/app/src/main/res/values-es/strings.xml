@@ -526,4 +526,6 @@
     <string name="admin_tips_title">Propinas de creadores</string>
     <string name="plan_locked_online">El interruptor de estado en línea es solo para suscriptores Legendary 👑.</string>
     <string name="profile_offline_suffix"> · oculto</string>
+    <string name="admin_shrink_assets">Reducir todas las imágenes de recursos</string>
+    <string name="admin_shrink_assets_hint">Hace que la cuadrícula cargue al instante. Solo una vez.</string>
 </resources>

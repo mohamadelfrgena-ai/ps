@@ -526,4 +526,6 @@
     <string name="admin_tips_title">Pourboires des créateurs</string>
     <string name="plan_locked_online">Le bouton d\'état en ligne est réservé aux abonnés Legendary 👑.</string>
     <string name="profile_offline_suffix"> · masqué</string>
+    <string name="admin_shrink_assets">Réduire toutes les images d\'assets</string>
+    <string name="admin_shrink_assets_hint">La galerie s\'affiche instantanément. Une seule fois.</string>
 </resources>

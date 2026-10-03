@@ -831,6 +831,9 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
         }
     }
 
+    // تصغير كل صور الأصول المخزّنة: يجعل شبكة الصور خفيفة فتظهر فوراً
+    var shrinking by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         loading = true
         assets = container.assets.all()
@@ -847,6 +850,32 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
                 .padding(horizontal = 14.dp),
         ) {
             Text(stringResource(R.string.admin_kicker_assets), style = AppText.kicker, color = AppColors.Blue)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GhostButton(
+                    text = if (shrinking) "… ${assets.size}" else stringResource(R.string.admin_shrink_assets),
+                    onClick = {
+                        scope.launch {
+                            shrinking = true
+                            messageIsError = false
+                            message = "جارٍ تصغير الصور… لا تغلق الشاشة"
+                            container.assets.shrinkStoredAssets()
+                                .onSuccess {
+                                    message = "✓ صُغّرت $it صورة — أعد فتح شبكة الصور لتظهر خفيفة"
+                                }
+                                .onFailure {
+                                    messageIsError = true
+                                    message = "فشل التصغير: ${it.message ?: it::class.simpleName}"
+                                }
+                            shrinking = false
+                        }
+                    },
+                )
+                Text(
+                    stringResource(R.string.admin_shrink_assets_hint),
+                    style = AppText.tiny,
+                    color = AppColors.Muted,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("avatar", "banner", "sticker", "item").forEach { t ->
                     FilterChip(t, type == t, { type = t })

@@ -542,4 +542,6 @@
     <string name="admin_tips_title">Creator tips</string>
     <string name="plan_locked_online">The online status switch is for Legendary 👑 subscribers only.</string>
     <string name="profile_offline_suffix"> · hidden</string>
+    <string name="admin_shrink_assets">Shrink all asset images</string>
+    <string name="admin_shrink_assets_hint">Makes the picture grid light and instant. One time only.</string>
 </resources>

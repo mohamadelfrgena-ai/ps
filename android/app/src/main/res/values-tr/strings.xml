@@ -526,4 +526,6 @@
     <string name="admin_tips_title">İçerik üreticisi bahşişleri</string>
     <string name="plan_locked_online">Çevrimiçi durum düğmesi yalnızca Legendary 👑 abonelerine açıktır.</string>
     <string name="profile_offline_suffix"> · gizli</string>
+    <string name="admin_shrink_assets">Tüm varlık görsellerini küçült</string>
+    <string name="admin_shrink_assets_hint">Resim ızgarası hafifler ve anında açılır. Bir kez yapılır.</string>
 </resources>

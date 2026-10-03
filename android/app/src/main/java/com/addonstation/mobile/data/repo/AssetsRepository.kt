@@ -3,6 +3,7 @@ package com.addonstation.mobile.data.repo
 import com.addonstation.mobile.data.AppState
 import com.addonstation.mobile.data.SupabaseClient
 import com.addonstation.mobile.data.model.SiteAsset
+import com.addonstation.mobile.util.shrinkImageBytes
 import com.addonstation.mobile.data.model.StickerPack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -66,6 +67,48 @@ class AssetsRepository(
             }.getOrElse { emptyList() }
             if (list.isNotEmpty()) synchronized(typeCache) { typeCache[type] = list }
             list
+        }
+    }
+
+    /**
+     * تصغير صور الأصول المخزّنة في مكانها — بلا تغيير المسارات ولا قاعدة البيانات.
+     *
+     * صور الأرشيف الأصلية ضخمة (حتى 5 ميغابايت للصورة) ⇒ شبكة الأصول تبدو ثقيلة
+     * وتستغرق وقتاً طويلاً. هنا نُنزّل كل صورة، نصغّرها إلى مقاس صالح لخانات
+     * الشبكة (512 بكسل)، ونعيد رفعها فوق الملف نفسه ⇒ ينزل حجم كل صورة إلى
+     * عُشر حجمها تقريباً، والصور تظهر فوراً.
+     * المتحرّكة (GIF) والمتجه (SVG) تُترك كما هي حفاظاً على حركتها.
+     *
+     * يعيد عدد الصور التي عولجت بنجاح.
+     */
+    suspend fun shrinkStoredAssets(maxSide: Int = 512): Result<Int> = withContext(Dispatchers.IO) {
+        runCatching {
+            val cfg = supabase.config()
+            val list = all().filter { it.enabled }
+            var done = 0
+            for (asset in list) {
+                val path = cfg.normalizeStoragePath(asset.fileUrl)
+                val lower = path.lowercase()
+                if (lower.endsWith(".gif") || lower.endsWith(".svg") || asset.animated) continue
+                val original = runCatching {
+                    supabase.downloadBytes(cfg.publicUrl("site-assets", asset.fileUrl))
+                }.getOrNull() ?: continue
+                // ما هو صغير أصلاً: نعدّه ولا نلمسه
+                if (original.size <= 120 * 1024) {
+                    done++
+                    continue
+                }
+                val shrunk = shrinkImageBytes(original, maxSide) ?: continue
+                if (shrunk.bytes.size >= original.size) {
+                    done++
+                    continue
+                }
+                val ok = runCatching {
+                    supabase.upload("site-assets", path, shrunk.bytes, shrunk.mime, upsert = true)
+                }.isSuccess
+                if (ok) done++
+            }
+            done
         }
     }
 

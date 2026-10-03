@@ -93,3 +93,42 @@ private fun scaleDown(bitmap: Bitmap, maxSide: Int): Bitmap {
     val h = (bitmap.height * ratio).toInt().coerceAtLeast(1)
     return Bitmap.createScaledBitmap(bitmap, w, h, true)
 }
+
+/**
+ * تصغير بايتات صورة قادمة من الشبكة (أصل موقع كبير) وإعادة ترميزها،
+ * لاستعمالها في تصغير صور الأصول المخزّنة: نفس منطق [prepareImageForUpload]
+ * لكن يبدأ من بايتات لا من Uri.
+ */
+suspend fun shrinkImageBytes(
+    bytes: ByteArray,
+    maxSide: Int = 512,
+    jpegQuality: Int = 85,
+): PreparedImage? = withContext(Dispatchers.IO) {
+    runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight, maxSide)
+        }
+        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+            ?: return@runCatching null
+        val scaled = scaleDown(decoded, maxSide)
+        val out = ByteArrayOutputStream()
+        val mime: String
+        val ext: String
+        if (scaled.hasAlpha()) {
+            scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
+            mime = "image/png"
+            ext = "png"
+        } else {
+            scaled.compress(Bitmap.CompressFormat.JPEG, jpegQuality, out)
+            mime = "image/jpeg"
+            ext = "jpg"
+        }
+        if (scaled !== decoded) scaled.recycle()
+        decoded.recycle()
+        PreparedImage(out.toByteArray(), mime, "shrunk.$ext")
+    }.getOrNull()
+}
