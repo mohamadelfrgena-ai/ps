@@ -67,7 +67,7 @@ class AssetsRepository(
             if (list.isNotEmpty()) synchronized(typeCache) { typeCache[type] = list }
             list
         }
-    }.getOrElse { emptyList() }
+    }
 
     suspend fun packs(): List<StickerPack> = runCatching {
         val packs = supabase.decodeList<StickerPack>(
