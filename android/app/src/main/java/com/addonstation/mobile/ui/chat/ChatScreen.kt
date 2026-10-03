@@ -675,9 +675,7 @@ private fun ChatHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            // ترويسة الشات كانت تمتد تحت شريط الحالة؛ الآن تحجز مساحته وتحته يبدأ المحتوى.
             .background(AppColors.Bg.copy(alpha = 0.96f))
-            .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),

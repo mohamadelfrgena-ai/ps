@@ -2,6 +2,11 @@ package com.addonstation.mobile.ui.nav
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -141,10 +146,24 @@ fun AppRoot(
 
     com.addonstation.mobile.ui.theme.AddonStationTheme(darkTheme = dark) {
         com.addonstation.mobile.ui.theme.AppBackground(dark = dark) {
-            when {
-                !splashDone -> SplashScreen(onFinished = { splashDone = true })
-                !configured -> SetupScreen(onDone = { configured = container.isConfigured })
-                else -> MainNavigation(startAtReset = deepLinkSession)
+            // **حجز منطقة شريط النظام (الساعة والبطارية والواي فاي) لكل التطبيق**:
+            // التطبيق يرسم من الحافة إلى الحافة (edge-to-edge) وtargetSdk=35 يفرض
+            // ذلك، فكان محتوى ٣٥ شاشة يعلو شريط الحالة ويتداخل معه. هنا نحجز
+            // المنطقة مرة واحدة عند الجذر فيبدأ كل المحتوى تحتها، وخلفيتها هي
+            // خلفية التطبيق نفسها ⇒ لا فواصل ولا اختلاف في الشكل.
+            Column(Modifier.fillMaxSize()) {
+                Spacer(
+                    Modifier
+                        .fillMaxWidth()
+                        .windowInsetsTopHeight(WindowInsets.statusBars),
+                )
+                Box(Modifier.fillMaxSize()) {
+                    when {
+                        !splashDone -> SplashScreen(onFinished = { splashDone = true })
+                        !configured -> SetupScreen(onDone = { configured = container.isConfigured })
+                        else -> MainNavigation(startAtReset = deepLinkSession)
+                    }
+                }
             }
         }
     }

@@ -7,13 +7,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -48,13 +45,12 @@ fun PixelTopBar(
     /** أزرار إضافية في الطرف (مثل زر قفل لوحة الإدارة) — لا تؤثر على بقية الشاشات. */
     actions: (@Composable () -> Unit)? = null,
 ) {
-    // الخلفية تُرسم على كامل الشريط **بما فيه منطقة شريط الحالة** (البطارية والواي فاي)،
-    // والصف نفسه (56dp) يبدأ أسفل تلك المنطقة — فلا يعلو المحتوى على أيقونات النظام.
+    // منطقة شريط الحالة (الساعة والبطارية والواي فاي) محجوزة عند جذر التطبيق
+    // (AppRoot)، فالمحتوى كله يبدأ تحتها؛ لا نحتاج حجزاً هنا مرة أخرى.
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AppColors.Bg.copy(alpha = 0.96f))
-            .windowInsetsPadding(WindowInsets.statusBars),
+            .background(AppColors.Bg.copy(alpha = 0.96f)),
     ) {
     Row(
         modifier = Modifier
