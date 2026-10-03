@@ -207,7 +207,14 @@ jobs:
                "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?name=addonstation-debug-apk&per_page=1" \
                -o /tmp/apk/list.json
           head -c 400 /tmp/apk/list.json; echo
-          AID=$(python3 -c "import json;d=json.load(open('/tmp/apk/list.json'));print(d['artifacts'][0]['id'] if d.get('artifacts') else '')")
+          # الأحدث زمنياً لا الأول في القائمة (معرّفات المخرجات ليست مرتّبة زمنياً)
+          AID=$(python3 - <<'PY'
+          import json
+          d = json.load(open('/tmp/apk/list.json'))
+          a = sorted(d.get('artifacts', []), key=lambda x: x.get('created_at', ''))
+          print(a[-1]['id'] if a else '')
+          PY
+          )
           [ -n "$AID" ] || { echo "::error::لا يوجد مُخرَج addonstation-debug-apk"; exit 1; }
           echo "معرّف المُخرَج: $AID"
 
