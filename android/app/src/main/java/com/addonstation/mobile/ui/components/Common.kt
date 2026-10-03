@@ -400,7 +400,7 @@ fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier) {
             AsyncImage(
                 model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
                     .data(url)
-                    .size(size)
+                    .size(size, size)      // Coil 2.7: العرض والارتفاع معاً
                     .crossfade(false)
                     .build(),
                 contentDescription = null,
