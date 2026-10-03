@@ -33,24 +33,39 @@ class AssetsRepository(
         assets
     }.getOrElse { emptyList() }
 
-    suspend fun byType(type: String): List<SiteAsset> = runCatching {
-        val ordered = runCatching {
-            supabase.decodeList<SiteAsset>(
-                supabase.select(
-                    "site_assets",
-                    "select=*&asset_type=eq.$type&enabled=eq.true&order=collection_order.asc,sort_order.asc&limit=500",
-                )
-            )
-        }.getOrElse { emptyList() }
-        if (ordered.isNotEmpty()) {
-            ordered
-        } else {
-            supabase.decodeList<SiteAsset>(
-                supabase.select(
-                    "site_assets",
-                    "select=*&asset_type=eq.$type&enabled=eq.true&order=sort_order.asc&limit=500",
-                )
-            )
+    /**
+     * ذاكرة مؤقتة للأصول حسب النوع: تبديل تبويب (بروفايل ↔ بانر ↔ أدوات) لا يعيد
+     * تنزيل مئات الصفوف في كل مرة.
+     */
+    private val typeCache = mutableMapOf<String, List<SiteAsset>>()
+
+    suspend fun byType(type: String): List<SiteAsset> {
+        synchronized(typeCache) { typeCache[type] }?.let { if (it.isNotEmpty()) return it }
+        // على خيط الشبكة: كان الفكّ يجري على خيط الواجهة فيجمّد الشاشة عند فتح القائمة
+        return withContext(Dispatchers.IO) {
+            val list = runCatching {
+                val ordered = runCatching {
+                    supabase.decodeList<SiteAsset>(
+                        supabase.select(
+                            "site_assets",
+                            "select=*&asset_type=eq.$type&enabled=eq.true&order=collection_order.asc,sort_order.asc&limit=500",
+                        )
+                    )
+                }.getOrElse { emptyList() }
+                if (ordered.isNotEmpty()) {
+                    ordered
+                } else {
+                    // ترميز احتياطي قبل تنفيذ supabase/15_assets_v2.sql (لا عمود collection_order بعد)
+                    supabase.decodeList<SiteAsset>(
+                        supabase.select(
+                            "site_assets",
+                            "select=*&asset_type=eq.$type&enabled=eq.true&order=sort_order.asc&limit=500",
+                        )
+                    )
+                }
+            }.getOrElse { emptyList() }
+            if (list.isNotEmpty()) synchronized(typeCache) { typeCache[type] = list }
+            list
         }
     }.getOrElse { emptyList() }
 

@@ -653,8 +653,13 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                             .clickable(enabled = unlocked) {
                                                 scope.launch {
                                                     val value = if (kind == "item") asset.name else asset.fileUrl
+                                                    busy = true
+                                                    // القاعدة هي الحكم: قد ترفض أصلاً (خطة أو صلاحية)،
+                                                    // فنُظهر سبب الرفض بدل أن يبدو وكأنه نجح بلا تغيير
                                                     container.profile.setProfileAsset(kind, value)
-                                                    message = null
+                                                        .onSuccess { message = null }
+                                                        .onFailure { message = it.message }
+                                                    busy = false
                                                 }
                                             }
                                             .padding(4.dp),
