@@ -123,6 +123,11 @@ fun ChatScreen(
     var actionsFor by remember { mutableStateOf<ChatMessageUi?>(null) }
     var mediaSheet by remember { mutableStateOf(false) }
     var imageViewerUrl by remember { mutableStateOf<String?>(null) }
+    // فتح صورة/ملصق بالحجم الكامل — دالة واحدة يستعملها كل نداء (لا يُشار إليها من
+    // داخل لامدا آخر كوسيط مجاور: وسائط الاستدعاء ليست متغيّرات مرئية في بعضها)
+    val openFullSize: (String) -> Unit = { path ->
+        scope.launch { container.chat.imageUrl(path)?.let { imageViewerUrl = it } }
+    }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var pinnedMessages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
     var mediaToSend by remember { mutableStateOf<Triple<String, String, String>?>(null) } // path,mime,type
@@ -263,9 +268,7 @@ fun ChatScreen(
                             myId = container.supabase.session()?.userId,
                             onLongPress = { actionsFor = ui },
                             onReply = { replyTo = ui.message },
-                            onOpenImage = { path ->
-                                scope.launch { container.chat.imageUrl(path)?.let { imageViewerUrl = it } }
-                            },
+                            onOpenImage = openFullSize,
                             onStickerTap = {
                                 // ملصقي: ضغطة سريعة تُشيله من الشات وتعيده إلى لوحة الملصقات
                                 val myId = container.supabase.session()?.userId
@@ -281,7 +284,7 @@ fun ChatScreen(
                                     }
                                 } else {
                                     // ملصق غيري: ضغطة سريعة تفتحه بالحجم الكامل (لا تُحذف رسالة غيري)
-                                    ui.message.stickerUrl?.let(onOpenImage)
+                                    ui.message.stickerUrl?.let(openFullSize)
                                 }
                             },
                             onToggleReaction = { emoji -> vm.toggleReaction(ui.message.id, emoji) },
