@@ -30,6 +30,9 @@ class ChatRepository(
 ) {
 
     companion object {
+        /** غرفة خدمات النقدية: معرّف ثابت لا يتغيّر. */
+        const val CASH_SERVICES_ROOM_ID = "cash-services"
+        const val CASH_SERVICES_ROOM_NAME = "خدمات النقدية"
         const val MAX_TEXT = 500
         const val MAX_IMAGE_BYTES = 4L * 1024 * 1024
         const val MAX_MEDIA_BYTES = 100L * 1024 * 1024
@@ -50,6 +53,40 @@ class ChatRepository(
             supabase.select("chat_channels", "select=*&order=sort_order.asc")
         )
     }.getOrElse { emptyList() }
+
+    /**
+     * يضمن وجود غرفة «خدمات النقدية» وضبطها للقراءة فقط.
+     *
+     * تُستدعى من الأدمن فقط (الخادم يرفض `chat_admin_upsert_room` لغيره):
+     * - إن لم تكن الغرفة موجودة تُنشأ مقفلة بصلاحية الأدمن وحده.
+     * - إن موجودة بلا قفل/بصلاحية الأدمن تُضبط كذلك، لأن المطلوب أن يقرأ
+     *   الجميع ولا يكتب إلا الأدمن.
+     * (نفس النتيجة لو نُفِّذ سكربت supabase/17_cash_services_room.sql يدوياً.)
+     */
+    suspend fun ensureCashServicesRoom(isAdmin: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (!isAdmin) return@runCatching
+            val existing = channels().firstOrNull { it.id == CASH_SERVICES_ROOM_ID }
+            val needsFix = existing == null ||
+                !existing.isLocked ||
+                existing.postPermission.lowercase() != "admin_only"
+            if (!needsFix) return@runCatching
+            upsertRoom(
+                id = CASH_SERVICES_ROOM_ID,
+                name = existing?.name?.takeIf { it.isNotBlank() } ?: CASH_SERVICES_ROOM_NAME,
+                icon = existing?.icon ?: "💵",
+                category = existing?.category ?: "main",
+                description = existing?.description
+                    ?: "مقالات وخدمات نقدية — القراءة للجميع، والكتابة للإدارة فقط.",
+                sortOrder = existing?.sortOrder
+                    ?: ((channels().maxOfOrNull { it.sortOrder } ?: 0) + 1),
+                isLocked = true,
+                slowmodeSeconds = existing?.slowmodeSeconds ?: 0,
+                postPermission = "admin_only",
+            ).getOrThrow()
+            Unit
+        }
+    }
 
     /** قواعد المجتمع من الخادم (قابلة للتعديل من لوحة الإدارة) مع نص احتياطي محلي. */
     suspend fun rules(lang: String): List<String> = runCatching {
