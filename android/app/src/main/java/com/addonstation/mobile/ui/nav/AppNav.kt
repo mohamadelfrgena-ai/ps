@@ -135,6 +135,12 @@ fun AppRoot(
                     container.auth.ensureFreshSession()
                     container.state.refreshAll()
                     container.assets.all()
+                    // غرفة «خدمات النقدية» (قراءة فقط للأدمن): نضمن وجودها
+                    // **عند فتح التطبيق** لا عند فتح شاشة الغرف فقط، فتظهر
+                    // لكل المستخدمين من أول تشغيل. الخادم يرفض الطلب لغير الأدمن.
+                    container.chat.ensureCashServicesRoom(
+                        container.state.profile.value?.role == "admin",
+                    )
                 }
                 container.plans.loadPlans()
                 container.plans.loadPaymentMethods()
