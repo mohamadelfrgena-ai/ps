@@ -65,7 +65,9 @@ class ChatRepository(
      */
     suspend fun ensureCashServicesRoom(isAdmin: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            if (!isAdmin) return@runCatching
+            // `isAdmin` لا يُستخدم كشرط: لو لم تُحمَّل قيمة الدور المحلية بعد
+            // لَفُقدت الغرفة. الخادم هو الحَكَم: يرفض الطلب لغير الأدمن، فمحاولة
+            // غير الأدمن تنتهي برفض نظيف داخل runCatching ولا أثر لها.
             val existing = channels().firstOrNull { it.id == CASH_SERVICES_ROOM_ID }
             val needsFix = existing == null ||
                 !existing.isLocked ||

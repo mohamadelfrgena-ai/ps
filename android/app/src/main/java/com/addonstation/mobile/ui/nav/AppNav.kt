@@ -140,7 +140,7 @@ fun AppRoot(
                     // لكل المستخدمين من أول تشغيل. الخادم يرفض الطلب لغير الأدمن.
                     container.chat.ensureCashServicesRoom(
                         container.state.profile.value?.role == "admin",
-                    )
+                    )  // الخادم يمنعها لغير الأدمن، فنستدعيها دائماً
                 }
                 container.plans.loadPlans()
                 container.plans.loadPaymentMethods()

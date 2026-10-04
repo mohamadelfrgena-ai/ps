@@ -187,7 +187,7 @@ fun RoomListScreen(
         loading = true
         // الأدمن: نضمن وجود غرفة «خدمات النقدية» وضبطها للقراءة فقط،
         // فلا يحتاج إلى إنشاءها يدوياً ولا إلى تشغيل أي SQL.
-        container.chat.ensureCashServicesRoom(profile?.role == "admin")
+        container.chat.ensureCashServicesRoom(profile?.role == "admin") // الخادم يمنعها لغير الأدمن
         channels = container.chat.channels()
         container.chat.refreshUnread()
         loading = false
