@@ -1133,11 +1133,15 @@ private fun MessageBlock(
                                         fraction = 0.38f, minDp = 108, maxDp = 180,
                                     ),
                                 )
-                                .clickable {
-                                    // ملصقي ⇒ ضغطة سريعة = إرجاعه للوحة الملصقات، وغيري = عرض بالحجم الكامل
-                                    val takeBack = onStickerTap
-                                    if (takeBack != null) takeBack() else message.stickerUrl?.let(onOpenImage)
-                                },
+                                // ضغطة مطوّلة ⇒ قائمة الرسالة نفسها (رد · نسخ · إبلاغ · حذف)
+                                .combinedClickable(
+                                    onClick = {
+                                        // ملصقي ⇒ ضغطة سريعة = إرجاعه للوحة الملصقات، وغيري = عرض بالحجم الكامل
+                                        val takeBack = onStickerTap
+                                        if (takeBack != null) takeBack() else message.stickerUrl?.let(onOpenImage)
+                                    },
+                                    onLongClick = onLongPress,
+                                ),
                         ) {
                             com.addonstation.mobile.ui.components.CoverImage(url = url, radius = 12.dp, modifier = Modifier.fillMaxSize())
                         }
@@ -1153,6 +1157,15 @@ private fun MessageBlock(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Column {
+                        // النص أولاً وتحته الصورة — **رسالة واحدة** كما أُرسلت
+                        if (!message.content.isNullOrBlank()) {
+                            Text(
+                                text = message.content.orEmpty(),
+                                style = AppText.chatBody,
+                                color = AppColors.Text,
+                                modifier = Modifier.padding(bottom = 6.dp),
+                            )
+                        }
                         com.addonstation.mobile.ui.components.CoverImage(
                             // الرابط الحقيقي للصورة (يُوقَّع من الخادم عند الحاجة)
                             url = imageUrl,
@@ -1160,11 +1173,14 @@ private fun MessageBlock(
                             modifier = Modifier
                                 .widthIn(max = 240.dp)
                                 .height(160.dp)
-                                .clickable {
-                                    val path = message.imagePath
-                                    if (imageUrl != null) onOpenImage(imageUrl!!)
-                                    else if (path != null) onOpenImage(path)
-                                },
+                                .combinedClickable(
+                                    onClick = {
+                                        val path = message.imagePath
+                                        if (imageUrl != null) onOpenImage(imageUrl!!)
+                                        else if (path != null) onOpenImage(path)
+                                    },
+                                    onLongClick = onLongPress,
+                                ),
                         )
                         Text(
                             "🖼",
@@ -1182,11 +1198,22 @@ private fun MessageBlock(
                 }
             }
             "audio", "video" -> {
+                // النص أولاً وتحته شريط الوسائط — **رسالة واحدة** كما أُرسلت
+                Column(modifier = Modifier.padding(start = 48.dp, top = 4.dp)) {
+                    if (!message.content.isNullOrBlank()) {
+                        Text(
+                            text = message.content.orEmpty(),
+                            style = AppText.chatBody,
+                            color = AppColors.Text,
+                            modifier = Modifier.padding(bottom = 6.dp),
+                        )
+                    }
                 Row(
                     modifier = Modifier
-                        .padding(start = 48.dp, top = 4.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(AppColors.Elevated)
+                        // ضغطة مطوّلة ⇒ قائمة الرسالة نفسها (رد · نسخ · إبلاغ · حذف)
+                        .combinedClickable(onClick = onReply, onLongClick = onLongPress)
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1207,6 +1234,7 @@ private fun MessageBlock(
                     }
                     // الوقت في نهاية الرسالة (على حافة شريط الوسائط)
                     MessageTime(createdAt = message.createdAt)
+                }
                 }
             }
             else -> {
