@@ -1,14 +1,6 @@
-→ البانرات: 2  (متحركة gif: 2)   الحجم: 7.8 MB
-✓ كُتب ملف SQL: /tmp/admin_banners.sql
-   [1/2] ✓ banners/admin/Animation-Reference.gif
-   [2/2] ✓ banners/admin/downloa1d.gif  ⇠ صُغِّر 6.9MB ⇒ 2.6MB
+— الروابط العامة بعد الرفع —
+  ✓ https://jqjmkssgjdsfdojkuqzq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png
 
-================ الخلاصة ================
-✅ نجح: 2    ❌ فشل: 0    ⚠ مُتخطّى (أكبر من الحدّ): 0
-→ أعمدة المخطط: collection=نعم · collection_order=نعم
-✓ سُجّل/حُدِّث 2 غلافاً في site_assets
+✓ رُفع 1 ملف/ملفات إلى site-assets/brand/
 
-================ تحقّق ================
-   Nature 🌿: 13 غلافاً · متحرّك 0 · مقفول 13
-   Random 🎲: 27 غلافاً · متحرّك 8 · مقفول 27
-   Admin 👑: 2 غلافاً · متحرّك 2 · مقفول 2
+استخدم هذا الرابط في حقل الصورة داخل قوالب البريد (docs/07-EMAIL-BRANDING-AR.md)
