@@ -1,1 +1,14 @@
-✗ لم تُوجد صور داخل المصدر
+→ البانرات: 2  (متحركة gif: 2)   الحجم: 7.8 MB
+Traceback (most recent call last):
+  File "/home/runner/work/ps/ps/tools/upload_banners.py", line 514, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/ps/ps/tools/upload_banners.py", line 428, in main
+    write_sql(rows, args.sql, args.plan)
+  File "/home/runner/work/ps/ps/tools/upload_banners.py", line 244, in write_sql
+    text = sql_text(rows)
+           ^^^^^^^^^^^^^^
+  File "/home/runner/work/ps/ps/tools/upload_banners.py", line 240, in sql_text
+    return SQL_HEADER.format(count=len(rows), plan=plan) + body + SQL_FOOTER
+                                                   ^^^^
+NameError: name 'plan' is not defined
