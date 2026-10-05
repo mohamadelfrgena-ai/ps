@@ -105,17 +105,21 @@ Supabase <noreply@mail.app.supabase.io>
 **الانتقال إلى Brevo (٥ دقائق، بلا نطاق):**
 
 1. حساب مجاني في [brevo.com](https://www.brevo.com) (٣٠٠ رسالة/يوم · بلا بطاقة).
-2. **Senders & Domains ← Senders** ← أضف `silverfoxinteractive@gmail.com`
-   ← افتح رابط التأكيد الذي يصلك عليه. (هذه الخطوة تُغني عن شراء نطاق.)
-3. **SMTP & API ← SMTP ← Generate a new SMTP key** ← انسخ المفتاح،
-   و**انسخ حقل Login من نفس الصفحة كما هو**.
+2. من **قائمة حسابك فوق اليمين** ← Settings ← Senders, Domains & Dedicated IPs
+   ← تبويب **Senders** ← **Add a sender** ← اكتب `silverfoxinteractive@gmail.com`
+   ← يصلك **رمز من ٦ أرقام** على نفس البريد ← أدخله. (هذه الخطوة تُغني عن شراء نطاق.)
+   رابط مباشر: https://app.brevo.com/senders/list
+3. **SMTP & API ← تبويب SMTP ← Generate a new SMTP key** ← انسخ المفتاح فوراً،
+   و**انسخ حقل Login من نفس الصفحة كما هو** (بصيغة `xxxxxxx@smtp-brevo.com` —
+   **ليس** بريدك؛ واستخدم مفتاح SMTP لا مفتاح API).
+   رابط مباشر: https://app.brevo.com/settings/keys/smtp
 4. في Supabase (**Project Settings ← Authentication ← SMTP Settings**) بدّل:
 
    | الحقل | القيمة |
    |---|---|
    | **Host** | `smtp-relay.brevo.com` |
    | **Port** | `587` |
-   | **Username** | حقل **Login** من Brevo (كما هو حرفياً) |
+   | **Username** | حقل **Login** من Brevo — بصيغة `xxxxxxx@smtp-brevo.com` (ليس بريدك) |
    | **Password** | مفتاح SMTP |
    | **Sender name** | `AddonStation` (لا يتغيّر) |
    | **Sender email** | `silverfoxinteractive@gmail.com` (لا يتغيّر) |
