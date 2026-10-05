@@ -1,11 +1,12 @@
-# طلب رفع أغلفة الملف الشخصي (البانرات)
+# طلب رفع عبر سير العمل Upload profile banners
 #   mode: upload      ⇒ رفع كل Banner.zip + التسجيل
 #   mode: seed-only   ⇒ تسجيل الصفوف فقط (الصور مرفوعة)
-#   mode: admin-gifs  ⇒ رفع أغلفة الأدمن (downloa1d.gif + Animation Reference.gif) بخطة admin
+#   mode: admin-gifs  ⇒ رفع أغلفة الأدمن بخطة admin
+#   mode: brand       ⇒ رفع شعار AddonStation إلى site-assets/brand/ (لقوالب البريد)
+#   mode: dry-run     ⇒ تجربة بلا رفع
 # دفع هذا الملف (أو تغييره) يشغّل سير العمل تلقائياً.
-mode: admin-gifs
+mode: brand
 zip: https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/Banner.zip
 
-# إعادة التشغيل: بنية المجلد AdminAssets/Admin (القسم «Admin 👑»)
-
-# إعادة التشغيل: إصلاح تمرير --plan إلى sql_text
+# الهدف: رفع brand/addonstation-logo.png وطباعة الرابط العام لاستخدامه في
+# قوالب البريد (docs/07-EMAIL-BRANDING-AR.md)
