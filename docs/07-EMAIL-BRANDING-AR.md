@@ -52,31 +52,51 @@ Supabase <noreply@mail.app.supabase.io>
 
 ## ١) تغيير اسم المُرسِل من `supabase` إلى `AddonStation`
 
-الاسم الذي يظهر في Gmail بجوار البريد (مثل `supabase`) يأتي من **خادم البريد**،
-لا من القالب. لتغييره تحتاج **SMTP مخصّصاً**:
+### (أ‑١) **الأسهل مباشرةً: Gmail SMTP** — بلا نطاق ولا حساب جديد
 
-1. **Project Settings → Authentication → SMTP Settings** (أو
-   Authentication → Emails → SMTP).
-2. فعّل **Enable Custom SMTP**.
-3. املأ:
+إن كان كل ما تملكه هو `silverfoxinteractive@gmail.com` فهذه أسرع طريقة
+(دقيقتان) وستظهر رسائلك باسم **AddonStation**:
 
-   | الحقل | القيمة المقترحة |
+1. **فعّل التحقّق بخطوتين** على حساب Google:
+   [myaccount.google.com/security](https://myaccount.google.com/security)
+   ← *التحقق بخطوتين* ← تفعيل.
+2. **أنشئ «كلمة تطبيقات» (App Password)**:
+   [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+   ← الاسم `AddonStation` ← **إنشاء** ← **انسخ الـ١٦ حرفاً** كما هي (بلا مسافات).
+   > كلمة المرور العادية للجيميل **لن تعمل** — لابد من كلمة التطبيقات.
+3. في Supabase: **Project Settings → Authentication → SMTP Settings**
+   ← فعّل **Enable Custom SMTP** ← املأ حرفياً:
+
+   | الحقل | القيمة |
    |---|---|
    | **Sender name** | `AddonStation` |
-   | **Sender email** | `no-reply@addonstation.com` (بعد تملّك النطاق وإضافته لدى المزوّد) |
-   | Host / Port / User / Pass | بيانات مزوّد SMTP (Resend · SendGrid · Mailgun · Brevo …) |
+   | **Sender email** | `silverfoxinteractive@gmail.com` |
+   | **Host** | `smtp.gmail.com` |
+   | **Port** | `465` |
+   | **Username** | `silverfoxinteractive@gmail.com` |
+   | **Password** | كلمة التطبيقات (١٦ حرفاً) |
+   | **Minimum TLS version** | `TLS 1.2` |
 
-4. **Save**، ثم أرسل رسالة اختبار.
+4. **Save** ← ثم **Authentication → Rate Limits** ← ارفع سقف البريد
+   (مثلاً ٣٠ في الساعة — جيميل يتحمّل نحو ٥٠٠ رسالة يومياً، فالرقم آمن).
+5. جرّب: التطبيق ← نسيت كلمة المرور؟ ← يجب أن يصلك البريد باسم **AddonStation**.
 
-**مزوّد مجاني مناسب للبداية: Resend** (٣٠٠٠ رسالة/شهر مجاناً):
+> النتيجة: يظهر الاسم **AddonStation** والعنوان تحته `silverfoxinteractive@gmail.com`
+> (لا يمكن إخفاء العنوان — هو حسابك). متى أردت لاحقاً عنواناً باسم التطبيق،
+> خذ نطاقاً وانتقل إلى (أ‑٢).
 
-1. أنشئ حساباً في [resend.com](https://resend.com).
-2. **Domains → Add Domain** ← أضف نطاقك (أو `auth.addonstation.com`) ← انسخ
-   سجلات **SPF و DKIM** إلى إعدادات DNS عند مسجّل النطاق ← **Verify**.
+### (أ‑٢) الأفضل للإنتاج: نطاقك + Resend
+
+إن كنت لا تملك نطاقاً فاذهب مباشرةً إلى **(أ‑١) Gmail SMTP** أعلاه — هي
+الأسهل. وإن أردت عنواناً باسم التطبيق (`@addonstation.com`) فاتبع (أ‑٢).
+
+1. في [resend.com](https://resend.com) أنشئ حساباً (٣٠٠٠ رسالة/شهر مجاناً).
+2. **Domains → Add Domain** ← أضف نطاقك ← انسخ سجلّات **SPF و DKIM** إلى DNS ← **Verify**.
 3. **API Keys → Create** ← انسخ المفتاح.
-4. املأ حقول SMTP في Supabase بهذه القيم حرفياً:
+4. في Supabase: **Project Settings → Authentication → SMTP Settings**
+   ← فعّل **Enable Custom SMTP** ← املأ:
 
-   | الحقل في Supabase | القيمة |
+   | الحقل | القيمة |
    |---|---|
    | **Sender name** | `AddonStation` |
    | **Sender email** | `no-reply@addonstation.com` (بنطاقك المُوثَّق) |
@@ -84,21 +104,17 @@ Supabase <noreply@mail.app.supabase.io>
    | **Port** | `465` (أو `587`) |
    | **Username** | `resend` |
    | **Password** | مفتاح API من Resend |
-   | Minimum TLS | `TLS 1.2` |
+   | **Minimum TLS version** | `TLS 1.2` |
 
-5. **Save** ثم **Send test email** (إن وُجد الزر).
-6. ارفع سقف Supabase أيضاً: **Authentication → Rate Limits → Emails**.
+5. **Save** ← ثم **Authentication → Rate Limits** ← ارفع سقف البريد.
 
-> ⚠️ بلا SMTP مخصّص **لا يمكن** تغيير اسم المُرسِل: خادم Supabase الافتراضي
-> يرسل باسمه، وهو مقصود منه التجربة فقط.
-
-**فائدة إضافية:** رفع السقف — الخادم الافتراضي لا يرسل إلا لعناوين فريق
-المشروع تقريباً، فلا يصل الرابط لمعظم المستخدمين! Custom SMTP يحلّ هذه أيضاً.
+**فائدة إضافية في الحالتين:** رفع السقف — الخادم الافتراضي لا يرسل إلا لعناوين
+فريق المشروع تقريباً، فلا يصل الرابط لمعظم المستخدمين! Custom SMTP يحلّ هذه أيضاً.
 
 ### (ب) الطريق الآخر: Send Email Hook (بريد كامل بلا SMTP)
 
 إن لم ترغب بـ SMTP، يمكنني تجهيز ملف SQL ينشئ دالة `hook_send_email` ترسل
-البريد من مزوّدك عبرHTTP (Resend) باسم **AddonStation** وبالشعار وبنصّ عربي
+البريد من مزوّدك عبر HTTP (Resend) باسم **AddonStation** وبالشعار وبنصّ عربي
 كامل — كل ما تحتاجه: مفتاح API + تفعيل `pg_net` مرة واحدة. قل «**جهّز الـ
 Email Hook**» وأكتبه لك.
 
