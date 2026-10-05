@@ -45,6 +45,7 @@ ORDER = [
     "25_fix_send_chat_message_unnest.sql",
     "26_fix_site_assets_sequence.sql",
     "27_admin_only_assets.sql",
+    "28_chat_cleanup.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -68,6 +69,7 @@ HEADER = """-- =================================================================
 --      → 25_fix_send_chat_message_unnest (إصلاح column "unnest" does not exist عند الإرسال)
 --      → 26_fix_site_assets_sequence (صلاحية تسلسل site_assets للتسجيل عبر REST)
 --      → 27_admin_only_assets (Enchanted Bedrock · PFP 4 · أغلفة الأدمن = admin فقط)
+--      → 28_chat_cleanup (تنظيف غرف الشات: حذف/إخفاء الرسائل — أقسام اختيارية)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --
