@@ -42,6 +42,7 @@ ORDER = [
     "22_plan_prices.sql",
     "23_payment_order_usd.sql",
     "24_free_default_avatar.sql",
+    "25_fix_send_chat_message_unnest.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -62,6 +63,7 @@ HEADER = """-- =================================================================
 --      → 22_plan_prices (أسعار الاشتراكات: Epic 2.99$ · Legendary 5.99$)
 --      → 23_payment_order_usd (مبلغ الطلب بالدولار + عملة الطلب حسب البوابة)
 --      → 24_free_default_avatar (الصورة الافتراضية المجانية onefree لكل حساب جديد)
+--      → 25_fix_send_chat_message_unnest (إصلاح column "unnest" does not exist عند الإرسال)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --

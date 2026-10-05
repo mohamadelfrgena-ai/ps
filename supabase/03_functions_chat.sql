@@ -162,7 +162,14 @@ begin
         v_mentions := v_mentions || (select array_agg(id) from public.profiles where username = v_name);
       end loop;
     end if;
-    v_mentions := coalesce(array(select distinct unnest(v_mentions) where unnest is not null), '{}');
+    -- ⚠️ تنبيه: لا يجوز استعمال اسم المخرَج (unnest) داخل عبارة WHERE في
+    -- PostgreSQL — أسماء أعمدة المخرجات تُرى في ORDER BY/GROUP BY فقط ⇒ خطأ
+    -- 42703: column "unnest" does not exist · وكان يُفشل كل إرسال رسالة نصية.
+    -- الصحيح: unnest في عبارة FROM مع اسم مستعار (كما هو مكتوب بالأسفل).
+    select coalesce(array_agg(distinct m), '{}'::uuid[])
+      into v_mentions
+      from unnest(coalesce(v_mentions, '{}'::uuid[])) as m
+     where m is not null;
   end if;
 
   -- ==========================================================================
