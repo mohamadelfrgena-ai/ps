@@ -1,14 +1,14 @@
 → البانرات: 2  (متحركة gif: 2)   الحجم: 7.8 MB
-Traceback (most recent call last):
-  File "/home/runner/work/ps/ps/tools/upload_banners.py", line 514, in <module>
-    sys.exit(main())
-             ^^^^^^
-  File "/home/runner/work/ps/ps/tools/upload_banners.py", line 428, in main
-    write_sql(rows, args.sql, args.plan)
-  File "/home/runner/work/ps/ps/tools/upload_banners.py", line 244, in write_sql
-    text = sql_text(rows)
-           ^^^^^^^^^^^^^^
-  File "/home/runner/work/ps/ps/tools/upload_banners.py", line 240, in sql_text
-    return SQL_HEADER.format(count=len(rows), plan=plan) + body + SQL_FOOTER
-                                                   ^^^^
-NameError: name 'plan' is not defined
+✓ كُتب ملف SQL: /tmp/admin_banners.sql
+   [1/2] ✓ banners/admin/Animation-Reference.gif
+   [2/2] ✓ banners/admin/downloa1d.gif  ⇠ صُغِّر 6.9MB ⇒ 2.6MB
+
+================ الخلاصة ================
+✅ نجح: 2    ❌ فشل: 0    ⚠ مُتخطّى (أكبر من الحدّ): 0
+→ أعمدة المخطط: collection=نعم · collection_order=نعم
+✓ سُجّل/حُدِّث 2 غلافاً في site_assets
+
+================ تحقّق ================
+   Nature 🌿: 13 غلافاً · متحرّك 0 · مقفول 13
+   Random 🎲: 27 غلافاً · متحرّك 8 · مقفول 27
+   Admin 👑: 2 غلافاً · متحرّك 2 · مقفول 2
