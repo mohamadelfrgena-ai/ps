@@ -37,12 +37,13 @@ DEFAULT_SQL = os.path.join(ROOT, "supabase", "21_banners.sql")
 BUCKET = "site-assets"
 ALLOWED_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 REQUIRED_PLAN = "epic"          # مقفولة ⇒ لا تُفتح إلا باشتراك Epic فما فوق
-COLLECTION_ORDER = {"nature": 22, "random": 23}
+COLLECTION_ORDER = {"nature": 22, "random": 23, "admin": 24}
 
 # مجلد المالك ← (اسم المجلد في المخزن، اسم القسم المعروض في التطبيق)
 FOLDERS = {
     "nature": ("nature", "Nature 🌿"),
     "random": ("random", "Random 🎲"),
+    "admin":  ("admin",  "Admin 👑"),        # أغلفة حصرية للإدارة
 }
 
 # أكبر حجم مقبول للرفع قبل التصغير التلقائي (حدّ المخزن في بعض المشاريع أصغر)
@@ -123,7 +124,7 @@ def read_source(zip_path: str, dir_path: str):
 
 
 # ------------------------------------------------------------- توليد SQL
-def build_rows(items):
+def build_rows(items, plan=REQUIRED_PLAN):
     """يرجع (صفوف الأصول كقواميس، قائمة (المسار في المخزن، البايتات، النوع))."""
     rows, uploads = [], []
     counters = {}
@@ -141,7 +142,7 @@ def build_rows(items):
             "name": pretty_name(file_name, index),
             "file_url": path,
             "sticker_pack": None,
-            "required_plan": REQUIRED_PLAN,
+            "required_plan": plan,
             "animated": animated,
             "enabled": True,
             "collection": collection,
@@ -236,10 +237,10 @@ on conflict (file_url) do update
       sort_order = excluded.sort_order,
       enabled = true;
 """
-    return SQL_HEADER.format(count=len(rows), plan=REQUIRED_PLAN) + body + SQL_FOOTER
+    return SQL_HEADER.format(count=len(rows), plan=plan) + body + SQL_FOOTER
 
 
-def write_sql(rows, out_path) -> str:
+def write_sql(rows, out_path, plan=REQUIRED_PLAN) -> str:
     text = sql_text(rows)
     with open(out_path, "w", encoding="utf-8") as fh:
         fh.write(text)
@@ -405,6 +406,8 @@ def main() -> int:
                     help="تسجيل الأغلفة في site_assets عبر REST بعد الرفع (بلا لصق SQL)")
     ap.add_argument("--seed-only", action="store_true",
                     help="تسجيل الأغلفة فقط (الصور مرفوعة مسبقاً)")
+    ap.add_argument("--plan", default=REQUIRED_PLAN,
+                    help="الخطة المطلوبة للأغلفة: epic (افتراضي) أو admin (حصرية للإدارة)")
     ap.add_argument("--dry-run", action="store_true", help="طباعة ما سيُرفع بلا رفع")
     args = ap.parse_args()
 
@@ -417,12 +420,12 @@ def main() -> int:
         print("✗ لم تُوجد صور داخل المصدر")
         return 2
 
-    rows, uploads = build_rows(items)
+    rows, uploads = build_rows(items, args.plan)
     total_mb = sum(len(d) for _, d, _ in uploads) / 1024 / 1024
     gifs = sum(1 for p, _, _ in uploads if p.lower().endswith(".gif"))
     print(f"→ البانرات: {len(rows)}  (متحركة gif: {gifs})   الحجم: {total_mb:.1f} MB")
 
-    write_sql(rows, args.sql)
+    write_sql(rows, args.sql, args.plan)
     print(f"✓ كُتب ملف SQL: {args.sql}")
 
     if args.sql_only:

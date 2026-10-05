@@ -551,10 +551,14 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
         val me = profile
 
         // **القفل**: كل الأصول (صور بروفايل · بانرات · items) مقفلة إلا الصورة المجانية،
-        // والقفل يختفي فقط مع اشتراك epic فما فوق.
+        // والقفل يختفي فقط مع اشتراك epic فما فوق — **أو للأدمن**: الأدمن يفتح كل شيء
+        // (حتى الأصول الحصرية للإدارة `required_plan = 'admin'`)، تماماً كما تسمح القاعدة.
         val epicUp = me != null && container.profile.planRank(me.effectivePlan) >= 2
         // حالة الاتصال feature حصرية لـ legendary فقط
         val legendaryUp = me != null && container.profile.planRank(me.effectivePlan) >= 3
+        val isAdmin = me?.role == "admin"
+        // الأدمن يرى كل الأصول مفتوحة (الخادم يوافقه داخل set_profile_asset)
+        val canUseLocked = isAdmin || epicUp
 
         // قائمة كسولة: تُركَّب الصفوف الظاهرة فقط، فتفتح الشاشة فوراً بدل انتظار
         // تحميل مئات الصور دفعةً واحدة (كان التبديل بين الأنواع يتجمّد طويلاً).
@@ -692,7 +696,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                         )
                     }
                     Spacer(Modifier.height(8.dp))
-                    if (!epicUp) {
+                    if (!canUseLocked) {
                         Text(lockedHint, style = AppText.tiny, color = AppColors.Dim)
                     }
                     Spacer(Modifier.height(8.dp))
@@ -701,7 +705,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                     if (isBanner) {
                         BannerPreviewCard(
                             url = me?.bannerUrl?.let { assetUrl(container, it) },
-                            locked = !epicUp,
+                            locked = !canUseLocked,
                             onLockedClick = { message = bannerLockedHint },
                             onClear = {
                                 scope.launch {
@@ -751,7 +755,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                     // الصورة المجانية وحدها بلا قفل
                                     val isFreeAvatar = kind == "avatar" &&
                                         asset.fileUrl.contains("onefree", ignoreCase = true)
-                                    val unlocked = isFreeAvatar || epicUp
+                                    val unlocked = isFreeAvatar || canUseLocked
                                     val selected = when (kind) {
                                         "avatar" -> me?.avatarUrl == asset.fileUrl
                                         "banner" -> me?.bannerUrl == asset.fileUrl

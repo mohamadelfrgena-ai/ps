@@ -44,6 +44,7 @@ ORDER = [
     "24_free_default_avatar.sql",
     "25_fix_send_chat_message_unnest.sql",
     "26_fix_site_assets_sequence.sql",
+    "27_admin_only_assets.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -66,6 +67,7 @@ HEADER = """-- =================================================================
 --      → 24_free_default_avatar (الصورة الافتراضية المجانية onefree لكل حساب جديد)
 --      → 25_fix_send_chat_message_unnest (إصلاح column "unnest" does not exist عند الإرسال)
 --      → 26_fix_site_assets_sequence (صلاحية تسلسل site_assets للتسجيل عبر REST)
+--      → 27_admin_only_assets (Enchanted Bedrock · PFP 4 · أغلفة الأدمن = admin فقط)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --

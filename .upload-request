@@ -1,15 +1,7 @@
 # طلب رفع أغلفة الملف الشخصي (البانرات)
-#   mode: upload   ⇒ رفع الصور + تسجيلها في القاعدة عبر REST
-#   mode: dry-run  ⇒ تجربة بلا رفع
+#   mode: upload      ⇒ رفع كل Banner.zip + التسجيل
+#   mode: seed-only   ⇒ تسجيل الصفوف فقط (الصور مرفوعة)
+#   mode: admin-gifs  ⇒ رفع أغلفة الأدمن (downloa1d.gif + Animation Reference.gif) بخطة admin
 # دفع هذا الملف (أو تغييره) يشغّل سير العمل تلقائياً.
-mode: upload
+mode: admin-gifs
 zip: https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/Banner.zip
-
-# إعادة التشغيل: نشر سجل الرفع كتعليق على العمولة لقراءته
-
-# إعادة التشغيل ٢: حفظ السجل في الفرع بدل التعليق
-
-# إعادة التشغيل ٣: تصغير تلقائي للملف الأكبر من حدّ المخزن ثم التسجيل
-
-# الحالة: الصور مرفوعة (٤٠/٤٠) · التسجيل ينتظر صلاحية التسلسل (26_fix_site_assets_sequence.sql)
-# بعد تنفيذ الملف في SQL Editor: بدّل mode إلى seed-only وادفع لأُسجّل الصفوف

@@ -98,6 +98,28 @@ jobs:
           assert names, "الأرشيف فارغ"
           PY
 
+      - name: تنزيل أغلفة الأدمن من مستودع المالك
+        if: ${{ steps.req.outputs.mode == 'admin-gifs' }}
+        run: |
+          set -e
+          mkdir -p Admin
+          curl -fsSL -o "Admin/downloa1d.gif" \
+               "https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/downloa1d.gif"
+          curl -fsSL -o "Admin/Animation Reference.gif" \
+               "https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/Animation%20Reference.gif"
+          ls -lh Admin
+
+      - name: رفع أغلفة الأدمن + تسجيلها (admin فقط)
+        if: ${{ steps.req.outputs.mode == 'admin-gifs' }}
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -o pipefail
+          exec > >(tee "$GITHUB_WORKSPACE/upload-log.txt") 2>&1
+          python3 -m pip install --quiet pillow
+          python3 tools/upload_banners.py --dir ./Admin --plan admin --seed --sql /tmp/admin_banners.sql
+
       - name: التسجيل فقط (الصور مرفوعة سابقاً)
         if: ${{ steps.req.outputs.mode == 'seed-only' }}
         env:
@@ -128,7 +150,7 @@ jobs:
           python3 tools/upload_banners.py --zip Banner.zip --seed
 
       - name: "تحقق: رابط عام لأول غلاف"
-        if: ${{ steps.req.outputs.mode == 'upload' || steps.req.outputs.mode == 'seed-only' }}
+        if: ${{ steps.req.outputs.mode == 'upload' || steps.req.outputs.mode == 'seed-only' || steps.req.outputs.mode == 'admin-gifs' }}
         env:
           S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
         run: |
