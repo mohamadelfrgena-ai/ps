@@ -36,13 +36,22 @@ class AuthRepository(
         }
     }
 
-    fun acceptRecoveryLink(url: String): Boolean = supabase.acceptRecoveryLink(url)
+    /** فتح جلسة من رابط استعادة البريد (يعمل على خيط الإدخال/الإخراج). */
+    suspend fun acceptRecoveryLink(url: String): Boolean = supabase.acceptRecoveryLink(url)
 
     suspend fun signUp(username: String, email: String, password: String): Result<AuthUser> = runCatching {
         validateUsername(username)
         validateEmail(email)
         validatePassword(password)
-        supabase.signUp(email.trim(), password, username.trim())
+        val user = supabase.signUp(email.trim(), password, username.trim())
+        // **دخول تلقائي بعد التسجيل**: إن أعاد الخادم جلسة فهذا يكفي؛ وإن لم
+        // يُعدها (تأكيد البريد مُعطّل لكن الجلسة لم تُحفظ) نحاول الدخول مباشرةً
+        // فيدخل المستخدم التطبيق فوراً بلا شاشة إضافية. وإن فشل (البريد يحتاج
+        // تأكيداً) نتركه كما هو ونُظهر رسالة «أُنشئ الحساب».
+        if (supabase.session() == null) {
+            runCatching { supabase.signIn(email.trim(), password) }
+        }
+        user
     }
 
     suspend fun signIn(email: String, password: String): Result<AuthUser> = runCatching {

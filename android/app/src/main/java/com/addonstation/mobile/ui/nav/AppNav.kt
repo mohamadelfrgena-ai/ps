@@ -124,13 +124,28 @@ fun AppRoot(
     }
     var deepLinkSession by remember { mutableStateOf(false) }
 
-    // استعادة الجلسة عند الإقلاع + معالجة رابط الاستعادة addonstation://recovery
+    // **رابط الاستعادة وحده في أثر مستقل**: قد يصل والتطبيق مفتوح أصلاً
+    // (onNewIntent) فيتغيّر `recoveryLink` بعد الإقلاع. لو بقينا نعالجه داخل
+    // أثر الإقلاع (مفتاحه Unit) لضاع الرابط ولم يحدث شيء ⇒ «الرابط لا يعمل».
+    LaunchedEffect(recoveryLink) {
+        val link = recoveryLink ?: return@LaunchedEffect
+        val recovered = runCatching {
+            withContext(Dispatchers.IO) { container.auth.acceptRecoveryLink(link) }
+        }.getOrDefault(false)
+        if (recovered) {
+            container.state.setSignedIn(true)
+            runCatching { withContext(Dispatchers.IO) { container.state.refreshAll() } }
+            deepLinkSession = true
+        }
+        onRecoveryConsumed()
+    }
+
+    // استعادة الجلسة عند الإقلاع
     LaunchedEffect(Unit) {
         // كل عمل الإقلاع (شبكة + فك ترميز JSON) على خيط الإدخال/الإخراج،
         // حتى لا يتجمّد الخيط الرئيسي أثناء شاشة الترحيب (كان سبب «اللاق»).
-        val recovered = runCatching {
+        runCatching {
             withContext(Dispatchers.IO) {
-                val linked = recoveryLink != null && container.auth.acceptRecoveryLink(recoveryLink)
                 if (container.auth.isSignedIn()) {
                     container.auth.ensureFreshSession()
                     container.state.refreshAll()
@@ -144,12 +159,9 @@ fun AppRoot(
                 }
                 container.plans.loadPlans()
                 container.plans.loadPaymentMethods()
-                linked
             }
-        }.getOrDefault(false)
-        deepLinkSession = recovered
+        }
         configured = container.isConfigured
-        onRecoveryConsumed()
     }
 
     com.addonstation.mobile.ui.theme.AddonStationTheme(darkTheme = dark) {
@@ -280,14 +292,17 @@ private fun MainNavigation(startAtReset: Boolean) {
                 composable(Routes.LOGIN) {
                     com.addonstation.mobile.ui.auth.LoginScreen(
                         onBack = { navController.popBackStack() },
-                        onSuccess = { goTab(MainTab.Profile) },
+                        // بعد الدخول ⟵ الصفحة الرئيسية مباشرةً (طلب المالك)
+                        onSuccess = { goTab(MainTab.Home) },
                         onOpenSignup = { go(Routes.SIGNUP) },
                     )
                 }
                 composable(Routes.SIGNUP) {
                     com.addonstation.mobile.ui.auth.SignUpScreen(
                         onBack = { navController.popBackStack() },
-                        onSuccess = { goTab(MainTab.Profile) },
+                        // بعد إنشاء الحساب ⟵ الصفحة الرئيسية مباشرةً (طلب المالك):
+                        // `AuthRepository.signUp` يدخل الحساب تلقائياً أولاً.
+                        onSuccess = { goTab(MainTab.Home) },
                         onOpenLogin = {
                             navController.navigate(Routes.LOGIN) { popUpTo(Routes.SIGNUP) { inclusive = true } }
                         },

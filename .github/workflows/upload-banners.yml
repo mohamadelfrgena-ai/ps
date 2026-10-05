@@ -170,6 +170,21 @@ jobs:
             echo "✅ الأغلفة تعمل — افتح التطبيق: الملف الشخصي ← تعديل ← تبويب «الأغلفة 🔒»"
           fi
 
+      # ── شعار AddonStation لقوالب البريد ────────────────────────────────
+      # قوالب بريد Supabase تحتاج رابطاً عاماً للصورة (لا تقبل الصور المضمّنة)،
+      # فنرفع الشعار إلى site-assets/brand/ ونستخدم رابطه في القوالب.
+      - name: رفع شعار AddonStation (mode = brand)
+        if: ${{ steps.req.outputs.mode == 'brand' }}
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -o pipefail
+          exec > >(tee "$GITHUB_WORKSPACE/upload-log.txt") 2>&1
+          python3 tools/upload_brand.py --dir ./brand
+          echo ""
+          echo "استخدم هذا الرابط في حقل الصورة داخل قوالب البريد (docs/07-EMAIL-BRANDING-AR.md)"
+
       - name: نشر السجل في الفرع (لقراءته من أي مكان)
         if: always()
         run: |

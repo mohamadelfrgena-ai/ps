@@ -131,8 +131,21 @@ class SupabaseClient(
         sessionStore.clear()
     }
 
+    /**
+     * إرسال رابط استعادة كلمة المرور.
+     *
+     * **redirect_to ضروري**: بدونه يبني Supabase الرابط على «Site URL» فيفتح
+     * متصفّحاً لا التطبيق، ويبدو للمستخدم أن «الرابط لا يعمل». بقيمته يفتح
+     * الرابط التطبيق مباشرةً على شاشة كلمة المرور الجديدة.
+     * (يجب أن يكون `addonstation://recovery` مسموحاً في
+     *  Authentication → URL Configuration → Redirect URLs، وإلا يتجاهله الخادم.)
+     */
     suspend fun sendRecovery(email: String) {
-        authPost("recover", buildJsonObject { put("email", email) }, token = null)
+        val body = buildJsonObject {
+            put("email", email)
+            put("redirect_to", RECOVERY_REDIRECT)
+        }
+        authPost("recover", body, token = null)
     }
 
     suspend fun updatePassword(newPassword: String) {
@@ -163,26 +176,116 @@ class SupabaseClient(
         }
     }
 
-    /** يستقبل رابط الاستعادة: addonstation://recovery#access_token=...&refresh_token=... */
-    fun acceptRecoveryLink(url: String): Boolean {
-        val hash = url.substringAfter('#', "")
-        if (hash.isBlank()) return false
-        val map = hash.split('&').mapNotNull {
-            val parts = it.split('=')
-            if (parts.size >= 2) parts[0] to parts.drop(1).joinToString("=") else null
-        }.toMap()
-        val access = map["access_token"] ?: return false
-        val refresh = map["refresh_token"] ?: ""
+    /**
+     * يستقبل رابط الاستعادة ويفتح به جلسة صالحة.
+     *
+     * يغطّي كل الصيغ التي يُنتجها Supabase (بلا افتراض واحد):
+     *   • `addonstation://recovery#access_token=…&refresh_token=…&type=recovery`
+     *     (التدفّق الضمني — الصيغة المعتادة للروابط المخصّصة)؛
+     *   • `…?access_token=…` (إن نقلها متصفّح أو عميل بريد إلى الاستعلام)؛
+     *   • `…?token_hash=…&type=recovery`
+     *     (صيغة القوالب الحديثة) ⇒ نستبدل الهاش بجلسة من الخادم.
+     *
+     * ويملأ معرّف المستخدم والبريد من **حمولة الـ JWT نفسها** بدل أن يتركهما
+     * فارغين، فتعمل بقية الشاشات (الملف الشخصي، المحفظة…) فور فتح الرابط.
+     */
+    suspend fun acceptRecoveryLink(url: String): Boolean {
+        val params = linkParams(url)
+        val type = params["type"]?.lowercase()
+
+        // ١) توكن وصول جاهز في الرابط
+        val access = params["access_token"]
+        if (!access.isNullOrBlank()) {
+            saveTokenSession(access, params["refresh_token"].orEmpty())
+            return true
+        }
+
+        // ٢) هاش توكن ({{ .TokenHash }}) ⇒ نستبدله بجلسة
+        val tokenHash = params["token_hash"]
+        if (!tokenHash.isNullOrBlank()) {
+            return try {
+                val body = buildJsonObject {
+                    put("type", type ?: "recovery")
+                    put("token_hash", tokenHash)
+                }
+                val obj = json.parseToJsonElement(authPost("verify", body, token = null)).jsonObject
+                val newAccess = obj["access_token"]?.jsonPrimitive?.contentOrNull() ?: return false
+                saveTokenSession(newAccess, obj["refresh_token"]?.jsonPrimitive?.contentOrNull().orEmpty())
+                true
+            } catch (_: Throwable) {
+                false
+            }
+        }
+
+        // ٣) رمز استرداد مُدخل يدوياً (إن وُجد)
+        val token = params["token"]
+        if (!token.isNullOrBlank()) {
+            return try {
+                val body = buildJsonObject {
+                    put("type", type ?: "recovery")
+                    put("token", token)
+                    put("email", params["email"].orEmpty())
+                }
+                val obj = json.parseToJsonElement(authPost("verify", body, token = null)).jsonObject
+                val newAccess = obj["access_token"]?.jsonPrimitive?.contentOrNull() ?: return false
+                saveTokenSession(newAccess, obj["refresh_token"]?.jsonPrimitive?.contentOrNull().orEmpty())
+                true
+            } catch (_: Throwable) {
+                false
+            }
+        }
+        return false
+    }
+
+    /**
+     * كل معاملات الرابط: **الجزء بعد # أولاً** (حيث تضع Supabase التوكنات)
+     * ثم الاستعلام `?…` — فنقبل الصيغتين بلا افتراض مسبق.
+     */
+    private fun linkParams(url: String): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        listOf(
+            url.substringAfter('?', "").substringBefore('#'),
+            url.substringAfter('#', ""),
+        ).forEach { raw ->
+            raw.split('&').forEach { pair ->
+                val idx = pair.indexOf('=')
+                if (idx > 0) {
+                    val key = pair.substring(0, idx)
+                    val value = pair.substring(idx + 1)
+                    if (key.isNotBlank() && value.isNotBlank()) out[key] = value
+                }
+            }
+        }
+        return out
+    }
+
+    /** حمولة JWT (base64) — نقرأ منها المعرّف والبريد ومدة الصلاحية. */
+    private fun jwtClaims(accessToken: String): JsonObject? {
+        val parts = accessToken.split('.')
+        if (parts.size < 2) return null
+        return try {
+            val payload = String(
+                android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP),
+                Charsets.UTF_8,
+            )
+            json.parseToJsonElement(payload).jsonObject
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun saveTokenSession(access: String, refresh: String) {
+        val claims = jwtClaims(access)
         sessionStore.save(
             Session(
                 accessToken = access,
                 refreshToken = refresh,
-                userId = map["user_id"].orEmpty(),
-                email = null,
-                expiresAtEpochSeconds = map["expires_at"]?.toLongOrNull() ?: 0L,
+                userId = claims?.get("sub")?.jsonPrimitive?.contentOrNull().orEmpty(),
+                email = claims?.get("email")?.jsonPrimitive?.contentOrNull(),
+                expiresAtEpochSeconds = claims?.get("exp")?.jsonPrimitive?.contentOrNull()?.toLongOrNull()
+                    ?: (System.currentTimeMillis() / 1000L + 3600L),
             )
         )
-        return true
     }
 
     private suspend fun authPost(path: String, body: JsonObject, token: String?): String =
@@ -383,6 +486,13 @@ class SupabaseClient(
 
     private companion object {
         val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+
+        /**
+         * الرابط الذي يفتح التطبيق بعد الضغط على رابط البريد.
+         * يجب إضافته في لوحة Supabase: Authentication → URL Configuration →
+         * Redirect URLs، وإلا يتجاهل الخادم redirect_to ويعود إلى Site URL.
+         */
+        const val RECOVERY_REDIRECT = "addonstation://recovery"
         val EMPTY_BODY: RequestBody = ByteArray(0).toRequestBody(null)
     }
 }
