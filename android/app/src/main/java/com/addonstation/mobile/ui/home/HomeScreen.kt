@@ -240,7 +240,7 @@ fun HomeScreen(
             }
 
             /* 4.4 إجراءات سريعة */
-            SectionHeader(title = stringResource(R.string.home_quick_actions), leadingEmoji = "⚡")
+            SectionHeader(title = stringResource(R.string.home_quick_actions))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 IconTile(Icons.Filled.Favorite, stringResource(R.string.home_qa_favorites), actions.openFavorites, Modifier.weight(1f), tint = AppColors.Red)
                 IconTile(Icons.Filled.FileDownload, stringResource(R.string.home_qa_downloads), actions.openDownloads, Modifier.weight(1f), tint = AppColors.Blue)
@@ -253,7 +253,6 @@ fun HomeScreen(
                 title = stringResource(R.string.home_plans),
                 actionText = stringResource(R.string.view_all),
                 onAction = actions.openPlans,
-                leadingEmoji = "✦",
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(plans.sortedBy { it.sortOrder }) { plan ->
@@ -280,7 +279,6 @@ fun HomeScreen(
                 title = stringResource(R.string.home_featured),
                 actionText = stringResource(R.string.view_all),
                 onAction = actions.openStore,
-                leadingEmoji = "⭐",
             )
             if (loading) {
                 LoadingBox()
@@ -304,7 +302,6 @@ fun HomeScreen(
                 title = stringResource(R.string.home_latest),
                 actionText = stringResource(R.string.view_all),
                 onAction = actions.openStore,
-                leadingEmoji = "🆕",
             )
             if (latest.isNotEmpty()) {
                 LazyVerticalGrid(
@@ -368,7 +365,7 @@ fun HomeScreen(
             )
 
             /* 4.11 موصى به لك */
-            SectionHeader(title = stringResource(R.string.home_recommended), leadingEmoji = "🔥")
+            SectionHeader(title = stringResource(R.string.home_recommended))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(recommended, key = { it.id }) { item ->
                     ContentCard(

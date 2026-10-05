@@ -329,7 +329,7 @@ private fun StatBox(label: String, value: String, modifier: Modifier = Modifier)
 @Composable
 private fun AboutTab(me: Profile, onOpenSettings: () -> Unit, onSignOut: () -> Unit) {
     val container = rememberContainer()
-    SectionHeader(title = stringResource(R.string.profile_about), leadingEmoji = "📝")
+    SectionHeader(title = stringResource(R.string.profile_about))
     GlassCard {
         Text(
             me.bio?.takeIf { it.isNotBlank() } ?: stringResource(R.string.profile_about_default),
@@ -337,7 +337,7 @@ private fun AboutTab(me: Profile, onOpenSettings: () -> Unit, onSignOut: () -> U
             color = AppColors.Muted,
         )
     }
-    SectionHeader(title = stringResource(R.string.profile_account_info), leadingEmoji = "⚡")
+    SectionHeader(title = stringResource(R.string.profile_account_info))
     GlassCard(padding = 6.dp) {
         RowItem(
             icon = Icons.Filled.WorkspacePremium,

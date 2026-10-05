@@ -922,7 +922,7 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
                     color = if (messageIsError) AppColors.Red else AppColors.Green,
                 )
             }
-            SectionHeader(title = stringResource(R.string.admin_assets), leadingEmoji = "🖼")
+            SectionHeader(title = stringResource(R.string.admin_assets))
             if (loading) {
                 LoadingBox()
             } else {
@@ -1933,7 +1933,7 @@ fun AdminChatScreen(onBack: () -> Unit) {
         ) {
             // ── إضافة غرفة جديدة (مثال: «خدمات النقدية») ──
             // تُنشأ مقفلة بصلاحية الأدمن وحده افتراضياً: يقرأ الجميع ولا يكتب إلا الأدمن.
-            SectionHeader(title = "➕ " + stringResource(R.string.admin_add_room), leadingEmoji = "➕")
+            SectionHeader(title = stringResource(R.string.admin_add_room), leadingEmoji = "➕")
             OutlinedTextField(
                 value = newRoomName,
                 onValueChange = { newRoomName = it },
@@ -2077,7 +2077,7 @@ fun AdminChatScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
             }
 
-            SectionHeader(title = "📢 " + stringResource(R.string.chat_announcement), leadingEmoji = "📢")
+            SectionHeader(title = stringResource(R.string.chat_announcement), leadingEmoji = "📢")
             OutlinedTextField(
                 value = announcement,
                 onValueChange = { announcement = it },
