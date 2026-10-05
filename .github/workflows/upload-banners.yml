@@ -110,6 +110,8 @@ jobs:
           SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
+          set -o pipefail
+          exec > >(tee /tmp/upload.log) 2>&1
           python3 tools/upload_banners.py --zip Banner.zip --seed
 
       - name: "تحقق: رابط عام لأول غلاف"
@@ -131,3 +133,19 @@ jobs:
           else
             echo "✅ الأغلفة تعمل — افتح التطبيق: الملف الشخصي ← تعديل ← تبويب «الأغلفة 🔒»"
           fi
+
+      - name: نشر السجل كتعليق على العمولة
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f /tmp/upload.log ] || exit 0
+          {
+            echo "### 🖼️ رفع الأغلفة — سجل المهمة"
+            echo ""
+            echo '```'
+            tail -120 /tmp/upload.log
+            echo '```'
+          } > /tmp/body.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@/tmp/body.md >/dev/null \
+            && echo "✓ نُشر السجل كتعليق" || echo "تعذّر نشر التعليق"
