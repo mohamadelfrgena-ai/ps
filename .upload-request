@@ -7,3 +7,5 @@ mode: admin-gifs
 zip: https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/Banner.zip
 
 # إعادة التشغيل: بنية المجلد AdminAssets/Admin (القسم «Admin 👑»)
+
+# إعادة التشغيل: إصلاح تمرير --plan إلى sql_text

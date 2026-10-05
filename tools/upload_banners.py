@@ -220,7 +220,7 @@ def sql_value(row) -> str:
     )
 
 
-def sql_text(rows) -> str:
+def sql_text(rows, plan=REQUIRED_PLAN) -> str:
     body = ("insert into public.site_assets\n"
             "  (asset_type, name, file_url, sticker_pack, required_plan, animated,\n"
             "   collection, collection_order, sort_order)\nvalues\n")
@@ -241,7 +241,7 @@ on conflict (file_url) do update
 
 
 def write_sql(rows, out_path, plan=REQUIRED_PLAN) -> str:
-    text = sql_text(rows)
+    text = sql_text(rows, plan)
     with open(out_path, "w", encoding="utf-8") as fh:
         fh.write(text)
     return text
