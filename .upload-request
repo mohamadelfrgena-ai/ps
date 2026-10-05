@@ -1,0 +1,6 @@
+# طلب رفع أغلفة الملف الشخصي (البانرات)
+#   mode: upload   ⇒ رفع الصور + تسجيلها في القاعدة عبر REST
+#   mode: dry-run  ⇒ تجربة بلا رفع
+# دفع هذا الملف (أو تغييره) يشغّل سير العمل تلقائياً.
+mode: upload
+zip: https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/Banner.zip

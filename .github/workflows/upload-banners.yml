@@ -20,6 +20,11 @@
 name: Upload profile banners
 
 on:
+  # دفعُ ملف `.upload-request` يشغّل السير تلقائياً (نفس أسلوب `.build-request`)
+  push:
+    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps ]
+    paths:
+      - '.upload-request'
   workflow_dispatch:
     inputs:
       mode:
@@ -42,6 +47,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # الوضع والرابط: من مُدخلات التشغيل اليدوي، وإلا من ملف `.upload-request`
+      - name: قراءة الطلب
+        id: req
+        run: |
+          MODE="${{ inputs.mode }}"
+          ZIP="${{ inputs.zip_url }}"
+          if [ -f .upload-request ]; then
+            m=$(grep -E '^mode:' .upload-request | head -1 | sed 's/^mode://' | tr -d ' \r')
+            z=$(grep -E '^zip:' .upload-request | head -1 | sed 's/^zip://' | tr -d ' \r')
+            [ -n "$m" ] && MODE="$m"
+            [ -n "$z" ] && ZIP="$z"
+          fi
+          [ -z "$MODE" ] && MODE="dry-run"
+          [ -z "$ZIP" ] && ZIP="https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/Banner.zip"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "⟹ الوضع: $MODE · الأرشيف: $ZIP"
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -60,7 +83,7 @@ jobs:
       - name: تنزيل Banner.zip
         run: |
           set -e
-          curl -fsSL -o Banner.zip "${{ inputs.zip_url }}"
+          curl -fsSL -o Banner.zip "${{ steps.req.outputs.zip }}"
           ls -lh Banner.zip
           python3 - <<'PY'
           import zipfile
@@ -74,7 +97,7 @@ jobs:
           PY
 
       - name: تجربة بلا رفع (dry-run)
-        if: ${{ inputs.mode == 'dry-run' }}
+        if: ${{ steps.req.outputs.mode == 'dry-run' }}
         env:
           SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
@@ -82,7 +105,7 @@ jobs:
           python3 tools/upload_banners.py --zip Banner.zip --dry-run
 
       - name: الرفع + التسجيل في القاعدة
-        if: ${{ inputs.mode == 'upload' }}
+        if: ${{ steps.req.outputs.mode == 'upload' }}
         env:
           SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
@@ -90,7 +113,7 @@ jobs:
           python3 tools/upload_banners.py --zip Banner.zip --seed
 
       - name: "تحقق: رابط عام لأول غلاف"
-        if: ${{ inputs.mode == 'upload' }}
+        if: ${{ steps.req.outputs.mode == 'upload' }}
         env:
           S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
         run: |
