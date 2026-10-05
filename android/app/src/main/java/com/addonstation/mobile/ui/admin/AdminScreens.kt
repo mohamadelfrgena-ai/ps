@@ -315,6 +315,20 @@ fun AdminPanelScreen(
             }
         }
 
+        // رسالة النتيجة (✓ أو سبب الفشل) فوق الشريط السفلي لا فوق الترويسة:
+        // كانت تُكتب خارج Column فتظهر **أعلى** الشاشة متداخلة مع الترويسة.
+        message?.let { text ->
+            Text(
+                text,
+                style = AppText.tiny,
+                color = AppColors.Green,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(AppColors.Bg)
+                    .padding(horizontal = 14.dp, vertical = 4.dp),
+            )
+        }
+
         // شريط اللوحة السفلي (5 عناصر)
         // **حجز منطقة شريط التنقّل (Navigation Bar)**: التطبيق يرسم من الحافة إلى
         // الحافة، فكان الشريط ينزل **تحت** أزرار النظام ويتداخل معها. الحاوية هنا
@@ -365,17 +379,6 @@ fun AdminPanelScreen(
         }
     }
 
-    message?.let { text ->
-        Text(
-            text,
-            style = AppText.tiny,
-            color = AppColors.Green,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AppColors.Bg)
-                .padding(horizontal = 14.dp, vertical = 4.dp),
-        )
-    }
     dialog?.let { url ->
         com.addonstation.mobile.ui.common.FullScreenImageViewer(url = url) { dialog = null }
     }
