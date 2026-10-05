@@ -325,6 +325,7 @@
     <string name="plan_payment_note">支付：本地转账方式，然后上传凭证等待审核。</string>
     <string name="plan_checkout">结账</string>
     <string name="plan_price_line">%1$s / %2$s 天</string>
+    <string name="plan_price_line_usd">%1$s LYD · $%2$s / %3$s 天</string>
     <string name="plan_unavailable">该方案暂不可用。</string>
     <string name="plan_payment_method">支付方式</string>
     <string name="plan_create_order">创建支付订单</string>
@@ -347,6 +348,11 @@
     <string name="plan_download_limit">你已达到该方案的下载上限</string>
     <string name="plan_locked_avatars">锁定的头像可通过 Epic 💎 或 Legendary 👑 解锁。</string>
     <string name="plan_locked_banners">锁定的封面需要相应的方案。</string>
+    <string name="plan_locked_banner_note">🔒 所有封面均已锁定 — 只有订阅 Epic 💎 或 Legendary 👑 才能解锁。</string>
+    <string name="profile_banner_preview">封面预览</string>
+    <string name="profile_banner_section">封面 🔒</string>
+    <string name="profile_banner_none">还没有封面 — 从下面的分区中挑选一个 👇</string>
+    <string name="profile_banner_clear">移除封面</string>
     <string name="plan_item_section">聊天中名字旁的物品</string>
 
     <string name="ac_title">AC 钱包</string>
@@ -495,6 +501,7 @@
     <string name="admin_pack_id_label">包 ID (meme / Minecraft_Memes1 …)</string>
     <string name="admin_amount_ac_label">AC 金额</string>
     <string name="admin_price_lyd_label">价格（LYD）</string>
+    <string name="admin_price_usd_label">价格（美元）</string>
     <string name="admin_duration_days_label">时长（天）</string>
     <string name="admin_download_limit_label">下载上限（留空 = 不限）</string>
     <string name="admin_method_code_label">代码</string>
@@ -536,4 +543,7 @@
     <string name="admin_add_room">添加房间</string>
     <string name="admin_room_name">房间名称</string>
     <string name="admin_room_category">分类</string>
+    <string name="chat_remove_sticker">移除贴纸</string>
+    <string name="chat_sticker_ready">需要的话可以写上文字，然后发送</string>
+    <string name="chat_add_reaction">添加表情回应</string>
 </resources>

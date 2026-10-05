@@ -336,6 +336,7 @@
     <string name="plan_payment_note">Payment: local transfer methods, then upload your receipt for review.</string>
     <string name="plan_checkout">CHECKOUT</string>
     <string name="plan_price_line">%1$s / %2$s days</string>
+    <string name="plan_price_line_usd">%1$s LYD · $%2$s / %3$s days</string>
     <string name="plan_unavailable">This plan is not available.</string>
     <string name="plan_payment_method">Payment method</string>
     <string name="plan_create_order">Create payment order</string>
@@ -358,6 +359,11 @@
     <string name="plan_download_limit">You reached your download limit for this plan</string>
     <string name="plan_locked_avatars">Locked avatars unlock with Epic 💎 or Legendary 👑.</string>
     <string name="plan_locked_banners">Locked banners need the right plan.</string>
+    <string name="plan_locked_banner_note">🔒 All banners are locked — unlock with an Epic 💎 or Legendary 👑 subscription.</string>
+    <string name="profile_banner_preview">Banner preview</string>
+    <string name="profile_banner_section">Banners 🔒</string>
+    <string name="profile_banner_none">No banner yet — pick one from the sections below 👇</string>
+    <string name="profile_banner_clear">Remove banner</string>
     <string name="plan_item_section">Item next to your name in chat</string>
 
     <!-- AddonCoins -->
@@ -511,6 +517,7 @@
     <string name="admin_pack_id_label">Pack id (meme / Minecraft_Memes1 …)</string>
     <string name="admin_amount_ac_label">Amount in AC</string>
     <string name="admin_price_lyd_label">Price in LYD</string>
+    <string name="admin_price_usd_label">Price in USD</string>
     <string name="admin_duration_days_label">Duration (days)</string>
     <string name="admin_download_limit_label">Download limit (empty = unlimited)</string>
     <string name="admin_method_code_label">Code</string>
@@ -552,4 +559,7 @@
     <string name="admin_add_room">Add room</string>
     <string name="admin_room_name">Room name</string>
     <string name="admin_room_category">Category</string>
+    <string name="chat_remove_sticker">Remove sticker</string>
+    <string name="chat_sticker_ready">Add a message with the sticker if you like, then send</string>
+    <string name="chat_add_reaction">Add reaction</string>
 </resources>

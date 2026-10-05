@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -65,6 +66,7 @@ import com.addonstation.mobile.ui.groupAssetsByCollection
 import com.addonstation.mobile.ui.components.AvatarImage
 import com.addonstation.mobile.ui.components.AssetSectionHeader
 import com.addonstation.mobile.ui.components.AssetThumb
+import com.addonstation.mobile.ui.components.BannerThumb
 import com.addonstation.mobile.ui.components.ContentCard
 import com.addonstation.mobile.ui.components.ContentColumn
 import com.addonstation.mobile.ui.components.EmptyState
@@ -149,40 +151,46 @@ fun ProfileScreen(
         ) {
             Spacer(Modifier.height(12.dp))
 
-            // الغلاف + الصورة الرمزية
+            // الغلاف + مربّع البروفايل: **نصف المربّع داخل الغلاف ونصفه خارجه**
+            // (كما في صورة المالك) — فيبدو الأفاتار راكباً على حافة الغلاف السفلية.
+            val avatarBoxSize = 74.dp                 // المربّع مع إطاره المتدرّج
+            val bannerHeight = 140.dp
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(140.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(AppColors.Elevated2),
+                    // نصف المربّع يبرز خارج الغلاف ⇒ نزيد ارتفاع الحاوية بمقداره
+                    .height(bannerHeight + avatarBoxSize / 2),
             ) {
-                val banner = assetUrl(container, me.bannerUrl)
-                if (banner != null) {
-                    com.addonstation.mobile.ui.components.CoverImage(
-                        url = banner,
-                        radius = 20.dp,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(bannerHeight)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(AppColors.Elevated2),
+                ) {
+                    val banner = assetUrl(container, me.bannerUrl)
+                    if (banner != null) {
+                        com.addonstation.mobile.ui.components.CoverImage(
+                            url = banner,
+                            radius = 20.dp,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
                 Box(
                     Modifier
                         .align(Alignment.BottomStart)
-                        .padding(12.dp),
+                        .padding(start = 16.dp)
+                        .size(avatarBoxSize)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Brush.linearGradient(listOf(AppColors.Green, AppColors.Blue)))
+                        .padding(3.dp),
                 ) {
-                    Box(
-                        Modifier
-                            .size(74.dp)
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(Brush.linearGradient(listOf(AppColors.Green, AppColors.Blue)))
-                            .padding(3.dp),
-                    ) {
-                        AvatarImage(
-                            url = assetUrl(container, me.avatarUrl),
-                            size = 68.dp,
-                            shape = RoundedCornerShape(19.dp),
-                        )
-                    }
+                    AvatarImage(
+                        url = assetUrl(container, me.avatarUrl),
+                        size = 68.dp,
+                        shape = RoundedCornerShape(19.dp),
+                    )
                 }
             }
 
@@ -511,6 +519,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
     var assets by remember { mutableStateOf<List<com.addonstation.mobile.data.model.SiteAsset>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     val lockedHint = stringResource(R.string.plan_locked_avatars)
+    val bannerLockedHint = stringResource(R.string.plan_locked_banner_note)
     val onlineLockedHint = stringResource(R.string.plan_locked_online)
 
     LaunchedEffect(kind) {
@@ -527,6 +536,12 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
         val gridContentWidth = appScreenWidthDp() - 28f - (gridColumns - 1) * GRID_SPACING
         val cellWidth = (gridContentWidth / gridColumns).coerceAtLeast(48f)
         val cellHeight = (cellWidth + 30f).coerceIn(74f, 104f).toInt()
+        // الأغلفة (بانرات) صور **عريضة** ⇒ عمودان فقط بخلية 16:9 بدل مربّعات
+        // الأفاتار الضيّقة — فتظهر تفاصيل الغلاف قبل الاختيار.
+        val isBanner = kind == "banner"
+        val bannerColumns = 2
+        val bannerCellWidth = (appScreenWidthDp() - 28f - GRID_SPACING) / bannerColumns
+        val bannerCellHeight = (bannerCellWidth * 9f / 16f + 30f).coerceIn(88f, 190f).toInt()
         // بحث داخل الأصول: 500 أصل بلا بحث = كل صورة مرّة بعينها
         val filteredAssets = remember(assets, assetQuery) {
             val q = assetQuery.trim()
@@ -666,7 +681,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                             onClick = { kind = "avatar" },
                         )
                         FilterChip(
-                            label = stringResource(R.string.plan_locked_banners),
+                            label = stringResource(R.string.profile_banner_section),
                             selected = kind == "banner",
                             onClick = { kind = "banner" },
                         )
@@ -681,6 +696,34 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                         Text(lockedHint, style = AppText.tiny, color = AppColors.Dim)
                     }
                     Spacer(Modifier.height(8.dp))
+                    // معاينة الغلاف المختار حالياً (وتتحرّك إن كان GIF) كما ستظهر
+                    // في الملف الشخصي تماماً — قبل أن يختار المستخدم غلافاً آخر.
+                    if (isBanner) {
+                        BannerPreviewCard(
+                            url = me?.bannerUrl?.let { assetUrl(container, it) },
+                            locked = !epicUp,
+                            onLockedClick = { message = bannerLockedHint },
+                            onClear = {
+                                scope.launch {
+                                    busy = true
+                                    // 'none' = إعادة الغلاف إلى الافتراضي (مسموح للجميع)
+                                    container.profile.setProfileAsset("banner", "none")
+                                        .onSuccess { message = null }
+                                        .onFailure { message = it.message }
+                                    busy = false
+                                }
+                            },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        if (!epicUp) {
+                            Text(
+                                text = stringResource(R.string.plan_locked_banner_note),
+                                style = AppText.tiny,
+                                color = AppColors.Dim,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                        }
+                    }
                 }
             }
 
@@ -695,7 +738,8 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                     item(key = "h-$sectionIndex") {
                         AssetSectionHeader(title = section.title, count = section.assets.size)
                     }
-                    section.assets.chunked(gridColumns).forEachIndexed { rowIndex, rowAssets ->
+                    section.assets.chunked(if (isBanner) bannerColumns else gridColumns)
+                        .forEachIndexed { rowIndex, rowAssets ->
                         item(key = "r-$sectionIndex-$rowIndex") {
                             Row(
                                 modifier = Modifier
@@ -716,7 +760,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                     Column(
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(cellHeight.dp)
+                                            .height((if (isBanner) bannerCellHeight else cellHeight).dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .background(AppColors.Elevated)
                                             .border(
@@ -724,29 +768,69 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                                 if (selected) AppColors.Green else AppColors.Border,
                                                 RoundedCornerShape(12.dp),
                                             )
-                                            .clickable(enabled = unlocked) {
-                                                scope.launch {
-                                                    val value = if (kind == "item") asset.name else asset.fileUrl
-                                                    busy = true
-                                                    // القاعدة هي الحكم: قد ترفض أصلاً (خطة أو صلاحية)،
-                                                    // فنُظهر سبب الرفض بدل أن يبدو وكأنه نجح بلا تغيير
-                                                    container.profile.setProfileAsset(kind, value)
-                                                        .onSuccess { message = null }
-                                                        .onFailure { message = it.message }
-                                                    busy = false
+                                            // المقفول قابل للنقر أيضاً: نقره يُظهر سبب
+                                            // القفل بدل أن يبدو كأنه معطّل بلا سبب
+                                            .clickable {
+                                                if (!unlocked) {
+                                                    message = if (isBanner) bannerLockedHint else lockedHint
+                                                } else {
+                                                    scope.launch {
+                                                        val value = if (kind == "item") asset.name else asset.fileUrl
+                                                        busy = true
+                                                        // القاعدة هي الحكم: قد ترفض أصلاً (خطة أو صلاحية)،
+                                                        // فنُظهر سبب الرفض بدل أن يبدو وكأنه نجح بلا تغيير
+                                                        container.profile.setProfileAsset(kind, value)
+                                                            .onSuccess { message = null }
+                                                            .onFailure { message = it.message }
+                                                        busy = false
+                                                    }
                                                 }
                                             }
                                             .padding(4.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center,
                                     ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            AssetThumb(
-                                                url = assetUrl(container, asset.fileUrl),
-                                                size = 40.dp,
-                                            )
-                                            if (!unlocked) {
-                                                Text("🔒", style = AppText.tiny)
+                                        if (isBanner) {
+                                            // خلية غلاف عريضة 16:9، وGIF فيها **يتحرّك**
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .fillMaxWidth(),
+                                            ) {
+                                                BannerThumb(
+                                                    url = assetUrl(container, asset.fileUrl),
+                                                    animate = true,
+                                                    modifier = Modifier.matchParentSize(),
+                                                )
+                                                if (asset.animated) {
+                                                    Text(
+                                                        "🎞",
+                                                        style = AppText.tiny,
+                                                        modifier = Modifier
+                                                            .align(Alignment.TopEnd)
+                                                            .padding(2.dp),
+                                                    )
+                                                }
+                                                if (!unlocked) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .matchParentSize()
+                                                            .background(AppColors.Surface.copy(alpha = 0.55f)),
+                                                        contentAlignment = Alignment.Center,
+                                                    ) {
+                                                        Text("🔒", style = AppText.bodySmall)
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                AssetThumb(
+                                                    url = assetUrl(container, asset.fileUrl),
+                                                    size = 40.dp,
+                                                )
+                                                if (!unlocked) {
+                                                    Text("🔒", style = AppText.tiny)
+                                                }
                                             }
                                         }
                                         Spacer(Modifier.height(4.dp))
@@ -762,7 +846,7 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                     }
                                 }
                                 // خلايا فارغة تكمل الصف الأخير حتى تبقى الأعمدة متساوية
-                                repeat(gridColumns - rowAssets.size) {
+                                repeat((if (isBanner) bannerColumns else gridColumns) - rowAssets.size) {
                                     Spacer(Modifier.weight(1f))
                                 }
                             }
@@ -772,6 +856,97 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
             }
 
             item { Spacer(Modifier.height(96.dp)) }
+        }
+    }
+}
+
+/**
+ * بطاقة **معاينة الغلاف** أعلى تبويب «الأغلفة» في تعديل الملف الشخصي:
+ * تعرض الغلاف المختار حالياً بعرض الشاشة وبنسبة 16:9، وإن كان GIF **يتحرّك**
+ * كما سيظهر في الملف الشخصي تماماً. وحين يكون الحساب بلا اشتراك تُغطّى البطاقة
+ * بقفل 🔒 ونقرها يُظهر سبب القفل.
+ */
+@Composable
+private fun BannerPreviewCard(
+    url: String?,
+    locked: Boolean,
+    onLockedClick: () -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.profile_banner_preview),
+            style = AppText.tiny,
+            color = AppColors.Muted,
+        )
+        Spacer(Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(AppColors.Elevated2)
+                .border(1.dp, AppColors.Border, RoundedCornerShape(16.dp)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .then(if (locked) Modifier.clickable { onLockedClick() } else Modifier),
+            ) {
+                if (url.isNullOrBlank()) {
+                    Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = stringResource(R.string.profile_banner_none),
+                            style = AppText.tiny,
+                            color = AppColors.Dim,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 18.dp),
+                        )
+                    }
+                } else {
+                    BannerThumb(
+                        url = url,
+                        animate = true,
+                        radius = 0.dp,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                }
+                if (locked) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(AppColors.Surface.copy(alpha = 0.62f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("🔒", style = AppText.sectionTitle)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.plan_locked_banner_note),
+                                style = AppText.tiny,
+                                color = AppColors.Text,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                            )
+                        }
+                    }
+                }
+                if (!url.isNullOrBlank()) {
+                    Text(
+                        text = stringResource(R.string.profile_banner_clear),
+                        style = AppText.tiny,
+                        color = AppColors.Text,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(AppColors.Surface.copy(alpha = 0.82f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .clickable { onClear() },
+                    )
+                }
+            }
         }
     }
 }
@@ -833,21 +1008,28 @@ fun UserProfileScreen(
                 LoadingBox(text = stringResource(R.string.common_loading))
                 return@ContentColumn
             }
+            // مربّع البروفايل راكب على حافة الغلاف: نصفه داخله ونصفه خارجه
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(140.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(AppColors.Elevated2),
+                    .height(140.dp + 36.dp),
             ) {
-                assetUrl(container, me.bannerUrl)?.let { banner ->
-                    com.addonstation.mobile.ui.components.CoverImage(
-                        url = banner,
-                        radius = 20.dp,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(AppColors.Elevated2),
+                ) {
+                    assetUrl(container, me.bannerUrl)?.let { banner ->
+                        com.addonstation.mobile.ui.components.CoverImage(
+                            url = banner,
+                            radius = 20.dp,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
-                Box(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
+                Box(Modifier.align(Alignment.BottomStart).padding(start = 16.dp)) {
                     AvatarImage(url = assetUrl(container, me.avatarUrl), size = 72.dp, borderColor = AppColors.Surface, borderWidth = 3.dp)
                 }
             }

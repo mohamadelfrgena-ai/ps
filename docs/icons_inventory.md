@@ -19,13 +19,28 @@
 | `6.jpeg` | ورقة غرف الشات (9 خلايا مستعملة) | general · minecraft · creator · support · ru · fr · pt · zh · es |
 | `7.png` | غرفة English (دائرة فقط بلا نص) | `ic_room_lang_en.png` 160×160 |
 
-**الخانتان الفارغتان في ورقة الغرف:** لا مصدر لهما ⇒ بقيتا أيقونتهما القديمة:
-`ic_room_lang_ar.png` (العربية) و`ic_room_lang_tr.png` (Türkçe).
+### 0/ب) التحديث الأخير: مجلد `icons` من ملف المالك «New folder (2).zip»
+
+كل أيقونات الغرف استُبدلت بأيقونات المالك الأصلية — **قصّ + تحجيم فقط، بلا رسم ولا
+توليد** — عبر `python3 tools/import_room_icons_v2.py "New folder (2).zip"`:
+
+| ملف المالك | أيقونة الغرفة |
+|---|---|
+| `general.png` | الغرفة العامة |
+| `minecraft.png` | ماينكرافت |
+| `creator.png` | المبدعون |
+| `support.png` | الدعم |
+| `social_media_makers.png` | صنّاع المحتوى الاجتماعي |
+| `cash services.png` | **خدمات النقدية** (أيقونة جديدة — كانت ترث أيقونة «عامة») |
+| `arabic.png` · `english.png` · `spanish.png` · `french.png` · `portuguese.png` · `russian.png` · `chinese.png` | غرف اللغات السبع |
+
+الأيقونة التركية `ic_room_lang_tr.png` لا يوجد لها ملف في المجلد ⇒ تُركت كما هي
+(أرسل صورتها وأُضيفها بنفس الأداة).
 *ملاحظة: الخلية الخامسة في ورقة الغرف تحمل خطّ «لا إله إلا الله محمد رسول الله» —
 شعار ديني، فلم يُستخدم لغرفة اللغة العربية. قل لي إن أردت用它.*
 أداة الاستيراد: `python3 tools/import_owner_icons.py` (تعيد إنتاج كل الملفات من ملف المالك).
 
-## 1) أيقونات الغرف — 13 ملفاً · `android/app/src/main/res/drawable-nodpi/` · 160×160
+## 1) أيقونات الغرف — 14 ملفاً · `android/app/src/main/res/drawable-nodpi/` · 160×160
 
 | الملف | الغرفة | يُستخدم في |
 |---|---|---|
@@ -34,6 +49,7 @@
 | `ic_room_creator.png` | المبدعون | قائمة الغرف · ترويسة الشات |
 | `ic_room_minecraft.png` | ماينكرافت | قائمة الغرف · ترويسة الشات |
 | `ic_room_support.png` | الدعم | قائمة الغرف · ترويسة الشات |
+| `ic_room_cash.png` | خدمات النقدية | قائمة الغرف · ترويسة الشات |
 | `ic_room_lang_ar.png` | العربية | قائمة الغرف · التلميح · الترويسة |
 | `ic_room_lang_en.png` | English | قائمة الغرف · التلميح · الترويسة |
 | `ic_room_lang_es.png` | Español | قائمة الغرف · التلميح · الترويسة |

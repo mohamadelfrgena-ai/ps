@@ -391,12 +391,20 @@ fun MessageActionsSheet(
         Column(Modifier.padding(horizontal = 14.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RECENT_FALLBACK.forEach { emoji ->
+                    // الرموز التي تفاعلتَ بها already تظهر مضاءة بإطار أخضر (نفس
+                    // شكل البسولات تحت الرسالة) فتعرف ما أضفته قبل أن تضغط.
+                    val mine = ui.myReactions.contains(emoji)
                     Text(
                         emoji,
                         style = AppText.welcomeName,
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(AppColors.Elevated)
+                            .background(if (mine) AppColors.GreenGlow else AppColors.Elevated)
+                            .border(
+                                if (mine) 1.5.dp else 0.dp,
+                                if (mine) AppColors.Green else Color.Transparent,
+                                CircleShape,
+                            )
                             .clickable { onReact(emoji) }
                             .padding(8.dp),
                     )
@@ -620,18 +628,25 @@ fun DiscordProfileCardSheet(
         containerColor = AppColors.Surface,
     ) {
         Column {
+            // مربّع البروفايل راكب على حافة الغلاف: نصفه داخله ونصفه خارجه
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(100.dp)
-                    .background(AppColors.Elevated2),
+                    .height(100.dp + 40.dp),
             ) {
-                assetUrl(container, profile.bannerUrl)?.let { banner ->
-                    com.addonstation.mobile.ui.components.CoverImage(
-                        url = banner,
-                        radius = 0.dp,
-                        modifier = Modifier.fillMaxWidth().height(100.dp),
-                    )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .background(AppColors.Elevated2),
+                ) {
+                    assetUrl(container, profile.bannerUrl)?.let { banner ->
+                        com.addonstation.mobile.ui.components.CoverImage(
+                            url = banner,
+                            radius = 0.dp,
+                            modifier = Modifier.fillMaxWidth().height(100.dp),
+                        )
+                    }
                 }
                 AvatarImage(
                     url = assetUrl(container, profile.avatarUrl),
@@ -641,7 +656,7 @@ fun DiscordProfileCardSheet(
                     borderWidth = 5.dp,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = 16.dp, bottom = 0.dp),
+                        .padding(start = 16.dp),
                 )
             }
             Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {

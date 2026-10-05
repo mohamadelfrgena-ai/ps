@@ -104,6 +104,7 @@ data class PaymentOrder(
     @SerialName("user_id") val userId: String,
     @SerialName("plan_id") val planId: String,
     @SerialName("amount_lyd") val amountLyd: Double = 0.0,
+    @SerialName("amount_usd") val amountUsd: Double = 0.0,
     val currency: String = "LYD",
     @SerialName("payment_method") val paymentMethod: String = "",
     @SerialName("reference_code") val referenceCode: String = "",

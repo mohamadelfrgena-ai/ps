@@ -325,6 +325,7 @@
     <string name="plan_payment_note">Ödeme: yerel transfer yöntemleri, ardından dekontu incelemeye gönder.</string>
     <string name="plan_checkout">ÖDEME</string>
     <string name="plan_price_line">%1$s / %2$s gün</string>
+    <string name="plan_price_line_usd">%1$s LYD · $%2$s / %3$s gün</string>
     <string name="plan_unavailable">Bu plan mevcut değil.</string>
     <string name="plan_payment_method">Ödeme Yöntemi</string>
     <string name="plan_create_order">Sipariş Oluştur</string>
@@ -347,6 +348,11 @@
     <string name="plan_download_limit">Bu plan için indirme sınırına ulaştın</string>
     <string name="plan_locked_avatars">Kilitli avatarlar Epic 💎 veya Legendary 👑 ile açılır.</string>
     <string name="plan_locked_banners">Kilitli kapaklar için doğru plan gerekir.</string>
+    <string name="plan_locked_banner_note">🔒 Tüm kapaklar kilitli — yalnızca Epic 💎 veya Legendary 👑 aboneliğiyle açılır.</string>
+    <string name="profile_banner_preview">Kapak önizlemesi</string>
+    <string name="profile_banner_section">Kapaklar 🔒</string>
+    <string name="profile_banner_none">Henüz kapak yok — aşağıdaki bölümlerden birini seç 👇</string>
+    <string name="profile_banner_clear">Kapağı kaldır</string>
     <string name="plan_item_section">Sohbette adının yanındaki öğe</string>
 
     <string name="ac_title">AC cüzdanı</string>
@@ -495,6 +501,7 @@
     <string name="admin_pack_id_label">Paket kimliği (meme / Minecraft_Memes1 …)</string>
     <string name="admin_amount_ac_label">AC cinsinden tutar</string>
     <string name="admin_price_lyd_label">Fiyat (LYD)</string>
+    <string name="admin_price_usd_label">USD fiyatı</string>
     <string name="admin_duration_days_label">Süre (gün)</string>
     <string name="admin_download_limit_label">İndirme sınırı (boş = sınırsız)</string>
     <string name="admin_method_code_label">Kod</string>
@@ -536,4 +543,7 @@
     <string name="admin_add_room">Oda ekle</string>
     <string name="admin_room_name">Oda adı</string>
     <string name="admin_room_category">Kategori</string>
+    <string name="chat_remove_sticker">Çıkartmayı kaldır</string>
+    <string name="chat_sticker_ready">İstersen çıkartmaya bir mesaj yaz, sonra gönder</string>
+    <string name="chat_add_reaction">Tepki ekle</string>
 </resources>

@@ -178,7 +178,15 @@ fun SettingsScreen(
             // رأس الحساب
             GlassCard(padding = 12.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AvatarImage(url = assetUrl(container, profile?.avatarUrl), size = 54.dp, borderColor = AppColors.Green)
+                    // الزائر ⇒ صورة المجهول (نفس صورة شاشة الدخول)
+                    if (profile == null) {
+                        com.addonstation.mobile.ui.components.AnonymousAvatarImage(
+                            size = 54.dp,
+                            borderColor = AppColors.Green,
+                        )
+                    } else {
+                        AvatarImage(url = assetUrl(container, profile?.avatarUrl), size = 54.dp, borderColor = AppColors.Green)
+                    }
                     Column(Modifier.weight(1f)) {
                         // رأس الحساب: الاسم فقط — أيقونة المستخدم انتقلت إلى حقل تغيير الاسم بالأسفل
                         Text(
@@ -213,21 +221,28 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else {
-                    OutlinedTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
-                        label = { Text(stringResource(R.string.auth_username)) },
-                        leadingIcon = {
-                            Image(
-                                painter = painterResource(R.drawable.ic_user),
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    // أيقونة المستخدم **خارج** مربع الاسم وعلى جانبه — تماماً مثل
+                    // أيقونة البريد في صف البريد بالأسفل (لا leadingIcon داخل الحقل)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_user),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(11.dp)),
+                        )
+                        OutlinedTextField(
+                            value = username,
+                            onValueChange = { username = it },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
+                            label = { Text(stringResource(R.string.auth_username)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     GradientButton(
                         text = stringResource(R.string.set_save_username),
                         onClick = {

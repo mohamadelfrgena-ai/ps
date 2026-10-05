@@ -24,6 +24,7 @@ ROOMS = [
     ("ic_room_creator", "المبدعون"),
     ("ic_room_minecraft", "ماينكرافت"),
     ("ic_room_support", "الدعم"),
+    ("ic_room_cash", "خدمات النقدية"),
     ("ic_room_lang_ar", "العربية"),
     ("ic_room_lang_en", "English"),
     ("ic_room_lang_es", "Español"),
@@ -85,11 +86,11 @@ def main() -> int:
     d = ImageDraw.Draw(img)
 
     d.rectangle((0, 0, W, 62), fill="#111823")
-    d.text((W - 22, 18), rtl("جرد الأيقونات المخصّصة في التطبيق — 26 أيقونة + أيقونة المشغّل (كلها موجودة ومرتبطة)"),
+    d.text((W - 22, 18), rtl("جرد الأيقونات المخصّصة في التطبيق — 27 أيقونة + أيقونة المشغّل (كلها موجودة ومرتبطة)"),
            font=f_h, fill="#E8EEF5", anchor="ra")
 
     y = 84
-    y = section(d, "أيقونات الغرف (13) — 160×160", 30, y, f_h)
+    y = section(d, "أيقونات الغرف (14) — 160×160", 30, y, f_h)
     for i, (name, label) in enumerate(ROOMS):
         col = i % cols
         cell(img, d, 30 + col * (box + gap), y + (i // cols) * (box + 60), box,

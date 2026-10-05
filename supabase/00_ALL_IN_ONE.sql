@@ -10,6 +10,12 @@
 --      → 14_redeem_codes (أكواد هدايا AC: توليد واستبدال)
 --      → 15_assets_v2 (الأصول الجديدة: يستبدل كل الأفاتارات والملصقات والأدوات)
 --      → 16_language_room_names (أسماء غرف اللغة بلغتها: العربية · Русский · 中文 …)
+--      → 17_message_delete_window → 18_media_admin_only → 19_admin_panel_guard
+--      → 20_sticker_with_text (النص مع الملصق في رسالة واحدة)
+--      → 21_banners (أغلفة الملف الشخصي: فقرتان · مقفولة باشتراك · GIF متحرّك)
+--      → 22_plan_prices (أسعار الاشتراكات: Epic 2.99$ · Legendary 5.99$)
+--      → 23_payment_order_usd (مبلغ الطلب بالدولار + عملة الطلب حسب البوابة)
+--      → 24_free_default_avatar (الصورة الافتراضية المجانية onefree لكل حساب جديد)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --
@@ -3199,9 +3205,9 @@ values
   ('free', 'Free', 'Start exploring free addons and worlds.',
     0, 0, 30, 5, 'day', true, 1),
   ('epic', 'Epic', 'More content and a wider play experience.',
-    25, 2.99, 30, 30, 'day', true, 2),
+    20, 2.99, 30, 30, 'day', true, 2),
   ('legendary', 'Legendary', 'Unlock premium content and VIP privileges.',
-    50, 5.99, 30, null, 'none', true, 3)
+    30, 5.99, 30, null, 'none', true, 3)
 on conflict (id) do update
   set name = excluded.name,
       tagline = excluded.tagline,
@@ -5292,3 +5298,700 @@ $$;
 --    • الواجهة          → بوابة AdminGate: الدور + الخادم + كلمة المرور + قفل تلقائي
 --    • الوصول           → مقصور على من يملك كلمة مرور حساب الأدمن على الجهاز نفسه
 -- ============================================================================
+
+
+-- ############################################################################
+-- ##  القسم: 20_sticker_with_text.sql
+-- ############################################################################
+
+-- ============================================================================
+--  AddonStation Mobile — 20) الملصق مع نصّ (رسالة واحدة)
+--
+--  الطلب: «عندما أختار ملصقاً تظهر معاينته في مربع الإرسال، وأستطيع كتابة نصّ
+--          معه ثم الضغط على إرسال، فتخرج الرسالة: النص وتحته الملصق مباشرة.»
+--
+--  ما يفعله هذا الملف (آمن لإعادة التنفيذ):
+--      1) دالة الإرسال تقبل نصّاً مع أي نوع رسالة (ملصق · صورة) — النص يُحفظ
+--         في نفس الصف (عمود content) فتظهر الرسالة: النص فوق، والملصق تحته.
+--      2) النص المرافق يُعامَل كأي نصّ شات: حدّ ٥٠٠ حرف، فحص المحتوى
+--         (chat_content_check)، واستخراج المنشنات @username — فلا ثغرة في
+--         الإشراف بسبب تغيير نوع الرسالة.
+--      3) الرسالة النصّية تبقى مشروطة: لا تُقبل رسالة text بلا نصّ.
+--
+--  التطبيق مطابق (ChatScreen):
+--      • اختيار الملصق يضعه في مربع الإرسال (معاينة + ✕ أحمر لإلغائه).
+--      • زر الإرسال يعمل مع النص أو الملصق أو الصورة، والنص يُرسل مع الملصق
+--        في رسالة واحدة تُعرض: النص ثم الملصق تحته مباشرة.
+--
+--  يُنفَّذ مرة واحدة في Supabase → SQL Editor.
+-- ============================================================================
+
+create or replace function public.send_chat_message(
+  p_channel_id   text,
+  p_content      text default null,
+  p_reply_to_id  bigint default null,
+  p_thread_root_id bigint default null,
+  p_sticker_url  text default null,
+  p_image_path   text default null,
+  p_message_type text default 'text',
+  p_media_path   text default null,
+  p_media_mime   text default null,
+  p_media_duration int default null,
+  p_media_size   bigint default null,
+  p_is_announcement boolean default false
+)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid      uuid := auth.uid();
+  v_channel  public.chat_channels;
+  v_role     text;
+  v_cfg      jsonb;
+  v_rate     int;
+  v_recent   int;
+  v_last     timestamptz;
+  v_mute     public.chat_mutes;
+  v_mentions uuid[] := '{}';
+  v_msg_id   bigint;
+  v_check    jsonb;
+  v_names    text[];
+  v_name     text;
+  v_parent   public.chat_messages;
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'message', 'sign_in_required'); end if;
+
+  select * into v_channel from public.chat_channels where id = p_channel_id;
+  if not found then return jsonb_build_object('ok', false, 'message', 'channel_not_found'); end if;
+
+  v_role := public.current_role_of(v_uid);
+
+  -- حظر من الشات
+  if exists(select 1 from public.chat_bans where user_id = v_uid and active) then
+    return jsonb_build_object('ok', false, 'message', 'banned');
+  end if;
+
+  -- كتم مؤقت
+  select * into v_mute from public.chat_mutes
+   where user_id = v_uid and active and (expires_at is null or expires_at > now())
+   order by created_at desc limit 1;
+  if found then
+    return jsonb_build_object('ok', false, 'message', 'muted', 'until', v_mute.expires_at);
+  end if;
+
+  if v_channel.is_locked and v_role not in ('admin','moderator') then
+    return jsonb_build_object('ok', false, 'message', 'room_locked');
+  end if;
+
+  if v_channel.post_permission = 'creators_admin' and v_role not in ('creator','admin','moderator') then
+    return jsonb_build_object('ok', false, 'message', 'creators_only');
+  end if;
+  if v_channel.post_permission = 'admin_only' and v_role <> 'admin' then
+    return jsonb_build_object('ok', false, 'message', 'admins_only');
+  end if;
+
+  -- slowmode
+  if v_channel.slowmode_seconds > 0 and v_role not in ('admin','moderator') then
+    select max(created_at) into v_last from public.chat_messages
+     where channel_id = p_channel_id and user_id = v_uid;
+    if v_last is not null and v_last + make_interval(secs => v_channel.slowmode_seconds) > now() then
+      return jsonb_build_object('ok', false, 'message', 'slowmode',
+        'retry_after', ceil(extract(epoch from (v_last + make_interval(secs => v_channel.slowmode_seconds) - now()))));
+    end if;
+  end if;
+
+  -- حد المعدل: عدد رسائل خلال 10 ثوان
+  v_cfg := public.app_setting('automod');
+  v_rate := coalesce((v_cfg->>'rate_limit_10s')::int, 5);
+  if v_role not in ('admin','moderator') then
+    select count(*) into v_recent from public.chat_messages
+     where user_id = v_uid and created_at > now() - interval '10 seconds';
+    if v_recent >= v_rate then
+      return jsonb_build_object('ok', false, 'message', 'rate_limited');
+    end if;
+  end if;
+
+  -- رسالة نصّية بلا نص مرفوضة: لا فقاعة فارغة في الشات.
+  if p_message_type = 'text' and coalesce(btrim(p_content),'') = '' then
+    return jsonb_build_object('ok', false, 'message', 'empty_message');
+  end if;
+
+  -- ==========================================================================
+  --  النص **المرافق** لأي نوع رسالة (ملصق · صورة) يُعامَل كنصّ الشات نفسه:
+  --  نفس حدّ الطول، ونفس فحص المحتوى، ونفس استخراج المنشنات @username.
+  --  (الملصق مع سطر نصّ = رسالة واحدة: النص فوقه والملصق تحته مباشرة.)
+  -- ==========================================================================
+  if coalesce(btrim(p_content),'') <> '' then
+    if char_length(p_content) > 500 then
+      return jsonb_build_object('ok', false, 'message', 'too_long');
+    end if;
+
+    v_check := public.chat_content_check(p_content);
+    if not (v_check->>'ok')::boolean then
+      return jsonb_build_object('ok', false, 'message', v_check->>'reason');
+    end if;
+
+    -- استخراج المنشنات @username
+    v_names := regexp_matches(p_content, '@([A-Za-z0-9_\.]{3,32})', 'g');
+    if v_names is not null then
+      foreach v_name in array v_names loop
+        v_mentions := v_mentions || (select array_agg(id) from public.profiles where username = v_name);
+      end loop;
+    end if;
+    v_mentions := coalesce(array(select distinct unnest(v_mentions) where unnest is not null), '{}');
+  end if;
+
+  -- ==========================================================================
+  --  الوسائط الثقيلة **للأدمن فقط**: مقاطع الفيديو · الملفات الصوتية · التسجيلات
+  --  الصوتية. أي مستخدم آخر (حتى المشرف moderator) يُرفض طلبه من الخادم.
+  -- ==========================================================================
+  if p_message_type in ('audio','video') and v_role <> 'admin' then
+    return jsonb_build_object('ok', false, 'message', 'admin_only_media');
+  end if;
+
+  if p_message_type = 'image' and coalesce(p_image_path,'') = '' then
+    return jsonb_build_object('ok', false, 'message', 'missing_image');
+  end if;
+
+  if p_message_type in ('audio','video') and coalesce(p_media_path,'') = '' then
+    return jsonb_build_object('ok', false, 'message', 'missing_media');
+  end if;
+
+  insert into public.chat_messages(
+      channel_id, user_id, content, message_type, sticker_url, image_path,
+      media_path, media_mime_type, media_duration, media_size,
+      reply_to_id, thread_root_id, mentions, is_announcement)
+  values (
+      p_channel_id, v_uid, btrim(p_content), coalesce(p_message_type,'text'), p_sticker_url, p_image_path,
+      p_media_path, p_media_mime, p_media_duration, p_media_size,
+      p_reply_to_id, p_thread_root_id, v_mentions,
+      coalesce(p_is_announcement, false) and public.is_admin(v_uid))
+  returning id into v_msg_id;
+
+  -- إشعار من ذُكر
+  if array_length(v_mentions, 1) > 0 then
+    insert into public.chat_notifications(recipient_id, actor_id, type, message_id, channel_id, body)
+    select m, v_uid, 'mention', v_msg_id, p_channel_id,
+           left(coalesce(p_content,''), 80)
+      from unnest(v_mentions) as m
+     where m <> v_uid;
+  end if;
+
+  -- إشعار صاحب الرسالة عند الرد
+  if p_reply_to_id is not null then
+    select * into v_parent from public.chat_messages where id = p_reply_to_id;
+    if found and v_parent.user_id <> v_uid then
+      insert into public.chat_notifications(recipient_id, actor_id, type, message_id, channel_id, body)
+      values (v_parent.user_id, v_uid, 'reply', v_msg_id, p_channel_id, left(coalesce(p_content,''), 80));
+    end if;
+  end if;
+
+  -- إشعار نشاط الموضوع
+  if p_thread_root_id is not null then
+    select * into v_parent from public.chat_messages where id = p_thread_root_id;
+    if found and v_parent.user_id <> v_uid then
+      insert into public.chat_notifications(recipient_id, actor_id, type, message_id, channel_id, body)
+      values (v_parent.user_id, v_uid, 'thread', v_msg_id, p_channel_id, 'New reply in your thread');
+    end if;
+  end if;
+
+  -- تحديث حالة القراءة الخاصة بالمرسل
+  insert into public.chat_read_state(user_id, channel_id, last_read_id)
+  values (v_uid, p_channel_id, v_msg_id)
+  on conflict (user_id, channel_id) do update set last_read_id = v_msg_id, updated_at = now();
+
+  return jsonb_build_object('ok', true, 'message_id', v_msg_id,
+                            'mentions', to_jsonb(v_mentions));
+end;
+$$;
+
+-- 4) تثبيت صلاحيات التنفيذ (create or replace يحتفظ بها، وهذا تأكيد صريح)
+grant execute on function public.send_chat_message(
+  text, text, bigint, bigint, text, text, text, text, text, int, bigint, boolean
+) to authenticated, anon, service_role;
+
+-- 5) تحقّق تلقائي: الدالة مُثبّتة وتقبل النص مع الملصق (بفحص المحتوى نفسه)
+do $$
+declare
+  v_src text;
+  v_ok  boolean;
+begin
+  select prosrc into v_src
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'send_chat_message';
+
+  v_ok := v_src is not null
+      and v_src like '%empty_message%'
+      and v_src like '%too_long%'
+      and v_src like '%chat_content_check%';
+
+  if not v_ok then
+    raise exception '✗ لم تُحدَّث دالة send_chat_message — أعد تنفيذ هذا الملف في SQL Editor.';
+  end if;
+
+  raise notice '✅ 20_sticker_with_text: النص يُقبل مع الملصق/الصورة ويُفحص كأي نصّ شات (منشنات + إشراف + ٥٠٠ حرف).';
+end;
+$$;
+
+
+-- ############################################################################
+-- ##  القسم: 21_banners.sql
+-- ############################################################################
+
+-- ============================================================================
+--  AddonStation Mobile — 21) بانرات الملف الشخصي (من ملف المالك Banner.zip)
+--
+--  الطلب: «أضف البانرات في تعديل الملف الشخصي، وهي غير مجانية وبقفل، ولا تُفتح
+--          إلا باشتراك. في داخلها مجلدان ⇒ اجعلهم فقرات. وأي بانر gif اجعله
+--          متحرّكاً في المعاينة والاستخدام.»
+--
+--  ما يفعله هذا الملف (آمن لإعادة التنفيذ):
+--      1) يسجّل 40 بانراً في site_assets بنوع banner.
+--      2) قسمان (فقرتان) حسب مجلد المالك: «Nature 🌿» و«Random 🎲».
+--      3) required_plan = 'epic' ⇒ مقفولة 🔒 ولا تُفتح إلا باشتراك Epic 💎
+--         أو Legendary 👑 (الخادم يرفضها لغير المشترك داخل set_profile_asset).
+--      4) animated = true لكل ملف gif ⇒ يتحرّك في المعاينة وفي الملف الشخصي.
+--
+--  ⚠️ قبل تنفيذ هذا الملف: ارفع الصور إلى المخزن أولاً:
+--       python3 tools/upload_banners.py --zip Banner.zip \
+--           --url https://xxxx.supabase.co --key sb_secret_…
+--     (وإلا ظهرت البانرات بأسمائها بلا صور).
+--
+--  يُنفَّذ مرة واحدة في Supabase → SQL Editor.
+-- ============================================================================
+
+insert into public.site_assets
+  (asset_type, name, file_url, sticker_pack, required_plan, animated,
+   collection, collection_order, sort_order)
+values
+  ('banner', 'o2rigbig', 'banners/nature/o2rigbig.png', null, 'epic', false, 'Nature 🌿', 22, 1),
+  ('banner', 'o36rigbig', 'banners/nature/o36rigbig.png', null, 'epic', false, 'Nature 🌿', 22, 2),
+  ('banner', 'o3rigbig', 'banners/nature/o3rigbig.png', null, 'epic', false, 'Nature 🌿', 22, 3),
+  ('banner', 'orig5big', 'banners/nature/orig5big.png', null, 'epic', false, 'Nature 🌿', 22, 4),
+  ('banner', 'origbig', 'banners/nature/origbig.png', null, 'epic', false, 'Nature 🌿', 22, 5),
+  ('banner', 'Summer1', 'banners/nature/Summer1.png', null, 'epic', false, 'Nature 🌿', 22, 6),
+  ('banner', 'Summer2', 'banners/nature/Summer2.png', null, 'epic', false, 'Nature 🌿', 22, 7),
+  ('banner', 'Summer3', 'banners/nature/Summer3.png', null, 'epic', false, 'Nature 🌿', 22, 8),
+  ('banner', 'Summer4', 'banners/nature/Summer4.png', null, 'epic', false, 'Nature 🌿', 22, 9),
+  ('banner', 'Summer5', 'banners/nature/Summer5.png', null, 'epic', false, 'Nature 🌿', 22, 10),
+  ('banner', 'Summer6', 'banners/nature/Summer6.png', null, 'epic', false, 'Nature 🌿', 22, 11),
+  ('banner', 'Summer7', 'banners/nature/Summer7.png', null, 'epic', false, 'Nature 🌿', 22, 12),
+  ('banner', 'Summer8', 'banners/nature/Summer8.png', null, 'epic', false, 'Nature 🌿', 22, 13),
+  ('banner', 'Banner 1', 'banners/random/16349-480013.jpg', null, 'epic', false, 'Random 🎲', 23, 1),
+  ('banner', 'gothicbanner', 'banners/random/34808-494692-gothicbanner.gif', null, 'epic', true, 'Random 🎲', 23, 2),
+  ('banner', 'siren head', 'banners/random/42438-438954-siren-head.jpg', null, 'epic', false, 'Random 🎲', 23, 3),
+  ('banner', 'exzy turu', 'banners/random/4298-exzy-turu.png', null, 'epic', false, 'Random 🎲', 23, 4),
+  ('banner', 'patrick jane', 'banners/random/45402-295484-patrick-jane.gif', null, 'epic', true, 'Random 🎲', 23, 5),
+  ('banner', 'none', 'banners/random/49705-114558-none.gif', null, 'epic', true, 'Random 🎲', 23, 6),
+  ('banner', 'night', 'banners/random/53568-997286-night.jpg', null, 'epic', false, 'Random 🎲', 23, 7),
+  ('banner', 'baby girl', 'banners/random/60529-527207-baby-girl.gif', null, 'epic', true, 'Random 🎲', 23, 8),
+  ('banner', 'drip', 'banners/random/63256-612217-drip.jpg', null, 'epic', false, 'Random 🎲', 23, 9),
+  ('banner', 'simple', 'banners/random/73372-642531-simple.jpg', null, 'epic', false, 'Random 🎲', 23, 10),
+  ('banner', 'kawaii gothic', 'banners/random/75143-329583-kawaii-gothic.png', null, 'epic', false, 'Random 🎲', 23, 11),
+  ('banner', 'all roads lead to rome', 'banners/random/89195-572283-all-roads-lead-to-rome.gif', null, 'epic', true, 'Random 🎲', 23, 12),
+  ('banner', 'vinland saga', 'banners/random/89295-797032-vinland-saga.jpg', null, 'epic', false, 'Random 🎲', 23, 13),
+  ('banner', 'bmw', 'banners/random/97427-337568-bmw.gif', null, 'epic', true, 'Random 🎲', 23, 14),
+  ('banner', 'clarence outro', 'banners/random/clarence-outro.jpg', null, 'epic', false, 'Random 🎲', 23, 15),
+  ('banner', 'download (1)', 'banners/random/download-1.jpg', null, 'epic', false, 'Random 🎲', 23, 16),
+  ('banner', 'download (12)', 'banners/random/download-12.jpg', null, 'epic', false, 'Random 🎲', 23, 17),
+  ('banner', 'download (3)', 'banners/random/download-3.jpg', null, 'epic', false, 'Random 🎲', 23, 18),
+  ('banner', 'download', 'banners/random/download.gif', null, 'epic', true, 'Random 🎲', 23, 19),
+  ('banner', 'e1feaf1251c78d0f48a198d8b453592a', 'banners/random/e1feaf1251c78d0f48a198d8b453592a.jpg', null, 'epic', false, 'Random 🎲', 23, 20),
+  ('banner', 'fondo playyy', 'banners/random/fondo-playyy.jpg', null, 'epic', false, 'Random 🎲', 23, 21),
+  ('banner', 'Gumball and Darwin Minecraft icon', 'banners/random/Gumball-and-Darwin-Minecraft-icon.jpg', null, 'epic', false, 'Random 🎲', 23, 22),
+  ('banner', 'Java Edition Technically Updated', 'banners/random/Java-Edition-Technically-Updated.jpg', null, 'epic', false, 'Random 🎲', 23, 23),
+  ('banner', 'Minecraft sky with clouds wallpaper', 'banners/random/Minecraft-sky-with-clouds-wallpaper.jpg', null, 'epic', false, 'Random 🎲', 23, 24),
+  ('banner', 'orig4big', 'banners/random/orig4big.png', null, 'epic', false, 'Random 🎲', 23, 25),
+  ('banner', 'Pin by the strawberry fairy on ♡ minecraft…', 'banners/random/Pin-by-the-strawberry-fairy-on-minecraft-_-Minecraft-wallpaper-Minecraft-images-Background-529.gif', null, 'epic', true, 'Random 🎲', 23, 26),
+  ('banner', 'wp15310214 minecraft platformer wallpapers', 'banners/random/wp15310214-minecraft-platformer-wallpapers.png', null, 'epic', false, 'Random 🎲', 23, 27)
+on conflict (file_url) do update
+  set name = excluded.name,
+      asset_type = excluded.asset_type,
+      sticker_pack = excluded.sticker_pack,
+      required_plan = excluded.required_plan,
+      animated = excluded.animated,
+      collection = excluded.collection,
+      collection_order = excluded.collection_order,
+      sort_order = excluded.sort_order,
+      enabled = true;
+
+-- ---------------------------------------------------------------------------
+-- تحقّق: عدد البانرات في كل قسم + هل هي مقفولة
+-- ---------------------------------------------------------------------------
+select collection   as "القسم",
+       count(*)     as "العدد",
+       count(*) filter (where required_plan <> 'free') as "المقفول",
+       count(*) filter (where animated)                as "متحرك"
+  from public.site_assets
+ where asset_type = 'banner'
+ group by collection, collection_order
+ order by collection_order;
+
+do $$
+declare
+  v_total int;
+begin
+  select count(*) into v_total from public.site_assets where asset_type = 'banner';
+  if v_total = 0 then
+    raise exception '✗ لا توجد بانرات مسجّلة — نفّذ هذا الملف بعد رفع الصور.';
+  end if;
+  raise notice '✅ 21_banners: % بانراً مسجّلاً (مقفولة باشتراك · gif متحرّك).', v_total;
+end;
+$$;
+
+
+-- ############################################################################
+-- ##  القسم: 22_plan_prices.sql
+-- ############################################################################
+
+-- ============================================================================
+--  AddonStation Mobile — 22) أسعار الاشتراكات (Epic 2.99$ · Legendary 5.99$)
+--
+--  الطلب: «غيّر أسعار الاشتراكات: epic = 2.99$ وlegendary = 5.99$»
+--
+--  هذا الملف يفرض السعرين بالدولار في قاعدة البيانات مباشرة (بلا انتظار بذرة
+--  جديدة)، وهو **آمن لإعادة التنفيذ** (idempotent):
+--      • Epic      💎 = 2.99 USD  لمدة 30 يوماً
+--      • Legendary 👑 = 5.99 USD  لمدة 30 يوماً
+--      • Free      🍃 = 0
+--
+--  ⚠️ هذا الملف **يفرض** السعرين معاً (الدينار والدولار). فإن عدّلت السعر
+--     من لوحة الإدارة (الأدمن → الخطط والدفع) فلا تُعد تنفيذ هذا الملف،
+--     وإلا أعاد القيم المكتوبة هنا (20 / 30 دينار · 2.99 / 5.99 دولار).
+--     وإن كانت الخطة بلا سعر دينار (صفر) نضع له قيمة تقديرية مقابلة
+--      (Epic 20 د.ل · Legendary 30 د.ل) — ويُفرض الآن صراحةً بلا شرط.
+--
+--  يُنفَّذ مرة واحدة في Supabase → SQL Editor.
+-- ============================================================================
+
+-- ٠) تأكيد وجود الخطط الثلاث (إن نُفِّذ الملف على قاعدة فارغة)
+insert into public.subscription_plans (id, name, tagline, price_lyd, price_usd, duration_days,
+                                       download_limit, limit_period, active, sort_order)
+values
+  ('free', 'Free', 'Start exploring free addons and worlds.',
+     0, 0, 30, 5, 'day', true, 1),
+  ('epic', 'Epic', 'More content and a wider play experience.',
+     20, 2.99, 30, 30, 'day', true, 2),
+  ('legendary', 'Legendary', 'Unlock premium content and VIP privileges.',
+     30, 5.99, 30, null, 'none', true, 3)
+on conflict (id) do update
+  set name = excluded.name,
+      tagline = excluded.tagline,
+      duration_days = excluded.duration_days,
+      download_limit = excluded.download_limit,
+      limit_period = excluded.limit_period,
+      sort_order = excluded.sort_order,
+      active = true;
+
+-- ١) السعر بالدولار هو المطلوب الآن
+update public.subscription_plans set price_usd = 2.99, updated_at = now() where id = 'epic';
+update public.subscription_plans set price_usd = 5.99, updated_at = now() where id = 'legendary';
+update public.subscription_plans set price_usd = 0,    updated_at = now() where id = 'free';
+
+-- ٢) السعر بالدينار: Epic = 20 د.ل · Legendary = 30 د.ل (يُفرض صراحةً)
+update public.subscription_plans set price_lyd = 20, updated_at = now() where id = 'epic';
+update public.subscription_plans set price_lyd = 30, updated_at = now() where id = 'legendary';
+update public.subscription_plans set price_lyd = 0,  updated_at = now() where id = 'free';
+
+-- ٣) سعر دينار تقديري إن كانت الخطة بلا سعر (حتى لا تُعرض مجانية بالخطأ)
+update public.subscription_plans
+   set price_lyd = 20, updated_at = now()
+ where id = 'epic' and coalesce(price_lyd, 0) <= 0;
+update public.subscription_plans
+   set price_lyd = 30, updated_at = now()
+ where id = 'legendary' and coalesce(price_lyd, 0) <= 0;
+
+-- ---------------------------------------------------------------------------
+-- تحقّق: اطّلع على الجدول بعد التنفيذ (يجب: epic 2.99 · legendary 5.99)
+-- ---------------------------------------------------------------------------
+select id            as "الخطة",
+       price_usd     as "بالدولار",
+       price_lyd     as "بالدينار",
+       duration_days as "المدة (يوم)",
+       active        as "مفعّلة"
+  from public.subscription_plans
+ order by sort_order;
+
+do $$
+declare
+  v_epic      numeric;
+  v_legend    numeric;
+  v_epic_lyd  numeric;
+  v_leg_lyd   numeric;
+begin
+  select price_usd, price_lyd into v_epic,   v_epic_lyd from public.subscription_plans where id = 'epic';
+  select price_usd, price_lyd into v_legend, v_leg_lyd  from public.subscription_plans where id = 'legendary';
+
+  if v_epic is null or v_legend is null then
+    raise exception '✗ خطتا epic/legendary غير موجودتين — نفّذ 01_schema.sql أولاً.';
+  end if;
+
+  if v_epic <> 2.99 or v_legend <> 5.99 then
+    raise exception '✗ أسعار الدولار لم تُحدَّث: epic = % وlegendary = %', v_epic, v_legend;
+  end if;
+
+  if v_epic_lyd <> 20 or v_leg_lyd <> 30 then
+    raise exception '✗ أسعار الدينار لم تُحدَّث: epic = % وlegendary = %', v_epic_lyd, v_leg_lyd;
+  end if;
+
+  raise notice '✅ 22_plan_prices: Epic = %$ / % د.ل · Legendary = %$ / % د.ل (30 يوماً).',
+               v_epic, v_epic_lyd, v_legend, v_leg_lyd;
+end;
+$$;
+
+
+-- ############################################################################
+-- ##  القسم: 23_payment_order_usd.sql
+-- ############################################################################
+
+-- ============================================================================
+--  AddonStation Mobile — 23) مبلغ الطلب بالدولار (amount_usd)
+--
+--  المشكلة التي يصلحها هذا الملف:
+--      جدول payment_orders كان يحفظ **الدينار فقط** (amount_lyd)، فلم يكن لطلب
+--      الدفع أي مبلغ بالدولار. ودالة Stripe كانت تقرأ `order.amount_usd`
+--      (غير موجود ⇒ undefined) فترجع إلى قيمة ثابتة 2.99:
+--          unit_amount: Math.round(Number(order.amount_usd ?? 2.99) * 100)
+--      ⇒ أي اشتراك Legendary (5.99$) كان يُحصَّل منه 2.99$ فقط!
+--
+--  ما يفعله (آمن لإعادة التنفيذ):
+--      1) يضيف العمود amount_usd إلى payment_orders.
+--      2) يعبّؤه للطلبات القديمة من سعر خطّتها.
+--      3) يعيد تعريف create_payment_order لتحفظ مبلغ الدولار من سعر الخطة
+--         وتُرجعه في النتيجة، وتضبط العملة تلقائياً:
+--              • طرق التحويل اليدوي (manual) → LYD
+--              • البوابات الإلكترونية (stripe/paymob/tap) → USD
+--      4) يتحقق من وجود العمود ومن أن الدالة ترجع amount_usd.
+--
+--  يُنفَّذ مرة واحدة في Supabase → SQL Editor (بعد 22_plan_prices.sql).
+-- ============================================================================
+
+-- ١) العمود الجديد
+alter table public.payment_orders
+  add column if not exists amount_usd numeric(10,2);
+
+-- ٢) تعبئة الطلبات القديمة من سعر خطّتها
+update public.payment_orders o
+   set amount_usd = p.price_usd
+  from public.subscription_plans p
+ where o.amount_usd is null
+   and p.id = o.plan_id;
+
+-- ٣) الدالة: تحفظ مبلغ الدولار وتُرجعه
+create or replace function public.create_payment_order(p_plan_id text, p_method text)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_plan    public.subscription_plans;
+  v_method  public.payment_method_settings;
+  v_ref     text;
+  v_open    int;
+  v_order   public.payment_orders;
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'message', 'sign_in_required'); end if;
+
+  select * into v_plan from public.subscription_plans where id = p_plan_id and active;
+  if not found then return jsonb_build_object('ok', false, 'message', 'plan_unavailable'); end if;
+
+  select * into v_method from public.payment_method_settings where code = p_method;
+  if not found then return jsonb_build_object('ok', false, 'message', 'method_unavailable'); end if;
+  if not v_method.enabled then return jsonb_build_object('ok', false, 'message', 'method_disabled'); end if;
+
+  -- حد أقصى للطلبات المفتوحة لكل مستخدم (مكافحة الإساءة)
+  select count(*) into v_open from public.payment_orders
+   where user_id = v_uid and status in ('pending','submitted');
+  if v_open >= 3 then
+    return jsonb_build_object('ok', false, 'message', 'too_many_open_orders');
+  end if;
+
+  -- رمز طلب AS-XXXXXXXX
+  loop
+    v_ref := 'AS-' || upper(substr(replace(gen_random_uuid()::text,'-',''), 1, 8));
+    exit when not exists (select 1 from public.payment_orders where reference_code = v_ref);
+  end loop;
+
+  -- المبلغ بالدينار وبالدولار معاً: الدينار للتحويل اليدوي، والدولار للبوابات.
+  -- العملة تتبع مزوّد الطريقة: يدوي ⇒ LYD · بوابة ⇒ USD
+  insert into public.payment_orders(user_id, plan_id, amount_lyd, amount_usd, currency,
+                                    payment_method, reference_code, provider)
+  values (v_uid, p_plan_id, v_plan.price_lyd, v_plan.price_usd,
+          case when v_method.provider = 'manual' then 'LYD' else 'USD' end,
+          p_method, v_ref, v_method.provider)
+  returning * into v_order;
+
+  insert into public.admin_audit_log(actor_id, action, target_type, target_id, details)
+  values (v_uid, 'payment_order_created', 'payment_order', v_order.id::text,
+          jsonb_build_object('plan', p_plan_id, 'amount', v_plan.price_lyd,
+                             'amount_usd', v_plan.price_usd,
+                             'currency', v_order.currency, 'method', p_method));
+
+  return jsonb_build_object('ok', true, 'order_id', v_order.id, 'reference_code', v_ref,
+                            'amount_lyd', v_plan.price_lyd,
+                            'amount_usd', v_plan.price_usd,
+                            'currency', v_order.currency,
+                            'duration_days', v_plan.duration_days,
+                            'account_name', v_method.account_name,
+                            'account_identifier', v_method.account_identifier,
+                            'instructions', v_method.instructions,
+                            'method_name', v_method.name,
+                            'provider', v_method.provider);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- تحقّق: العمود موجود، والطلبات القديمة صار لها مبلغ دولار
+-- ---------------------------------------------------------------------------
+select count(*)                                   as "كل الطلبات",
+       count(*) filter (where amount_usd is null) as "بلا مبلغ دولار"
+  from public.payment_orders;
+
+do $$
+declare
+  v_has_column boolean;
+  v_missing    int;
+begin
+  select exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'payment_orders'
+       and column_name = 'amount_usd'
+  ) into v_has_column;
+
+  if not v_has_column then
+    raise exception '✗ العمود amount_usd غير موجود — لم يُضاف.';
+  end if;
+
+  select count(*) into v_missing
+    from public.payment_orders
+   where amount_usd is null;
+
+  raise notice '✅ 23_payment_order_usd: العمود موجود · طلبات بلا مبلغ دولار: %', v_missing;
+end;
+$$;
+
+
+-- ############################################################################
+-- ##  القسم: 24_free_default_avatar.sql
+-- ############################################################################
+
+-- ============================================================================
+--  AddonStation Mobile — 24) الصورة الافتراضية المجانية (onefree) لكل حساب جديد
+--
+--  الطلب: «أرجِع صورة onefree الافتراضية لكل مستخدم عند إنشاء الحساب —
+--          أي الصورة الافتراضية المجانية.»
+--
+--  ما يفعله هذا الملف (آمن لإعادة التنفيذ):
+--      1) يجعل الافتراضي لعمود profiles.avatar_url = 'profiles/onefree.png'.
+--      2) يعبّئ كل حساب **بلا صورة** (فارغ أو null) بنفس الصورة — فلا يبقى
+--         حساب بلا أفاتار.
+--      3) يثبّت الصورة صراحةً داخل دالة handle_new_user() ⇒ كل حساب **جديد**
+--         يولد وصورته هي onefree (بلا انتظار أي خطوة من التطبيق).
+--      4) يتحقق: يعدّ الحسابات بلا صورة (يجب صفر) ويطبع الافتراضي.
+--
+--  ملاحظة: «إعادة التعيين» داخل set_profile_asset تُعيد onefree أيضاً،
+--  والصورة مسجّلة في site_assets بـ required_plan = 'free' ⇒ مباحة للجميع
+--  (هي الصورة الوحيدة غير المقفولة في تبويب الأفاتار).
+--
+--  ⚠️ إن لم تظهر الصورة داخل التطبيق فالملف غير موجود في المخزن — ارفعه:
+--       site-assets/profiles/onefree.png
+--     (التطبيق يجرب المسارين profiles/profiles/onefree.png و
+--      profiles/onefree.png تلقائياً، ثم أيقونة محلية أخيرة).
+--
+--  يُنفَّذ مرة واحدة في Supabase → SQL Editor.
+-- ============================================================================
+
+-- ١) الافتراضي على مستوى العمود
+alter table public.profiles
+  alter column avatar_url set default 'profiles/onefree.png';
+
+-- ٢) تعبئة الحسابات القائمة التي بلا صورة
+update public.profiles
+   set avatar_url = 'profiles/onefree.png',
+       updated_at = now()
+ where avatar_url is null
+    or btrim(avatar_url) = ''
+    or lower(btrim(avatar_url)) = 'none';
+
+-- ٣) تثبيت الصورة داخل دالة إنشاء الحساب (كل حساب جديد)
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_username text;
+  v_welcome  int := 50;
+begin
+  v_username := coalesce(
+      nullif(new.raw_user_meta_data->>'username', ''),
+      nullif(split_part(coalesce(new.email,''), '@', 1), ''),
+      'player_' || substr(new.id::text, 1, 8)
+  );
+
+  -- ضمان فرادة اسم المستخدم
+  while exists (select 1 from public.profiles p where p.username = v_username) loop
+    v_username := v_username || floor(random()*10)::int;
+  end loop;
+
+  -- الصورة الافتراضية المجانية onefree لكل حساب جديد
+  insert into public.profiles (id, username, display_name, avatar_url)
+  values (new.id, v_username, v_username, 'profiles/onefree.png')
+  on conflict (id) do nothing;
+
+  insert into public.ac_wallets (user_id, balance, total_earned)
+  values (new.id, v_welcome, v_welcome)
+  on conflict (user_id) do nothing;
+
+  insert into public.ac_transactions (user_id, amount, kind, reason, request_key, balance_after)
+  values (new.id, v_welcome, 'welcome', 'Welcome reward', 'welcome:' || new.id::text, v_welcome)
+  on conflict (request_key) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- ---------------------------------------------------------------------------
+-- تحقّق: لا حساب بلا صورة · والصورة المجانية واحدة فقط غير مقفولة
+-- ---------------------------------------------------------------------------
+select count(*)                                             as "كل الحسابات",
+       count(*) filter (where avatar_url is null
+                           or btrim(avatar_url) = '')       as "بلا صورة",
+       count(*) filter (where avatar_url like '%onefree%')  as "يستعمل onefree"
+  from public.profiles;
+
+select coalesce(column_default, '(بلا)') as "افتراضي avatar_url"
+  from information_schema.columns
+ where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url';
+
+do $$
+declare
+  v_missing int;
+  v_default text;
+begin
+  select count(*) into v_missing
+    from public.profiles
+   where avatar_url is null or btrim(avatar_url) = '';
+
+  select column_default into v_default
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url';
+
+  if v_missing > 0 then
+    raise exception '✗ ما زال هناك % حساباً بلا صورة', v_missing;
+  end if;
+
+  if v_default is null or v_default not like '%onefree%' then
+    raise exception '✗ افتراضي avatar_url ليس onefree: %', coalesce(v_default, '(بلا)');
+  end if;
+
+  raise notice '✅ 24_free_default_avatar: كل الحسابات لها صورة · الافتراضي = %', v_default;
+end;
+$$;

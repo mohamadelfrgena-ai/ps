@@ -37,6 +37,11 @@ ORDER = [
     "17_message_delete_window.sql",
     "18_media_admin_only.sql",
     "19_admin_panel_guard.sql",
+    "20_sticker_with_text.sql",
+    "21_banners.sql",
+    "22_plan_prices.sql",
+    "23_payment_order_usd.sql",
+    "24_free_default_avatar.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -51,6 +56,12 @@ HEADER = """-- =================================================================
 --      → 14_redeem_codes (أكواد هدايا AC: توليد واستبدال)
 --      → 15_assets_v2 (الأصول الجديدة: يستبدل كل الأفاتارات والملصقات والأدوات)
 --      → 16_language_room_names (أسماء غرف اللغة بلغتها: العربية · Русский · 中文 …)
+--      → 17_message_delete_window → 18_media_admin_only → 19_admin_panel_guard
+--      → 20_sticker_with_text (النص مع الملصق في رسالة واحدة)
+--      → 21_banners (أغلفة الملف الشخصي: فقرتان · مقفولة باشتراك · GIF متحرّك)
+--      → 22_plan_prices (أسعار الاشتراكات: Epic 2.99$ · Legendary 5.99$)
+--      → 23_payment_order_usd (مبلغ الطلب بالدولار + عملة الطلب حسب البوابة)
+--      → 24_free_default_avatar (الصورة الافتراضية المجانية onefree لكل حساب جديد)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --

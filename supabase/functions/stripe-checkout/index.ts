@@ -75,6 +75,12 @@ Deno.serve(async (req) => {
     }
 
     // 3) جلسة دفع Stripe (المبلغ بالدولار لتجنب قيود العملات المحلية)
+    //    المبلغ يأتي من سعر الخطة نفسه (23_payment_order_usd.sql) — لا قيمة ثابتة،
+    //    حتى يُحصَّل Legendary بـ 5.99$ و Epic بـ 2.99$ لا أقلّ.
+    const amountUsd = Number(order.amount_usd ?? 0);
+    if (!(amountUsd > 0)) {
+      return json({ ok: false, message: "order_amount_missing" }, 400);
+    }
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       client_reference_id: order.reference_code,
@@ -89,7 +95,7 @@ Deno.serve(async (req) => {
           quantity: 1,
           price_data: {
             currency: "usd",
-            unit_amount: Math.round(Number(order.amount_usd ?? 2.99) * 100),
+            unit_amount: Math.round(amountUsd * 100),
             product_data: {
               name: `AddonStation — ${plan_id.toUpperCase()} plan`,
               description: `${order.duration_days ?? 30} days subscription`,

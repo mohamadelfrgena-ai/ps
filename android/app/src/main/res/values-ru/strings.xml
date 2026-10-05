@@ -325,6 +325,7 @@
     <string name="plan_payment_note">Оплата: локальные способы перевода, затем загрузите чек на проверку.</string>
     <string name="plan_checkout">ОПЛАТА</string>
     <string name="plan_price_line">%1$s / %2$s дней</string>
+    <string name="plan_price_line_usd">%1$s LYD · $%2$s / %3$s дней</string>
     <string name="plan_unavailable">Этот план недоступен.</string>
     <string name="plan_payment_method">Способ оплаты</string>
     <string name="plan_create_order">Создать заказ на оплату</string>
@@ -347,6 +348,11 @@
     <string name="plan_download_limit">Достигнут предел загрузок для этого плана</string>
     <string name="plan_locked_avatars">Закрытые аватары открываются с Epic 💎 или Legendary 👑.</string>
     <string name="plan_locked_banners">Для закрытых обложек нужен подходящий план.</string>
+    <string name="plan_locked_banner_note">🔒 Все обложки заблокированы — открываются только с подпиской Epic 💎 или Legendary 👑.</string>
+    <string name="profile_banner_preview">Предпросмотр обложки</string>
+    <string name="profile_banner_section">Обложки 🔒</string>
+    <string name="profile_banner_none">Обложки пока нет — выберите одну в разделах ниже 👇</string>
+    <string name="profile_banner_clear">Убрать обложку</string>
     <string name="plan_item_section">Предмет рядом с именем в чате</string>
 
     <string name="ac_title">Кошелёк AC</string>
@@ -495,6 +501,7 @@
     <string name="admin_pack_id_label">Id пакета (meme / Minecraft_Memes1 …)</string>
     <string name="admin_amount_ac_label">Сумма в AC</string>
     <string name="admin_price_lyd_label">Цена в LYD</string>
+    <string name="admin_price_usd_label">Цена в USD</string>
     <string name="admin_duration_days_label">Срок (дни)</string>
     <string name="admin_download_limit_label">Лимит загрузок (пусто = без лимита)</string>
     <string name="admin_method_code_label">Код</string>
@@ -536,4 +543,7 @@
     <string name="admin_add_room">Добавить комнату</string>
     <string name="admin_room_name">Название комнаты</string>
     <string name="admin_room_category">Раздел</string>
+    <string name="chat_remove_sticker">Убрать стикер</string>
+    <string name="chat_sticker_ready">При желании добавь текст к стикеру и отправь</string>
+    <string name="chat_add_reaction">Добавить реакцию</string>
 </resources>

@@ -12,9 +12,9 @@ values
   ('free', 'Free', 'Start exploring free addons and worlds.',
     0, 0, 30, 5, 'day', true, 1),
   ('epic', 'Epic', 'More content and a wider play experience.',
-    25, 2.99, 30, 30, 'day', true, 2),
+    20, 2.99, 30, 30, 'day', true, 2),
   ('legendary', 'Legendary', 'Unlock premium content and VIP privileges.',
-    50, 5.99, 30, null, 'none', true, 3)
+    30, 5.99, 30, null, 'none', true, 3)
 on conflict (id) do update
   set name = excluded.name,
       tagline = excluded.tagline,

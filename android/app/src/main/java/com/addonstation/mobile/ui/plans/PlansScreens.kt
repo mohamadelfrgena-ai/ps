@@ -134,6 +134,26 @@ fun PlansScreen(
     }
 }
 
+/**
+ * سعر الخطة كما يراه المستخدم: «25 د.ل · 2.99$ / 30 يوم».
+ * الدينار أولاً لأنه المبلغ المدفوع فعلياً، والدولار مرجعاً بجانبه
+ * (يُحذف إن كان صفراً حتى لا يظهر «0$» بجانب الخطة المجانية).
+ */
+@Composable
+private fun planPriceLine(plan: SubscriptionPlan): String {
+    val lyd = moneyText(plan.priceLyd)
+    val days = plan.durationDays.toString()
+    return if (plan.priceUsd > 0.0) {
+        stringResource(R.string.plan_price_line_usd, lyd, moneyText(plan.priceUsd), days)
+    } else {
+        stringResource(R.string.plan_price_line, lyd, days)
+    }
+}
+
+/** يزيل الكسر الصفري: 25.0 → «25» و2.99 → «2.99». */
+private fun moneyText(value: Double): String =
+    if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+
 @Composable
 private fun PlanCard(plan: SubscriptionPlan, isCurrent: Boolean, onSelect: () -> Unit) {
     val (accent, badgeBg, emoji) = when (plan.id) {
@@ -168,8 +188,7 @@ private fun PlanCard(plan: SubscriptionPlan, isCurrent: Boolean, onSelect: () ->
         }
         plan.tagline?.let { Text(it, style = AppText.bodySmall, color = AppColors.Muted) }
         Text(
-            text = if (plan.isFree) stringResource(R.string.plan_free_features)
-            else stringResource(R.string.plan_price_line, plan.priceLyd.toString(), plan.durationDays.toString()),
+            text = if (plan.isFree) stringResource(R.string.plan_free_features) else planPriceLine(plan),
             style = AppText.bodySmall,
             color = AppColors.Text,
         )
@@ -276,11 +295,8 @@ fun CheckoutScreen(
             GlassCard {
                 Text(currentPlan.name, style = AppText.sectionTitle, color = AppColors.Gold)
                 Text(
-                    stringResource(
-                        R.string.plan_price_line,
-                        currentPlan.priceLyd.toString(),
-                        currentPlan.durationDays.toString(),
-                    ),
+                    if (currentPlan.isFree) stringResource(R.string.plan_free_features)
+                    else planPriceLine(currentPlan),
                     style = AppText.body,
                     color = AppColors.Text,
                 )

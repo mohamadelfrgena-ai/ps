@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -134,21 +136,36 @@ fun RulesScreen(onAccepted: () -> Unit, onDecline: () -> Unit) {
     )
     val rules = if (serverRules.isNotEmpty()) serverRules else fallback
 
+    // المقاسات تتبع الشاشة: العنوان فوق، وبطاقة القواعد تأخذ المساحة المتبقية
+    // وتتمرّر إن زادت عنها، والزرّان ثابتان في الأسفل ظاهران دائماً — فلا يخرج
+    // شيء عن حدود الشاشة على الهاتف الصغير ولا على الكبير.
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.Center,
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("⚠️ " + stringResource(R.string.chat_rules_title), style = AppText.pageTitle, color = AppColors.Text)
-        Spacer(Modifier.height(14.dp))
-        GlassCard {
-            rules.forEach { rule ->
-                Text("• $rule", style = AppText.bodySmall, color = AppColors.Muted)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "⚠️ " + stringResource(R.string.chat_rules_title),
+            style = AppText.pageTitle,
+            color = AppColors.Text,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(12.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            GlassCard(modifier = Modifier.fillMaxWidth(), padding = 12.dp) {
+                rules.forEach { rule ->
+                    Text("• $rule", style = AppText.bodySmall, color = AppColors.Muted)
+                }
             }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
         GradientButton(
             text = stringResource(R.string.chat_accept_enter),
             onClick = onAccepted,
@@ -160,6 +177,7 @@ fun RulesScreen(onAccepted: () -> Unit, onDecline: () -> Unit) {
             onClick = onDecline,
             modifier = Modifier.fillMaxWidth(),
         )
+        Spacer(Modifier.height(6.dp))
     }
 }
 
@@ -263,12 +281,17 @@ fun RoomListScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Box {
-                    AvatarImage(
-                        url = assetUrl(container, profile?.avatarUrl),
-                        size = 40.dp,
-                        online = profile?.showOnlineStatus == true,
-                        borderColor = if (profile == null) AppColors.Border2 else AppColors.Green,
-                    )
+                    // الزائر ⇒ صورة المجهول، والمسجّل ⇒ صورته مع نقطة الاتصال
+                    if (profile == null) {
+                        com.addonstation.mobile.ui.components.AnonymousAvatarImage(size = 40.dp)
+                    } else {
+                        AvatarImage(
+                            url = assetUrl(container, profile?.avatarUrl),
+                            size = 40.dp,
+                            online = profile?.showOnlineStatus == true,
+                            borderColor = AppColors.Green,
+                        )
+                    }
                 }
                 Column(Modifier.weight(1f)) {
                     Text(

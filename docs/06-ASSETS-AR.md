@@ -130,3 +130,88 @@ python3 tools/prune_old_assets.py --dry-run
 
 **الملصقات في `Minecraft Memes3` كلها PNG وليست GIF؟** صحيح — هذه هي كما في مجلدك المصدر
 بالضبط، والبقية (المتحرّكة) تُعلَّم تلقائياً بـ`animated = true`.
+
+---
+
+## أغلفة الملف الشخصي (البانرات) 🖼️🔒
+
+الأغلفة تأتي من ملف المالك `Banner.zip` (40 صورة في مجلدين)، وتُعرض في
+**شاشة «تعديل الملف الشخصي» → تبويب «الأغلفة 🔒»** بهذه القواعد:
+
+| القاعدة | كيف تتحقّق |
+|---|---|
+| **فقرتان** (لا شبكة واحدة) | مجلدا المصدر يصبحان قسمين: `Nature 🌿` و`Random 🎲` (عمود `collection`) — والتطبيق يجمّع الأصول في فقرات بالاسم نفسه |
+| **غير مجانية ومقفولة 🔒** | كل صفوف الأغلفة بـ`required_plan = 'epic'`: لا تُفتح إلا باشتراك Epic 💎 أو Legendary 👑. والتطبيق يمنع النقر ويُظهر سبب القفل، والقاعدة ترفض أي محاولة تجاوز (`plan_too_low` داخل `set_profile_asset`) |
+| **GIF متحرّك في المعاينة والاستخدام** | `animated = true` لكل ملف ‎.gif‎ ⇒ يتحرّك في **المعاينة** أعلى التبويب، وفي **الشبكة** (خلية عريضة 16:9 بعلامة 🎞)، وفي الملف الشخصي نفسه وبطاقة المستخدم في الشات (نفس `CoverImage` الذي يحرّك GIF في كل التطبيق) |
+
+### الطريقة الأسهل: سير العمل (بلا حاسوب)
+
+`Actions → Upload profile banners → Run workflow` (اختر `upload`) —
+ينزّل `Banner.zip` من مستودعك، يرفع الصور، **ويسجّلها في القاعدة عبر REST
+بلا لصق SQL**، ثم يتحقق برابط عام لأول غلاف (يحتاج السرّين المعتادَين).
+
+### أو يدوياً: خطوتان
+
+```bash
+# ١) رفع الصور إلى مخزن site-assets تحت banners/nature وbanners/random
+python3 tools/upload_banners.py --zip Banner.zip \
+    --url https://xxxx.supabase.co --key sb_secret_… --seed
+
+# ٢) (بدل --seed) نفّذ supabase/21_banners.sql في Supabase → SQL Editor
+```
+
+> `--seed` يسجّل الأغلفة في `site_assets` عبر REST مباشرة (upsert على `file_url`)
+> فلا حاجة لفتح SQL Editor. و`--seed-only` يسجّل الصفوف حين تكون الصور مرفوعة مسبقاً.
+
+السكربت يولّد ملف SQL بنفسه (40 صفاً جاهزاً) — ويمكن تشغيله بلا رفع بـ`--sql-only`:
+
+```bash
+python3 tools/upload_banners.py --zip Banner.zip --sql-only   # يكتب supabase/21_banners.sql
+python3 tools/upload_banners.py --dir ./Banner --dry-run      # تجربة بلا رفع
+```
+
+> الصور تُرفع كما هي من ملف المالك (بلا أي تعديل): الأسماء تُصبح آمنة للروابط
+> (`Pin by the strawberry fairy ….gif` → `Pin-by-the-strawberry-fairy-on-….gif`)،
+> و‌`collection` يحمل اسم المجلد الأصلي بالإيموجي كما هو.
+
+### تحقّق
+
+```sql
+select collection, count(*) as n,
+       count(*) filter (where required_plan <> 'free') as locked,
+       count(*) filter (where animated) as animated
+  from public.site_assets where asset_type = 'banner'
+ group by collection, collection_order order by collection_order;
+```
+
+| النتيجة المتوقعة | المعنى |
+|---|---|
+| صفّان فقط: `Nature 🌿` (13) و`Random 🎲` (27) | الفقرتان صحيحتان ✔ |
+| عمود `locked` = 40 | كل الأغلفة مقفولة ✔ |
+| عمود `animated` = 8 في `Random 🎲` | GIFs معلَّمة ✔ |
+
+### ملاحظات
+
+- إعادة تنفيذ `21_banners.sql` آمنة (تحديث بنفس `file_url` لا تكرار).
+- من لم يشترك: يرى الأغلفة كلها بقفل 🔒 والمعاينة مغطّاة، ونقر أي غلاف يُظهر
+  «🔒 الأغلفة كلها مقفولة — لا تُفتح إلا باشتراك Epic 💎 أو Legendary 👑».
+- «إزالة الغلاف» (✕ أعلى المعاينة) متاحة للجميع: تُعيد الغلاف إلى الافتراضي.
+
+---
+
+## الصورة الافتراضية المجانية (`onefree`) لكل حساب جديد 🍃
+
+- **القاعدة هي مصدر الحقيقة:** عمود `profiles.avatar_url` افتراضه `profiles/onefree.png`،
+  ودالة `handle_new_user()` تثبّت نفس الصورة صراحةً عند إنشاء كل حساب
+  (`supabase/24_free_default_avatar.sql`) ⇒ كل حساب جديد يولد وصورته `onefree`.
+- **الحسابات القديمة:** نفس الملف يعبّئ كل حساب بلا صورة (فارغ أو `null`) بـ`onefree`.
+- **إعادة التعيين:** زر «إزالة/إعادة التعيين» و`set_profile_asset('avatar','none')`
+  يعيدان `onefree` أيضاً.
+- **الصورة مجانية:** مسجّلة في `site_assets` بـ`required_plan = 'free'` ⇒ هي
+  الأفاتار الوحيدة غير المقفولة في تبويب «الأفاتار / الأداة».
+- **احتياط في التطبيق:** إن لم يُوجد الملف في المخزن (أو اختلف مساره)، يجرب
+  التطبيق المسارين `profiles/profiles/onefree.png` ثم `profiles/onefree.png`
+  ثم أيقونة محلية — بلا شاشة فارغة.
+
+> صورة **المجهول** (`default-profile.jpg`) تختلف عنها: تظهر قبل الدخول/الإنشاء
+> وبعد تسجيل الخروج فقط، لا للمستخدم المسجّل.

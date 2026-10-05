@@ -33,7 +33,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.ui.nav.MainTab
 import com.addonstation.mobile.ui.theme.AppColors
@@ -109,9 +108,10 @@ private fun NavItem(
         verticalArrangement = Arrangement.Center,
     ) {
         if (tab.isCenter) {
+            // زر المنزل المرتفع — **بلا كلمة تحته** (الأيقونة وحدها كما طلب المالك)
             Box(
                 modifier = Modifier
-                    .offset(y = (-18).dp)
+                    .offset(y = (-20).dp)
                     .size(58.dp)
                     .shadow(18.dp, RoundedCornerShape(19.dp))
                     .clip(RoundedCornerShape(19.dp))
@@ -130,13 +130,7 @@ private fun NavItem(
                     modifier = Modifier.size(26.dp),
                 )
             }
-            Text(
-                text = stringResource(tab.labelRes),
-                style = AppText.small.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Default),
-                color = AppColors.GreenLight,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.offset(y = (-12).dp),
-            )
+            // لا نصّ تحت زر المنزل: الكلمة (Home) أُزيلت بالكامل من الشريط السفلي
         } else {
             Spacer(Modifier.height(4.dp))
             Box(

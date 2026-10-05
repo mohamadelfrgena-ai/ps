@@ -325,6 +325,7 @@
     <string name="plan_payment_note">Pagamento: métodos de transferência locais e depois envie o comprovante para análise.</string>
     <string name="plan_checkout">FINALIZAR</string>
     <string name="plan_price_line">%1$s / %2$s dias</string>
+    <string name="plan_price_line_usd">%1$s LYD · $%2$s / %3$s dias</string>
     <string name="plan_unavailable">Este plano não está disponível.</string>
     <string name="plan_payment_method">Método de pagamento</string>
     <string name="plan_create_order">Criar pedido de pagamento</string>
@@ -347,6 +348,11 @@
     <string name="plan_download_limit">Você atingiu o limite de downloads deste plano</string>
     <string name="plan_locked_avatars">Avatares bloqueados abrem com Epic 💎 ou Legendary 👑.</string>
     <string name="plan_locked_banners">Banners bloqueados precisam do plano certo.</string>
+    <string name="plan_locked_banner_note">🔒 Todos os banners estão bloqueados — abrem apenas com uma assinatura Epic 💎 ou Legendary 👑.</string>
+    <string name="profile_banner_preview">Pré-visualização do banner</string>
+    <string name="profile_banner_section">Banners 🔒</string>
+    <string name="profile_banner_none">Ainda sem banner — escolha um nas seções abaixo 👇</string>
+    <string name="profile_banner_clear">Remover banner</string>
     <string name="plan_item_section">Item ao lado do seu nome no chat</string>
 
     <string name="ac_title">Carteira AC</string>
@@ -495,6 +501,7 @@
     <string name="admin_pack_id_label">Id do pack (meme / Minecraft_Memes1 …)</string>
     <string name="admin_amount_ac_label">Valor em AC</string>
     <string name="admin_price_lyd_label">Preço em LYD</string>
+    <string name="admin_price_usd_label">Preço em USD</string>
     <string name="admin_duration_days_label">Duração (dias)</string>
     <string name="admin_download_limit_label">Limite de downloads (vazio = ilimitado)</string>
     <string name="admin_method_code_label">Código</string>
@@ -536,4 +543,7 @@
     <string name="admin_add_room">Adicionar sala</string>
     <string name="admin_room_name">Nome da sala</string>
     <string name="admin_room_category">Categoria</string>
+    <string name="chat_remove_sticker">Remover figurinha</string>
+    <string name="chat_sticker_ready">Escreva uma mensagem com a figurinha se quiser e envie</string>
+    <string name="chat_add_reaction">Adicionar reação</string>
 </resources>

@@ -1,0 +1,110 @@
+# رفع **أغلفة الملف الشخصي (البانرات)** من ملف المالك Banner.zip
+#
+# ما يفعله بالترتيب:
+#   1) ينزّل Banner.zip من المستودع العام mohamadelfrgena-ai/vae
+#   2) يرفع الصور إلى مخزن site-assets تحت banners/nature وbanners/random
+#   3) يسجّلها في site_assets عبر REST (بلا لصق SQL):
+#        40 غلافاً · required_plan = epic ⇒ مقفولة 🔒 إلا باشتراك
+#        قسمان (فقرتان): Nature 🌿 و Random 🎲
+#        animated = true لكل ملف gif ⇒ يتحرّك في المعاينة والاستخدام
+#   4) يتحقق بقراءة الصفوف من قاعدة البيانات ويطبع الأعداد
+#
+# الإعداد المطلوب مرة واحدة (نفس سرّي رفع الأصول):
+#   Settings → Secrets and variables → Actions:
+#     ADDONSTATION_SUPABASE_URL          = https://xxxx.supabase.co
+#     ADDONSTATION_SUPABASE_SECRET_KEY   = sb_secret_xxxxxxxx
+#
+# التشغيل: Actions → Upload profile banners → Run workflow
+#   (mode = dry-run للتجربة · upload للرفع والتسجيل الفعلي)
+
+name: Upload profile banners
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "الوضع: dry-run (تجربة) أو upload (رفع + تسجيل)"
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - upload
+      zip_url:
+        description: "رابط ملف الأغلفة Banner.zip"
+        required: true
+        default: "https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/Banner.zip"
+
+jobs:
+  upload-banners:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: التحقق من وجود السرّين
+        env:
+          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          S_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          if [ -z "$S_URL" ] || [ -z "$S_KEY" ]; then
+            echo "::error::السرّان غير مضبوطين. أضف ADDONSTATION_SUPABASE_URL و ADDONSTATION_SUPABASE_SECRET_KEY في Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          echo "✓ السرّان موجودان (الرابط: ${S_URL%%/} · طول المفتاح: ${#S_KEY} حرفاً)"
+
+      - name: تنزيل Banner.zip
+        run: |
+          set -e
+          curl -fsSL -o Banner.zip "${{ inputs.zip_url }}"
+          ls -lh Banner.zip
+          python3 - <<'PY'
+          import zipfile
+          z = zipfile.ZipFile("Banner.zip")
+          names = [n for n in z.namelist() if not n.endswith("/")]
+          folders = sorted({n.split("/")[-2] for n in names if "/" in n})
+          gifs = [n for n in names if n.lower().endswith(".gif")]
+          print("المجلدات (الفقرات):", folders)
+          print("عدد الصور:", len(names), "· متحرّكة gif:", len(gifs))
+          assert names, "الأرشيف فارغ"
+          PY
+
+      - name: تجربة بلا رفع (dry-run)
+        if: ${{ inputs.mode == 'dry-run' }}
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python3 tools/upload_banners.py --zip Banner.zip --dry-run
+
+      - name: الرفع + التسجيل في القاعدة
+        if: ${{ inputs.mode == 'upload' }}
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python3 tools/upload_banners.py --zip Banner.zip --seed
+
+      - name: "تحقق: رابط عام لأول غلاف"
+        if: ${{ inputs.mode == 'upload' }}
+        env:
+          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+        run: |
+          set -e
+          python3 - <<'PY' > /tmp/first_banner.txt
+          import re, io
+          sql = io.open("supabase/21_banners.sql", encoding="utf-8").read()
+          print(re.search(r"'banners/[a-z0-9._/-]+'", sql).group(0).strip("'"))
+          PY
+          REL=$(cat /tmp/first_banner.txt)
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" "${S_URL%/}/storage/v1/object/public/site-assets/$REL")
+          echo "$REL → HTTP $CODE"
+          if [ "$CODE" != "200" ]; then
+            echo "::warning::الغلاف لا يُقرأ عامّاً — تأكد أن مخزن site-assets عام وأن 05_storage.sql نُفِّذ"
+          else
+            echo "✅ الأغلفة تعمل — افتح التطبيق: الملف الشخصي ← تعديل ← تبويب «الأغلفة 🔒»"
+          fi

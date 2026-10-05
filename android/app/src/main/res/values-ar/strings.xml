@@ -325,6 +325,7 @@
     <string name="plan_payment_note">الدفع: طرق تحويل محلية، ثم ترفع الإيصال للمراجعة.</string>
     <string name="plan_checkout">إتمام الشراء</string>
     <string name="plan_price_line">%1$s / %2$s يوم</string>
+    <string name="plan_price_line_usd">%1$s د.ل · %2$s$ / %3$s يوم</string>
     <string name="plan_unavailable">الخطة غير متاحة.</string>
     <string name="plan_payment_method">طريقة الدفع</string>
     <string name="plan_create_order">إنشاء طلب الدفع</string>
@@ -347,6 +348,11 @@
     <string name="plan_download_limit">وصلت إلى حد التحميلات لهذه الخطة</string>
     <string name="plan_locked_avatars">الأفاتارات المقفلة تفتح مع Epic 💎 أو Legendary 👑.</string>
     <string name="plan_locked_banners">الأغلفة المقفلة تحتاج الخطة المناسبة.</string>
+    <string name="plan_locked_banner_note">🔒 الأغلفة كلها مقفولة — لا تُفتح إلا باشتراك Epic 💎 أو Legendary 👑.</string>
+    <string name="profile_banner_preview">معاينة الغلاف</string>
+    <string name="profile_banner_section">الأغلفة 🔒</string>
+    <string name="profile_banner_none">ما في غلاف — اختر واحداً من الفقرات تحت 👇</string>
+    <string name="profile_banner_clear">إزالة الغلاف</string>
     <string name="plan_item_section">الأداة بجانب الاسم في الشات</string>
 
     <string name="ac_title">محفظة AC</string>
@@ -495,6 +501,7 @@
     <string name="admin_pack_id_label">معرّف الحزمة (meme / Minecraft_Memes1 …)</string>
     <string name="admin_amount_ac_label">المبلغ بعملات AC</string>
     <string name="admin_price_lyd_label">السعر بالدينار</string>
+    <string name="admin_price_usd_label">السعر بالدولار</string>
     <string name="admin_duration_days_label">المدة (أيام)</string>
     <string name="admin_download_limit_label">حد التنزيل (فارغ = بلا حد)</string>
     <string name="admin_method_code_label">الرمز</string>
@@ -536,4 +543,7 @@
     <string name="admin_add_room">إضافة غرفة</string>
     <string name="admin_room_name">اسم الغرفة</string>
     <string name="admin_room_category">القسم</string>
+    <string name="chat_remove_sticker">إلغاء الملصق</string>
+    <string name="chat_sticker_ready">اكتب نصاً مع الملصق إن أردت، ثم اضغط إرسال</string>
+    <string name="chat_add_reaction">إضافة تفاعل</string>
 </resources>

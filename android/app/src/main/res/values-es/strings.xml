@@ -325,6 +325,7 @@
     <string name="plan_payment_note">Pago: métodos de transferencia locales y luego sube el recibo para su revisión.</string>
     <string name="plan_checkout">PAGO</string>
     <string name="plan_price_line">%1$s / %2$s días</string>
+    <string name="plan_price_line_usd">%1$s LYD · $%2$s / %3$s días</string>
     <string name="plan_unavailable">Este plan no está disponible.</string>
     <string name="plan_payment_method">Método de pago</string>
     <string name="plan_create_order">Crear pedido de pago</string>
@@ -347,6 +348,11 @@
     <string name="plan_download_limit">Alcanzaste el límite de descargas de este plan</string>
     <string name="plan_locked_avatars">Los avatares bloqueados se abren con Epic 💎 o Legendary 👑.</string>
     <string name="plan_locked_banners">Las portadas bloqueadas necesitan el plan adecuado.</string>
+    <string name="plan_locked_banner_note">🔒 Todas las portadas están bloqueadas — se abren solo con una suscripción Epic 💎 o Legendary 👑.</string>
+    <string name="profile_banner_preview">Vista previa de la portada</string>
+    <string name="profile_banner_section">Portadas 🔒</string>
+    <string name="profile_banner_none">Aún sin portada — elige una en las secciones de abajo 👇</string>
+    <string name="profile_banner_clear">Quitar portada</string>
     <string name="plan_item_section">Ítem junto a tu nombre en el chat</string>
 
     <string name="ac_title">Cartera AC</string>
@@ -495,6 +501,7 @@
     <string name="admin_pack_id_label">Id del pack (meme / Minecraft_Memes1 …)</string>
     <string name="admin_amount_ac_label">Importe en AC</string>
     <string name="admin_price_lyd_label">Precio en LYD</string>
+    <string name="admin_price_usd_label">Precio en USD</string>
     <string name="admin_duration_days_label">Duración (días)</string>
     <string name="admin_download_limit_label">Límite de descargas (vacío = sin límite)</string>
     <string name="admin_method_code_label">Código</string>
@@ -536,4 +543,7 @@
     <string name="admin_add_room">Añadir sala</string>
     <string name="admin_room_name">Nombre de la sala</string>
     <string name="admin_room_category">Categoría</string>
+    <string name="chat_remove_sticker">Quitar pegatina</string>
+    <string name="chat_sticker_ready">Escribe un mensaje con la pegatina si quieres y envía</string>
+    <string name="chat_add_reaction">Añadir reacción</string>
 </resources>

@@ -1710,6 +1710,7 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
             SectionHeader(title = stringResource(R.string.plan_title), leadingEmoji = "💠")
             plans.forEach { plan ->
                 var price by remember(plan.id) { mutableStateOf(plan.priceLyd.toString()) }
+                var priceUsd by remember(plan.id) { mutableStateOf(plan.priceUsd.toString()) }
                 var days by remember(plan.id) { mutableStateOf(plan.durationDays.toString()) }
                 var limit by remember(plan.id) { mutableStateOf(plan.downloadLimit?.toString() ?: "") }
                 GlassCard(padding = 10.dp) {
@@ -1719,6 +1720,14 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
                         onValueChange = { price = it },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                         label = { Text(stringResource(R.string.admin_price_lyd_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = priceUsd,
+                        onValueChange = { priceUsd = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                        label = { Text(stringResource(R.string.admin_price_usd_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -1745,7 +1754,7 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
                                 container.admin.updatePlan(
                                     planId = plan.id,
                                     priceLyd = price.toDoubleOrNull(),
-                                    priceUsd = null,
+                                    priceUsd = priceUsd.toDoubleOrNull(),
                                     durationDays = days.toIntOrNull(),
                                     downloadLimit = limit.toIntOrNull(),
                                     limitPeriod = if (limit.isBlank()) "none" else "day",

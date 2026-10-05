@@ -181,11 +181,19 @@ fun HomeScreen(
                         .clickable { if (profile == null) actions.openLogin() else actions.openProfile() },
                     contentAlignment = Alignment.Center,
                 ) {
-                    com.addonstation.mobile.ui.components.AvatarImage(
-                        url = assetUrl(container, profile?.avatarUrl),
-                        size = 62.dp,
-                        shape = RoundedCornerShape(19.dp),
-                    )
+                    // الزائر (بلا حساب / بعد تسجيل الخروج) ⇒ صورة المجهول التي أرسلها المالك
+                    if (profile == null) {
+                        com.addonstation.mobile.ui.components.AnonymousAvatarImage(
+                            size = 62.dp,
+                            shape = RoundedCornerShape(19.dp),
+                        )
+                    } else {
+                        com.addonstation.mobile.ui.components.AvatarImage(
+                            url = assetUrl(container, profile?.avatarUrl),
+                            size = 62.dp,
+                            shape = RoundedCornerShape(19.dp),
+                        )
+                    }
                 }
             }
 

@@ -120,6 +120,12 @@ fun ChatScreen(
     /** ملصق أُزيل بضغطة سريعة ⇒ لوحة الملصقات تُفتح عليه مباشرة (العودة لمكانه). */
     var resentSticker by remember { mutableStateOf<String?>(null) }
     var attachment by remember { mutableStateOf<Pair<String, String>?>(null) } // (path, kind)
+    /**
+     * ملصق اختاره المستخدم ولم يُرسله بعد: تظهر **معاينته داخل مربع الإرسال**،
+     * ويستطيع أن يكتب معه نصاً إن أراد، ثم يضغط إرسال — فيخرجان في رسالة واحدة
+     * (النص فوقه والملصق تحته مباشرة). زر ✕ الأحمر على يمين المعاينة يُلغيه.
+     */
+    var pendingSticker by remember { mutableStateOf<String?>(null) }
     var showEmoji by remember { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
     var showMembers by remember { mutableStateOf(false) }
@@ -201,7 +207,8 @@ fun ChatScreen(
             val mime = prepared?.mime ?: context.contentResolver.getType(uri) ?: "image/jpeg"
             val name = prepared?.fileName ?: "chat-${System.currentTimeMillis()}.jpg"
             container.chat.uploadImage(bytes, mime, name)
-                .onSuccess { path -> attachment = path to "image" }
+                // صورة وملصق في رسالة واحدة غير واضحين ⇒ الصورة تُسقط الملصق المنتظر
+                .onSuccess { path -> attachment = path to "image"; pendingSticker = null }
                 .onFailure { statusMessage = imageFormatsMsg }
         }
     }
@@ -508,22 +515,30 @@ fun ChatScreen(
                 onEmoji = { showEmoji = true },
                 onSend = {
                     val content = text.trim()
-                    if (content.isEmpty() && attachment == null) return@ChatInputBar
+                    if (content.isEmpty() && attachment == null && pendingSticker == null) return@ChatInputBar
                     val attach = attachment
+                    val sticker = pendingSticker
                     val replySnapshot = replyTo
                     text = ""                // مسح فوري: الفقاعة تظهر الآن، ولا يمكن إرسالها مرّتين
+                    pendingSticker = null
                     replyTo = null
                     vm.send(
                         content = content.ifEmpty { null },
                         replyTo = replySnapshot,
+                        stickerUrl = sticker,
                         imagePath = if (attach?.second == "image") attach.first else null,
-                        messageType = if (attach?.second == "image") "image" else "text",
+                        messageType = when {
+                            sticker != null -> "sticker"
+                            attach?.second == "image" -> "image"
+                            else -> "text"
+                        },
                     ) { ok, error ->
                         if (ok) {
                             attachment = null
                             statusMessage = null
                         } else {
                             if (text.isEmpty()) text = content   // استرجاع ما كتبه إن فشل الإرسال
+                            if (pendingSticker == null) pendingSticker = sticker   // الملصق لا يضيع
                             replyTo = replySnapshot
                             statusMessage = error
                         }
@@ -534,6 +549,9 @@ fun ChatScreen(
                     .filter { it.isNotBlank() }.take(40) else emptyList(),
                 onMention = { name -> text = text.dropLast(1) + "@$name " },
                 slowmodeSeconds = channel.slowmodeSeconds,
+                pendingStickerUrl = pendingSticker?.let { container.siteAssetUrl(it) },
+                onRemoveSticker = { pendingSticker = null },
+                canSend = text.isNotBlank() || attachment != null || pendingSticker != null,
             )
         }
     }
@@ -551,26 +569,10 @@ fun ChatScreen(
             },
             focusSticker = resentSticker,
             onSticker = { stickerUrl ->
-                // الملصق مع أي كتابة ⇒ رسالة واحدة (لا تنقسم)، والكتابة تُمسح بعد النجاح
-                val body = text.trim()
-                val replySnapshot = replyTo
-                text = ""                // مسح فوري (الملصق نفسه يُختار من اللوحة)
-                replyTo = null
-                vm.send(
-                    content = body.ifEmpty { null },
-                    replyTo = replySnapshot,
-                    stickerUrl = stickerUrl,
-                    messageType = "sticker",
-                ) { ok, error ->
-                    if (ok) {
-                        resentSticker = null
-                        statusMessage = null
-                    } else {
-                        if (text.isEmpty()) text = body
-                        replyTo = replySnapshot
-                        statusMessage = error
-                    }
-                }
+                // اختيار الملصق لا يُرسله فوراً: يوضعه في مربع الإرسال (معاينة + ✕ أحمر)
+                // فيستطيع صاحبه أن يكتب نصاً تحته إن أراد، ثم يضغط إرسال.
+                pendingSticker = stickerUrl
+                resentSticker = null
                 showEmoji = false
             },
         )
@@ -769,8 +771,39 @@ private fun ChatInputBar(
     mentionSuggestions: List<String>,
     onMention: (String) -> Unit,
     slowmodeSeconds: Int,
+    /**
+     * ملصق مختار ينتظر الإرسال: رابط معاينته تظهر **داخل مربع الإرسال** فوق
+     * حقل الكتابة، وزر ✕ الأحمر على أقصى يمينه يُلغيه.
+     */
+    pendingStickerUrl: String? = null,
+    onRemoveSticker: () -> Unit = {},
+    /** هل يمكن الإرسال الآن؟ (نص مكتوب، أو صورة مرفقة، أو ملصق في الانتظار) */
+    canSend: Boolean = text.isNotBlank(),
 ) {
     Column {
+        // معاينة الملصق داخل مربع الإرسال (النص يُكتب تحته إن أراد، ثم إرسال)
+        if (pendingStickerUrl != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AppColors.Elevated)
+                    .border(1.dp, AppColors.Border, RoundedCornerShape(14.dp))
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                PendingStickerPreview(url = pendingStickerUrl, onRemove = onRemoveSticker)
+                Text(
+                    stringResource(R.string.chat_sticker_ready),
+                    style = AppText.tiny,
+                    color = AppColors.Muted,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+        }
         if (mentionSuggestions.isNotEmpty()) {
             LazyColumn(
                 modifier = Modifier
@@ -818,7 +851,8 @@ private fun ChatInputBar(
                     onValueChange = { if (it.length <= 500) onTextChange(it) },
                     // Enter على لوحة المفاتيح يُرسل الرسالة (زر الإرسال يبقى موجوداً)
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { if (text.isNotBlank()) onSend() }),
+                    // Enter على لوحة المفاتيح يُرسل ما في المربع (نصّاً أو ملصقاً)
+                    keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() }),
                     placeholder = {
                         Text(
                             stringResource(
@@ -855,17 +889,61 @@ private fun ChatInputBar(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(if (text.isBlank()) AppColors.Elevated2 else AppColors.Green)
-                    .clickable(enabled = text.isNotBlank()) { onSend() },
+                    .background(if (canSend) AppColors.Green else AppColors.Elevated2)
+                    .clickable(enabled = canSend) { onSend() },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Filled.Send,
                     contentDescription = stringResource(R.string.chat_send),
-                    tint = if (text.isBlank()) AppColors.Dim else AppColors.OnGreen,
+                    tint = if (canSend) AppColors.OnGreen else AppColors.Dim,
                     modifier = Modifier.size(20.dp),
                 )
             }
+        }
+    }
+}
+
+/**
+ * معاينة الملصق المختار داخل مربع الإرسال: الصورة + زر ✕ أحمر دائري على أقصى
+ * يمينها (فوقها) يُلغي الاختيار، فيعود مربع الإرسال نصّياً كما كان.
+ */
+@Composable
+private fun PendingStickerPreview(
+    url: String,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            // حجم المعاينة يتبع عرض شاشة الهاتف (لا يفيض على الشاشات الضيقة)
+            .size(
+                com.addonstation.mobile.ui.theme.screenWidthFraction(
+                    fraction = 0.30f, minDp = 92, maxDp = 132,
+                ),
+            ),
+    ) {
+        com.addonstation.mobile.ui.components.CoverImage(
+            url = url,
+            radius = 12.dp,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(AppColors.Red)
+                .clickable { onRemove() }
+                .padding(4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = stringResource(R.string.chat_remove_sticker),
+                tint = androidx.compose.ui.graphics.Color.White,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
@@ -891,6 +969,11 @@ private fun MessageBlock(
     val container = rememberContainer()
     val message = ui.message
     val author = ui.author
+    // رابط الصورة المرفقة: يُوقَّع من الخادم مرة واحدة لكل رسالة (بدونه تظهر فارغة)
+    var imageUrl by remember(message.id, message.imagePath) { mutableStateOf<String?>(null) }
+    LaunchedEffect(message.id, message.imagePath) {
+        imageUrl = message.imagePath?.let { runCatching { container.chat.imageUrl(it) }.getOrNull() }
+    }
     val grouped = previous != null &&
         previous.message.userId == message.userId &&
         TimeFormat.withinFiveMinutes(previous.message.createdAt, message.createdAt)
@@ -981,11 +1064,8 @@ private fun MessageBlock(
                         Text("🎖", style = AppText.tiny)
                     }
                 }
-                Text(
-                    TimeFormat.timeOnly(message.createdAt, Locale.getDefault()),
-                    style = AppText.chatTime,
-                    color = AppColors.Dim,
-                )
+                // وقت الإرسال لم يعد هنا: صار في **نهاية الرسالة نفسها** (أسفل
+                // النص على حافة الفقاعة) كما في صورة المالك.
             }
         }
 
@@ -1031,43 +1111,74 @@ private fun MessageBlock(
         when (message.messageType) {
             "sticker" -> {
                 val url = stickerUrlResolver(message.stickerUrl ?: "")
-                Box(
-                    modifier = Modifier
-                        .padding(start = 48.dp, top = 4.dp)
-                        // حجم الملصق يتبع عرض شاشة الهاتف (لا يفيض على الشاشات الضيقة)
-                        .size(
-                            com.addonstation.mobile.ui.theme.screenWidthFraction(
-                                fraction = 0.38f, minDp = 108, maxDp = 180,
-                            ),
+                Column(modifier = Modifier.padding(start = 48.dp, top = 4.dp)) {
+                    // النص أولاً، وتحته مباشرة الملصق — رسالة واحدة كما يراها صاحبها
+                    if (!message.content.isNullOrBlank()) {
+                        Text(
+                            text = message.content.orEmpty(),
+                            style = AppText.chatBody,
+                            color = AppColors.Text,
+                            modifier = Modifier.padding(bottom = 6.dp),
                         )
-                        .clickable {
-                            // ملصقي ⇒ ضغطة سريعة = إرجاعه للوحة الملصقات، وغيري = عرض بالحجم الكامل
-                            val takeBack = onStickerTap
-                            if (takeBack != null) takeBack() else message.stickerUrl?.let(onOpenImage)
-                        },
-                ) {
-                    com.addonstation.mobile.ui.components.CoverImage(url = url, radius = 12.dp, modifier = Modifier.fillMaxSize())
+                    }
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                // حجم الملصق يتبع عرض شاشة الهاتف (لا يفيض على الشاشات الضيقة)
+                                .size(
+                                    com.addonstation.mobile.ui.theme.screenWidthFraction(
+                                        fraction = 0.38f, minDp = 108, maxDp = 180,
+                                    ),
+                                )
+                                .clickable {
+                                    // ملصقي ⇒ ضغطة سريعة = إرجاعه للوحة الملصقات، وغيري = عرض بالحجم الكامل
+                                    val takeBack = onStickerTap
+                                    if (takeBack != null) takeBack() else message.stickerUrl?.let(onOpenImage)
+                                },
+                        ) {
+                            com.addonstation.mobile.ui.components.CoverImage(url = url, radius = 12.dp, modifier = Modifier.fillMaxSize())
+                        }
+                        // الوقت في نهاية الرسالة (أسفل الملصق على الحافة)
+                        MessageTime(createdAt = message.createdAt)
+                    }
                 }
             }
             "image" -> {
-                Column {
-                    com.addonstation.mobile.ui.components.CoverImage(
-                        url = null,
-                        radius = 12.dp,
-                        modifier = Modifier
-                            .padding(start = 48.dp, top = 4.dp)
-                            .widthIn(max = 260.dp)
-                            .height(160.dp)
-                            .clickable { message.imagePath?.let(onOpenImage) },
-                    )
-                    Text(
-                        "🖼",
-                        style = AppText.tiny,
-                        color = AppColors.Muted,
-                        modifier = Modifier
-                            .padding(start = 48.dp)
-                            .clickable { message.imagePath?.let(onOpenImage) },
-                    )
+                Row(
+                    modifier = Modifier.padding(start = 48.dp, top = 4.dp),
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Column {
+                        com.addonstation.mobile.ui.components.CoverImage(
+                            // الرابط الحقيقي للصورة (يُوقَّع من الخادم عند الحاجة)
+                            url = imageUrl,
+                            radius = 12.dp,
+                            modifier = Modifier
+                                .widthIn(max = 240.dp)
+                                .height(160.dp)
+                                .clickable {
+                                    val path = message.imagePath
+                                    if (imageUrl != null) onOpenImage(imageUrl!!)
+                                    else if (path != null) onOpenImage(path)
+                                },
+                        )
+                        Text(
+                            "🖼",
+                            style = AppText.tiny,
+                            color = AppColors.Muted,
+                            modifier = Modifier.clickable {
+                                val path = message.imagePath
+                                if (imageUrl != null) onOpenImage(imageUrl!!)
+                                else if (path != null) onOpenImage(path)
+                            },
+                        )
+                    }
+                    // الوقت في نهاية الرسالة (أسفل الصورة على الحافة)
+                    MessageTime(createdAt = message.createdAt)
                 }
             }
             "audio", "video" -> {
@@ -1094,88 +1205,138 @@ private fun MessageBlock(
                             color = AppColors.Muted,
                         )
                     }
+                    // الوقت في نهاية الرسالة (على حافة شريط الوسائط)
+                    MessageTime(createdAt = message.createdAt)
                 }
             }
             else -> {
-                if (message.status == "hidden" || message.status == "deleted") {
-                    Text(
-                        "🚫 " + stringResource(R.string.chat_hidden_message),
-                        style = AppText.bodySmall,
-                        color = AppColors.Muted,
-                        modifier = Modifier.padding(start = 48.dp),
-                    )
-                } else {
+                Row(
+                    modifier = Modifier.padding(start = 48.dp, top = 2.dp),
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Text(
                         text = message.content.orEmpty(),
                         style = AppText.chatBody,
                         color = AppColors.Text,
-                        modifier = Modifier.padding(start = 48.dp, top = 2.dp),
+                        modifier = Modifier.weight(1f, fill = false),
                     )
+                    // الوقت في نهاية السطر (على حافة الفقاعة) — صغير وباهت
+                    MessageTime(createdAt = message.createdAt)
                 }
             }
         }
 
+        // التفاعلات بأسلوب ديسكورد: صفّ من **البسولات الدائرية** تحت الرسالة،
+        // والبسولة التي تفاعلتَ بها بخلفية مضيئة وإطار أخضر ورقم أخضر، وآخر
+        // الصفّ زر «إضافة تفاعل» (＋) الذي يفتح لوحة الرموز.
         if (ui.reactions.isNotEmpty()) {
             Row(
                 modifier = Modifier.padding(start = 48.dp, top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 ui.reactions.forEach { (emoji, count) ->
-                    val mine = ui.myReactions.contains(emoji)
-                    Row(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(AppColors.Elevated2)
-                            .border(
-                                1.dp,
-                                if (mine) AppColors.Green else AppColors.Border,
-                                CircleShape,
-                            )
-                            .clickable { onToggleReaction(emoji) }
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text(emoji, style = AppText.tiny)
-                        Text("$count", style = AppText.tiny, color = AppColors.Muted)
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(AppColors.Elevated)
-                        .clickable { onLongPress() }
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                ) {
-                    Text("+", style = AppText.tiny, color = AppColors.Muted)
-                }
-            }
-        } else {
-            Row(
-                modifier = Modifier.padding(start = 48.dp, top = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                listOf("👍", "❤️").forEach { emoji ->
-                    Text(
-                        emoji,
-                        style = AppText.tiny,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .clickable { onToggleReaction(emoji) }
-                            .padding(2.dp),
+                    ReactionPill(
+                        emoji = emoji,
+                        count = count,
+                        selected = ui.myReactions.contains(emoji),
+                        onClick = { onToggleReaction(emoji) },
                     )
                 }
-                Text(
-                    "+",
-                    style = AppText.tiny,
-                    color = AppColors.Dim,
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .clickable { onLongPress() }
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                )
+                AddReactionPill(onClick = onLongPress)
             }
         }
+    }
+}
+
+/**
+ * بسولة تفاعل واحدة (ديسكورد): رمز + عدد داخل كبسولة دائرية صغيرة.
+ * البسولة التي تفاعلتَ بها = خلفية مضيئة + إطار أخضر + رقم أخضر.
+ */
+@Composable
+private fun ReactionPill(
+    emoji: String,
+    count: Int,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .height(26.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(if (selected) AppColors.GreenGlow else AppColors.Elevated)
+            .border(
+                width = if (selected) 1.5.dp else 1.dp,
+                color = if (selected) AppColors.Green else AppColors.Border,
+                shape = RoundedCornerShape(13.dp),
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text(emoji, style = AppText.small)
+        Text(
+            text = "$count",
+            style = AppText.tiny,
+            color = if (selected) AppColors.Green else AppColors.Muted,
+        )
+    }
+}
+
+/**
+ * وقت إرسال الرسالة — **في نهاية الرسالة نفسها** (أسفل النص/الملصق/الصورة على
+ * حافة الفقاعة) كما في صورة المالك، لا بجانب اسم صاحبها في الأعلى: رقم صغير
+ * باهت (9.5sp) فلا يزاحم النص ولا يقطع تسلسل الرسائل المجمّعة.
+ */
+@Composable
+private fun MessageTime(
+    createdAt: String?,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = TimeFormat.timeOnly(createdAt, Locale.getDefault()),
+        style = AppText.chatTime,
+        color = AppColors.Dim,
+        modifier = modifier,
+    )
+}
+
+/** زر «إضافة تفاعل» في آخر صفّ التفاعلات: كبسولة （＋ وجه مبتسم） بأسلوب ديسكورد. */
+@Composable
+private fun AddReactionPill(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(width = 46.dp, height = 26.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(AppColors.Elevated)
+            .border(1.dp, AppColors.Border, RoundedCornerShape(13.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Filled.EmojiEmotions,
+            contentDescription = stringResource(R.string.chat_add_reaction),
+            tint = AppColors.Muted,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 7.dp)
+                .size(15.dp),
+        )
+        Icon(
+            Icons.Filled.Add,
+            contentDescription = null,
+            tint = AppColors.Muted,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 6.dp)
+                .size(13.dp),
+        )
     }
 }
 

@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -293,7 +294,12 @@ fun RoomIcon(channelId: String, size: Dp = 20.dp, modifier: Modifier = Modifier)
     )
 }
 
-/** يحوّل معرّف الغرفة إلى أيقونتها المرسومة (بلا إيموجي). */
+/**
+ * يحوّل معرّف الغرفة إلى أيقونتها المرسومة (بلا إيموجي).
+ *
+ * الأيقونات هي **أيقونات المالك الأصلية** المستوردة من مجلد `icons`
+ * (عام · ماينكرافت · المبدعين · الدعم · صنّاع المحتوى · الأعلام · خدمات النقدية).
+ */
 @androidx.annotation.DrawableRes
 fun roomIconRes(channelId: String): Int = when (channelId) {
     "general" -> R.drawable.ic_room_general
@@ -301,6 +307,7 @@ fun roomIconRes(channelId: String): Int = when (channelId) {
     "creator" -> R.drawable.ic_room_creator
     "support" -> R.drawable.ic_room_support
     "social-media-makers" -> R.drawable.ic_room_social
+    "cash-services" -> R.drawable.ic_room_cash
     "lang-ar" -> R.drawable.ic_room_lang_ar
     "lang-ru" -> R.drawable.ic_room_lang_ru
     "lang-pt" -> R.drawable.ic_room_lang_pt
@@ -319,6 +326,11 @@ private val ASSET_AUTH_DEFAULT = listOf("profiles/profiles/default-profile.jpg")
 /**
  * صورة من مكتبة الأصول (site-assets) مع نسخة محلية احتياطية: تظهر فوراً محلياً
  * ثم تُستبدل بالأصل الحقيقي عند وصوله — فتعمل بلا إنترنت أيضاً.
+ *
+ * المسارات تُجرَّب **بالترتيب**: إن فشل الأول (404 لأن سكربت الرفع كرّر اسم
+ * المجلد مثلاً: profiles/profiles/onefree.png) ننتقل إلى الذي يليه
+ * (profiles/onefree.png) ثم إلى الصورة المحلية — فتظهر الصورة الافتراضية
+ * المجانية ولو اختلف مسارها بين قاعدة وأخرى.
  */
 @Composable
 private fun SiteAssetOrLocal(
@@ -328,7 +340,8 @@ private fun SiteAssetOrLocal(
     modifier: Modifier = Modifier,
 ) {
     val container = com.addonstation.mobile.ui.rememberContainer()
-    val url = remember(paths) { paths.firstNotNullOfOrNull { container.siteAssetUrl(it) } }
+    var index by remember(paths) { mutableStateOf(0) }
+    val url = remember(paths, index) { paths.getOrNull(index)?.let { container.siteAssetUrl(it) } }
     val localImage: @Composable () -> Unit = {
         Image(
             painter = painterResource(local),
@@ -349,18 +362,25 @@ private fun SiteAssetOrLocal(
             contentScale = ContentScale.Crop,
             modifier = modifier.size(size),
             loading = { localImage() },
-            error = { localImage() },
+            error = {
+                if (index + 1 < paths.size) {
+                    // المسار التالي قبل الاستسلام للصورة المحلية
+                    LaunchedEffect(url) { index += 1 }
+                }
+                localImage()
+            },
         )
     }
 }
 
 /**
- * البروفايل الافتراضي داخل التطبيق: الأصل المجاني `onefree` من مكتبة الصور —
- * وهو نفسه الذي تعطيه القاعدة لأي حساب جديد (افتراضي عمود avatar_url)،
- * فيظهر للحساب الجديد مباشرة بعد التسجيل أو إنشاء الحساب، ولكل من لم يرفع صورة.
- * (شاشة الدخول/الإنشاء قبل وجود الحساب تستعمل DefaultProfileAvatar وهي صورة أخرى.)
+ * بديل الأفاتار: يظهر عند غياب الرابط أو فشل تحميل الصورة.
+ *
+ * هو الأصل المجاني `onefree` من مكتبة الصور — وهو نفسه الذي تعطيه القاعدة لأي
+ * حساب جديد (افتراضي عمود avatar_url)، فيظهر للحساب الجديد مباشرة بعد التسجيل
+ * أو إنشاء الحساب، ولكل حساب مسجّل بلا صورة.
+ * أمّا **الزائر** (بلا حساب / بعد تسجيل الخروج) فصورته [AnonymousAvatarImage].
  */
-/** بديل الأفاتار: يظهر عند غياب الرابط أو فشل تحميل الصورة. */
 @Composable
 fun AvatarFallback(size: Dp) {
     SiteAssetOrLocal(ASSET_FREE_DEFAULT, R.drawable.ic_user, size)
@@ -375,11 +395,36 @@ fun DefaultProfileAvatar(
     size: Dp = 96.dp,
     modifier: Modifier = Modifier,
 ) {
+    AnonymousAvatarImage(size = size, modifier = modifier)
+}
+
+/**
+ * صورة **المجهول (الزائر)** — صورة المالك `default-profile.jpg`:
+ * تُعرض في كل موضع يظهر فيه المستخدم **بلا حساب**:
+ *   • قبل إنشاء الحساب أو تسجيل الدخول (شاشات الدخول والإنشاء)؛
+ *   • وبعد **تسجيل الخروج**؛
+ *   • وللزائر في الرئيسية · الإعدادات · لوحة المستخدم في المجتمع.
+ *
+ * تختلف عن [AvatarFallback] (صورة `onefree` التي تعطيها القاعدة لكل حساب
+ * جديد ولكل حساب بلا صورة) — فالمجهول صورته هذه، والمسجّل صورته `onefree`.
+ *
+ * تُقرأ من مكتبة الأصول أولاً (`profiles/profiles/default-profile.jpg`) فإن
+ * لم توجد عُرضت النسخة المضمّنة داخل التطبيق (`ic_default_profile`).
+ */
+@Composable
+fun AnonymousAvatarImage(
+    size: Dp,
+    modifier: Modifier = Modifier,
+    shape: Shape = CircleShape,
+    borderColor: Color = AppColors.Border2,
+    borderWidth: Dp = 1.dp,
+) {
     Box(
         modifier = modifier
             .size(size)
-            .clip(CircleShape)
-            .border(1.dp, AppColors.Border2, CircleShape),
+            .clip(shape)
+            .border(borderWidth, borderColor, shape)
+            .background(AppColors.Elevated2),
     ) {
         SiteAssetOrLocal(ASSET_AUTH_DEFAULT, R.drawable.ic_default_profile, size)
     }
@@ -391,7 +436,7 @@ fun DefaultProfileAvatar(
  * مضبوط — ففتح قائمة الاختيار لا ينتظر تحميل مئات الصور دفعةً واحدة.
  */
 @Composable
-fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier) {
+fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier, animate: Boolean = false) {
     Box(
         modifier = modifier
             .size(size)
@@ -406,10 +451,13 @@ fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier) {
             // المتحرّكات معاً يستهلك الذاكرة ويجعل التمرير يتهنّج. اللقطة الثابتة
             // تُنتجها أداة «تصغير كل صور الأصول» بنفس المسار + ‎.thumb.jpg‎، فإن لم
             // توجد نرجع إلى الأصل.
-            val thumb = remember(url) {
-                if (url.contains(".gif", ignoreCase = true)) "$url.thumb.jpg" else null
+            //
+            // animate = true (الغلاف المختار في المعاينة) يُبقي GIF متحرّكاً: صورة
+            // واحدة فقط على الشاشة فلا خطر على الذاكرة.
+            val thumb = remember(url, animate) {
+                if (!animate && url.contains(".gif", ignoreCase = true)) "$url.thumb.jpg" else null
             }
-            var thumbFailed by remember(url) { mutableStateOf(false) }
+            var thumbFailed by remember(url, animate) { mutableStateOf(false) }
             if (thumb != null && !thumbFailed) {
                 AsyncImage(
                     model = thumb,
@@ -426,6 +474,43 @@ fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier) {
                     modifier = Modifier.size(size),
                 )
             }
+        }
+    }
+}
+
+/**
+ * صورة **غلاف (بانر)** بملء الخلية وبنسبة 16:9 — تُستعمل في شبكة الأغلفة
+ * وفي المعاينة داخل «تعديل الملف الشخصي».
+ *
+ * تختلف عن [AssetThumb] في أمرين:
+ *   • تأخذ عرض الخلية كاملاً (لا مربّعاً صغيراً) لأن الغلاف صورة عريضة؛
+ *   • `animate = true` افتراضياً ⇒ أي GIF **يتحرّك** في الشبكة وفي المعاينة،
+ *     وعدد الأغلفة محدود (عشرات لا مئات) فالتحريك خفيف على الذاكرة.
+ */
+@Composable
+fun BannerThumb(
+    url: String?,
+    modifier: Modifier = Modifier,
+    animate: Boolean = true,
+    radius: Dp = 10.dp,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(radius))
+            .background(AppColors.Elevated2),
+    ) {
+        if (!url.isNullOrBlank()) {
+            val thumb = remember(url, animate) {
+                if (!animate && url.contains(".gif", ignoreCase = true)) "$url.thumb.jpg" else null
+            }
+            var thumbFailed by remember(url, animate) { mutableStateOf(false) }
+            AsyncImage(
+                model = if (thumb != null && !thumbFailed) thumb else url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+                onError = { thumbFailed = true },
+            )
         }
     }
 }

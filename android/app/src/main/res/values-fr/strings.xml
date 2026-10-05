@@ -325,6 +325,7 @@
     <string name="plan_payment_note">Paiement : méthodes de transfert locales, puis envoie le reçu pour vérification.</string>
     <string name="plan_checkout">PAIEMENT</string>
     <string name="plan_price_line">%1$s / %2$s jours</string>
+    <string name="plan_price_line_usd">%1$s LYD · $%2$s / %3$s jours</string>
     <string name="plan_unavailable">Cette offre n’est pas disponible.</string>
     <string name="plan_payment_method">Moyen de paiement</string>
     <string name="plan_create_order">Créer la commande</string>
@@ -347,6 +348,11 @@
     <string name="plan_download_limit">Tu as atteint la limite de téléchargements de cette offre</string>
     <string name="plan_locked_avatars">Les avatars verrouillés se débloquent avec Epic 💎 ou Legendary 👑.</string>
     <string name="plan_locked_banners">Les bannières verrouillées nécessitent l’offre appropriée.</string>
+    <string name="plan_locked_banner_note">🔒 Toutes les bannières sont verrouillées — elles ne s’ouvrent qu’avec un abonnement Epic 💎 ou Legendary 👑.</string>
+    <string name="profile_banner_preview">Aperçu de la bannière</string>
+    <string name="profile_banner_section">Bannières 🔒</string>
+    <string name="profile_banner_none">Pas encore de bannière — choisissez-en une dans les sections ci-dessous 👇</string>
+    <string name="profile_banner_clear">Retirer la bannière</string>
     <string name="plan_item_section">Objet à côté de ton nom dans le chat</string>
 
     <string name="ac_title">Portefeuille AC</string>
@@ -495,6 +501,7 @@
     <string name="admin_pack_id_label">Id du pack (meme / Minecraft_Memes1 …)</string>
     <string name="admin_amount_ac_label">Montant en AC</string>
     <string name="admin_price_lyd_label">Prix en LYD</string>
+    <string name="admin_price_usd_label">Prix en USD</string>
     <string name="admin_duration_days_label">Durée (jours)</string>
     <string name="admin_download_limit_label">Limite de téléchargements (vide = illimité)</string>
     <string name="admin_method_code_label">Code</string>
@@ -536,4 +543,7 @@
     <string name="admin_add_room">Ajouter un salon</string>
     <string name="admin_room_name">Nom du salon</string>
     <string name="admin_room_category">Catégorie</string>
+    <string name="chat_remove_sticker">Retirer l’autocollant</string>
+    <string name="chat_sticker_ready">Écris un message avec l’autocollant si tu veux, puis envoie</string>
+    <string name="chat_add_reaction">Ajouter une réaction</string>
 </resources>

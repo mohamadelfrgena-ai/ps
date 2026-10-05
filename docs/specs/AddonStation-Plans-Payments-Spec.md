@@ -20,7 +20,7 @@ There are 3 subscription levels. Internal ids never change: `free`, `epic`, `leg
 | | 🍃 Free | 💎 Epic | 👑 Legendary |
 |---|---|---|---|
 | Price shown on the plans screen | $0 | $2.99 / month | $5.99 / month |
-| Price shown in the profile "My plan" tab | — | 25 د.ل / 30 days | 50 د.ل / 30 days |
+| Price shown in the profile "My plan" tab | — | 20 د.ل / 30 days | 30 د.ل / 30 days |
 | Tagline | ابدأ باكتشاف الإضافات والعوالم المجانية. | محتوى أكثر وتجربة لعب أوسع. | افتح المحتوى المميز وامتيازات VIP. |
 | Feature lines (as written) | محتوى مجاني · وصول أساسي · بدون اشتراك | إضافات Epic 💎 · تنزيلات أكثر · وصول المشتركين | إضافات Legendary 👑 · عوالم Legendary 👑 · أولوية الوصول |
 | Button on the plans screen | ابدأ الآن | اختيار الخطة | اختيار الخطة (home preview: "JOIN LEGENDARY 👑") |

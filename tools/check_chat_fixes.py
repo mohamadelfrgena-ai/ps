@@ -87,13 +87,41 @@ rows.append(("اللوحة تُحدّد الملصق المُعاد", "focusStic
 rows.append(("التبويب يفتح على الملصقات", 'mutableStateOf(if (focusSticker != null) 1 else 0)' in sheets))
 
 # ── 5) النص + الملصق/الوسائط = رسالة واحدة ────────────────────────────
-sticker_send = re.search(r"onSticker = \{ stickerUrl ->(?:.|\n)*?\n            \},", screen)
+# (جديد بطلب المالك: اختيار الملصق لا يُرسله فوراً — بل يضعه في مربع الإرسال
+#  بمعاينة وزر ✕ أحمر، فيُكتب النص تحته إن أراد ثم يُضغط إرسال، فتخرج
+#  رسالة واحدة: النص فوقه والملصق تحته مباشرة.)
+sticker_pick = re.search(r"onSticker = \{ stickerUrl ->(?:.|\n)*?\n            \},", screen)
+sticker_pick = sticker_pick.group(0) if sticker_pick else ""
+rows.append(("اختيار الملصق يضعه في مربع الإرسال", "pendingSticker = stickerUrl" in sticker_pick))
+rows.append(("لوحة الملصقات تُغلق بعد الاختيار", "showEmoji = false" in sticker_pick))
+rows.append(("حالة الملصق المنتظر في الشاشة",
+             "var pendingSticker by remember { mutableStateOf<String?>(null) }" in screen))
+rows.append(("معاينة الملصق داخل مربع الإرسال",
+             "pendingStickerUrl = pendingSticker?.let { container.siteAssetUrl(it) }" in screen))
+rows.append(("زر ✕ أحمر لإلغاء الملصق",
+             "PendingStickerPreview(" in screen and "AppColors.Red" in screen
+             and "R.string.chat_remove_sticker" in screen))
+rows.append(("الإرسال يعمل بالملصق وحده",
+             "canSend = text.isNotBlank() || attachment != null || pendingSticker != null" in screen))
+sticker_send = re.search(r"onSend = \{(?:.|\n)*?\n                \},", screen)
 sticker_send = sticker_send.group(0) if sticker_send else ""
-rows.append(("الملصق يحمل النص المكتوب", "content = body.ifEmpty { null }" in sticker_send))
+rows.append(("الملصق يُرسل مع النص المكتوب", "content = content.ifEmpty { null }" in sticker_send
+             and "stickerUrl = sticker" in sticker_send))
+rows.append(("نوع الرسالة sticker مع النص", 'sticker != null -> "sticker"' in sticker_send))
+# الرسالة نفسها: النص فوقه والملصق تحته مباشرة
+sticker_block = re.search(r'"sticker" -> \{(?:.|\n)*?\n            \}', screen)
+sticker_block = sticker_block.group(0) if sticker_block else ""
+rows.append(("عرض النص فوق الملصق في نفس الرسالة",
+             "message.content.orEmpty()" in sticker_block
+             and "CoverImage(url = url" in sticker_block
+             and sticker_block.find("message.content.orEmpty()") < sticker_block.find("CoverImage(url = url")))
 rows.append(("النص يُمسح فوراً لا بعد النجاح", "text = \"\"            // مسح فوري" in screen
              or "text = \"\"                // مسح فوري" in screen))
-rows.append(("ما كتبه يعود لو فشل الإرسال", screen.count("val replySnapshot = replyTo") >= 3
+rows.append(("ما كتبه يعود لو فشل الإرسال", screen.count("val replySnapshot = replyTo") >= 2
+             and "if (text.isEmpty()) text = content" in screen
              and "if (text.isEmpty()) text = body" in screen))
+rows.append(("الملصق يعود لو فشل الإرسال",
+             "if (pendingSticker == null) pendingSticker = sticker" in screen))
 media_send = re.search(r"vm\.send\(\n\s+content = body\.ifEmpty \{ null \},(?:.|\n)*?mediaMime = mime,", screen)
 rows.append(("الوسائط تحمل النص المكتوب", media_send is not None))
 rows.append(("الرسالة المحذوفة تختفي لكل الأنواع", "return@messageBody" in screen))
