@@ -62,11 +62,10 @@
 رفعنا الشعار إلى مخزنك العام:
 
 ```
-https://<معرّف-المشروع>.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png
+https://jqjmkssgjdsfdojkuqzq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png
 ```
 
-*(يُطبع الرابط كاملاً في سجل تشغيل سير العمل عند وضع `.upload-request`
-بـ `mode: brand`، وهو محفوظ في ملف `upload-log.txt` في الفرع.)*
+(مُرفَع فعلاً — معرّف مشروعك `jqjmkssgjdsfdojkuqzq`).
 
 الملف الأصلي في المستودع: `brand/addonstation-logo.png` (٢٥٦×٢٥٦ بشفافية)،
 وإعادة رفعه تتم بـ:
@@ -87,7 +86,7 @@ python3 tools/upload_brand.py --dir ./brand \
 ```html
 <div dir="rtl" style="background:#0B0F14;padding:24px;font-family:Tahoma,Arial,sans-serif">
   <div style="max-width:480px;margin:auto;background:#131A24;border:1px solid #263240;border-radius:16px;padding:24px;text-align:center">
-    <img src="https://<معرّف-المشروع>.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png"
+    <img src="https://jqjmkssgjdsfdojkuqzq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png"
          alt="AddonStation" width="72" height="72"
          style="display:block;margin:0 auto 12px;border-radius:16px" />
     <h1 style="margin:0 0 6px;font-size:20px;color:#E8EEF5">AddonStation</h1>
@@ -117,7 +116,7 @@ python3 tools/upload_brand.py --dir ./brand \
 ```html
 <div dir="rtl" style="background:#0B0F14;padding:24px;font-family:Tahoma,Arial,sans-serif">
   <div style="max-width:480px;margin:auto;background:#131A24;border:1px solid #263240;border-radius:16px;padding:24px;text-align:center">
-    <img src="https://<معرّف-المشروع>.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png"
+    <img src="https://jqjmkssgjdsfdojkuqzq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png"
          alt="AddonStation" width="72" height="72"
          style="display:block;margin:0 auto 12px;border-radius:16px" />
     <h1 style="margin:0 0 6px;font-size:20px;color:#E8EEF5">مرحباً بك في AddonStation 🎮</h1>
@@ -140,9 +139,8 @@ python3 tools/upload_brand.py --dir ./brand \
 </div>
 ```
 
-> **مهم:** استبدل `<معرّف-المشروع>` برابط مشروعك الحقيقي في السطر الذي يبدأ بـ
-> `https://…supabase.co/storage/…` (مرّتين: مرة في كل قالب).
-> واترك المتغيّرَين `{{ .ConfirmationURL }}` كما هما — لا تبدّلهما.
+> **مهم:** الرابط في القالبين أعلاه **جاهز كما هو** (شعارك المرفوع).
+> اترك المتغيّرَين `{{ .ConfirmationURL }}` كما هما — لا تبدّلهما.
 
 ### ج) حقل الموضوع (Subject)
 
