@@ -51,12 +51,14 @@ img = Image.new("RGB", (W, H), BG)
 d = ImageDraw.Draw(img)
 
 
-def panel(y: int, rtl: bool, title: str, lines, avatar_label: str, note: str):
+def panel(y: int, rtl: bool, title: str, lines, avatar_label: str, note: str, caption: str = ""):
     """رسم لوحة واحدة: نص الترحيب ملتصق بالصورة حسب الاتجاه."""
     pad = 24
     box = (pad, y, W - pad, y + 150)
     d.rounded_rectangle(box, radius=16, fill=PANEL, outline=(48, 54, 66), width=1)
     d.text((pad + 16, y + 12), title, font=F_TITLE, fill=ACCENT)
+    if caption:
+        d.text((pad + 16, y + 30), ar(caption) if rtl else caption, font=F_NOTE, fill=MUTED)
 
     avatar_size = 84
     gap = 12
@@ -121,6 +123,7 @@ panel(
     ],
     avatar_label="avatar",
     note="EN panel ok",
+    caption="Same Text for  Good morning \u2600  and  Good evening *  (both aligned to End)",
 )
 
 # ٢) العربية (RTL): النص على يسار الصورة، محاذاة لليسار (End = left)
@@ -135,6 +138,7 @@ panel(
     ],
     avatar_label=ar("الصورة"),
     note="AR panel ok",
+    caption="نفس السطر لـ «صباح الخير ☀️» و«مساء الخير 👋» — كلاهما محاذىً إلى End",
 )
 
 d.text((24, 12), ar("رأس الصفحة الرئيسية — الترحيب بجانب صورة البروفايل"),
