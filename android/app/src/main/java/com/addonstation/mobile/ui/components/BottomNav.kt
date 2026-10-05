@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,6 +55,7 @@ import com.addonstation.mobile.ui.theme.AppText
  * الإيماءات حتى لا نضيف حاشية من حواف الرجوع يميناً ويساراً. النتيجة: الشريط
  * يبقى فوق شريط الهاتف في **كل الأجهزة وكل أوضاع التنقّل** بلا فراغ زائد.
  */
+@Composable
 fun bottomBarInsets(): WindowInsets = WindowInsets.navigationBars.union(
     WindowInsets.systemGestures.only(WindowInsetsSides.Bottom),
 )

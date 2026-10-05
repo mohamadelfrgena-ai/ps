@@ -67,6 +67,20 @@ def main() -> int:
         for needle in ("navigationBars", "systemGestures"):
             if needle not in body:
                 problems.append(f"bottomBarInsets() لا يغطّي {needle}")
+        # درس من البناء: الدالة تقرأ WindowInsets.navigationBars/systemGestures
+        # وهي **دوال @Composable** ⇒ إن لم تُعلَّم الدالة بـ @Composable يفشل
+        # التصريف. وكذلك `union` دالة امتداد تحتاج استيراداً صريحاً.
+        decl_lines = htext[: htext.index("fun bottomBarInsets()")].strip().splitlines()
+        if not decl_lines or decl_lines[-1].strip() != "@Composable":
+            problems.append(
+                "bottomBarInsets() بلا @Composable — تقرأ WindowInsets "
+                "@Composable (يفشل التصريف)"
+            )
+        if "union" in body and "import androidx.compose.foundation.layout.union" not in htext:
+            problems.append(
+                "BottomNav.kt يستخدم union بلا استيراد "
+                "androidx.compose.foundation.layout.union"
+            )
 
     print("الفحص | النتيجة")
     print("----------------------------------------------")
