@@ -98,6 +98,16 @@ jobs:
           assert names, "الأرشيف فارغ"
           PY
 
+      - name: التسجيل فقط (الصور مرفوعة سابقاً)
+        if: ${{ steps.req.outputs.mode == 'seed-only' }}
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -o pipefail
+          exec > >(tee "$GITHUB_WORKSPACE/upload-log.txt") 2>&1
+          python3 tools/upload_banners.py --zip Banner.zip --seed-only
+
       - name: تجربة بلا رفع (dry-run)
         if: ${{ steps.req.outputs.mode == 'dry-run' }}
         env:
@@ -118,7 +128,7 @@ jobs:
           python3 tools/upload_banners.py --zip Banner.zip --seed
 
       - name: "تحقق: رابط عام لأول غلاف"
-        if: ${{ steps.req.outputs.mode == 'upload' }}
+        if: ${{ steps.req.outputs.mode == 'upload' || steps.req.outputs.mode == 'seed-only' }}
         env:
           S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
         run: |

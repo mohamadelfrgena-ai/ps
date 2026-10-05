@@ -43,6 +43,7 @@ ORDER = [
     "23_payment_order_usd.sql",
     "24_free_default_avatar.sql",
     "25_fix_send_chat_message_unnest.sql",
+    "26_fix_site_assets_sequence.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -64,6 +65,7 @@ HEADER = """-- =================================================================
 --      → 23_payment_order_usd (مبلغ الطلب بالدولار + عملة الطلب حسب البوابة)
 --      → 24_free_default_avatar (الصورة الافتراضية المجانية onefree لكل حساب جديد)
 --      → 25_fix_send_chat_message_unnest (إصلاح column "unnest" does not exist عند الإرسال)
+--      → 26_fix_site_assets_sequence (صلاحية تسلسل site_assets للتسجيل عبر REST)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --

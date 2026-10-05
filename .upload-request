@@ -10,3 +10,6 @@ zip: https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/Banner.zip
 # إعادة التشغيل ٢: حفظ السجل في الفرع بدل التعليق
 
 # إعادة التشغيل ٣: تصغير تلقائي للملف الأكبر من حدّ المخزن ثم التسجيل
+
+# الحالة: الصور مرفوعة (٤٠/٤٠) · التسجيل ينتظر صلاحية التسلسل (26_fix_site_assets_sequence.sql)
+# بعد تنفيذ الملف في SQL Editor: بدّل mode إلى seed-only وادفع لأُسجّل الصفوف
