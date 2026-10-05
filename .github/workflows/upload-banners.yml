@@ -102,12 +102,13 @@ jobs:
         if: ${{ steps.req.outputs.mode == 'admin-gifs' }}
         run: |
           set -e
-          mkdir -p Admin
-          curl -fsSL -o "Admin/downloa1d.gif" \
+          # المجلد الداخلي اسمه Admin ⇒ يصير القسم «Admin 👑» والمسار banners/admin/
+          mkdir -p AdminAssets/Admin
+          curl -fsSL -o "AdminAssets/Admin/downloa1d.gif" \
                "https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/downloa1d.gif"
-          curl -fsSL -o "Admin/Animation Reference.gif" \
+          curl -fsSL -o "AdminAssets/Admin/Animation Reference.gif" \
                "https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/Animation%20Reference.gif"
-          ls -lh Admin
+          ls -lh AdminAssets/Admin
 
       - name: رفع أغلفة الأدمن + تسجيلها (admin فقط)
         if: ${{ steps.req.outputs.mode == 'admin-gifs' }}
@@ -118,7 +119,7 @@ jobs:
           set -o pipefail
           exec > >(tee "$GITHUB_WORKSPACE/upload-log.txt") 2>&1
           python3 -m pip install --quiet pillow
-          python3 tools/upload_banners.py --dir ./Admin --plan admin --seed --sql /tmp/admin_banners.sql
+          python3 tools/upload_banners.py --dir ./AdminAssets --plan admin --seed --sql /tmp/admin_banners.sql
 
       - name: التسجيل فقط (الصور مرفوعة سابقاً)
         if: ${{ steps.req.outputs.mode == 'seed-only' }}
