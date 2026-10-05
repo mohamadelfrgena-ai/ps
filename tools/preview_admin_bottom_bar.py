@@ -5,8 +5,10 @@
 
     • قبل: شريط اللوحة (5 عناصر) ينزل إلى حافة الشاشة ⇒ يقع **تحت** أزرار
       النظام (رجوع · منزل · التطبيقات) فيتداخل معها وتُغطّى الكلمات.
-    • بعد: حاوية الشريط تحجز `WindowInsets.navigationBars` وتلوّنها بلون
-      التطبيق، ويبقى الشريط **فوق** المنطقة ⇒ لا تداخل.
+    • بعد: حاوية الشريط تحجز `bottomBarInsets()` =
+      `navigationBars ∪ systemGestures(السفلى)` وتلوّنها بلون التطبيق،
+      ويبقى الشريط **فوق** المنطقة ⇒ لا تداخل — تلقائياً مع **الأزرار الثلاثة**
+      و**الإيماءات** في كل الأجهزة.
 
 يولّد: admin_bottom_bar_preview.png
 """
@@ -57,7 +59,7 @@ d = ImageDraw.Draw(img)
 d.text((24, 16), ar("لوحة الإدارة — الشريط السفلي وشريط التنقّل"), font=F_TITLE, fill=TEXT)
 d.text(
     (24, 42),
-    ar("الإصلاح: الشريط يحجز منطقة Navigation Bar فيبقى فوق أزرار النظام"),
+    ar("الإصلاح: bottomBarInsets() = navigationBars ∪ systemGestures ⇒ يعمل مع الأزرار والإيماءات"),
     font=F_NOTE,
     fill=GREEN,
 )
@@ -129,7 +131,7 @@ phone(510, 80, "بعد — الشريط فوقها والمنطقة بلون ا�
 
 d.text(
     (24, H - 34),
-    ar("الحاوية: .background(AppColors.Bg).windowInsetsPadding(WindowInsets.navigationBars)"),
+    ar("الحاوية: .background(AppColors.Bg).windowInsetsPadding(bottomBarInsets())"),
     font=F_NOTE,
     fill=MUTED,
 )

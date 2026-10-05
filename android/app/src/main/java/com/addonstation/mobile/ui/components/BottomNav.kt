@@ -14,7 +14,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -39,6 +42,23 @@ import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 
 /**
+ * منطقة النظام التي يجب أن يحجزها **أي شريط سفلي** قبل أن يرسم نفسه:
+ *
+ *   • أزرار التنقّل الثلاثة (رجوع · المنزل · التطبيقات)
+ *       ⇒ `WindowInsets.navigationBars` هو الشريط نفسه (نحو 48dp).
+ *   • التنقّل بالإيماءات (شريط رفيع أسفل الشاشة)
+ *       ⇒ `navigationBars` قد يكون 0، والمنطقة الفعليّة هي
+ *         `WindowInsets.systemGestures` (شريط سحب «المنزل»).
+ *
+ * نأخذ **اتحاد** الاثنين (أكبر قيمة لكل جهة) — وبجهة **السفلى فقط** من
+ * الإيماءات حتى لا نضيف حاشية من حواف الرجوع يميناً ويساراً. النتيجة: الشريط
+ * يبقى فوق شريط الهاتف في **كل الأجهزة وكل أوضاع التنقّل** بلا فراغ زائد.
+ */
+fun bottomBarInsets(): WindowInsets = WindowInsets.navigationBars.union(
+    WindowInsets.systemGestures.only(WindowInsetsSides.Bottom),
+)
+
+/**
  * الشريط السفلي (5 عناصر) مع زر «المنزل» المرتفع في المنتصف:
  * 58×58dp، نصف قطر 19، تدرّج أخضر، إطار أخضر فاتح، توهّج، مرتفع 18dp فوق الشريط.
  */
@@ -53,7 +73,7 @@ fun BottomNavBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(AppColors.Bg)
-            .windowInsetsPadding(WindowInsets.navigationBars),
+            .windowInsetsPadding(bottomBarInsets()),
     ) {
         Box(
             modifier = Modifier

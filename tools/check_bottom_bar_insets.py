@@ -42,11 +42,31 @@ def main() -> int:
             block = text[max(0, m.start() - WINDOW) : m.end() + 200]
             if not BAR_BG_RE.search(block):
                 continue  # ليس شريطاً سفلياً ملوّناً بلون التطبيق
-            if "navigationBars" in block:
-                continue  # المنطقة محجوزة ✓
             line = text[: m.start()].count("\n") + 1
             rel = path.relative_to(ROOT)
+            if "bottomBarInsets()" in block:
+                continue  # المساعد يحجز المنطقة في كل أوضاع التنقّل ✓
+            if "navigationBars" in block and "systemGestures" in block:
+                continue  # يحجز الأزرار الثلاثة **والإيماءات** ✓
+            if "navigationBars" in block:
+                problems.append(
+                    f"{rel}:{line} — الشريط يحجز navigationBars فقط: "
+                    f"على أجهزة الإيماءات تكون المنطقة 0 فيبقى التداخل "
+                    f"(استخدم bottomBarInsets())"
+                )
+                continue
             problems.append(f"{rel}:{line} — شريط سفلي بلا حجز منطقة Navigation Bar")
+
+    # المساعد نفسه يجب أن يغطّي النوعين: أزرار ثلاثة + إيماءات
+    helper = SRC / "com/addonstation/mobile/ui/components/BottomNav.kt"
+    htext = helper.read_text(encoding="utf-8") if helper.exists() else ""
+    if "fun bottomBarInsets()" not in htext:
+        problems.append("BottomNav.kt — المساعد bottomBarInsets() مفقود")
+    else:
+        body = htext[htext.index("fun bottomBarInsets()") :][:400]
+        for needle in ("navigationBars", "systemGestures"):
+            if needle not in body:
+                problems.append(f"bottomBarInsets() لا يغطّي {needle}")
 
     print("الفحص | النتيجة")
     print("----------------------------------------------")
@@ -58,7 +78,7 @@ def main() -> int:
               "`.background(AppColors.Bg).windowInsetsPadding(WindowInsets.navigationBars)`")
         return 1
 
-    print("✅ كل الأشرطة السفلية تحجز منطقة شريط التنقّل")
+    print("✅ كل الأشرطة السفلية تحجز منطقة شريط التنقّل (أزرار + إيماءات)")
     print("\n🟢 لا شريط سفلي يتداخل مع Navigation Bar: كل شريط فوق أزرار النظام "
           "والمنطقة تحته ملوّنة بلون التطبيق.")
     return 0
