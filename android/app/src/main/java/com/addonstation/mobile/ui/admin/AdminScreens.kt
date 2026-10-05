@@ -13,12 +13,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -313,40 +316,50 @@ fun AdminPanelScreen(
         }
 
         // شريط اللوحة السفلي (5 عناصر)
-        Row(
+        // **حجز منطقة شريط التنقّل (Navigation Bar)**: التطبيق يرسم من الحافة إلى
+        // الحافة، فكان الشريط ينزل **تحت** أزرار النظام ويتداخل معها. الحاوية هنا
+        // تحجز المنطقة وتلوّنها بلون التطبيق، والشريط نفسه يبقى **فوقها**.
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(AppColors.Bg.copy(alpha = 0.96f))
-                .border(1.dp, AppColors.Border)
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+                .background(AppColors.Bg)
+                .windowInsetsPadding(WindowInsets.navigationBars),
         ) {
-            listOf(
-                stringResource(R.string.admin_overview) to Icons.Filled.AdminPanelSettings,
-                stringResource(R.string.admin_content) to Icons.Filled.Image,
-                stringResource(R.string.admin_payments) to Icons.Filled.Receipt,
-                stringResource(R.string.admin_moderation) to Icons.Filled.Flag,
-                stringResource(R.string.admin_more) to Icons.Filled.Settings,
-            ).forEachIndexed { index, (label, icon) ->
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { tab = index },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    androidx.compose.material3.Icon(
-                        icon,
-                        contentDescription = label,
-                        tint = if (tab == index) AppColors.Green else AppColors.Dim,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Text(
-                        label,
-                        style = AppText.tiny,
-                        color = if (tab == index) AppColors.Green else AppColors.Dim,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(AppColors.Bg.copy(alpha = 0.96f))
+                    .border(1.dp, AppColors.Border)
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                listOf(
+                    stringResource(R.string.admin_overview) to Icons.Filled.AdminPanelSettings,
+                    stringResource(R.string.admin_content) to Icons.Filled.Image,
+                    stringResource(R.string.admin_payments) to Icons.Filled.Receipt,
+                    stringResource(R.string.admin_moderation) to Icons.Filled.Flag,
+                    stringResource(R.string.admin_more) to Icons.Filled.Settings,
+                ).forEachIndexed { index, (label, icon) ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { tab = index },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        androidx.compose.material3.Icon(
+                            icon,
+                            contentDescription = label,
+                            tint = if (tab == index) AppColors.Green else AppColors.Dim,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            label,
+                            style = AppText.tiny,
+                            color = if (tab == index) AppColors.Green else AppColors.Dim,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
