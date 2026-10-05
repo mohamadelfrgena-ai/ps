@@ -106,7 +106,7 @@ for i, (label, color) in enumerate(menu):
     d.rounded_rectangle([(90, ly), (330, ly + 28)], radius=8, fill=BUBBLE)
     d.text((104, ly + 6), ar(label), font=F_MENU, fill=color)
 
-d.text((24, H - 26), ar("ضغطة سريعة على الملصق = عرضه/إرجاعه للوحة · ضغطة مطوّلة = القائمة"),
+d.text((24, H - 26), ar("ضغطة سريعة على أي ملصق = لوحة الملصقات تُفتح على مكانه · ضغطة مطوّلة = القائمة"),
        font=F_TINY, fill=BLUE)
 
 out = "chat_media_actions_preview.png"
