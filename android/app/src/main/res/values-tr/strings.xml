@@ -58,6 +58,8 @@
     <string name="auth_password">Şifre</string>
     <string name="auth_new_password">Yeni şifre</string>
     <string name="auth_confirm_password">Şifreyi tekrarla</string>
+    <string name="auth_show_password">Şifreyi göster</string>
+    <string name="auth_hide_password">Şifreyi gizle</string>
     <string name="auth_forgot">Şifreni mi unuttun?</string>
     <string name="auth_recovery_title">Şifreyi sıfırla</string>
     <string name="auth_recovery_text">E-postanı gir, yeni şifre oluşturman için sana bir bağlantı gönderelim.</string>

@@ -22,7 +22,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.R
@@ -51,6 +55,47 @@ import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import kotlinx.coroutines.launch
+
+/**
+ * حقل كلمة مرور **بعين 👁 داخل الحقل**: لمسة واحدة تُظهر كلمة المرور كما
+ * كتبها المستخدم وتُخفيها ثانيةً.
+ *
+ * لماذا داخل الحقل؟ لأن المستخدم — خاصّة على الجوال وبكتابة عربية/لاتينية
+ * مختلطة — ينسى هل كتب الحرف كبيراً أم صغيراً، فكان يضطر للحذف وإعادة
+ * الكتابة. العين تمنع ذلك، وتظهر في **كل** شاشات كلمة المرور: الدخول،
+ * إنشاء الحساب (الحقل وحقل التأكيد)، وكلمة المرور الجديدة.
+ */
+@Composable
+private fun PasswordField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    imeAction: ImeAction = ImeAction.Done,
+    modifier: Modifier = Modifier,
+) {
+    var visible by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, style = AppText.bodySmall) },
+        leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = AppColors.Muted) },
+        trailingIcon = {
+            IconButton(onClick = { visible = !visible }) {
+                Icon(
+                    imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    contentDescription = stringResource(
+                        if (visible) R.string.auth_hide_password else R.string.auth_show_password,
+                    ),
+                    tint = if (visible) AppColors.Green else AppColors.Muted,
+                )
+            }
+        },
+        singleLine = true,
+        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = imeAction),
+        modifier = modifier.fillMaxWidth(),
+    )
+}
 
 /** تسجيل الدخول — كما في الوثيقة §7: العنوان، الحقلان، «نسيت كلمة المرور؟»، ورابط إنشاء حساب. */
 @Composable
@@ -111,15 +156,10 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
+            PasswordField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text(stringResource(R.string.auth_password)) },
-                leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = AppColors.Muted) },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.auth_password),
             )
 
             errorKind?.let {
@@ -241,6 +281,7 @@ fun SignUpScreen(
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     var errorKind by remember { mutableStateOf<ApiErrorKind?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -248,6 +289,7 @@ fun SignUpScreen(
     val creating = stringResource(R.string.msg_creating_account)
     val shortUsername = stringResource(R.string.msg_username_too_short)
     val shortPassword = stringResource(R.string.msg_password_too_short)
+    val noMatch = stringResource(R.string.msg_passwords_no_match)
     val createdMsg = stringResource(R.string.msg_account_created)
 
     Column(Modifier.fillMaxSize()) {
@@ -294,15 +336,19 @@ fun SignUpScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
+            PasswordField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text(stringResource(R.string.auth_password)) },
-                leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = AppColors.Muted) },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.auth_password),
+                imeAction = ImeAction.Next,
+            )
+            Spacer(Modifier.height(10.dp))
+            // **حقل التأكيد**: إن اختلف الحقلان لا نُنشئ الحساب ونُظهر
+            // السبب، بدل أن يكتشف المستخدم الخطأ بعد التسجيل.
+            PasswordField(
+                value = confirm,
+                onValueChange = { confirm = it },
+                label = stringResource(R.string.auth_confirm_password),
             )
 
             errorKind?.let {
@@ -321,6 +367,7 @@ fun SignUpScreen(
                     when {
                         username.trim().length < 3 -> status = shortUsername
                         password.length < 6 -> status = shortPassword
+                        password != confirm -> status = noMatch
                         else -> scope.launch {
                             busy = true
                             errorKind = null
@@ -415,24 +462,17 @@ fun ResetPasswordScreen(
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(20.dp))
-            OutlinedTextField(
+            PasswordField(
                 value = password,
                 onValueChange = { password = it },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
-                label = { Text(stringResource(R.string.auth_new_password)) },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.auth_new_password),
+                imeAction = ImeAction.Next,
             )
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
+            PasswordField(
                 value = confirm,
                 onValueChange = { confirm = it },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                label = { Text(stringResource(R.string.auth_confirm_password)) },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.auth_confirm_password),
             )
             status?.let {
                 Spacer(Modifier.height(8.dp))
