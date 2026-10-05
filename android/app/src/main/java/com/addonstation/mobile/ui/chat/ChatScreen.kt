@@ -281,21 +281,12 @@ fun ChatScreen(
                             onReply = { replyTo = ui.message },
                             onOpenImage = openFullSize,
                             onStickerTap = {
-                                // ملصقي: ضغطة سريعة تُشيله من الشات وتعيده إلى لوحة الملصقات
-                                val myId = container.supabase.session()?.userId
-                                if (ui.message.userId == myId) {
-                                    val sticker = ui.message.stickerUrl
-                                    vm.deleteMine(ui.message.id) { ok ->
-                                        if (ok && sticker != null) {
-                                            resentSticker = sticker
-                                            showEmoji = true
-                                        } else if (!ok) {
-                                            statusMessage = deleteExpiredMsg
-                                        }
-                                    }
-                                } else {
-                                    // ملصق غيري: ضغطة سريعة تفتحه بالحجم الكامل (لا تُحذف رسالة غيري)
-                                    ui.message.stickerUrl?.let(openFullSize)
+                                // ضغطة سريعة على **أي** ملصق (لي أو لغيري) ⇒ لوحة الملصقات
+                                // تُفتح على مكانه وهو محدَّد — بلا حذف ولا فتح بالحجم الكامل.
+                                // (الحذف يبقى من قائمة الضغط المطوّل خلال ٣ دقائق.)
+                                ui.message.stickerUrl?.takeIf { it.isNotBlank() }?.let { sticker ->
+                                    resentSticker = sticker
+                                    showEmoji = true
                                 }
                             },
                             onToggleReaction = { emoji -> vm.toggleReaction(ui.message.id, emoji) },
@@ -959,7 +950,7 @@ private fun MessageBlock(
     onLongPress: () -> Unit,
     /** ضغطة بسيطة على الرسالة ⇒ الرد عليها مباشرة (الضغط المطوّل = قائمة الإبلاغ/الحذف). */
     onReply: () -> Unit,
-    /** ضغطة سريعة على ملصقي ⇒ يُشال ويعود إلى لوحة الملصقات. */
+    /** ضغطة سريعة على أي ملصق ⇒ لوحة الملصقات تُفتح على مكانه وهو محدَّد. */
     onStickerTap: (() -> Unit)? = null,
     onToggleReaction: (String) -> Unit,
     onOpenImage: (String) -> Unit,
@@ -1136,7 +1127,7 @@ private fun MessageBlock(
                                 // ضغطة مطوّلة ⇒ قائمة الرسالة نفسها (رد · نسخ · إبلاغ · حذف)
                                 .combinedClickable(
                                     onClick = {
-                                        // ملصقي ⇒ ضغطة سريعة = إرجاعه للوحة الملصقات، وغيري = عرض بالحجم الكامل
+                                        // ضغطة سريعة = لوحة الملصقات على مكان هذا الملصق (بلا حذف)
                                         val takeBack = onStickerTap
                                         if (takeBack != null) takeBack() else message.stickerUrl?.let(onOpenImage)
                                     },

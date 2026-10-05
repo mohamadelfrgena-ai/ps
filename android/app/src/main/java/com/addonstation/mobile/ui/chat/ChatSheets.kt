@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,6 +42,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -153,7 +155,33 @@ fun EmojiStickerSheet(
                     minCellDp = 78, maxCellDp = 104, maxColumns = 6,
                     horizontalPaddingDp = 28, spacingDp = 8,
                 )
+                val stickerGridState = rememberLazyGridState()
+                // موضع الملصق المُركَّز عليه داخل الشبكة (عناوين الأقسام تُعدّ خانات أيضاً)
+                val focusIndex = remember(groups, focusSticker) {
+                    var found = -1
+                    if (focusSticker != null) {
+                        var idx = 0
+                        run search@{
+                            for (section in groups) {
+                                idx++                          // سطر عنوان القسم
+                                for (asset in section.assets) {
+                                    val hit = asset.fileUrl == focusSticker ||
+                                        resolvedStickerUrl(asset.fileUrl)
+                                            ?.substringBefore('?')
+                                            ?.endsWith(focusSticker, ignoreCase = true) == true
+                                    if (hit) { found = idx; return@search }
+                                    idx++
+                                }
+                            }
+                        }
+                    }
+                    found
+                }
+                LaunchedEffect(focusIndex) {
+                    if (focusIndex >= 0) stickerGridState.animateScrollToItem(focusIndex)
+                }
                 LazyVerticalGrid(
+                    state = stickerGridState,
                     columns = GridCells.Fixed(stickerColumns),
                     modifier = Modifier.height(
                         com.addonstation.mobile.ui.theme.screenHeightFraction(0.34f, minDp = 200, maxDp = 320),
