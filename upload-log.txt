@@ -31,15 +31,17 @@
    [29/40] ✓ banners/random/download-1.jpg
    [30/40] ✓ banners/random/download-12.jpg
    [31/40] ✓ banners/random/download-3.jpg
-   [32/40] ✓ banners/random/download.gif
+   [32/40] ✓ banners/random/download.gif  ⇠ صُغِّر 4.0MB ⇒ 1.4MB
    [33/40] ✓ banners/random/e1feaf1251c78d0f48a198d8b453592a.jpg
    [34/40] ✓ banners/random/fondo-playyy.jpg
    [35/40] ✓ banners/random/Gumball-and-Darwin-Minecraft-icon.jpg
    [36/40] ✓ banners/random/Java-Edition-Technically-Updated.jpg
    [37/40] ✓ banners/random/Minecraft-sky-with-clouds-wallpaper.jpg
    [38/40] ✓ banners/random/orig4big.png
-   [39/40] ✗ banners/random/Pin-by-the-strawberry-fairy-on-minecraft-_-Minecraft-wallpaper-Minecraft-images-Background-529.gif — HTTP 400 The object exceeded the maximum allowed size
+   [39/40] ✓ banners/random/Pin-by-the-strawberry-fairy-on-minecraft-_-Minecraft-wallpaper-Minecraft-images-Background-529.gif  ⇠ صُغِّر 5.4MB ⇒ 2.5MB
    [40/40] ✓ banners/random/wp15310214-minecraft-platformer-wallpapers.png
 
 ================ الخلاصة ================
-✅ نجح: 39    ❌ فشل: 1
+✅ نجح: 40    ❌ فشل: 0    ⚠ مُتخطّى (أكبر من الحدّ): 0
+→ أعمدة المخطط: collection=نعم · collection_order=نعم
+✗ فشل التسجيل: HTTP 403 {"code":"42501","details":null,"hint":null,"message":"permission denied for sequence site_assets_id_seq"}
