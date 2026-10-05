@@ -147,15 +147,26 @@ fun HomeScreen(
         ) {
             Spacer(Modifier.height(12.dp))
 
-            /* 4.1 رأس الترحيب */
+            /* 4.1 رأس الترحيب — النص ملتصق بالصورة: يمينها في الإنجليزية ويسارها في العربية
+               (Alignment.End/TextAlign.End يتبعان اتجاه اللغة تلقائياً). */
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("$greeting 👋", style = AppText.greeting, color = AppColors.Muted)
+                Column(
+                    Modifier.weight(1f),
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        "$greeting 👋",
+                        style = AppText.greeting,
+                        color = AppColors.Muted,
+                        textAlign = TextAlign.End,
+                    )
                     Text(
                         text = if (profile == null) stringResource(R.string.home_welcome_guest)
                         else stringResource(R.string.home_welcome_back, profile?.username ?: ""),
                         style = AppText.welcomeName,
                         color = AppColors.Text,
+                        textAlign = TextAlign.End,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -163,6 +174,7 @@ fun HomeScreen(
                         text = stringResource(R.string.brand_wordmark),
                         style = AppText.brand,
                         color = Color.White,
+                        textAlign = TextAlign.End,
                     )
                     if (profile != null) {
                         RankBadge(role = profile!!.role, plan = profile!!.effectivePlan)
