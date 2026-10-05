@@ -49,8 +49,10 @@ android {
         applicationId = "com.addonstation.mobile"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2"          // AddonStation Mobile v1.2
+        // 1.3: استعادة كلمة المرور · الدخول التلقائي بعد التسجيل · عين كلمة المرور
+        //      وحقل التأكيد · شريط التنقّل السفلي · إطار الاختيار · استقرار الشات
+        versionCode = 4
+        versionName = "1.3"          // AddonStation Mobile v1.3
 
         resourceConfigurations += listOf("en", "ar", "pt", "es", "ru", "zh", "fr", "tr")
 

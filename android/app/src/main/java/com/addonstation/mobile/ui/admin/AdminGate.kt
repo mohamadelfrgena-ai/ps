@@ -17,7 +17,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.R
 import com.addonstation.mobile.ui.components.GhostButton
@@ -170,6 +174,10 @@ fun AdminGate(onExit: () -> Unit, content: @Composable () -> Unit) {
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.admin_gate_hint), style = AppText.bodySmall, color = AppColors.Muted)
             Spacer(Modifier.height(18.dp))
+            // نفس حقل كلمة المرور في شاشات الحساب: **بعين 👁 داخل الحقل**
+            // تُظهر النص وتُخفيه، حتى لا يُعيد المستخدم كتابتها من الصفر.
+            var visible by remember { mutableStateOf(false) }
+            val fieldEnabled = !busy && cooldown == 0L
             OutlinedTextField(
                 value = password,
                 onValueChange = {
@@ -178,9 +186,20 @@ fun AdminGate(onExit: () -> Unit, content: @Composable () -> Unit) {
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                 singleLine = true,
-                enabled = !busy && cooldown == 0L,
-                visualTransformation = PasswordVisualTransformation(),
+                enabled = fieldEnabled,
+                visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
                 label = { Text(stringResource(R.string.admin_gate_password), style = AppText.bodySmall) },
+                trailingIcon = {
+                    IconButton(onClick = { visible = !visible }, enabled = fieldEnabled) {
+                        Icon(
+                            imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = stringResource(
+                                if (visible) R.string.auth_hide_password else R.string.auth_show_password,
+                            ),
+                            tint = if (visible) AppColors.Green else AppColors.Muted,
+                        )
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 420.dp),

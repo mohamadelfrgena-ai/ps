@@ -17,7 +17,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "android", "app", "src", "main", "java", "com", "addonstation", "mobile")
 
-# نصوص مسموحة (وحدات/رموز/كلمات麻将 لا تُترجم)
+# نصوص مسموحة (وحدات/رموز/كلمات لا تُترجم)
 ALLOW = {
     "AC", "∞", "LYD", "GB", "MB", "KB", "ID", "AddonStation", "•••", "—", "·",
     "↩", "→", "←", "‹", "›", "×", "✓", "✕", "⚠", "⚠️", "•", "▾", "▸", "◂", "▴", "▾",

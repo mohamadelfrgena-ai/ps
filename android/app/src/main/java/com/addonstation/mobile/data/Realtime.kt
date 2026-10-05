@@ -115,7 +115,10 @@ class SupabaseRealtime(private val supabase: SupabaseClient) {
                             put("payload", buildJsonObject { })
                             put("ref", ref.getAndIncrement().toString())
                         }
-                        webSocket.send(ping.toString())
+                        // إن أُغلق المقبس (أو فُقدت الشبكة لحظةً) لا يجوز أن
+                        // يموت خيط النبض مع الخطأ: نبتلعه ونستمر، فإعادة
+                        // الاتصال تتولّاها دورة الإعادة في الأعلى.
+                        runCatching { webSocket.send(ping.toString()) }
                     }
                 }
             }

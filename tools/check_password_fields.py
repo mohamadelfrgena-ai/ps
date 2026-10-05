@@ -16,7 +16,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-AUTH = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/auth/AuthScreens.kt"
+SRC = ROOT / "android/app/src/main/java"
+AUTH = SRC / "com/addonstation/mobile/ui/auth/AuthScreens.kt"
 RES = ROOT / "android/app/src/main/res"
 
 
@@ -43,10 +44,21 @@ def main() -> int:
             if needle not in body:
                 problems.append(f"PasswordField بلا {label}")
 
-    # ٢) لا حقل كلمة مرور «أعمى» خارج الحقل الموحّد
+    # ٢) لا حقل كلمة مرور «أعمى» (بلا عين) في **أي** شاشة في التطبيق
     blind = s.count("PasswordVisualTransformation()")
-    if blind > 1:  # واحد فقط داخله PasswordField نفسه
+    if blind > 1:  # واحد فقط داخل PasswordField نفسه
         problems.append(f"يوجد {blind - 1} حقل/حقول كلمة مرور بلا عين في شاشات الحساب")
+    for f in sorted(SRC.rglob("*.kt")):
+        if f == AUTH:
+            continue
+        t = f.read_text(encoding="utf-8")
+        if "PasswordVisualTransformation()" not in t:
+            continue
+        # الحقل مقبول فقط إن كان بجانبه تبديل إظهار/إخفاء (عين)
+        if "Icons.Filled.Visibility" not in t or "VisualTransformation.None" not in t:
+            problems.append(
+                f"حقل كلمة مرور بلا عين · {f.relative_to(ROOT)}"
+            )
 
     # ٣) حقل التأكيد في إنشاء الحساب + التحقق من التطابق
     signup = s[s.index("fun SignUpScreen("):]
@@ -78,9 +90,9 @@ def main() -> int:
         print(f"\n✗ عدد المشاكل: {len(problems)}")
         return 1
 
-    print("✅ عين الإظهار في كل حقول كلمة المرور + حقل تأكيد في إنشاء الحساب")
-    print("\n🟢 كل حقل كلمة مرور يملك عين 👁 داخله، وإنشاء الحساب يرفض الحقلين "
-          "غير المتطابقين، والنصوص بكل اللغات.")
+    print("✅ عين الإظهار في **كل** حقول كلمة المرور في التطبيق + حقل تأكيد في إنشاء الحساب")
+    print("\n🟢 كل حقل كلمة مرور في التطبيق يملك عين 👁 داخله (الحساب ولوحة "
+          "الإدارة)، وإنشاء الحساب يرفض الحقلين غير المتطابقين، والنصوص بكل اللغات.")
     return 0
 
 
