@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -761,92 +762,131 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                         "banner" -> me?.bannerUrl == asset.fileUrl
                                         else -> me?.equippedItemId == asset.name
                                     }
-                                    Column(
+                                    // **إطار الاختيار**: حدّ أخضر ساطع + هالة خضراء + خلفية
+                                    // مُلوّنة + علامة ✓ في الزاوية — ليعرف المستخدم فوراً
+                                    // أي أصل اختاره (أفاتار · غلاف · أداة) بلا لبس.
+                                    val cellShape = RoundedCornerShape(12.dp)
+                                    Box(
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height((if (isBanner) bannerCellHeight else cellHeight).dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(AppColors.Elevated)
-                                            .border(
-                                                1.dp,
-                                                if (selected) AppColors.Green else AppColors.Border,
-                                                RoundedCornerShape(12.dp),
-                                            )
-                                            // المقفول قابل للنقر أيضاً: نقره يُظهر سبب
-                                            // القفل بدل أن يبدو كأنه معطّل بلا سبب
-                                            .clickable {
-                                                if (!unlocked) {
-                                                    message = if (isBanner) bannerLockedHint else lockedHint
-                                                } else {
-                                                    scope.launch {
-                                                        val value = if (kind == "item") asset.name else asset.fileUrl
-                                                        busy = true
-                                                        // القاعدة هي الحكم: قد ترفض أصلاً (خطة أو صلاحية)،
-                                                        // فنُظهر سبب الرفض بدل أن يبدو وكأنه نجح بلا تغيير
-                                                        container.profile.setProfileAsset(kind, value)
-                                                            .onSuccess { message = null }
-                                                            .onFailure { message = it.message }
-                                                        busy = false
+                                            .height((if (isBanner) bannerCellHeight else cellHeight).dp),
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .matchParentSize()
+                                                // هالة خضراء خفيفة تحيط بالخلية المختارة
+                                                .then(
+                                                    if (selected) Modifier.shadow(
+                                                        10.dp,
+                                                        cellShape,
+                                                        ambientColor = AppColors.Green,
+                                                        spotColor = AppColors.Green,
+                                                    ) else Modifier
+                                                )
+                                                .clip(cellShape)
+                                                .background(
+                                                    if (selected) AppColors.Green.copy(alpha = 0.14f)
+                                                    else AppColors.Elevated
+                                                )
+                                                .border(
+                                                    if (selected) 2.5.dp else 1.dp,
+                                                    if (selected) AppColors.Green else AppColors.Border,
+                                                    cellShape,
+                                                )
+                                                // المقفول قابل للنقر أيضاً: نقره يُظهر سبب
+                                                // القفل بدل أن يبدو كأنه معطّل بلا سبب
+                                                .clickable {
+                                                    if (!unlocked) {
+                                                        message = if (isBanner) bannerLockedHint else lockedHint
+                                                    } else {
+                                                        scope.launch {
+                                                            val value = if (kind == "item") asset.name else asset.fileUrl
+                                                            busy = true
+                                                            // القاعدة هي الحكم: قد ترفض أصلاً (خطة أو صلاحية)،
+                                                            // فنُظهر سبب الرفض بدل أن يبدو وكأنه نجح بلا تغيير
+                                                            container.profile.setProfileAsset(kind, value)
+                                                                .onSuccess { message = null }
+                                                                .onFailure { message = it.message }
+                                                            busy = false
+                                                        }
+                                                    }
+                                                }
+                                                .padding(4.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center,
+                                        ) {
+                                            if (isBanner) {
+                                                // خلية غلاف عريضة 16:9، وGIF فيها **يتحرّك**
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .fillMaxWidth(),
+                                                ) {
+                                                    BannerThumb(
+                                                        url = assetUrl(container, asset.fileUrl),
+                                                        animate = true,
+                                                        modifier = Modifier.matchParentSize(),
+                                                    )
+                                                    if (asset.animated) {
+                                                        Text(
+                                                            "🎞",
+                                                            style = AppText.tiny,
+                                                            modifier = Modifier
+                                                                .align(Alignment.TopEnd)
+                                                                .padding(2.dp),
+                                                        )
+                                                    }
+                                                    if (!unlocked) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .matchParentSize()
+                                                                .background(AppColors.Surface.copy(alpha = 0.55f)),
+                                                            contentAlignment = Alignment.Center,
+                                                        ) {
+                                                            Text("🔒", style = AppText.bodySmall)
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    AssetThumb(
+                                                        url = assetUrl(container, asset.fileUrl),
+                                                        size = 40.dp,
+                                                    )
+                                                    if (!unlocked) {
+                                                        Text("🔒", style = AppText.tiny)
                                                     }
                                                 }
                                             }
-                                            .padding(4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center,
-                                    ) {
-                                        if (isBanner) {
-                                            // خلية غلاف عريضة 16:9، وGIF فيها **يتحرّك**
+                                            Spacer(Modifier.height(4.dp))
+                                            Text(
+                                                asset.name,
+                                                style = AppText.tiny,
+                                                color = if (selected) AppColors.Green else AppColors.Muted,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                                textAlign = TextAlign.Center,
+                                                lineHeight = AppText.tiny.fontSize * 1.05f,
+                                            )
+                                        }
+                                        if (selected) {
+                                            // علامة ✓ واضحة فوق زاوية الخلية المختارة
                                             Box(
                                                 modifier = Modifier
-                                                    .weight(1f)
-                                                    .fillMaxWidth(),
+                                                    .align(Alignment.TopStart)
+                                                    .padding(3.dp)
+                                                    .size(20.dp)
+                                                    .background(AppColors.Green, CircleShape)
+                                                    .border(1.dp, AppColors.Surface, CircleShape),
+                                                contentAlignment = Alignment.Center,
                                             ) {
-                                                BannerThumb(
-                                                    url = assetUrl(container, asset.fileUrl),
-                                                    animate = true,
-                                                    modifier = Modifier.matchParentSize(),
+                                                Text(
+                                                    "✓",
+                                                    style = AppText.tiny,
+                                                    color = AppColors.OnGreen,
                                                 )
-                                                if (asset.animated) {
-                                                    Text(
-                                                        "🎞",
-                                                        style = AppText.tiny,
-                                                        modifier = Modifier
-                                                            .align(Alignment.TopEnd)
-                                                            .padding(2.dp),
-                                                    )
-                                                }
-                                                if (!unlocked) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .matchParentSize()
-                                                            .background(AppColors.Surface.copy(alpha = 0.55f)),
-                                                        contentAlignment = Alignment.Center,
-                                                    ) {
-                                                        Text("🔒", style = AppText.bodySmall)
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                AssetThumb(
-                                                    url = assetUrl(container, asset.fileUrl),
-                                                    size = 40.dp,
-                                                )
-                                                if (!unlocked) {
-                                                    Text("🔒", style = AppText.tiny)
-                                                }
                                             }
                                         }
-                                        Spacer(Modifier.height(4.dp))
-                                        Text(
-                                            asset.name,
-                                            style = AppText.tiny,
-                                            color = if (selected) AppColors.Green else AppColors.Muted,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.Center,
-                                            lineHeight = AppText.tiny.fontSize * 1.05f,
-                                        )
                                     }
                                 }
                                 // خلايا فارغة تكمل الصف الأخير حتى تبقى الأعمدة متساوية

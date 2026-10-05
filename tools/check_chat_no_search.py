@@ -43,6 +43,15 @@ if re.search(r"messages\.filter\s*\{", chat):
     problems.append("ChatScreen.kt ما زال يصفّي الرسائل (فلترة بحث)")
 
 # 3) بحث منتقي الرموز أيضاً أُزيل
+#    ملاحظة: `run search@ { … }` وسمُ قفزة في كوتلن (label) لا حقلَ بحث،
+#    فتُحذف الأوسمة قبل الفحص حتى لا يُحسب بلاغاً كاذباً.
+def strip_labels(text: str) -> str:
+    # `return@search` (قفزة) ثم `search@ {` (وسم حلقة/نطاق)
+    text = re.sub(r"\b[A-Za-z_]\w*@[A-Za-z_]\w*", "L", text)
+    return re.sub(r"\b[A-Za-z_]\w*@", "L", text)
+
+
+sheets = strip_labels(sheets)
 for needle, label in (
     ("search", "حالة/حقل البحث"),
     ("filtered", "تصفية قائمة الإيموجي"),
