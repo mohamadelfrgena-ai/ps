@@ -96,11 +96,11 @@ class ProfileRepository(
         supabase.rpc(
             "update_my_profile",
             params(
-                "username" to p(username.trim()),
-                "bio" to p(bio),
-                "custom_status" to p(customStatus),
-                "show_online" to p(showOnline),
-                "country" to p(country),
+                "p_username" to p(username.trim()),
+                "p_bio" to p(bio),
+                "p_custom_status" to p(customStatus),
+                "p_show_online" to p(showOnline),
+                "p_country" to p(country),
             ),
             signedOnly = true,
         )
@@ -115,7 +115,7 @@ class ProfileRepository(
         runCatching {
             supabase.rpc(
                 "update_my_profile",
-                params("show_online" to p(value)),
+                params("p_show_online" to p(value)),
                 signedOnly = true,
             )
             refreshProfile()
@@ -127,7 +127,7 @@ class ProfileRepository(
     suspend fun setProfileAsset(kind: String, value: String?): Result<Unit> = runCatching {
         supabase.rpc(
             "set_profile_asset",
-            params("kind" to p(kind), "value" to p(value)),
+            params("p_kind" to p(kind), "p_value" to p(value)),
             signedOnly = true,
         )
         refreshProfile()
@@ -181,14 +181,14 @@ class ProfileRepository(
     }
 
     suspend fun sendFriendRequest(userId: String): Result<Unit> = runCatching {
-        supabase.rpc("send_friend_request", params("target_id" to p(userId)), signedOnly = true)
+        supabase.rpc("send_friend_request", params("p_user_id" to p(userId)), signedOnly = true)
         Unit
     }
 
     suspend fun respondFriendRequest(requestId: Long, accept: Boolean): Result<Unit> = runCatching {
         supabase.rpc(
             "respond_friend_request",
-            params("request_id" to p(requestId), "accept" to p(accept)),
+            params("p_request_id" to p(requestId), "p_accept" to p(accept)),
             signedOnly = true,
         )
         Unit

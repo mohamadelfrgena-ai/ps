@@ -144,13 +144,13 @@ class ContentRepository(
     // ------------------------------------------------------------------ إحصاءات
 
     suspend fun recordView(itemId: String) {
-        runCatching { supabase.rpc("record_content_view", params("item_id" to p(itemId))) }
+        runCatching { supabase.rpc("record_content_view", params("p_item_id" to p(itemId))) }
     }
 
     // ----------------------------------------------------------------- المفضلة
 
     suspend fun toggleFavorite(itemId: String): Result<Boolean> = runCatching {
-        val result = supabase.rpc("toggle_favorite", params("item_id" to p(itemId)), signedOnly = true)
+        val result = supabase.rpc("toggle_favorite", params("p_item_id" to p(itemId)), signedOnly = true)
         result?.jsonPrimitive?.booleanOrNull ?: false
     }
 
@@ -201,7 +201,7 @@ class ContentRepository(
      * كل شروط الخطة والحد اليومي تُفرض داخل الدالة على الخادم.
      */
     suspend fun download(context: android.content.Context, item: ContentItem): Result<DownloadedFile> = runCatching {
-        val result = supabase.rpc("record_content_download", params("item_id" to p(item.id)), signedOnly = true)
+        val result = supabase.rpc("record_content_download", params("p_item_id" to p(item.id)), signedOnly = true)
         val outcome = result.toOutcome()
         if (!outcome.ok) throw ApiError(ApiErrorKind.NO_PERMISSION, outcome.message)
         val bucket = outcome.data.str("bucket") ?: "content-files"
@@ -219,7 +219,7 @@ class ContentRepository(
 
     /** فتح قفل عنصر بالعملات AC (للمحتوى المدفوع بـ AC). */
     suspend fun unlockWithAc(itemId: String): Result<Int> = runCatching {
-        val outcome = supabase.rpc("ac_unlock_content", params("item_id" to p(itemId)), signedOnly = true).toOutcome()
+        val outcome = supabase.rpc("ac_unlock_content", params("p_item_id" to p(itemId)), signedOnly = true).toOutcome()
         if (!outcome.ok) throw ApiError(ApiErrorKind.NOT_ENOUGH_AC, outcome.message)
         outcome.data.num("charged") ?: 0
     }
