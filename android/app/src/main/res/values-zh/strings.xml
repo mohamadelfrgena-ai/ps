@@ -350,7 +350,7 @@
     <string name="plan_locked_banners">锁定的封面需要相应的方案。</string>
     <string name="plan_locked_banner_note">🔒 所有封面均已锁定 — 只有订阅 Epic 💎 或 Legendary 👑 才能解锁。</string>
     <string name="profile_banner_preview">封面预览</string>
-    <string name="profile_banner_section">封面 🔒</string>
+    <string name="profile_banner_section">封面</string>
     <string name="profile_banner_none">还没有封面 — 从下面的分区中挑选一个 👇</string>
     <string name="profile_banner_clear">移除封面</string>
     <string name="plan_item_section">聊天中名字旁的物品</string>

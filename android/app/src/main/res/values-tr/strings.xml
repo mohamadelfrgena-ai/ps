@@ -350,7 +350,7 @@
     <string name="plan_locked_banners">Kilitli kapaklar için doğru plan gerekir.</string>
     <string name="plan_locked_banner_note">🔒 Tüm kapaklar kilitli — yalnızca Epic 💎 veya Legendary 👑 aboneliğiyle açılır.</string>
     <string name="profile_banner_preview">Kapak önizlemesi</string>
-    <string name="profile_banner_section">Kapaklar 🔒</string>
+    <string name="profile_banner_section">Kapaklar</string>
     <string name="profile_banner_none">Henüz kapak yok — aşağıdaki bölümlerden birini seç 👇</string>
     <string name="profile_banner_clear">Kapağı kaldır</string>
     <string name="plan_item_section">Sohbette adının yanındaki öğe</string>

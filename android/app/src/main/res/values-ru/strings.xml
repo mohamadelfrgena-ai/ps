@@ -350,7 +350,7 @@
     <string name="plan_locked_banners">Для закрытых обложек нужен подходящий план.</string>
     <string name="plan_locked_banner_note">🔒 Все обложки заблокированы — открываются только с подпиской Epic 💎 или Legendary 👑.</string>
     <string name="profile_banner_preview">Предпросмотр обложки</string>
-    <string name="profile_banner_section">Обложки 🔒</string>
+    <string name="profile_banner_section">Обложки</string>
     <string name="profile_banner_none">Обложки пока нет — выберите одну в разделах ниже 👇</string>
     <string name="profile_banner_clear">Убрать обложку</string>
     <string name="plan_item_section">Предмет рядом с именем в чате</string>

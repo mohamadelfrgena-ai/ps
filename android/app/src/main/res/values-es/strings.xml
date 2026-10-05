@@ -350,7 +350,7 @@
     <string name="plan_locked_banners">Las portadas bloqueadas necesitan el plan adecuado.</string>
     <string name="plan_locked_banner_note">🔒 Todas las portadas están bloqueadas — se abren solo con una suscripción Epic 💎 o Legendary 👑.</string>
     <string name="profile_banner_preview">Vista previa de la portada</string>
-    <string name="profile_banner_section">Portadas 🔒</string>
+    <string name="profile_banner_section">Portadas</string>
     <string name="profile_banner_none">Aún sin portada — elige una en las secciones de abajo 👇</string>
     <string name="profile_banner_clear">Quitar portada</string>
     <string name="plan_item_section">Ítem junto a tu nombre en el chat</string>

@@ -350,7 +350,7 @@
     <string name="plan_locked_banners">Banners bloqueados precisam do plano certo.</string>
     <string name="plan_locked_banner_note">🔒 Todos os banners estão bloqueados — abrem apenas com uma assinatura Epic 💎 ou Legendary 👑.</string>
     <string name="profile_banner_preview">Pré-visualização do banner</string>
-    <string name="profile_banner_section">Banners 🔒</string>
+    <string name="profile_banner_section">Banners</string>
     <string name="profile_banner_none">Ainda sem banner — escolha um nas seções abaixo 👇</string>
     <string name="profile_banner_clear">Remover banner</string>
     <string name="plan_item_section">Item ao lado do seu nome no chat</string>

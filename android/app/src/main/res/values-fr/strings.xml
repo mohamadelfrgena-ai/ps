@@ -350,7 +350,7 @@
     <string name="plan_locked_banners">Les bannières verrouillées nécessitent l’offre appropriée.</string>
     <string name="plan_locked_banner_note">🔒 Toutes les bannières sont verrouillées — elles ne s’ouvrent qu’avec un abonnement Epic 💎 ou Legendary 👑.</string>
     <string name="profile_banner_preview">Aperçu de la bannière</string>
-    <string name="profile_banner_section">Bannières 🔒</string>
+    <string name="profile_banner_section">Bannières</string>
     <string name="profile_banner_none">Pas encore de bannière — choisissez-en une dans les sections ci-dessous 👇</string>
     <string name="profile_banner_clear">Retirer la bannière</string>
     <string name="plan_item_section">Objet à côté de ton nom dans le chat</string>

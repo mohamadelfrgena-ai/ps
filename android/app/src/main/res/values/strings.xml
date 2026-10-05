@@ -361,7 +361,7 @@
     <string name="plan_locked_banners">Locked banners need the right plan.</string>
     <string name="plan_locked_banner_note">🔒 All banners are locked — unlock with an Epic 💎 or Legendary 👑 subscription.</string>
     <string name="profile_banner_preview">Banner preview</string>
-    <string name="profile_banner_section">Banners 🔒</string>
+    <string name="profile_banner_section">Banners</string>
     <string name="profile_banner_none">No banner yet — pick one from the sections below 👇</string>
     <string name="profile_banner_clear">Remove banner</string>
     <string name="plan_item_section">Item next to your name in chat</string>

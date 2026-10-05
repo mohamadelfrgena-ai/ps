@@ -350,7 +350,7 @@
     <string name="plan_locked_banners">الأغلفة المقفلة تحتاج الخطة المناسبة.</string>
     <string name="plan_locked_banner_note">🔒 الأغلفة كلها مقفولة — لا تُفتح إلا باشتراك Epic 💎 أو Legendary 👑.</string>
     <string name="profile_banner_preview">معاينة الغلاف</string>
-    <string name="profile_banner_section">الأغلفة 🔒</string>
+    <string name="profile_banner_section">الأغلفة</string>
     <string name="profile_banner_none">ما في غلاف — اختر واحداً من الفقرات تحت 👇</string>
     <string name="profile_banner_clear">إزالة الغلاف</string>
     <string name="plan_item_section">الأداة بجانب الاسم في الشات</string>
