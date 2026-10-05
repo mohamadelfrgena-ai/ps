@@ -45,6 +45,9 @@ FOLDERS = {
     "random": ("random", "Random 🎲"),
 }
 
+# أكبر حجم مقبول للرفع قبل التصغير التلقائي (حدّ المخزن في بعض المشاريع أصغر)
+MAX_UPLOAD_BYTES = 4 * 1024 * 1024
+
 UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
 NUM_PREFIX = re.compile(r"^(\d+[-_])+")
 MULTI_DASH = re.compile(r"-{2,}")
@@ -314,6 +317,63 @@ def seed_rows(url: str, key: str, rows) -> int:
     return 0
 
 
+
+def shrink_to_fit(data: bytes, path: str, target: int):
+    """تصغير **نسبي** للصورة (بلا إعادة رسم) لتناسب حدّ حجم المخزن.
+
+    • GIF المتحرّك يُصغَّر إطاراً بإطار فيبقى متحرّكاً؛
+    • الصور الثابتة تُصغَّر بنسب متدرّجة حتى تدخل في `target`؛
+    • يُعيد None إن تعذّر (PIL غير مثبّتة أو صورة غير مدعومة).
+    """
+    try:
+        import io
+        from PIL import Image, ImageSequence
+    except Exception:
+        return None
+    try:
+        src = Image.open(io.BytesIO(data))
+        src.load()
+    except Exception:
+        return None
+
+    is_gif = path.lower().endswith(".gif")
+    ext = os.path.splitext(path)[1].lower()
+
+    for scale in (0.75, 0.55, 0.4, 0.28, 0.2):
+        out = io.BytesIO()
+        try:
+            if is_gif:
+                frames, durations = [], []
+                for frame in ImageSequence.Iterator(src):
+                    w, h = frame.size
+                    f = frame.convert("RGBA").resize(
+                        (max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS
+                    ).convert("P", palette=Image.ADAPTIVE)
+                    frames.append(f)
+                    durations.append(int(frame.info.get("duration") or 100))
+                if not frames:
+                    return None
+                frames[0].save(
+                    out, format="GIF", save_all=True, append_images=frames[1:],
+                    duration=durations, loop=0, optimize=True,
+                )
+            else:
+                w, h = src.size
+                im = src.convert("RGBA").resize(
+                    (max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS
+                )
+                if ext in (".jpg", ".jpeg"):
+                    im.convert("RGB").save(out, format="JPEG", quality=84, optimize=True)
+                elif ext == ".webp":
+                    im.save(out, format="WEBP", quality=84, method=5)
+                else:
+                    im.convert("RGB").save(out, format="PNG", optimize=True)
+        except Exception:
+            continue
+        if out.tell() <= target:
+            return out.getvalue()
+    return None
+
 # ------------------------------------------------------------------- الرفع
 def upload_file(url, key, path, data, ctype, bucket=BUCKET):
     import urllib.error
@@ -392,26 +452,55 @@ def main() -> int:
         print("✓ تجربة فقط — لم يُرفع شيء.")
         return 0
 
-    ok = failed = 0
+    ok = failed = skipped = 0
+    uploaded_paths = []
     for index, (path, data, ctype) in enumerate(uploads, 1):
+        note = ""
+        # ملف أكبر من حدّنا المبدئي ⇒ نصغّره نسبياً قبل الرفع
+        if len(data) > MAX_UPLOAD_BYTES:
+            shrunk = shrink_to_fit(data, path, MAX_UPLOAD_BYTES)
+            if shrunk:
+                note = f"  ⇠ صُغِّر {len(data) / 1024 / 1024:.1f}MB ⇒ {len(shrunk) / 1024 / 1024:.1f}MB"
+                data = shrunk
         status, body = upload_file(args.url, args.key, path, data, ctype)
+        # رفض بسبب حدّ حجم المخزن ⇒ تصغير أقوى ثم إعادة المحاولة
+        if not (200 <= status < 300) and "maximum allowed size" in (body or "").lower():
+            for target in (2 * 1024 * 1024, 1024 * 1024, 512 * 1024):
+                shrunk = shrink_to_fit(data, path, target)
+                if not shrunk:
+                    break
+                status, body = upload_file(args.url, args.key, path, shrunk, ctype)
+                if 200 <= status < 300:
+                    note = f"  ⇠ صُغِّر إلى {len(shrunk) / 1024 / 1024:.1f}MB"
+                    break
         if 200 <= status < 300:
             ok += 1
-            print(f"   [{index}/{len(uploads)}] ✓ {path}")
+            uploaded_paths.append(path)
+            print(f"   [{index}/{len(uploads)}] ✓ {path}{note}")
         else:
-            failed += 1
             detail = ""
             try:
                 detail = json.loads(body).get("message", "")
             except Exception:
-                detail = body[:120]
-            print(f"   [{index}/{len(uploads)}] ✗ {path} — HTTP {status} {detail}")
+                detail = (body or "")[:120]
+            if "maximum allowed size" in (body or "").lower():
+                skipped += 1
+                print(
+                    f"   [{index}/{len(uploads)}] ⚠ تخطّي (أكبر من حدّ المخزن "
+                    f"{len(data) / 1024 / 1024:.1f}MB): {path} {detail}"
+                )
+            else:
+                failed += 1
+                print(f"   [{index}/{len(uploads)}] ✗ {path} — HTTP {status} {detail}")
 
     print("\n================ الخلاصة ================")
-    print(f"✅ نجح: {ok}    ❌ فشل: {failed}")
-    if failed == 0 and args.seed:
-        return seed_rows(args.url, args.key, rows)
-    if failed == 0:
+    print(f"✅ نجح: {ok}    ❌ فشل: {failed}    ⚠ مُتخطّى (أكبر من الحدّ): {skipped}")
+    if ok and args.seed:
+        # نسجّل **ما رُفع فعلاً** فقط، حتى لا يظهر غلاف بلا صورة
+        done = set(uploaded_paths)
+        rows_ok = [r for r in rows if r["file_url"] in done]
+        return seed_rows(args.url, args.key, rows_ok)
+    if ok and failed == 0 and skipped == 0:
         print("الآن نفّذ في Supabase → SQL Editor:")
         print(f"   {os.path.relpath(args.sql, ROOT)}")
         print("أو سجّلها بلا لصق SQL:  python3 tools/upload_banners.py --zip Banner.zip --url … --key … --seed-only")

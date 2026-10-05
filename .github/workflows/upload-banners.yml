@@ -114,6 +114,7 @@ jobs:
         run: |
           set -o pipefail
           exec > >(tee "$GITHUB_WORKSPACE/upload-log.txt") 2>&1
+          python3 -m pip install --quiet pillow
           python3 tools/upload_banners.py --zip Banner.zip --seed
 
       - name: "تحقق: رابط عام لأول غلاف"
