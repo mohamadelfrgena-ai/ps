@@ -47,6 +47,7 @@ ORDER = [
     "27_admin_only_assets.sql",
     "28_chat_cleanup.sql",
     "29_chat_moderation_rooms.sql",
+    "30_chat_members_only.sql",
 ]
 
 HEADER = """-- ============================================================================

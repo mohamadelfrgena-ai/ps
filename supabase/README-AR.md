@@ -34,7 +34,9 @@
 `23_payment_order_usd` · `24_free_default_avatar` · `25_fix_send_chat_message_unnest` ·
 `26_fix_site_assets_sequence` · `27_admin_only_assets` · `28_chat_cleanup` (تنظيف اختياري) ·
 **`29_chat_moderation_rooms`** — إشراف الشات: حذف أي رسالة للأدمن والمشرف مهما كان
-عمرها، ونطاق غرف المشرف (غرفة واحدة · عدّة غرف · كل الغرف).
+عمرها، ونطاق غرف المشرف (غرفة واحدة · عدّة غرف · كل الغرف) ·
+**`30_chat_members_only`** — الشات للمسجّلين فقط: الزائر (مفتاح anon) لا يقرأ
+رسالةً ولا غرفةً ولا تفاعلاً.
 
 ## نتائج متوقعة للتحقق
 

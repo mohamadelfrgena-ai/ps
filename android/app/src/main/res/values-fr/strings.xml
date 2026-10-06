@@ -219,6 +219,7 @@
     <string name="set_delete_note">Supprimer ton compte efface définitivement ton profil. Cette action est irréversible.</string>
     <string name="set_log_out">Se déconnecter</string>
 
+    <string name="chat_login_required">Le chat est réservé aux membres — connectez-vous pour entrer dans les salons</string>
     <string name="chat_rules_title">⚠️ Règles de la communauté</string>
     <string name="chat_rule_1">🤝 Respecte tous les membres</string>
     <string name="chat_rule_2">🚫 Pas d’insultes ni de harcèlement</string>

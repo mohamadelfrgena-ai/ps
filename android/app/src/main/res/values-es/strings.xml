@@ -219,6 +219,7 @@
     <string name="set_delete_note">Eliminar tu cuenta borra tu perfil de forma permanente. No se puede deshacer.</string>
     <string name="set_log_out">Cerrar sesión</string>
 
+    <string name="chat_login_required">El chat es solo para miembros: inicia sesión para entrar a las salas</string>
     <string name="chat_rules_title">⚠️ Reglas de la comunidad</string>
     <string name="chat_rule_1">🤝 Respeta a todos los miembros</string>
     <string name="chat_rule_2">🚫 Sin insultos ni acoso</string>

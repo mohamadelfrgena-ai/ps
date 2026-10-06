@@ -219,6 +219,7 @@
     <string name="set_delete_note">删除账号将永久移除你的资料，此操作无法撤销。</string>
     <string name="set_log_out">退出登录</string>
 
+    <string name="chat_login_required">聊天室仅会员可用 — 登录后即可进入房间</string>
     <string name="chat_rules_title">⚠️ 社区规则</string>
     <string name="chat_rule_1">🤝 尊重所有成员</string>
     <string name="chat_rule_2">🚫 禁止侮辱和骚扰</string>

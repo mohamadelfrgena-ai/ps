@@ -219,6 +219,7 @@
     <string name="set_delete_note">Удаление аккаунта навсегда убирает ваш профиль. Это действие необратимо.</string>
     <string name="set_log_out">Выйти</string>
 
+    <string name="chat_login_required">Чат только для участников — войдите, чтобы зайти в комнаты</string>
     <string name="chat_rules_title">⚠️ Правила сообщества</string>
     <string name="chat_rule_1">🤝 Уважайте всех участников</string>
     <string name="chat_rule_2">🚫 Без оскорблений и травли</string>

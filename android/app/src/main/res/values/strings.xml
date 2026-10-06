@@ -229,6 +229,7 @@
     <string name="set_log_out">Log out</string>
 
     <!-- Community / chat -->
+    <string name="chat_login_required">Chat is for members only — sign in to enter the rooms</string>
     <string name="chat_rules_title">⚠️ Community rules</string>
     <string name="chat_rule_1">🤝 Respect all members</string>
     <string name="chat_rule_2">🚫 No insults or harassment</string>

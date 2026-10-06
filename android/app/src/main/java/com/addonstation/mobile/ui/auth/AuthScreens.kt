@@ -44,6 +44,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.R
@@ -122,6 +123,11 @@ fun LoginScreen(
     onBack: () -> Unit,
     onSuccess: () -> Unit,
     onOpenSignup: () -> Unit,
+    /**
+     * سطر توضيحي أعلى الشاشة يُبيّن سبب فتحها — مثلاً حين يُنقل المستخدم
+     * إلى الدخول لأنه حاول فتح الشات (الشات للمسجّلين فقط).
+     */
+    notice: String? = null,
 ) {
     val container = rememberContainer()
     val scope = rememberCoroutineScope()
@@ -189,6 +195,17 @@ fun LoginScreen(
                 color = AppColors.Muted,
                 textAlign = TextAlign.Center,
             )
+            if (notice != null) {
+                // لماذا فُتحت شاشة الدخول؟ (مثال: الشات لا يُفتح لغير مسجّل)
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "🔒 $notice",
+                    style = AppText.bodySmall,
+                    color = AppColors.Gold,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
 
             Spacer(Modifier.height(22.dp))
             OutlinedTextField(

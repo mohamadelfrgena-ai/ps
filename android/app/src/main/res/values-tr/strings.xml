@@ -219,6 +219,7 @@
     <string name="set_delete_note">Hesabını silmek profilini kalıcı olarak kaldırır. Bu işlem geri alınamaz.</string>
     <string name="set_log_out">Çıkış Yap</string>
 
+    <string name="chat_login_required">Sohbet yalnızca üyeler için — odalara girmek için oturum açın</string>
     <string name="chat_rules_title">⚠️ Topluluk kuralları</string>
     <string name="chat_rule_1">🤝 Herkese saygı göster</string>
     <string name="chat_rule_2">🚫 Hakaret ve taciz yok</string>

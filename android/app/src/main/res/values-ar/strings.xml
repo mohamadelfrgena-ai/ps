@@ -219,6 +219,7 @@
     <string name="set_delete_note">حذف حسابك يزيل ملفك الشخصي نهائياً. لا يمكن التراجع عن هذا الإجراء.</string>
     <string name="set_log_out">تسجيل الخروج</string>
 
+    <string name="chat_login_required">الشات للمسجّلين فقط — سجّل الدخول لتفتح الغرف</string>
     <string name="chat_rules_title">⚠️ قواعد المجتمع</string>
     <string name="chat_rule_1">🤝 احترام جميع الأعضاء</string>
     <string name="chat_rule_2">🚫 لا إهانات أو مضايقات</string>

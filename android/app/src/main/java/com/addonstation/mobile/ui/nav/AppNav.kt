@@ -226,16 +226,82 @@ private fun MainNavigation(startAtReset: Boolean) {
         }
     }
 
+    /**
+     * الوجهة التي أرادها المستخدم قبل أن نوقفه عند شاشة الدخول — نعود إليها
+     * بعد نجاح الدخول مباشرةً (قائمة الغرف، أو الغرفة نفسها إن جاء من إشعار).
+     */
+    var afterLoginRoute by remember { mutableStateOf<String?>(null) }
+
+    /** هل هذه الوجهة من الشات (قائمة الغرف أو غرفة بعينها)؟ */
+    fun isChatRoute(destination: String): Boolean =
+        destination == Routes.COMMUNITY || destination.startsWith("chat/")
+
+    /**
+     * **الشات كلّه خلف تسجيل الدخول** (طلب المالك): لا تُفتح قائمة الغرف ولا
+     * غرفةٌ منها لغير مسجّل — يُنقل إلى شاشة الدخول، وبعد نجاحه يعود إلى حيث
+     * أراد تلقائياً.
+     *
+     * إخراج وجهة الشات من الرصة خطوة جوهريّة: لولاها صار زرّ الرجوع من شاشة
+     * الدخول يعيده إلى الشات، فيُرسله إلى الدخول من جديد … حلقة لا تنتهي.
+     */
+    fun requireSignIn(intended: String) {
+        afterLoginRoute = intended
+        // إن كنّا واقفين على وجهة الشات أخرجناها من الرصة أولاً: وإلا صار زرّ
+        // الرجوع من شاشة الدخول يعيده إلى الشات، فيُرسله إلى الدخول من جديد
+        // … حلقة لا تنتهي. (الغرفة تُبلّغ عن نمطها chat/{channelId} لا عن
+        // معرّفها، لذا نفحص العائلة بالنمط لا بالمعرّف.)
+        val standingOnChat = route == Routes.COMMUNITY || route?.startsWith("chat/") == true
+        if (standingOnChat) navController.popBackStack()
+        navController.navigate(Routes.LOGIN) { launchSingleTop = true }
+    }
+
     fun go(route: String) {
+        if (isChatRoute(route) && !signedIn) {
+            requireSignIn(route)
+            return
+        }
         navController.navigate(route) { launchSingleTop = true }
     }
 
     fun goTab(target: MainTab) {
+        if (target == MainTab.Community && !signedIn) {
+            requireSignIn(target.route)
+            return
+        }
         navController.navigate(target.route) {
             popUpTo(Routes.HOME) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }
+    }
+
+    // إن رجع المستخدم من شاشة الدخول بلا إتمام نُلغي الوجهة المعلّقة، فلا يقفز
+    // إلى الشات في دخولٍ تالٍ لا علاقة له به. (الدخول الناجح يُفرغها بنفسه.)
+    LaunchedEffect(route) {
+        if (route != null && route != Routes.LOGIN && route != Routes.SIGNUP) {
+            afterLoginRoute = null
+        }
+    }
+
+    // سطرٌ أعلى شاشة الدخول يفسّر لماذا فُتحت: «الشات للمسجّلين فقط»
+    val chatLoginNotice = stringResource(R.string.chat_login_required)
+
+    /**
+     * بعد نجاح الدخول: إن كنّا أوقفنا المستخدم عند بوابة الشات نعيده إلى
+     * وجهته نفسها (قائمة الغرف، أو الغرفة التي فتحها من إشعار) ونُخبر النداء.
+     * وإلا لا نفعل شيئاً فيعود إلى الصفحة الرئيسية — السلوك المعتاد.
+     *
+     * @return صحيحٌ إن أعدناه إلى الشات؛ وإلا فالصفحة الرئيسية.
+     */
+    fun continueAfterLogin(): Boolean {
+        val intended = afterLoginRoute
+        afterLoginRoute = null
+        if (intended == null) return false
+        navController.navigate(intended) {
+            popUpTo(Routes.LOGIN) { inclusive = true }
+            launchSingleTop = true
+        }
+        return true
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -272,14 +338,22 @@ private fun MainNavigation(startAtReset: Boolean) {
                 }
 
                 composable(Routes.COMMUNITY) {
-                    com.addonstation.mobile.ui.community.CommunityGate(
-                        onOpenRoom = { channel: ChatChannel -> go(Routes.chat(channel.id)) },
-                        // ترس لوحة المستخدم في الشات → تعديل الملف الشخصي (وإن لم يسجّل: شاشة الدخول)
-                        onOpenEditProfile = { if (signedIn) go(Routes.EDIT_PROFILE) else go(Routes.LOGIN) },
-                        onOpenWallet = { go(Routes.WALLET) },
-                        onLogin = { go(Routes.LOGIN) },
-                        onDeclineToHome = { goTab(MainTab.Home) },
-                    )
+                    // الشات لا يُفتح لغير مسجّل: رابطٌ خارجيّ أو استعادةُ حالة
+                    // تُدخله هنا تُنقله إلى الدخول (والأزرار تمنعه أصلاً).
+                    SignInGate(
+                        signedIn = signedIn,
+                        intended = Routes.COMMUNITY,
+                        onRequireSignIn = { intended -> requireSignIn(intended) },
+                    ) {
+                        com.addonstation.mobile.ui.community.CommunityGate(
+                            onOpenRoom = { channel: ChatChannel -> go(Routes.chat(channel.id)) },
+                            // ترس لوحة المستخدم في الشات → تعديل الملف الشخصي
+                            onOpenEditProfile = { go(Routes.EDIT_PROFILE) },
+                            onOpenWallet = { go(Routes.WALLET) },
+                            onLogin = { go(Routes.LOGIN) },
+                            onDeclineToHome = { goTab(MainTab.Home) },
+                        )
+                    }
                 }
 
                 composable(Routes.SETTINGS) {
@@ -309,9 +383,12 @@ private fun MainNavigation(startAtReset: Boolean) {
                 composable(Routes.LOGIN) {
                     com.addonstation.mobile.ui.auth.LoginScreen(
                         onBack = { navController.popBackStack() },
-                        // بعد الدخول ⟵ الصفحة الرئيسية مباشرةً (طلب المالك)
-                        onSuccess = { goTab(MainTab.Home) },
+                        // بعد الدخول ⟵ الصفحة الرئيسية مباشرةً (طلب المالك) …
+                        // إلّا إن كان قد أُوقف عند الدخول وهو داخلٌ إلى الشات:
+                        // فنردّه إلى الشات الذي أراده (قائمة الغرف أو الغرفة).
+                        onSuccess = { if (!continueAfterLogin()) goTab(MainTab.Home) },
                         onOpenSignup = { go(Routes.SIGNUP) },
+                        notice = if (afterLoginRoute != null) chatLoginNotice else null,
                     )
                 }
                 composable(Routes.SIGNUP) {
@@ -319,7 +396,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                         onBack = { navController.popBackStack() },
                         // بعد إنشاء الحساب ⟵ الصفحة الرئيسية مباشرةً (طلب المالك):
                         // `AuthRepository.signUp` يدخل الحساب تلقائياً أولاً.
-                        onSuccess = { goTab(MainTab.Home) },
+                        onSuccess = { if (!continueAfterLogin()) goTab(MainTab.Home) },
                         onOpenLogin = {
                             navController.navigate(Routes.LOGIN) { popUpTo(Routes.SIGNUP) { inclusive = true } }
                         },
@@ -393,22 +470,30 @@ private fun MainNavigation(startAtReset: Boolean) {
                     arguments = listOf(navArgument("channelId") { type = NavType.StringType }),
                 ) { entry ->
                     val channelId = entry.arguments?.getString("channelId").orEmpty()
-                    var channel by remember { mutableStateOf<ChatChannel?>(null) }
-                    LaunchedEffect(channelId) {
-                        channel = container.chat.channels().firstOrNull { it.id == channelId }
-                            ?: ChatChannel(id = channelId, name = channelId)
-                    }
-                    val current = channel
-                    if (current == null) {
-                        ContentColumn { com.addonstation.mobile.ui.components.LoadingBox() }
-                    } else {
-                        ChatScreen(
-                            channel = current,
-                            onBack = { navController.popBackStack() },
-                            onOpenSettings = { goTab(MainTab.Settings) },
-                            onOpenUser = { profile -> go(Routes.userProfile(profile.id)) },
-                            onLogin = { go(Routes.LOGIN) },
-                        )
+                    // الغرفة نفسها محجوبة عن غير المسجّلين: رابط إشعار أو رجوع
+                    // في التنقّل لا يفتحها قبل الدخول، وبعده يعود إلى الغرفة نفسها.
+                    SignInGate(
+                        signedIn = signedIn,
+                        intended = Routes.chat(channelId),
+                        onRequireSignIn = { intended -> requireSignIn(intended) },
+                    ) {
+                        var channel by remember { mutableStateOf<ChatChannel?>(null) }
+                        LaunchedEffect(channelId) {
+                            channel = container.chat.channels().firstOrNull { it.id == channelId }
+                                ?: ChatChannel(id = channelId, name = channelId)
+                        }
+                        val current = channel
+                        if (current == null) {
+                            ContentColumn { com.addonstation.mobile.ui.components.LoadingBox() }
+                        } else {
+                            ChatScreen(
+                                channel = current,
+                                onBack = { navController.popBackStack() },
+                                onOpenSettings = { goTab(MainTab.Settings) },
+                                onOpenUser = { profile -> go(Routes.userProfile(profile.id)) },
+                                onLogin = { go(Routes.LOGIN) },
+                            )
+                        }
                     }
                 }
 
@@ -579,5 +664,34 @@ private fun MainNavigation(startAtReset: Boolean) {
         if (tab != null) {
             BottomNavBar(current = tab, onSelect = { target -> goTab(target) })
         }
+    }
+}
+
+/**
+ * **بوابة الشات**: قائمة الغرف وكل غرفةٍ فيها **خلف تسجيل الدخول** — لا تدخل
+ * الشات إلا بعد الدخول، ومن يحاول وهو غير مسجّل يُنقل إلى شاشة الدخول فوراً.
+ *
+ * وُضعت في التنقّل نفسه لا داخل الشاشة، فتعمل مع كل الطرق: ضغطة تبويب
+ * «المجتمع»، رابط إشعار، رجوعٌ في التنقّل، أو استعادةُ حالةٍ بعد قتل العملية.
+ * ولا يرى غير المسجّل الشات ولا لحظةً واحدة — حتى أثناء النقل.
+ */
+@Composable
+private fun SignInGate(
+    signedIn: Boolean,
+    intended: String,
+    onRequireSignIn: (String) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    if (signedIn) {
+        content()
+        return
+    }
+    // النقل يجري مرةً واحدة لكل وجهة: لا نُعيده إن تغيّرت الحالة أثناء الرحلة
+    LaunchedEffect(signedIn, intended) { onRequireSignIn(intended) }
+    Box(
+        Modifier.fillMaxSize(),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        com.addonstation.mobile.ui.components.LoadingBox()
     }
 }
