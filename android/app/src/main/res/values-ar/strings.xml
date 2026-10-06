@@ -169,6 +169,7 @@
     <string name="profile_stats_favorites">المفضلة</string>
     <string name="profile_stats_downloads">تحميلاتي</string>
     <string name="profile_edit">✏️ تعديل الملف</string>
+    <string name="profile_edit_mine">✏️ تعديل الملف الشخصي</string>
     <string name="profile_upgrade">👑 ترقية</string>
     <string name="profile_dashboard">⚙️ لوحة</string>
     <string name="profile_my_content_empty">📦 لا يوجد محتوى بعد — أنشئ إضافاتك وعوالمك من لوحة الإدارة</string>

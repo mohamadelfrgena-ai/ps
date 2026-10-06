@@ -1079,8 +1079,15 @@ fun UserProfileScreen(
     onMessage: (Profile) -> Unit,
     onAddFriend: (Profile) -> Unit,
     onOpenItem: (ContentItem) -> Unit,
+    /**
+     * فتح **تعديل الملف الشخصي** — يظهر بدل «مراسلة» و«إضافة صديق» حين يفتح
+     * المستخدم ملفه هو (لا معنى لأن يراسل نفسه أو يضيفها صديقاً).
+     */
+    onEditProfile: () -> Unit = {},
 ) {
     val container = rememberContainer()
+    // هل هذا ملفي أنا؟ (نفس مقارنة بطاقة الشات: معرّف الجلسة = معرّف الملف)
+    val isMyProfile = container.supabase.session()?.userId == userId
     var profile by remember { mutableStateOf<Profile?>(null) }
     var items by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var card by remember { mutableStateOf<com.addonstation.mobile.data.model.CreatorCard?>(null) }
@@ -1144,26 +1151,35 @@ fun UserProfileScreen(
             Text("@${me.username ?: ""}", style = AppText.tiny, color = AppColors.Muted)
 
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (isMyProfile) {
+                // ملفي أنا: زرّ واحد يعرض الشاشة كاملة بدل مراسلة النفس
                 GradientButton(
-                    text = stringResource(R.string.profile_message),
-                    onClick = { onMessage(me) },
-                    modifier = Modifier.weight(1f),
+                    text = stringResource(R.string.profile_edit_mine),
+                    onClick = onEditProfile,
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                val friendLabel = when (friendState) {
-                    "friends" -> stringResource(R.string.profile_friends)
-                    "sent" -> stringResource(R.string.profile_friend_sent)
-                    else -> stringResource(R.string.profile_add_friend)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GradientButton(
+                        text = stringResource(R.string.profile_message),
+                        onClick = { onMessage(me) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    val friendLabel = when (friendState) {
+                        "friends" -> stringResource(R.string.profile_friends)
+                        "sent" -> stringResource(R.string.profile_friend_sent)
+                        else -> stringResource(R.string.profile_add_friend)
+                    }
+                    GhostButton(
+                        text = friendLabel,
+                        onClick = {
+                            if (friendState == "none") onAddFriend(me)
+                        },
+                        enabled = friendState == "none",
+                        modifier = Modifier.weight(1f),
+                        borderColor = AppColors.Blue.copy(alpha = 0.5f),
+                    )
                 }
-                GhostButton(
-                    text = friendLabel,
-                    onClick = {
-                        if (friendState == "none") onAddFriend(me)
-                    },
-                    enabled = friendState == "none",
-                    modifier = Modifier.weight(1f),
-                    borderColor = AppColors.Blue.copy(alpha = 0.5f),
-                )
             }
 
             SectionHeader(title = stringResource(R.string.profile_about_me), leadingEmoji = "📝")

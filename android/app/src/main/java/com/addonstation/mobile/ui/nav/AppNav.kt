@@ -592,6 +592,8 @@ private fun MainNavigation(startAtReset: Boolean) {
                             scope.launch { container.profile.sendFriendRequest(profile.id) }
                         },
                         onOpenItem = { item -> go(Routes.item(item.id)) },
+                        // ملفي أنا: الزرّ الوحيد هو «تعديل الملف الشخصي»
+                        onEditProfile = { go(Routes.EDIT_PROFILE) },
                     )
                 }
 

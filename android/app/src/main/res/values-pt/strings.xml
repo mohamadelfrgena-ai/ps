@@ -169,6 +169,7 @@
     <string name="profile_stats_favorites">Favoritos</string>
     <string name="profile_stats_downloads">Downloads</string>
     <string name="profile_edit">✏️ Editar perfil</string>
+    <string name="profile_edit_mine">✏️ Editar meu perfil</string>
     <string name="profile_upgrade">👑 Melhorar plano</string>
     <string name="profile_dashboard">⚙️ Painel</string>
     <string name="profile_my_content_empty">📦 Nenhum conteúdo ainda — crie seus addons e mundos no painel de administração</string>

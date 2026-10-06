@@ -177,6 +177,7 @@
     <string name="profile_stats_favorites">Favorites</string>
     <string name="profile_stats_downloads">Downloads</string>
     <string name="profile_edit">✏️ Edit profile</string>
+    <string name="profile_edit_mine">✏️ Edit my profile</string>
     <string name="profile_upgrade">👑 Upgrade</string>
     <string name="profile_dashboard">⚙️ Dashboard</string>
     <string name="profile_my_content_empty">📦 No content yet — create your addons and worlds from the admin panel</string>

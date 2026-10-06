@@ -169,6 +169,7 @@
     <string name="profile_stats_favorites">Избранное</string>
     <string name="profile_stats_downloads">Загрузки</string>
     <string name="profile_edit">✏️ Изменить профиль</string>
+    <string name="profile_edit_mine">✏️ Редактировать мой профиль</string>
     <string name="profile_upgrade">👑 Улучшить</string>
     <string name="profile_dashboard">⚙️ Панель</string>
     <string name="profile_my_content_empty">📦 Контента пока нет — создайте аддоны и миры в панели администратора</string>

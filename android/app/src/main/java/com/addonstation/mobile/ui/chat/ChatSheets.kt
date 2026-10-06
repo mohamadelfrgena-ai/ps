@@ -661,6 +661,8 @@ fun DiscordProfileCardSheet(
     onMessage: () -> Unit,
     onAddFriend: () -> Unit,
     onOpenProfile: () -> Unit,
+    /** ملفي أنا: زرّ «تعديل الملف الشخصي» بدل «مراسلة» و«إضافة صديق». */
+    onEditProfile: () -> Unit = {},
 ) {
     val container = rememberContainer()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -755,19 +757,20 @@ fun DiscordProfileCardSheet(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (isSelf(container, profile)) {
+                    // ملفي أنا: لا «مراسلة» ولا «إضافة صديق» — زرّ تعديل الملف
                     com.addonstation.mobile.ui.components.GradientButton(
-                        text = stringResource(R.string.profile_message),
-                        onClick = onMessage,
-                        modifier = Modifier.weight(1f),
+                        text = stringResource(R.string.profile_edit_mine),
+                        onClick = onEditProfile,
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    if (isSelf(container, profile)) {
-                        GhostButton(
-                            text = stringResource(R.string.profile_open_profile),
-                            onClick = onOpenProfile,
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        com.addonstation.mobile.ui.components.GradientButton(
+                            text = stringResource(R.string.profile_message),
+                            onClick = onMessage,
                             modifier = Modifier.weight(1f),
                         )
-                    } else {
                         GhostButton(
                             text = when (friendState) {
                                 "friends" -> stringResource(R.string.profile_friends)
@@ -826,6 +829,7 @@ fun MemberCardHost(
     onMessage: () -> Unit,
     onAddFriend: () -> Unit,
     onOpenProfile: () -> Unit,
+    onEditProfile: () -> Unit = {},
 ) {
     profile ?: return
     DiscordProfileCardSheet(
@@ -834,5 +838,6 @@ fun MemberCardHost(
         onMessage = onMessage,
         onAddFriend = onAddFriend,
         onOpenProfile = onOpenProfile,
+        onEditProfile = onEditProfile,
     )
 }

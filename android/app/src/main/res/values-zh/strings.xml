@@ -169,6 +169,7 @@
     <string name="profile_stats_favorites">收藏</string>
     <string name="profile_stats_downloads">下载</string>
     <string name="profile_edit">✏️ 编辑资料</string>
+    <string name="profile_edit_mine">✏️ 编辑我的个人资料</string>
     <string name="profile_upgrade">👑 升级</string>
     <string name="profile_dashboard">⚙️ 面板</string>
     <string name="profile_my_content_empty">📦 还没有内容 — 从管理面板创建你的插件和世界</string>

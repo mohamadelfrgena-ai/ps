@@ -169,6 +169,7 @@
     <string name="profile_stats_favorites">Favoriler</string>
     <string name="profile_stats_downloads">İndirmeler</string>
     <string name="profile_edit">✏️ Profili düzenle</string>
+    <string name="profile_edit_mine">✏️ Profilimi düzenle</string>
     <string name="profile_upgrade">👑 Yükselt</string>
     <string name="profile_dashboard">⚙️ Panel</string>
     <string name="profile_my_content_empty">📦 Henüz içerik yok — eklentilerini ve dünyalarını yönetim panelinden oluştur</string>
