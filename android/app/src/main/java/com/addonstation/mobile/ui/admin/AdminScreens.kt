@@ -149,19 +149,30 @@ fun AdminPanelScreen(
         return
     }
 
-    LaunchedEffect(tab, userQuery, roleFilter) {
+    var failed by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
+
+    LaunchedEffect(tab, userQuery, roleFilter, reloadTick) {
         loading = true
-        container.state.setAdminStats(container.admin.stats())
-        when (tab) {
-            0 -> {
-                users = container.admin.users(userQuery, roleFilter)
-                content = container.admin.allContent(20)
+        failed = false
+        try {
+            container.state.setAdminStats(container.admin.stats())
+            when (tab) {
+                0 -> {
+                    users = container.admin.users(userQuery, roleFilter)
+                    content = container.admin.allContent(20)
+                }
+                1 -> content = container.admin.allContent(200)
+                2 -> orders = container.admin.orders()
+                3 -> reports = container.chat.openReports()
             }
-            1 -> content = container.admin.allContent(200)
-            2 -> orders = container.admin.orders()
-            3 -> reports = container.chat.openReports()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            failed = true
+        } finally {
+            loading = false
         }
-        loading = false
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -209,6 +220,8 @@ fun AdminPanelScreen(
                     roleFilter = roleFilter,
                     onRoleFilter = { roleFilter = it },
                     loading = loading,
+                    failed = failed,
+                    onRetry = { reloadTick += 1 },
                     onGiveAc = { userId -> onOpenAc(userId) },
                     onSaveUser = { user, plan, role, grantDays ->
                         scope.launch {
@@ -252,6 +265,8 @@ fun AdminPanelScreen(
                 2 -> PaymentsTab(
                     orders = orders,
                     loading = loading,
+                    failed = failed,
+                    onRetry = { reloadTick += 1 },
                     onApprove = { order ->
                         scope.launch {
                             container.admin.approveOrder(order.id)
@@ -275,6 +290,8 @@ fun AdminPanelScreen(
                 3 -> ModerationTab(
                     reports = reports,
                     loading = loading,
+                    failed = failed,
+                    onRetry = { reloadTick += 1 },
                     onHideMessage = { report ->
                         scope.launch {
                             report.messageId?.let { container.chat.moderateMessage(it, true) }
@@ -394,6 +411,8 @@ private fun OverviewTab(
     roleFilter: String,
     onRoleFilter: (String) -> Unit,
     loading: Boolean,
+    failed: Boolean = false,
+    onRetry: () -> Unit = {},
     onGiveAc: (String) -> Unit,
     onSaveUser: (Profile, String?, String?, Int?) -> Unit,
     onEditContent: () -> Unit,
@@ -453,6 +472,8 @@ private fun OverviewTab(
         Spacer(Modifier.height(8.dp))
         if (loading) {
             LoadingBox()
+        } else if (failed) {
+            com.addonstation.mobile.ui.components.ErrorState(onRetry = onRetry)
         } else {
             users.take(40).forEach { user ->
                 AdminUserRow(user = user, onGiveAc = onGiveAc, onSave = onSaveUser)
@@ -590,6 +611,8 @@ private fun AdminUserRow(
 private fun ContentTab(
     content: List<ContentItem>,
     loading: Boolean,
+    failed: Boolean = false,
+    onRetry: () -> Unit = {},
     onOpenContentAdmin: () -> Unit,
     onRefresh: () -> Unit,
 ) {
@@ -614,6 +637,8 @@ private fun ContentTab(
         Spacer(Modifier.height(10.dp))
         if (loading) {
             LoadingBox()
+        } else if (failed) {
+            com.addonstation.mobile.ui.components.ErrorState(onRetry = onRetry)
         } else {
             content.forEach { item ->
                 Row(
@@ -651,6 +676,8 @@ private fun ContentTab(
 private fun PaymentsTab(
     orders: List<PaymentOrder>,
     loading: Boolean,
+    failed: Boolean = false,
+    onRetry: () -> Unit = {},
     onApprove: (PaymentOrder) -> Unit,
     onReject: (PaymentOrder, String?) -> Unit,
     onOpenReceipt: (PaymentOrder) -> Unit,
@@ -666,6 +693,8 @@ private fun PaymentsTab(
         Text(stringResource(R.string.admin_kicker_payments), style = AppText.kicker, color = AppColors.Blue)
         if (loading) {
             LoadingBox()
+        } else if (failed) {
+            com.addonstation.mobile.ui.components.ErrorState(onRetry = onRetry)
         } else if (orders.isEmpty()) {
             EmptyState(stringResource(R.string.common_none))
         } else {
@@ -714,6 +743,8 @@ private fun PaymentsTab(
 private fun ModerationTab(
     reports: List<ChatReport>,
     loading: Boolean,
+    failed: Boolean = false,
+    onRetry: () -> Unit = {},
     onHideMessage: (ChatReport) -> Unit,
     onMuteAuthor: (ChatReport, Int) -> Unit,
     onClose: (ChatReport) -> Unit,
@@ -729,6 +760,8 @@ private fun ModerationTab(
         Text(stringResource(R.string.admin_kicker_chat), style = AppText.kicker, color = AppColors.Blue)
         if (loading) {
             LoadingBox()
+        } else if (failed) {
+            com.addonstation.mobile.ui.components.ErrorState(onRetry = onRetry)
         } else if (reports.isEmpty()) {
             EmptyState(stringResource(R.string.admin_open_reports_none))
         } else {
@@ -852,10 +885,21 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
     // تصغير كل صور الأصول المخزّنة: يجعل شبكة الصور خفيفة فتظهر فوراً
     var shrinking by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
+    var failed by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
+
+    LaunchedEffect(reloadTick) {
         loading = true
-        assets = container.assets.all()
-        loading = false
+        failed = false
+        try {
+            assets = container.assets.all()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            failed = true
+        } finally {
+            loading = false
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -941,6 +985,8 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
             SectionHeader(title = stringResource(R.string.admin_assets))
             if (loading) {
                 LoadingBox()
+            } else if (failed) {
+                com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
             } else {
                 assets.take(60).forEach { asset ->
                     Row(

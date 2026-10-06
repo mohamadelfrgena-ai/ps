@@ -61,6 +61,9 @@
     <string name="auth_show_password">Şifreyi göster</string>
     <string name="auth_hide_password">Şifreyi gizle</string>
     <string name="auth_password_hint">En az 6 karakter</string>
+    <string name="auth_username_hint">3–24 karakter: İngilizce harfler, rakamlar ve _</string>
+    <string name="msg_username_invalid">Kullanıcı adı yalnızca İngilizce harf, rakam ve _ içerebilir</string>
+    <string name="msg_username_too_long">Kullanıcı adı çok uzun (en fazla 24 karakter)</string>
     <string name="auth_forgot">Şifreni mi unuttun?</string>
     <string name="auth_recovery_title">Şifreyi sıfırla</string>
     <string name="auth_recovery_text">E-postanı gir, yeni şifre oluşturman için sana bir bağlantı gönderelim.</string>

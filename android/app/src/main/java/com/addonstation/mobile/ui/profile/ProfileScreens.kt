@@ -115,16 +115,26 @@ fun ProfileScreen(
     var favourites by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var downloads by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
 
-    LaunchedEffect(profile?.id, tab) {
+    LaunchedEffect(profile?.id, tab, reloadTick) {
         val me = profile ?: return@LaunchedEffect
         loading = true
-        when (tab) {
-            1 -> myContent = container.content.byCreator(me.id)
-            2 -> favourites = container.content.favorites()
-            3 -> downloads = container.content.downloads()
+        failed = false
+        try {
+            when (tab) {
+                1 -> myContent = container.content.byCreator(me.id)
+                2 -> favourites = container.content.favorites()
+                3 -> downloads = container.content.downloads()
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            failed = true
+        } finally {
+            loading = false
         }
-        loading = false
     }
 
     if (!signedIn || profile == null) {
@@ -287,12 +297,16 @@ fun ProfileScreen(
                 1 -> ContentGrid(
                     items = myContent,
                     loading = loading,
+                    failed = failed,
+                    onRetry = { reloadTick += 1 },
                     emptyText = stringResource(R.string.profile_my_content_empty),
                     onClick = onOpenItem,
                 )
                 2 -> ContentGrid(
                     items = favourites,
                     loading = loading,
+                    failed = failed,
+                    onRetry = { reloadTick += 1 },
                     emptyText = stringResource(R.string.profile_favorites_empty),
                     onClick = onOpenItem,
                 )
@@ -478,10 +492,13 @@ private fun ContentGrid(
     loading: Boolean,
     emptyText: String,
     onClick: (ContentItem) -> Unit,
+    failed: Boolean = false,
+    onRetry: () -> Unit = {},
 ) {
     val container = rememberContainer()
     when {
         loading -> LoadingBox(text = stringResource(R.string.common_loading))
+        failed -> com.addonstation.mobile.ui.components.ErrorState(onRetry = onRetry)
         items.isEmpty() -> EmptyState(emptyText)
         else -> LazyVerticalGrid(
             columns = GridCells.Fixed(2),

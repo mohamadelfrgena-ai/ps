@@ -480,12 +480,22 @@ fun MyOrdersScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var orders by remember { mutableStateOf<List<PaymentOrder>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
     var filter by remember { mutableStateOf("all") }
 
-    LaunchedEffect(filter) {
+    LaunchedEffect(filter, reloadTick) {
         loading = true
-        orders = container.plans.myOrders().filter { filter == "all" || it.status == filter }
-        loading = false
+        failed = false
+        try {
+            orders = container.plans.myOrders().filter { filter == "all" || it.status == filter }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            failed = true
+        } finally {
+            loading = false
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -508,6 +518,8 @@ fun MyOrdersScreen(onBack: () -> Unit) {
         }
         if (loading) {
             LoadingBox(text = stringResource(R.string.common_loading))
+        } else if (failed) {
+            com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
         } else if (orders.isEmpty()) {
             EmptyState(stringResource(R.string.common_none))
         } else {

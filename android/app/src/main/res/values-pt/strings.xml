@@ -61,6 +61,9 @@
     <string name="auth_show_password">Mostrar senha</string>
     <string name="auth_hide_password">Ocultar senha</string>
     <string name="auth_password_hint">Pelo menos 6 caracteres</string>
+    <string name="auth_username_hint">3 a 24 caracteres: letras inglesas, números e _</string>
+    <string name="msg_username_invalid">O usuário aceita apenas letras inglesas, números e _</string>
+    <string name="msg_username_too_long">Usuário muito longo (máx. 24 caracteres)</string>
     <string name="auth_forgot">Esqueceu a senha?</string>
     <string name="auth_recovery_title">Redefinir senha</string>
     <string name="auth_recovery_text">Digite seu e-mail e enviaremos um link para criar uma nova senha.</string>

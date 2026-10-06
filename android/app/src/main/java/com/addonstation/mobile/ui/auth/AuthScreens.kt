@@ -59,6 +59,16 @@ import com.addonstation.mobile.ui.theme.AppText
 import kotlinx.coroutines.launch
 
 /**
+ * ما يقبله الخادم في اسم المستخدم (نفس القاعدة في AuthRepository):
+ * حروف إنجليزية وأرقام وشرطة سفلية فقط. نتحقّق منه **قبل** الإرسال لنُظهر
+ * سبباً واضحاً بدل رسالة عامّة — لأن المستخدم العربي يكتب اسمه بالعربية
+ * غالباً، فكان يرى «حدث خطأ ما» بلا تفسير.
+ */
+private val USERNAME_RE = Regex("^[A-Za-z0-9_]+$")
+private const val USERNAME_MIN = 3
+private const val USERNAME_MAX = 24
+
+/**
  * حقل كلمة مرور **بعين 👁 داخل الحقل**: لمسة واحدة تُظهر كلمة المرور كما
  * كتبها المستخدم وتُخفيها ثانيةً.
  *
@@ -304,12 +314,19 @@ fun SignUpScreen(
     val shortUsername = stringResource(R.string.msg_username_too_short)
     val shortPassword = stringResource(R.string.msg_password_too_short)
     val noMatch = stringResource(R.string.msg_passwords_no_match)
+    val invalidUsername = stringResource(R.string.msg_username_invalid)
+    val longUsername = stringResource(R.string.msg_username_too_long)
+    val invalidEmail = stringResource(R.string.msg_invalid_email)
     val createdMsg = stringResource(R.string.msg_account_created)
 
     // عملية إنشاء واحدة: من زر «إنشاء حساب» أو من زر «تم» ✓ بلوحة المفاتيح.
     fun submit() {
+        val name = username.trim()
         when {
-            username.trim().length < 3 -> status = shortUsername
+            name.length < USERNAME_MIN -> status = shortUsername
+            name.length > USERNAME_MAX -> status = longUsername
+            !USERNAME_RE.matches(name) -> status = invalidUsername
+            !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() -> status = invalidEmail
             password.length < 6 -> status = shortPassword
             password != confirm -> status = noMatch
             else -> scope.launch {
@@ -367,6 +384,13 @@ fun SignUpScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
                 label = { Text(stringResource(R.string.auth_username)) },
                 leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null, tint = AppColors.Muted) },
+                supportingText = {
+                    Text(
+                        stringResource(R.string.auth_username_hint),
+                        style = AppText.tiny,
+                        color = AppColors.Muted,
+                    )
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )

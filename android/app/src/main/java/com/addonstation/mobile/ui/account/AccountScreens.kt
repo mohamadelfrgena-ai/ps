@@ -126,12 +126,23 @@ fun AcWalletScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    var failed by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
+
+    LaunchedEffect(reloadTick) {
         loading = true
-        container.profile.refreshWallet()
-        tasks = container.ac.tasks()
-        transactions = container.ac.transactions()
-        loading = false
+        failed = false
+        try {
+            container.profile.refreshWallet()
+            tasks = container.ac.tasks()
+            transactions = container.ac.transactions()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            failed = true
+        } finally {
+            loading = false
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -234,6 +245,8 @@ fun AcWalletScreen(
             SectionHeader(title = stringResource(R.string.ac_tasks))
             if (loading) {
                 LoadingBox()
+            } else if (failed) {
+                com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
             } else {
                 tasks.forEach { task ->
                     GlassCard(padding = 12.dp) {
@@ -343,14 +356,25 @@ fun NotificationsScreen(
     var profiles by remember { mutableStateOf<Map<String, com.addonstation.mobile.data.model.Profile>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) {
+    var failed by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
+
+    LaunchedEffect(reloadTick) {
         loading = true
-        items = container.notifications.list()
-        requests = container.notifications.incomingFriendRequests()
-        val ids = (items.mapNotNull { it.actorId } + requests.map { it.requesterId }).toSet()
-        profiles = container.profile.loadProfiles(ids)
-        container.notifications.markRead()
-        loading = false
+        failed = false
+        try {
+            items = container.notifications.list()
+            requests = container.notifications.incomingFriendRequests()
+            val ids = (items.mapNotNull { it.actorId } + requests.map { it.requesterId }).toSet()
+            profiles = container.profile.loadProfiles(ids)
+            container.notifications.markRead()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            failed = true
+        } finally {
+            loading = false
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -362,6 +386,8 @@ fun NotificationsScreen(
         )
         if (loading) {
             LoadingBox(text = stringResource(R.string.common_loading))
+        } else if (failed) {
+            com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
         } else if (items.isEmpty() && requests.isEmpty()) {
             EmptyState(stringResource(R.string.notif_empty))
         } else {
@@ -492,21 +518,34 @@ fun FriendsScreen(onBack: () -> Unit, onOpenProfile: (String) -> Unit) {
     var profiles by remember { mutableStateOf<Map<String, com.addonstation.mobile.data.model.Profile>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) {
+    var failed by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
+
+    LaunchedEffect(reloadTick) {
         loading = true
-        friends = container.notifications.acceptedFriends()
-        incoming = container.notifications.incomingFriendRequests()
-        val me = container.supabase.session()?.userId
-        val ids = (friends.map { if (it.requesterId == me) it.receiverId else it.requesterId } +
-            incoming.map { it.requesterId }).toSet()
-        profiles = container.profile.loadProfiles(ids)
-        loading = false
+        failed = false
+        try {
+            friends = container.notifications.acceptedFriends()
+            incoming = container.notifications.incomingFriendRequests()
+            val me = container.supabase.session()?.userId
+            val ids = (friends.map { if (it.requesterId == me) it.receiverId else it.requesterId } +
+                incoming.map { it.requesterId }).toSet()
+            profiles = container.profile.loadProfiles(ids)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            failed = true
+        } finally {
+            loading = false
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
         SubScreenHeader(title = stringResource(R.string.profile_friends), onBack = onBack)
         if (loading) {
             LoadingBox(text = stringResource(R.string.common_loading))
+        } else if (failed) {
+            com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
         } else if (friends.isEmpty() && incoming.isEmpty()) {
             EmptyState(stringResource(R.string.common_none))
         } else {

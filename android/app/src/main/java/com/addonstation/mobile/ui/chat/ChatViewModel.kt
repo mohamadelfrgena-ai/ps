@@ -73,7 +73,9 @@ class ChatViewModel(private val container: AppContainer) {
         _channel.value = channel
         scope.launch {
             _loading.value = true
-            loadInitial(channel.id)
+            // فشل أول جلب لا يجوز أن يُبقي الشات على «جارٍ التحميل» للأبد:
+            // الاستطلاع (كل ثانيتين) يجلب الرسائل بعده في أي حال.
+            runCatching { loadInitial(channel.id) }
             _loading.value = false
             startRealtime(channel.id)
             startPolling(channel.id)

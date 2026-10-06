@@ -65,6 +65,9 @@
     <string name="auth_show_password">Show password</string>
     <string name="auth_hide_password">Hide password</string>
     <string name="auth_password_hint">At least 6 characters</string>
+    <string name="auth_username_hint">3–24 characters: English letters, digits and _</string>
+    <string name="msg_username_invalid">Username may contain English letters, digits and _ only</string>
+    <string name="msg_username_too_long">Username is too long (24 characters max)</string>
     <string name="auth_forgot">Forgot password?</string>
     <string name="auth_recovery_title">Reset password</string>
     <string name="auth_recovery_text">Enter your email and we will send you a link to create a new password.</string>

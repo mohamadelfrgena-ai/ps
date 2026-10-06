@@ -611,6 +611,37 @@ fun LoadingBox(modifier: Modifier = Modifier, text: String? = null) {
     }
 }
 
+/**
+ * حالة **فشل التحميل** مع زر «إعادة المحاولة».
+ *
+ * لماذا؟ الشاشات كانت تفعل هكذا: `loading = true` ⇒ جلب من الشبكة ⇒
+ * `loading = false`. فإن فشلت الشبكة (وهو كثير على بيانات الجوال) يرمي
+ * الجلب استثناءً فيُقتل كوروتين `LaunchedEffect` **قبل** السطر الأخير،
+ * فتبقى دوّامة الانتظار إلى الأبد ولا تعود الشاشة تستجيب لأي لمسة —
+ * والمستخدم يظن التطبيق «علّق». الآن: الخطأ يُلتقط، وتظهر رسالة واضحة
+ * وزر إعادة محاولة يعيد الجلب فعلياً.
+ */
+@Composable
+fun ErrorState(
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    text: String? = null,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text ?: stringResource(R.string.msg_network_error),
+            style = AppText.bodySmall,
+            color = AppColors.Red,
+            textAlign = TextAlign.Center,
+        )
+        GhostButton(text = stringResource(R.string.common_retry), onClick = onRetry)
+    }
+}
+
 @Composable
 fun EmptyState(text: String, modifier: Modifier = Modifier) {
     Box(

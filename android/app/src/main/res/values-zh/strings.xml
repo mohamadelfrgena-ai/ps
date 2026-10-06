@@ -61,6 +61,9 @@
     <string name="auth_show_password">显示密码</string>
     <string name="auth_hide_password">隐藏密码</string>
     <string name="auth_password_hint">至少 6 个字符</string>
+    <string name="auth_username_hint">3–24 个字符：英文字母、数字和 _</string>
+    <string name="msg_username_invalid">用户名只能包含英文字母、数字和 _</string>
+    <string name="msg_username_too_long">用户名过长（最多 24 个字符）</string>
     <string name="auth_forgot">忘记密码？</string>
     <string name="auth_recovery_title">重置密码</string>
     <string name="auth_recovery_text">输入你的邮箱，我们会发送创建新密码的链接。</string>

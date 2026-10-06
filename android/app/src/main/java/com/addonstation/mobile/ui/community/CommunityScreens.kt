@@ -201,14 +201,25 @@ fun RoomListScreen(
     // لغة الواجهة الحالية (طبّقناها في MainActivity) — لتظليل غرفة اللغة المناسبة
     val appLanguage = LocaleManager.byCode(java.util.Locale.getDefault().language).code
 
-    LaunchedEffect(Unit) {
+    var failed by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
+
+    LaunchedEffect(reloadTick) {
         loading = true
-        // الأدمن: نضمن وجود غرفة «خدمات النقدية» وضبطها للقراءة فقط،
-        // فلا يحتاج إلى إنشاءها يدوياً ولا إلى تشغيل أي SQL.
-        container.chat.ensureCashServicesRoom(profile?.role == "admin") // الخادم يمنعها لغير الأدمن
-        channels = container.chat.channels()
-        container.chat.refreshUnread()
-        loading = false
+        failed = false
+        try {
+            // الأدمن: نضمن وجود غرفة «خدمات النقدية» وضبطها للقراءة فقط،
+            // فلا يحتاج إلى إنشاءها يدوياً ولا إلى تشغيل أي SQL.
+            container.chat.ensureCashServicesRoom(profile?.role == "admin") // الخادم يمنعها لغير الأدمن
+            channels = container.chat.channels()
+            container.chat.refreshUnread()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            failed = true
+        } finally {
+            loading = false
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -220,6 +231,8 @@ fun RoomListScreen(
         )
         if (loading) {
             LoadingBox(text = stringResource(R.string.common_loading))
+        } else if (failed) {
+            com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),

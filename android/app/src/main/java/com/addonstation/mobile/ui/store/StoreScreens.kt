@@ -96,25 +96,36 @@ fun StoreScreen(
     var sort by remember { mutableStateOf("newest") }
     var query by remember { mutableStateOf(initialQuery) }
     var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
     var items by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var favourites by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     suspend fun reload() {
         loading = true
-        // بالتوازي: المتصفح كان ينتظر جولتين شبكيتين متتاليتين
-        coroutineScope {
-            val list = async { container.content.browse(type, sort, query, 60) }
-            val fav = async {
-                if (container.supabase.session() == null) emptySet()
-                else container.content.favorites().map { it.id }.toSet()
+        failed = false
+        try {
+            // بالتوازي: المتصفح كان ينتظر جولتين شبكيتين متتاليتين
+            coroutineScope {
+                val list = async { container.content.browse(type, sort, query, 60) }
+                val fav = async {
+                    if (container.supabase.session() == null) emptySet()
+                    else container.content.favorites().map { it.id }.toSet()
+                }
+                items = list.await()
+                favourites = fav.await()
             }
-            items = list.await()
-            favourites = fav.await()
+
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            failed = true
+        } finally {
+            loading = false
         }
-        loading = false
     }
 
-    LaunchedEffect(type, sort, query) { reload() }
+    LaunchedEffect(type, sort, query, reloadTick) { reload() }
 
     Column(Modifier.fillMaxSize()) {
         PixelTopBar(
@@ -175,6 +186,7 @@ fun StoreScreen(
             Spacer(Modifier.height(12.dp))
             when {
                 loading -> LoadingBox(text = stringResource(R.string.common_loading))
+                failed -> com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
                 items.isEmpty() -> EmptyState(
                     stringResource(R.string.store_empty) + "\n" + stringResource(R.string.store_empty_hint)
                 )

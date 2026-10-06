@@ -81,12 +81,22 @@ fun CreatorsScreen(
     val container = rememberContainer()
     var query by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableStateOf(0) }
     var creators by remember { mutableStateOf<List<CreatorCard>>(emptyList()) }
 
-    LaunchedEffect(query) {
+    LaunchedEffect(query, reloadTick) {
         loading = true
-        creators = container.creators.creators(query)
-        loading = false
+        failed = false
+        try {
+            creators = container.creators.creators(query)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            failed = true
+        } finally {
+            loading = false
+        }
     }
 
     val featured = creators.filter { it.isFeatured }
@@ -120,6 +130,7 @@ fun CreatorsScreen(
             )
             when {
                 loading -> LoadingBox(text = stringResource(R.string.common_loading))
+                failed -> com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
                 creators.isEmpty() -> EmptyState(stringResource(R.string.creator_empty))
                 else -> {
                     if (featured.isNotEmpty()) {
