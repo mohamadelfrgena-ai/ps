@@ -37,6 +37,31 @@ class ContentRepository(
 
     private val uid: String? get() = supabase.session()?.userId
 
+    // ------------------------------------------------------------------
+    // ذاكرة مؤقّتة قصيرة العمر — **أصل «اللاق» عند تبديل التبويبات**:
+    // الشاشة الرئيسية كانت تجلب (مميّز + أحدث + مقترح + مبدعين) مع كل رجوع
+    // أو تبديل تبويب ⇒ أربع رحلات شبكة ومؤقّت تحميل في كل مرة. الآن تُبذر
+    // الشاشة بالمحفوظ فوراً، ويجري التحديث في الخلفية عند انقضاء المدة.
+    // ------------------------------------------------------------------
+    private val featuredCache = TtlCache<List<ContentItem>>(60_000L)
+    private val latestCache = TtlCache<List<ContentItem>>(60_000L)
+    private val recommendedCache = TtlCache<List<ContentItem>>(60_000L)
+
+    /** آخر نسخة معروفة (بلا شبكة) لتبذر بها الشاشة فوراً. */
+    fun cachedFeatured(): List<ContentItem> = featuredCache.peek().orEmpty()
+
+    fun cachedLatest(): List<ContentItem> = latestCache.peek().orEmpty()
+
+    fun cachedRecommended(): List<ContentItem> = recommendedCache.peek().orEmpty()
+
+    /** إبطال الذاكرة بعد إضافة محتوى أو تعديله. */
+    fun invalidate() {
+        featuredCache.clear()
+        latestCache.clear()
+        recommendedCache.clear()
+    }
+
+
     // ------------------------------------------------------------- تصفّح المتجر
 
     suspend fun browse(
@@ -70,26 +95,38 @@ class ContentRepository(
         else -> "created_at.desc"
     }
 
-    suspend fun featured(limit: Int = 8): List<ContentItem> = supabase.decodeList(
-        supabase.select(
-            "content_items",
-            "select=*&is_published=eq.true&is_featured=eq.true&order=created_at.desc&limit=$limit",
+    suspend fun featured(limit: Int = 8, force: Boolean = false): List<ContentItem> = through(
+        featuredCache, force
+    ) {
+        supabase.decodeList(
+            supabase.select(
+                "content_items",
+                "select=*&is_published=eq.true&is_featured=eq.true&order=created_at.desc&limit=$limit",
+            )
         )
-    )
+    }
 
-    suspend fun latest(limit: Int = 6): List<ContentItem> = supabase.decodeList(
-        supabase.select(
-            "content_items",
-            "select=*&is_published=eq.true&order=created_at.desc&limit=$limit",
+    suspend fun latest(limit: Int = 6, force: Boolean = false): List<ContentItem> = through(
+        latestCache, force
+    ) {
+        supabase.decodeList(
+            supabase.select(
+                "content_items",
+                "select=*&is_published=eq.true&order=created_at.desc&limit=$limit",
+            )
         )
-    )
+    }
 
-    suspend fun recommended(limit: Int = 6): List<ContentItem> = supabase.decodeList(
-        supabase.select(
-            "content_items",
-            "select=*&is_published=eq.true&order=rating.desc,downloads_count.desc&limit=$limit",
+    suspend fun recommended(limit: Int = 6, force: Boolean = false): List<ContentItem> = through(
+        recommendedCache, force
+    ) {
+        supabase.decodeList(
+            supabase.select(
+                "content_items",
+                "select=*&is_published=eq.true&order=rating.desc,downloads_count.desc&limit=$limit",
+            )
         )
-    )
+    }
 
     suspend fun exclusives(limit: Int = 24): List<ContentItem> = supabase.decodeList(
         supabase.select(

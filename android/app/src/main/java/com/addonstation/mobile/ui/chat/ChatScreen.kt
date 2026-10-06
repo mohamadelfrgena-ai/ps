@@ -231,7 +231,14 @@ fun ChatScreen(
         // جديدة (أو سحبها) تظهر أزراره الصحيحة بعد لحظة من فتح الغرفة.
         runCatching { container.chat.refreshMyStatus() }
     }
-    DisposableEffect(channel.id) { onDispose { vm.close() } }
+    // الغرفة معروضة ⇒ الاستطلاع يعمل · ومع مغادرتها يتوقّف (لا شبكة في الخلفية)
+    DisposableEffect(channel.id) {
+        vm.setScreenActive(true)
+        onDispose {
+            vm.setScreenActive(false)
+            vm.close()
+        }
+    }
 
     // هل العرض ملتصق بالأسفل؟ (= المستخدم يقرأ آخر الرسائل)
     var atBottom by remember { mutableStateOf(true) }
@@ -498,7 +505,13 @@ fun ChatScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 ) {
-                    itemsIndexedCompat(messages) { index, ui ->
+                    itemsIndexedCompat(
+                        messages,
+                        // مفتاح = معرّف الرسالة: ثابت لا يتغيّر (السالب للمؤقّتة)
+                        key = { it.message.id },
+                        // نوع المحتوى: الرسائل من نوع واحد يعيد استعمال تركيبها
+                        contentType = { it.message.messageType ?: "text" },
+                    ) { index, ui ->
                         val previous = messages.getOrNull(index - 1)
                         MessageBlock(
                             ui = ui,
@@ -1860,10 +1873,24 @@ private fun copyText(context: android.content.Context, text: String) {
     clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("AddonStation", text))
 }
 
-/** itemsIndexed مبسّط (يعمل مع LazyListScope). */
+/**
+ * itemsIndexed بمفتاح ونوع محتوى (يعمل مع LazyListScope).
+ *
+ * **المفتاح هو أصل الأداء في القوائم الطويلة** (وهو سبب «اللاق والتقطّع»
+ * في الشات): بدونه لا يستطيع Compose أن يعيد استعمال تركيب العناصر، فيعيد
+ * تركيب **كل** العناصر الظاهرة عند أي تغيير — رسالة جديدة، تفاعل، تحديث
+ * استطلاع — ومعها تنتقل حالات `remember` (مثل روابط الصور الموقَّعة) إلى
+ * عناصر أخرى، فتظهر الصور فارغة أو في مكانها خطأ.
+ */
 private inline fun <T> androidx.compose.foundation.lazy.LazyListScope.itemsIndexedCompat(
     items: List<T>,
+    crossinline key: (T) -> Any,
+    crossinline contentType: (T) -> Any? = { null },
     crossinline content: @Composable (Int, T) -> Unit,
 ) {
-    items(items.size) { index -> content(index, items[index]) }
+    items(
+        count = items.size,
+        key = { index -> key(items[index]) },
+        contentType = { index -> contentType(items[index]) },
+    ) { index -> content(index, items[index]) }
 }

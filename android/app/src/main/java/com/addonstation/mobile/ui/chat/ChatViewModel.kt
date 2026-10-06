@@ -34,6 +34,22 @@ class ChatViewModel(private val container: AppContainer) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var pollJob: Job? = null
 
+    /** هل شاشة الشات معروضة الآن؟ (الاستطلاع يتوقّف تماماً في الخلفية) */
+    @Volatile
+    private var screenActive = true
+
+    /** هل اتصال Realtime سليم؟ ⇒ الاستطلاع يخفّ إلى نسخة احتياطية. */
+    @Volatile
+    private var realtimeHealthy = false
+
+    /**
+     * تُستدعى من الشاشة: true عند العرض، و false عند مغادرتها (أو ذهاب التطبيق
+     * إلى الخلفية) — فلا شبكة ولا عمل بلا داعٍ.
+     */
+    fun setScreenActive(value: Boolean) {
+        screenActive = value
+    }
+
     private val _channel = MutableStateFlow<ChatChannel?>(null)
     val channel: StateFlow<ChatChannel?> = _channel.asStateFlow()
 
@@ -118,6 +134,7 @@ class ChatViewModel(private val container: AppContainer) {
 
     private fun startRealtime(channelId: String) {
         container.realtime.close()
+        realtimeHealthy = false
         // قناة Realtime على جدول chat_messages مقيّدة بهذه الغرفة (نفس ما تشترطه وثيقة الشات)
         val sub = container.realtimeClient.subscribeChatMessages(
             channelId = channelId,
@@ -125,24 +142,43 @@ class ChatViewModel(private val container: AppContainer) {
                 scope.launch { onInserted(record) }
             },
             onStatus = { status ->
+                // اتصال سليم ⇒ الاستطلاع يصير نسخةً احتياطية خفيفة (كل ٤ ثوانٍ)
+                realtimeHealthy = status == "joined"
                 if (status == "failed") scope.launch { refreshTails() }
             },
         )
         container.realtime.replace(sub)
     }
 
-    /** تحديث احتياطي كل ثانيتين (منطق النسخة الأصلية). */
+    /**
+     * تحديث احتياطي (الاستطلاع).
+     *
+     * كان يستقصي **كل ثانيتين** بطلبين (الرسائل + أسماء الكتابة) سواءٌ اتصل
+     * Realtime أو لا، وسواءٌ كانت الشاشة معروضة أو في الخلفية — ويُسنِد النتيجة
+     * إلى الحالة كل مرة ⇒ **إعادة تركيب الشاشة كل ثانيتين** (وهو أصل التقطّع
+     * واستنزاف البطارية). الآن:
+     *   • الشاشة غير معروضة ⇒ لا شبكة إطلاقاً.
+     *   • Realtime سليم ⇒ كل ٤ ثوانٍ (نسخة احتياطية فقط) · وإلا كل ثانيتين.
+     *   • لا يُسنَد إلى الحالة إلا ما **تغيّر** فعلاً (لا إعادة تركيب بلا سبب).
+     */
     private fun startPolling(channelId: String) {
         pollJob?.cancel()
         pollJob = scope.launch {
             while (true) {
-                delay(2000)
+                val period = when {
+                    !screenActive -> 10_000L          // في الخلفية: نائمة
+                    realtimeHealthy -> 4_000L         // Realtime يكفي ⇒ نسخة خفيفة
+                    else -> 2_000L                    // بلا Realtime ⇒ الاستقصاء هو الأصل
+                }
+                delay(period)
+                if (!screenActive) continue           // بلا شبكة ولا إعادة تركيب
                 // أي خطأ عابر في جلب واحد لا يجوز أن يُوقف الاستقبال كلّه
                 runCatching { refreshTails() }
                 runCatching {
-                    _typing.value = container.chat.typingNames(
+                    val names = container.chat.typingNames(
                         channelId, container.supabase.session()?.userId,
                     )
+                    if (names != _typing.value) _typing.value = names
                 }
             }
         }
@@ -155,7 +191,9 @@ class ChatViewModel(private val container: AppContainer) {
         }.getOrNull() ?: return
         if (_messages.value.any { it.message.id == message.id }) return
         _messages.value = _messages.value + toUi(message)
-        if (message.userId != container.supabase.session()?.userId) {
+        if (message.userId != container.supabase.session()?.userId &&
+            !_newMessagesBelow.value
+        ) {
             // تظهر شارة «↓ New messages» ويمسحها المستخدم بالتمرير للأسفل
             _newMessagesBelow.value = true
         }
@@ -192,7 +230,10 @@ class ChatViewModel(private val container: AppContainer) {
                 }
                 if (mapped.isNotEmpty() || list !== current) _messages.value = list + mapped
                 // رسائل الآخرين فقط ترفع شارة «رسائل بالأسفل» — لا رسائلي أنا
-                if (mapped.any { it.message.userId != myId }) _newMessagesBelow.value = true
+                // (ولا نُسنِد القيمة إن كانت مرفوعة أصلاً: كل إسناد = إعادة تركيب)
+                if (mapped.any { it.message.userId != myId } && !_newMessagesBelow.value) {
+                    _newMessagesBelow.value = true
+                }
             }
         }
     }

@@ -23,39 +23,76 @@ class CreatorRepository(private val supabase: SupabaseClient) {
         )
     }.getOrElse { emptyList() }
 
-    /** قائمة المبدعين مع إحصاءات محتواهم (تُبنى من profiles + content_items). */
-    suspend fun creators(query: String = ""): List<CreatorCard> = withContext(Dispatchers.IO) {
-        val featured = featuredIds().associateBy { it.userId }
-        val profiles = runCatching {
-            val filter = if (query.isBlank()) "" else
-                "&or=(username.ilike.*${query.trim()}*,display_name.ilike.*${query.trim()}*,bio.ilike.*${query.trim()}*)"
-            supabase.decodeList<Profile>(
-                supabase.select(
-                    "profiles",
-                    "select=*&role=in.(creator,admin)&order=user_level.desc&limit=60$filter",
-                )
-            )
-        }.getOrElse { emptyList() }
+    /** ذاكرة مؤقّتة: القائمة كانت تُجلب (مع عشرات الطلبات) عند كل تبديل تبويب. */
+    private val listCache = TtlCache<List<CreatorCard>>(60_000L)
 
-        profiles.map { profile ->
-            val items = runCatching {
-                supabase.select(
-                    "content_items",
-                    "select=content_type,downloads_count&created_by=eq.${profile.id}&is_published=eq.true&limit=200",
+    /** آخر نسخة معروفة (بلا شبكة) لتبذر بها الشاشة فوراً. */
+    fun cachedCreators(): List<CreatorCard> = listCache.peek().orEmpty()
+
+    /** إبطال الذاكرة بعد رفع محتوى أو تعديل إحصاءات. */
+    fun invalidate() = listCache.clear()
+
+    /**
+     * قائمة المبدعين مع إحصاءات محتواهم (تُبنى من profiles + content_items).
+     *
+     * **إصلاح جذري**: كانت تطلب محتوى كل مبدع على حدة ⇒ حتى ٦١ رحلة شبكة
+     * (N+1) في كل مرة تُفتح فيها الشاشة. الآن **طلبان فقط**: المبدعون، ثم
+     * كل المنشور دفعةً واحدة تُجمَّع محليّاً (وهو سبب «اللاق» في الرئيسية).
+     */
+    suspend fun creators(query: String = "", force: Boolean = false): List<CreatorCard> =
+        withContext(Dispatchers.IO) {
+            if (query.isBlank()) {
+                val cached = listCache.fresh()
+                if (!force && cached != null) return@withContext cached
+            }
+            val featured = featuredIds().associateBy { it.userId }
+            val profiles = runCatching {
+                val filter = if (query.isBlank()) "" else
+                    "&or=(username.ilike.*${query.trim()}*,display_name.ilike.*${query.trim()}*,bio.ilike.*${query.trim()}*)"
+                supabase.decodeList<Profile>(
+                    supabase.select(
+                        "profiles",
+                        "select=*&role=in.(creator,admin)&order=user_level.desc&limit=60$filter",
+                    )
                 )
-            }.getOrNull()
-            val rows = (items as? kotlinx.serialization.json.JsonArray).orEmpty()
-            val downloads = rows.sumOf { row -> row.asObject()?.get("downloads_count")?.asInt() ?: 0 }
-            val worlds = rows.count { row -> row.asObject()?.get("content_type")?.asString() == "world" }
-            CreatorCard(
-                profile = profile,
-                downloads = downloads,
-                worlds = worlds,
-                published = rows.size,
-                isFeatured = featured.containsKey(profile.id),
-            )
-        }.sortedWith(compareByDescending<CreatorCard> { it.isFeatured }.thenByDescending { it.downloads })
-    }
+            }.getOrElse { emptyList() }
+
+            // إحصاءات كل المبدعين في **طلب واحد** بدل طلب لكل مبدع
+            val stats = runCatching {
+                val rows = supabase.select(
+                    "content_items",
+                    "select=created_by,content_type,downloads_count&is_published=eq.true&limit=1000",
+                ).asArray().orEmpty()
+                val map = HashMap<String, Triple<Int, Int, Int>>() // تنزيلات · عوالم · منشور
+                for (row in rows) {
+                    val obj = row.asObject() ?: continue
+                    val by = obj["created_by"]?.asString() ?: continue
+                    val downloads = obj["downloads_count"]?.asInt() ?: 0
+                    val isWorld = obj["content_type"]?.asString() == "world"
+                    val prev = map[by] ?: Triple(0, 0, 0)
+                    map[by] = Triple(
+                        prev.first + downloads,
+                        prev.second + if (isWorld) 1 else 0,
+                        prev.third + 1,
+                    )
+                }
+                map
+            }.getOrDefault(emptyMap())
+
+            val cards = profiles.map { profile ->
+                val (downloads, worlds, published) = stats[profile.id] ?: Triple(0, 0, 0)
+                CreatorCard(
+                    profile = profile,
+                    downloads = downloads,
+                    worlds = worlds,
+                    published = published,
+                    isFeatured = featured.containsKey(profile.id),
+                )
+            }.sortedWith(compareByDescending<CreatorCard> { it.isFeatured }.thenByDescending { it.downloads })
+
+            if (query.isBlank() && cards.isNotEmpty()) listCache.set(cards)
+            cards
+        }
 
     suspend fun creatorStats(userId: String): CreatorCard? {
         val profile = runCatching {

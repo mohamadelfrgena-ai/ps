@@ -111,11 +111,13 @@ fun HomeScreen(
     val plans by container.state.plans.collectAsState()
 
     var profileRetryTick by remember { mutableStateOf(0) }
-    var loading by remember { mutableStateOf(true) }
-    var featured by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
-    var latest by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
-    var recommended by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
-    var creators by remember { mutableStateOf<List<CreatorCard>>(emptyList()) }
+    // **لا وميض عند تبديل التبويب**: تُبذر الشاشة بالنسخة المحفوظة فوراً،
+    // فلا مؤقّت تحميل ولا فراغ في كل رجوع إلى الرئيسية.
+    var featured by remember { mutableStateOf(container.content.cachedFeatured()) }
+    var latest by remember { mutableStateOf(container.content.cachedLatest()) }
+    var recommended by remember { mutableStateOf(container.content.cachedRecommended()) }
+    var creators by remember { mutableStateOf(container.creators.cachedCreators()) }
+    var loading by remember { mutableStateOf(featured.isEmpty() && latest.isEmpty()) }
 
     LaunchedEffect(signedIn, profileRetryTick) {
         if (signedIn && container.state.currentProfile == null) {
@@ -130,7 +132,8 @@ fun HomeScreen(
     }
 
     LaunchedEffect(profile?.id) {
-        loading = true
+        // بيانات محفوظة ⇒ نُحدّث في الخلفية بلا أن نُفرغ الشاشة
+        loading = featured.isEmpty() && latest.isEmpty()
         runCatching {
             // بالتوازي لا بالتتابع: الانتظار كان أربع جولات شبكة (زمنها مجموع)
             coroutineScope {
@@ -311,7 +314,7 @@ fun HomeScreen(
                 actionText = stringResource(R.string.view_all),
                 onAction = actions.openStore,
             )
-            if (loading) {
+            if (loading && featured.isEmpty()) {
                 LoadingBox()
             } else {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
