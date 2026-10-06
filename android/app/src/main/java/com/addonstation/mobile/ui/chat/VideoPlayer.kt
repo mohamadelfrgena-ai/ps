@@ -45,6 +45,8 @@ import java.io.File
  */
 @Composable
 fun FullScreenVideoPlayer(url: String, onClose: () -> Unit) {
+    // الرجوع يُغلق العارض أولاً (إيماءة أو زرّ) بدل مغادرة الغرفة
+    androidx.activity.compose.BackHandler(onBack = onClose)
     val context = LocalContext.current
     val player = remember(url) {
         ExoPlayer.Builder(context).build().apply {

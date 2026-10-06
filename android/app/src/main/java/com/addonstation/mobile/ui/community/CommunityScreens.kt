@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -195,10 +196,12 @@ fun RoomListScreen(
     val unread by container.state.unread.collectAsState()
     val wallet by container.state.wallet.collectAsState()
 
-    var channels by remember { mutableStateOf<List<ChatChannel>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var mainOpen by remember { mutableStateOf(true) }
-    var langOpen by remember { mutableStateOf(true) }
+    // **لا مؤقّت تحميل عند الرجوع**: القائمة تُبذر من الذاكرة المحفوظة فوراً،
+    // فلا فراغ ولا وميض ولا انتظار شبكة بعد الرجوع من غرفة.
+    var channels by remember { mutableStateOf(container.chat.cachedChannels()) }
+    var loading by remember { mutableStateOf(channels.isEmpty()) }
+    var mainOpen by rememberSaveable { mutableStateOf(true) }
+    var langOpen by rememberSaveable { mutableStateOf(true) }
     // لغة الواجهة الحالية (طبّقناها في MainActivity) — لتظليل غرفة اللغة المناسبة
     val appLanguage = LocaleManager.byCode(java.util.Locale.getDefault().language).code
 
@@ -206,11 +209,13 @@ fun RoomListScreen(
     var reloadTick by remember { mutableStateOf(0) }
 
     LaunchedEffect(reloadTick) {
-        loading = true
+        // قائمة محفوظة ⇒ نُحدّث في الخلفية بلا أن نُفرغ الشاشة (لا يظهر مؤقّت)
+        loading = channels.isEmpty()
         failed = false
         try {
             // الأدمن: نضمن وجود غرفة «خدمات النقدية» وضبطها للقراءة فقط،
             // فلا يحتاج إلى إنشاءها يدوياً ولا إلى تشغيل أي SQL.
+            // (مرة واحدة في الجلسة — لا رحلة شبكة مع كل رجوع.)
             container.chat.ensureCashServicesRoom(profile?.role == "admin") // الخادم يمنعها لغير الأدمن
             channels = container.chat.channels()
             container.chat.refreshUnread()
@@ -230,9 +235,9 @@ fun RoomListScreen(
             onWalletClick = { onOpenWallet() },
             icon = Icons.Filled.Group,
         )
-        if (loading) {
+        if (loading && channels.isEmpty()) {
             LoadingBox(text = stringResource(R.string.common_loading))
-        } else if (failed) {
+        } else if (failed && channels.isEmpty()) {
             com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
         } else {
             LazyColumn(

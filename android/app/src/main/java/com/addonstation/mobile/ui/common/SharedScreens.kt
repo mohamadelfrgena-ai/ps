@@ -121,6 +121,8 @@ fun metaOf(item: ContentItem): String =
 /** عارض صورة بملء الشاشة مع تكبير/تحريك وزر إغلاق. */
 @Composable
 fun FullScreenImageViewer(url: String, onClose: () -> Unit) {
+    // الرجوع (إيماءة النظام أو زرّ الرجوع) يُغلق العارض أولاً — لا الشاشة التي تحته
+    androidx.activity.compose.BackHandler(onBack = onClose)
     var scale by remember { mutableStateOf(1f) }
     var offsetX by remember { mutableStateOf(0f) }
     var offsetY by remember { mutableStateOf(0f) }

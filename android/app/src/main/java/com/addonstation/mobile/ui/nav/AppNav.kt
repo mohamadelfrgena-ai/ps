@@ -255,6 +255,30 @@ private fun MainNavigation(startAtReset: Boolean) {
         navController.navigate(Routes.LOGIN) { launchSingleTop = true }
     }
 
+    /**
+     * **رجوع واحد نظيف**: مهلة 300ms تمنع «الرجوع المزدوج» — ضغطتان سريعتان
+     * على السهم (أو إيماءة بعد ضغطة) كانتا تُخرجان المستخدم خطوتين دفعة واحدة
+     * فيبدو وكأنّ شاشةً قفزت من تحته (تقطّع). الضغطة الثانية تُتجاهل.
+     */
+    var lastBackAt by remember { mutableStateOf(0L) }
+
+    val rootView = LocalView.current
+
+    fun back() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastBackAt < 300) return
+        lastBackAt = now
+        // **لوحة المفاتيح تُخفى قبل الرجوع** (لا بعده): إغلاقها أثناء انتقال
+        // الشاشة هو أكثر ما يُقطّع الحركة — خاصّةً عند الرجوع من الشات.
+        runCatching {
+            rootView.clearFocus()
+            val imm = rootView.context
+                .getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.hideSoftInputFromWindow(rootView.windowToken, 0)
+        }
+        navController.popBackStack()
+    }
+
     fun go(route: String) {
         if (isChatRoute(route) && !signedIn) {
             requireSignIn(route)
@@ -382,7 +406,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                 // المصادقة
                 composable(Routes.LOGIN) {
                     com.addonstation.mobile.ui.auth.LoginScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         // بعد الدخول ⟵ الصفحة الرئيسية مباشرةً (طلب المالك) …
                         // إلّا إن كان قد أُوقف عند الدخول وهو داخلٌ إلى الشات:
                         // فنردّه إلى الشات الذي أراده (قائمة الغرف أو الغرفة).
@@ -393,7 +417,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                 }
                 composable(Routes.SIGNUP) {
                     com.addonstation.mobile.ui.auth.SignUpScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         // بعد إنشاء الحساب ⟵ الصفحة الرئيسية مباشرةً (طلب المالك):
                         // `AuthRepository.signUp` يدخل الحساب تلقائياً أولاً.
                         onSuccess = { if (!continueAfterLogin()) goTab(MainTab.Home) },
@@ -404,7 +428,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                 }
                 composable(Routes.RESET) {
                     com.addonstation.mobile.ui.auth.ResetPasswordScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onDone = { go(Routes.LOGIN) },
                     )
                 }
@@ -416,7 +440,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                 ) { entry ->
                     ContentDetailScreen(
                         itemId = entry.arguments?.getString("itemId").orEmpty(),
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onOpenProfile = { id -> go(Routes.userProfile(id)) },
                         onUpgrade = { go(Routes.PLANS) },
                         onLogin = { go(Routes.LOGIN) },
@@ -433,7 +457,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                             com.addonstation.mobile.R.string.profile_favorites_empty
                         ),
                         loader = { container.content.favorites() },
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onOpen = { item -> go(Routes.item(item.id)) },
                     )
                 }
@@ -446,7 +470,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                             com.addonstation.mobile.R.string.profile_my_content_empty
                         ),
                         loader = { container.content.downloads() },
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onOpen = { item -> go(Routes.item(item.id)) },
                     )
                 }
@@ -459,7 +483,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                             com.addonstation.mobile.R.string.store_empty
                         ),
                         loader = { container.content.exclusives() },
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onOpen = { item -> go(Routes.item(item.id)) },
                     )
                 }
@@ -488,7 +512,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                         } else {
                             ChatScreen(
                                 channel = current,
-                                onBack = { navController.popBackStack() },
+                                onBack = { back() },
                                 onOpenSettings = { goTab(MainTab.Settings) },
                                 onOpenUser = { profile -> go(Routes.userProfile(profile.id)) },
                                 onLogin = { go(Routes.LOGIN) },
@@ -500,20 +524,20 @@ private fun MainNavigation(startAtReset: Boolean) {
                 // الحساب والمحفظة والإشعارات
                 composable(Routes.WALLET) {
                     com.addonstation.mobile.ui.account.AcWalletScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onOpenItem = { id -> go(Routes.item(id)) },
                     )
                 }
                 composable(Routes.NOTIFICATIONS) {
                     com.addonstation.mobile.ui.account.NotificationsScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onOpenChannel = { channelId, _ -> go(Routes.chat(channelId)) },
                         onOpenProfile = { id -> go(Routes.userProfile(id)) },
                     )
                 }
                 composable(Routes.FRIENDS) {
                     com.addonstation.mobile.ui.account.FriendsScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onOpenProfile = { id -> go(Routes.userProfile(id)) },
                     )
                 }
@@ -521,7 +545,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                 // الخطط والدفع
                 composable(Routes.PLANS) {
                     com.addonstation.mobile.ui.plans.PlansScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onCheckout = { plan -> go(Routes.checkout(plan.id)) },
                         onOpenOrders = { go(Routes.ORDERS) },
                     )
@@ -532,20 +556,20 @@ private fun MainNavigation(startAtReset: Boolean) {
                 ) { entry ->
                     com.addonstation.mobile.ui.plans.CheckoutScreen(
                         planId = entry.arguments?.getString("planId").orEmpty(),
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onOpenOrders = { go(Routes.ORDERS) },
                         onLogin = { go(Routes.LOGIN) },
                         onOpenPlans = { go(Routes.PLANS) },
                     )
                 }
                 composable(Routes.ORDERS) {
-                    com.addonstation.mobile.ui.plans.MyOrdersScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.plans.MyOrdersScreen(onBack = { back() })
                 }
 
                 // المبدعون
                 composable(Routes.CREATORS) {
                     com.addonstation.mobile.ui.creators.CreatorsScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onOpenCreator = { id -> go(Routes.creatorProfile(id)) },
                     )
                 }
@@ -555,20 +579,20 @@ private fun MainNavigation(startAtReset: Boolean) {
                 ) { entry ->
                     com.addonstation.mobile.ui.creators.CreatorProfileScreen(
                         userId = entry.arguments?.getString("userId").orEmpty(),
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onOpenItem = { item -> go(Routes.item(item.id)) },
                         onOpenProfile = { id -> go(Routes.userProfile(id)) },
                     )
                 }
                 composable(Routes.CREATOR_APPLY) {
                     com.addonstation.mobile.ui.creators.CreatorApplicationScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onSubmitted = { },
                     )
                 }
                 composable(Routes.CREATOR_STUDIO) {
                     com.addonstation.mobile.ui.creators.CreatorStudioScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onOpenItem = { item -> go(Routes.item(item.id)) },
                     )
                 }
@@ -576,8 +600,8 @@ private fun MainNavigation(startAtReset: Boolean) {
                 // الملف الشخصي
                 composable(Routes.EDIT_PROFILE) {
                     com.addonstation.mobile.ui.profile.EditProfileScreen(
-                        onBack = { navController.popBackStack() },
-                        onSaved = { navController.popBackStack() },
+                        onBack = { back() },
+                        onSaved = { back() },
                     )
                 }
                 composable(
@@ -586,7 +610,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                 ) { entry ->
                     com.addonstation.mobile.ui.profile.UserProfileScreen(
                         userId = entry.arguments?.getString("userId").orEmpty(),
-                        onBack = { navController.popBackStack() },
+                        onBack = { back() },
                         onMessage = { goTab(MainTab.Community) },
                         onAddFriend = { profile ->
                             scope.launch { container.profile.sendFriendRequest(profile.id) }
@@ -619,18 +643,18 @@ private fun MainNavigation(startAtReset: Boolean) {
                     }
                 }
                 composable(Routes.ADMIN_ASSETS) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
-                        com.addonstation.mobile.ui.admin.AdminAssetsScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                        com.addonstation.mobile.ui.admin.AdminAssetsScreen(onBack = { back() })
                     }
                 }
                 composable(Routes.ADMIN_CREATORS) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
-                        com.addonstation.mobile.ui.admin.AdminCreatorReviewScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                        com.addonstation.mobile.ui.admin.AdminCreatorReviewScreen(onBack = { back() })
                     }
                 }
                 composable(Routes.ADMIN_AC) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
-                        com.addonstation.mobile.ui.admin.AdminAcScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                        com.addonstation.mobile.ui.admin.AdminAcScreen(onBack = { back() })
                     }
                 }
                 // نفس الشاشة لكن مع مستخدم محدَّد (فتحها زر «+AC» من بطاقة المستخدم)
@@ -638,26 +662,26 @@ private fun MainNavigation(startAtReset: Boolean) {
                     Routes.ADMIN_AC_USER,
                     arguments = listOf(navArgument("userId") { type = NavType.StringType }),
                 ) { entry ->
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
                         com.addonstation.mobile.ui.admin.AdminAcScreen(
-                            onBack = { navController.popBackStack() },
+                            onBack = { back() },
                             preselectUserId = entry.arguments?.getString("userId"),
                         )
                     }
                 }
                 composable(Routes.ADMIN_SETTINGS) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
-                        com.addonstation.mobile.ui.admin.AdminSettingsScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                        com.addonstation.mobile.ui.admin.AdminSettingsScreen(onBack = { back() })
                     }
                 }
                 composable(Routes.ADMIN_AUDIT) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
-                        com.addonstation.mobile.ui.admin.AdminAuditScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                        com.addonstation.mobile.ui.admin.AdminAuditScreen(onBack = { back() })
                     }
                 }
                 composable(Routes.ADMIN_CHAT) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { navController.popBackStack() }) {
-                        com.addonstation.mobile.ui.admin.AdminChatScreen(onBack = { navController.popBackStack() })
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                        com.addonstation.mobile.ui.admin.AdminChatScreen(onBack = { back() })
                     }
                 }
             }

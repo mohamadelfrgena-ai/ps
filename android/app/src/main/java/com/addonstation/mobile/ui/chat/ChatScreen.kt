@@ -3,6 +3,7 @@
 package com.addonstation.mobile.ui.chat
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -181,6 +182,20 @@ fun ChatScreen(
     val openFullSize: (String) -> Unit = { path ->
         scope.launch { container.chat.imageUrl(path)?.let { imageViewerUrl = it } }
     }
+    // **زرّ الرجوع: السهم وإيماءة النظام سواء.** كل ما يُفتح فوق الغرفة
+    // (عارض صورة · عارض فيديو · لوحة إيموجي · قائمة رسالة · الأعضاء · المثبّتات
+    // · ورقة المرفقات · ورقة الوسائط) يُغلق أولاً قبل مغادرة الغرفة — فلا
+    // تُقفل الغرفة كلها بضربة إيماءة واحدة كانت تقصد إغلاق ورقة.
+    // (المعالج الأخير هو الذي يستلم الرجوع، فالأخصّ يُسجَّل أخيراً.)
+    BackHandler(enabled = mediaSheet) { mediaSheet = false }
+    BackHandler(enabled = showAttach) { showAttach = false }
+    BackHandler(enabled = showMembers) { showMembers = false }
+    BackHandler(enabled = showPinned) { showPinned = false }
+    BackHandler(enabled = actionsFor != null) { actionsFor = null }
+    BackHandler(enabled = showEmoji) { showEmoji = false }
+    BackHandler(enabled = videoViewerUrl != null) { videoViewerUrl = null }
+    BackHandler(enabled = imageViewerUrl != null) { imageViewerUrl = null }
+
     var statusMessage by remember { mutableStateOf<String?>(null) }
     /** سبب فشل الإرسال (يُترجَم في الشاشة) — لا نعرض رمز الخادم الخام. */
     var statusError by remember { mutableStateOf<ApiErrorKind?>(null) }
@@ -210,10 +225,11 @@ fun ChatScreen(
     val notSentMsg = stringResource(R.string.chat_send_failed)
 
     LaunchedEffect(channel.id) {
-        // نطاق الإشراف يُجلب مع كل دخول غرفة: فإن منح الأدمن مشرفاً غرفةً
-        // جديدة (أو سحبها) تظهر أزراره الصحيحة فور فتح الغرفة.
-        runCatching { container.chat.refreshMyStatus() }
+        // الرسائل أولاً (دخول الغرفة أسرع): الجلب لا ينتظر طلباً آخر.
         vm.open(channel)
+        // نطاق الإشراف يُجلب مع كل دخول غرفة: فإن منح الأدمن مشرفاً غرفةً
+        // جديدة (أو سحبها) تظهر أزراره الصحيحة بعد لحظة من فتح الغرفة.
+        runCatching { container.chat.refreshMyStatus() }
     }
     DisposableEffect(channel.id) { onDispose { vm.close() } }
 

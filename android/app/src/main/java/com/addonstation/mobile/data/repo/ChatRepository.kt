@@ -49,11 +49,44 @@ class ChatRepository(
 
     // ------------------------------------------------------------- الغرف والقواعد
 
-    suspend fun channels(): List<ChatChannel> = runCatching {
-        supabase.decodeList<ChatChannel>(
-            supabase.select("chat_channels", "select=*&order=sort_order.asc")
-        )
-    }.getOrElse { emptyList() }
+    /**
+     * ذاكرة مؤقّتة خفيفة لقائمة الغرف — **سببها «اللاق» عند الرجوع**:
+     * شاشة الغرف تُفتح من جديد بعد كل رجوع من غرفة، فكانت تُفرغ قائمتها
+     * وتنتظر ثلاث رحلات شبكة (ضمان غرفة النقدية + الغرف + غير المقروء)
+     * قبل أن تظهر ⇒ مؤقّت تحميل وتقطّع في كل رجوع. الآن:
+     *   • القائمة المحفوظة تُبذر الشاشة فوراً (بلا مؤقّت ولا فراغ).
+     *   • وتُحدَّث في الخلفية إن مضى على حفظها أكثر من 30 ثانية.
+     */
+    @Volatile private var channelsCache: List<ChatChannel>? = null
+    @Volatile private var channelsCachedAt = 0L
+    @Volatile private var cashRoomEnsured = false
+    private val channelsTtlMs = 30_000L
+
+    /** آخر قائمة غرف معروفة (بلا شبكة) — تبذر بها الشاشة فور فتحها. */
+    fun cachedChannels(): List<ChatChannel> = channelsCache.orEmpty()
+
+    /** إبطال الذاكرة بعد أي تغيير في الغرف (من لوحة الإدارة). */
+    fun invalidateChannels() {
+        channelsCache = null
+        cashRoomEnsured = false
+    }
+
+    suspend fun channels(force: Boolean = false): List<ChatChannel> {
+        val cached = channelsCache
+        val fresh = cached != null && System.currentTimeMillis() - channelsCachedAt < channelsTtlMs
+        if (!force && fresh) return cached!!
+        val list = runCatching {
+            supabase.decodeList<ChatChannel>(
+                supabase.select("chat_channels", "select=*&order=sort_order.asc")
+            )
+        }.getOrElse { emptyList() }
+        if (list.isNotEmpty()) {
+            channelsCache = list
+            channelsCachedAt = System.currentTimeMillis()
+        }
+        // شبكة فارغة أو خطأ ⇒ نُبقي المحفوظة (أفضل من قائمة تختفي)
+        return list.ifEmpty { cached.orEmpty() }
+    }
 
     /**
      * يضمن وجود غرفة «خدمات النقدية» وضبطها للقراءة فقط.
@@ -65,6 +98,9 @@ class ChatRepository(
      * (نفس النتيجة لو نُفِّذ سكربت supabase/17_cash_services_room.sql يدوياً.)
      */
     suspend fun ensureCashServicesRoom(isAdmin: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        // مرة واحدة في الجلسة: كانت تُستدعى مع كل فتحٍ لقائمة الغرف (ورحلة
+        // شبكة إضافية قبل ظهورها). تُستدعى عند الإقلاع وبعد أي تغيير غرف.
+        if (cashRoomEnsured) return@withContext Result.success(Unit)
         runCatching {
             // `isAdmin` لا يُستخدم كشرط: لو لم تُحمَّل قيمة الدور المحلية بعد
             // لَفُقدت الغرفة. الخادم هو الحَكَم: يرفض الطلب لغير الأدمن، فمحاولة
@@ -73,7 +109,10 @@ class ChatRepository(
             val needsFix = existing == null ||
                 !existing.isLocked ||
                 existing.postPermission.lowercase() != "admin_only"
-            if (!needsFix) return@runCatching
+            if (!needsFix) {
+                cashRoomEnsured = true
+                return@runCatching
+            }
             upsertRoom(
                 id = CASH_SERVICES_ROOM_ID,
                 name = existing?.name?.takeIf { it.isNotBlank() } ?: CASH_SERVICES_ROOM_NAME,
@@ -87,6 +126,8 @@ class ChatRepository(
                 slowmodeSeconds = existing?.slowmodeSeconds ?: 0,
                 postPermission = "admin_only",
             ).getOrThrow()
+            invalidateChannels()   // غرفة جديدة/معدَّلة ⇒ تُجلب من جديد
+            cashRoomEnsured = true
             Unit
         }
     }
@@ -671,6 +712,7 @@ class ChatRepository(
                     "p_post_permission" to JsonPrimitive(postPermission),
                 ),
             ).asOutcome().requireOk()
+            invalidateChannels()   // الغرف تغيّرت ⇒ لا نُقدّم المحفوظة القديمة
             Unit
         }
     }
@@ -679,6 +721,7 @@ class ChatRepository(
         runCatching {
             supabase.rpc("chat_admin_delete_room", mapOf("p_id" to JsonPrimitive(id)))
                 .asOutcome().requireOk()
+            invalidateChannels()
             Unit
         }
     }
