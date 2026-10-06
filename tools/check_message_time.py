@@ -30,12 +30,21 @@ rows.append(("لا وقت بجانب اسم صاحب الرسالة",
              screen.count("TimeFormat.timeOnly(") == 1
              and "TimeFormat.timeOnly(createdAt" in time_fn))
 
-# 3) الوقت مع كل الأنواع
-uses = screen.count("MessageTime(createdAt = message.createdAt)")
-rows.append(("وقت مع النص", uses >= 1))
-rows.append(("وقت مع الملصق", uses >= 2))
-rows.append(("وقت مع الصورة", uses >= 3))
-rows.append(("وقت مع الصوت/الفيديو", uses >= 4))
+# 3) الوقت مع كل الأنواع — يُعرض اليوم عبر MessageStatus (الوقت حين تُؤكَّد
+#    الرسالة، وحالة الإرسال حين تكون قيده أو فاشلة) في نهاية كل نوع.
+def branch_has(tag: str) -> bool:
+    block = screen[screen.find(tag):]
+    end = block.find("\n            \"")
+    block = block[:end] if end != -1 else block
+    return "MessageStatus(" in block
+
+rows.append(("وقت مع النص", branch_has("            else -> {")))
+rows.append(("وقت مع الملصق", branch_has('            "sticker" -> {')))
+rows.append(("وقت مع الصورة", branch_has('            "image" -> {')))
+rows.append(("وقت مع الصوت/الفيديو", branch_has('            "video" -> {')
+             and branch_has('            "audio" -> {')))
+rows.append(("الوقت يظهر عبر بانية الحالة", "MessageStatus(" in screen
+             and "else -> MessageTime(createdAt = createdAt" in screen))
 rows.append(("الوقت في نهاية السطر (محاذاة سفلية)",
              "verticalAlignment = Alignment.Bottom" in screen))
 

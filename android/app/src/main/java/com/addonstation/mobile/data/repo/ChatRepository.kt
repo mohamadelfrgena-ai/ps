@@ -234,7 +234,15 @@ class ChatRepository(
                 "p_is_announcement" to JsonPrimitive(isAnnouncement),
             ),
         ).asOutcome().requireOk()
-        val id = outcome.data["id"]?.asLong() ?: 0L
+        // ⚠️ سبب «لازم أخرج وأرجع للغرفة عشان أتأكد إن رسالتي انبعتت»:
+        // الدالة تُعيد الرقم في حقل **message_id** لا `id` — فكان الرقم يقرأ 0
+        // دائماً، فتُمحى الرسالة المؤقتة (التي ظهرت فوراً) ويبقى صاحبها ينتظر
+        // الاستطلاع/الاستقبال اللحظي دون أن يرى تأكيداً. الآن يُقرأ الحقل
+        // الصحيح (والاسم القديم يبقى احتياطاً) فتُستبدل الرسالة في مكانها.
+        val id = outcome.data["message_id"]?.asLong()
+            ?: outcome.data["messageId"]?.asLong()
+            ?: outcome.data["id"]?.asLong()
+            ?: 0L
         ChatMessage(
             id = id,
             channelId = channelId,
@@ -406,8 +414,33 @@ class ChatRepository(
             }
         }
 
+    /**
+     * يرفع **إطاراً مصغّراً** للفيديو في مخزن صور الشات.
+     *
+     * مساره مشتق من مسار الفيديو نفسه (`<مسار الفيديو>.thumb.jpg`) فلا يحتاج
+     * عموداً جديداً في قاعدة البيانات: أي عميل يعرف مسار الفيديو يعرف مسار
+     * صورته المصغّرة، وإن لم تكن موجودة يعرض البطاقة بلا صورة (لا ينكسر شيء).
+     */
+    suspend fun uploadVideoThumb(bytes: ByteArray, mediaPath: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                if (bytes.isEmpty() || bytes.size > MAX_IMAGE_BYTES) return@runCatching ""
+                val path = videoThumbPath(mediaPath)
+                supabase.upload("chat-images", path, bytes, "image/jpeg")
+                path
+            }
+        }
+
     suspend fun imageUrl(path: String): String? =
         runCatching { supabase.signedUrl("chat-images", path, 300) }.getOrNull()
+
+    /** مسار الصورة المصغّرة لفيديو (مشتق من مساره) — في مخزن صور الشات. */
+    fun videoThumbPath(mediaPath: String?): String =
+        "${mediaPath.orEmpty().trim()}.thumb.jpg"
+
+    /** رابط موقّع للصورة المصغّرة للفيديو (null إن لم تُرفع أو فشل التوقيع). */
+    suspend fun videoThumbUrl(mediaPath: String?): String? =
+        if (mediaPath.isNullOrBlank()) null else imageUrl(videoThumbPath(mediaPath))
 
     suspend fun mediaUrl(path: String): String? =
         runCatching { supabase.signedUrl("chat-media", path, 300) }.getOrNull()

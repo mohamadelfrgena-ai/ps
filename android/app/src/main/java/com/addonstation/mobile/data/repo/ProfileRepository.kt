@@ -1,6 +1,9 @@
 package com.addonstation.mobile.data.repo
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 import com.addonstation.mobile.data.AppState
@@ -23,14 +26,43 @@ class ProfileRepository(
 ) {
 
     private val uid: String? get() = supabase.session()?.userId
+    private val refreshMutex = Mutex()
 
     // ------------------------------------------------------------------ قراءة
 
-    suspend fun refreshProfile(): Profile? {
-        val id = uid ?: return null
-        val profile = loadProfile(id)
-        state.setProfile(profile)
-        return profile
+    /** تحميل أولي آمن ومتزامن: لا يكرر الطلب إذا سبق أن جُلب ملف هذا الحساب. */
+    suspend fun ensureProfileLoaded(): Profile? = loadMyProfile(force = false)
+
+    /** تحديث قسري بعد تعديل الملف أو إعادة تحميل بيانات الحساب. */
+    suspend fun refreshProfile(): Profile? = loadMyProfile(force = true)
+
+    /**
+     * جلب الملف الشخصي مع حالة تحميل صريحة. يمنع هذا السباق بين استعادة الجلسة
+     * عند التشغيل وفتح التبويبات، ويترك الخطأ قابلاً لإعادة المحاولة بدلاً من
+     * تفسيره على أنه تسجيل خروج.
+     */
+    private suspend fun loadMyProfile(force: Boolean): Profile? = refreshMutex.withLock {
+        val id = uid
+        if (id.isNullOrBlank()) {
+            state.setProfileLoadFailed()
+            return@withLock null
+        }
+        if (!force) {
+            state.currentProfile?.takeIf { it.id == id }?.let { return@withLock it }
+        }
+
+        state.setProfileLoading()
+        try {
+            val profile = loadProfile(id)
+            state.setProfile(profile)
+            profile
+        } catch (cancelled: CancellationException) {
+            state.setProfileLoadFailed()
+            throw cancelled
+        } catch (error: Throwable) {
+            state.setProfileLoadFailed()
+            throw error
+        }
     }
 
     suspend fun loadProfile(userId: String): Profile? = withContext(Dispatchers.IO) {

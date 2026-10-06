@@ -563,21 +563,27 @@ fun AvatarImage(
     }
 }
 
-/** صورة غلاف مستطيلة بزوايا مستديرة. */
+/**
+ * صورة غلاف مستطيلة بزوايا مستديرة.
+ *
+ * @param model نموذج بديل (ملف أو Uri محلي) يُحمّل **قبل** رابط الخادم —
+ *              يستعمله الشات لمعاينة الصورة/إطار الفيديو لحظة اختياره.
+ */
 @Composable
 fun CoverImage(
     url: String?,
     modifier: Modifier = Modifier,
     radius: Dp = 16.dp,
+    model: Any? = null,
 ) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(radius))
             .background(AppColors.Elevated2),
     ) {
-        if (!url.isNullOrBlank()) {
+        if (!url.isNullOrBlank() || model != null) {
             SubcomposeAsyncImage(
-                model = url,
+                model = model ?: url,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),

@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.R
+import com.addonstation.mobile.data.ProfileLoadStatus
 import com.addonstation.mobile.data.model.ContentItem
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.ui.assetUrl
@@ -89,7 +90,10 @@ import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.util.TimeFormat
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /** شاشة الملف الشخصي (تتطلب تسجيل الدخول — وإلا ينتقل المستخدم لتسجيل الدخول). */
@@ -108,8 +112,10 @@ fun ProfileScreen(
     val profile by container.state.profile.collectAsState()
     val wallet by container.state.wallet.collectAsState()
     val signedIn by container.state.signedIn.collectAsState()
+    val profileLoadStatus by container.state.profileLoadStatus.collectAsState()
     val scope = rememberCoroutineScope()
 
+    var profileRetryTick by remember { mutableStateOf(0) }
     var tab by remember { mutableStateOf(0) }
     var myContent by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var favourites by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
@@ -117,6 +123,20 @@ fun ProfileScreen(
     var loading by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableStateOf(0) }
+
+    // الجلسة قد تكون صالحة بينما الملف الشخصي لم يكتمل تحميله بعد؛ لا نحوّل
+    // هذه الحالة المؤقتة إلى شاشة تسجيل دخول، بل نجلب الملف ونتيح إعادة المحاولة.
+    LaunchedEffect(signedIn, profileRetryTick) {
+        if (signedIn && container.state.currentProfile == null) {
+            try {
+                withContext(Dispatchers.IO) { container.profile.ensureProfileLoaded() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                // حالة الفشل محفوظة في AppState ويظهر زر إعادة المحاولة أدناه.
+            }
+        }
+    }
 
     LaunchedEffect(profile?.id, tab, reloadTick) {
         val me = profile ?: return@LaunchedEffect
@@ -137,10 +157,26 @@ fun ProfileScreen(
         }
     }
 
-    if (!signedIn || profile == null) {
-        LaunchedEffect(Unit) { onLogin() }
+    if (!signedIn) {
+        LaunchedEffect(signedIn) { onLogin() }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             LoadingBox(text = stringResource(R.string.msg_sign_in_needed))
+        }
+        return
+    }
+    if (profile == null) {
+        Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            if (profileLoadStatus == ProfileLoadStatus.IDLE || profileLoadStatus == ProfileLoadStatus.LOADING) {
+                LoadingBox(text = stringResource(R.string.common_loading))
+            } else {
+                com.addonstation.mobile.ui.components.ErrorState(
+                    onRetry = { profileRetryTick += 1 },
+                )
+            }
         }
         return
     }

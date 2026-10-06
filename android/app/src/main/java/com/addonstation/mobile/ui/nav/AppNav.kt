@@ -44,6 +44,7 @@ import com.addonstation.mobile.ui.profile.ProfileScreen
 import com.addonstation.mobile.ui.common.SetupScreen
 import android.app.Activity
 import android.content.ContextWrapper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -203,10 +204,26 @@ private fun MainNavigation(startAtReset: Boolean) {
     val route = backStackEntry?.destination?.route
     val tab = MainTab.entries.firstOrNull { it.route == route }
     val profile by container.state.profile.collectAsState()
+    val signedIn by container.state.signedIn.collectAsState()
     val wallet by container.state.wallet.collectAsState()
 
     LaunchedEffect(startAtReset) {
         if (startAtReset) navController.navigate(Routes.RESET)
+    }
+
+    // كل تبويب يستفيد من ملف المستخدم نفسه؛ إذا كان الحساب مسجّلاً لكن الملف
+    // لم يكتمل تحميله، نعيد جلبه عند الانتقال بدلاً من إرسال المستخدم للدخول.
+    LaunchedEffect(signedIn, route) {
+        if (!signedIn || route == null || container.state.currentProfile != null) return@LaunchedEffect
+        scope.launch(Dispatchers.IO) {
+            try {
+                container.profile.ensureProfileLoaded()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                // الشاشات تعرض حالة تحميل/إعادة محاولة؛ فشل الشبكة لا يعني انتهاء الجلسة.
+            }
+        }
     }
 
     fun go(route: String) {
@@ -258,7 +275,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                     com.addonstation.mobile.ui.community.CommunityGate(
                         onOpenRoom = { channel: ChatChannel -> go(Routes.chat(channel.id)) },
                         // ترس لوحة المستخدم في الشات → تعديل الملف الشخصي (وإن لم يسجّل: شاشة الدخول)
-                        onOpenEditProfile = { if (profile == null) go(Routes.LOGIN) else go(Routes.EDIT_PROFILE) },
+                        onOpenEditProfile = { if (signedIn) go(Routes.EDIT_PROFILE) else go(Routes.LOGIN) },
                         onOpenWallet = { go(Routes.WALLET) },
                         onLogin = { go(Routes.LOGIN) },
                         onDeclineToHome = { goTab(MainTab.Home) },

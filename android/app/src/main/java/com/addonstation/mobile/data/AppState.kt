@@ -17,10 +17,22 @@ import kotlinx.coroutines.flow.asStateFlow
  * حالة التطبيق المشتركة: الملف الشخصي، المحفظة، الخطط، طرق الدفع، الأصول، الإشعارات.
  * كل الشاشات تقرأ منها، والمستودعات هي التي تكتب فيها.
  */
+enum class ProfileLoadStatus {
+    IDLE,
+    LOADING,
+    READY,
+    MISSING,
+    FAILED,
+}
+
 class AppState(private val container: AppContainer) {
 
     private val _profile = MutableStateFlow<Profile?>(null)
     val profile: StateFlow<Profile?> = _profile.asStateFlow()
+
+    /** لا نخلط بين «الجلسة مسجّلة» و«بيانات الملف الشخصي وصلت بعد». */
+    private val _profileLoadStatus = MutableStateFlow(ProfileLoadStatus.IDLE)
+    val profileLoadStatus: StateFlow<ProfileLoadStatus> = _profileLoadStatus.asStateFlow()
 
     private val _signedIn = MutableStateFlow(container.supabase.isSignedIn())
     val signedIn: StateFlow<Boolean> = _signedIn.asStateFlow()
@@ -61,12 +73,26 @@ class AppState(private val container: AppContainer) {
 
     fun setProfile(value: Profile?) {
         _profile.value = value
+        _profileLoadStatus.value = if (value == null) ProfileLoadStatus.MISSING else ProfileLoadStatus.READY
+    }
+
+    fun setProfileLoading() {
+        _profileLoadStatus.value = ProfileLoadStatus.LOADING
+    }
+
+    fun setProfileLoadFailed() {
+        _profileLoadStatus.value = if (_profile.value == null) {
+            ProfileLoadStatus.FAILED
+        } else {
+            ProfileLoadStatus.READY
+        }
     }
 
     fun setSignedIn(value: Boolean) {
         _signedIn.value = value
         if (!value) {
             _profile.value = null
+            _profileLoadStatus.value = ProfileLoadStatus.IDLE
             _wallet.value = null
             _unread.value = emptyMap()
             _chatStatus.value = null

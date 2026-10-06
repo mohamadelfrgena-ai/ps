@@ -1,7 +1,10 @@
 package com.addonstation.mobile.ui.home
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -53,10 +56,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.R
+import com.addonstation.mobile.data.ProfileLoadStatus
 import com.addonstation.mobile.data.model.ContentItem
 import com.addonstation.mobile.data.model.CreatorCard
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.components.ContentCard
+import com.addonstation.mobile.ui.components.ErrorState
 import com.addonstation.mobile.ui.components.GlassCard
 import com.addonstation.mobile.ui.components.IconTile
 import com.addonstation.mobile.ui.components.LinkRow
@@ -71,7 +76,6 @@ import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.ui.theme.PixelFont
-import com.addonstation.mobile.util.LocaleManager
 import com.addonstation.mobile.util.TimeFormat
 import java.util.Locale
 
@@ -101,14 +105,29 @@ fun HomeScreen(
 ) {
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
+    val signedIn by container.state.signedIn.collectAsState()
+    val profileLoadStatus by container.state.profileLoadStatus.collectAsState()
     val wallet by container.state.wallet.collectAsState()
     val plans by container.state.plans.collectAsState()
 
+    var profileRetryTick by remember { mutableStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var featured by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var latest by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var recommended by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var creators by remember { mutableStateOf<List<CreatorCard>>(emptyList()) }
+
+    LaunchedEffect(signedIn, profileRetryTick) {
+        if (signedIn && container.state.currentProfile == null) {
+            try {
+                withContext(Dispatchers.IO) { container.profile.ensureProfileLoaded() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                // لا نعامل فشل الجلب كخروج؛ زر إعادة المحاولة يبقى متاحاً.
+            }
+        }
+    }
 
     LaunchedEffect(profile?.id) {
         loading = true
@@ -128,7 +147,6 @@ fun HomeScreen(
         loading = false
     }
 
-    val locale = Locale.getDefault()
     val morning = TimeFormat.isMorning()
     val greeting = stringResource(TimeFormat.greetingRes(morning))
 
@@ -147,9 +165,14 @@ fun HomeScreen(
         ) {
             Spacer(Modifier.height(12.dp))
 
-            /* 4.1 رأس الترحيب — النص ملتصق بالصورة: يمينها في الإنجليزية ويسارها في العربية
-               (Alignment.End/TextAlign.End يتبعان اتجاه اللغة تلقائياً). */
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            /* 4.1 رأس الترحيب — سطرا التحية واسم AddonStation يسار مربّع البروفايل
+               في LTR، والصورة يميناً؛ وفي RTL (العربية) ينعكس موضعهما تلقائياً.
+               محاذاة End تُبقي النص قريباً من الصورة في كلا الاتجاهين. */
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Column(
                     Modifier.weight(1f),
                     horizontalAlignment = Alignment.End,
@@ -162,8 +185,11 @@ fun HomeScreen(
                         textAlign = TextAlign.End,
                     )
                     Text(
-                        text = if (profile == null) stringResource(R.string.home_welcome_guest)
-                        else stringResource(R.string.home_welcome_back, profile?.username ?: ""),
+                        text = when {
+                            !signedIn -> stringResource(R.string.home_welcome_guest)
+                            profile == null -> stringResource(R.string.common_loading)
+                            else -> stringResource(R.string.home_welcome_back, profile?.username ?: "")
+                        },
                         style = AppText.welcomeName,
                         color = AppColors.Text,
                         textAlign = TextAlign.End,
@@ -190,7 +216,7 @@ fun HomeScreen(
                         .padding(3.dp)
                         .clip(RoundedCornerShape(19.dp))
                         .border(1.dp, Color.White.copy(alpha = 0.55f), RoundedCornerShape(19.dp))
-                        .clickable { if (profile == null) actions.openLogin() else actions.openProfile() },
+                        .clickable { if (signedIn) actions.openProfile() else actions.openLogin() },
                     contentAlignment = Alignment.Center,
                 ) {
                     // الزائر (بلا حساب / بعد تسجيل الخروج) ⇒ صورة المجهول التي أرسلها المالك
@@ -213,7 +239,12 @@ fun HomeScreen(
 
             /* 4.2 بطاقة الحالة */
             when {
-                profile == null -> GuestCard(actions)
+                !signedIn -> GuestCard(actions)
+                profile == null && profileLoadStatus in setOf(ProfileLoadStatus.IDLE, ProfileLoadStatus.LOADING) ->
+                    LoadingBox(text = stringResource(R.string.common_loading))
+                profile == null -> ErrorState(
+                    onRetry = { profileRetryTick += 1 },
+                )
                 profile!!.effectivePlan == "free" -> FreePlanCard(planName = stringResource(R.string.plan_free_name), onUpgrade = actions.openPlans)
                 else -> ActivePlanCard(
                     planLabel = stringResource(R.string.home_plan_active, planLabelOf(profile!!.effectivePlan)),
@@ -352,7 +383,7 @@ fun HomeScreen(
                     title = stringResource(R.string.home_creator_title),
                     text = stringResource(R.string.home_creator_text),
                     buttonText = stringResource(R.string.home_creator_cta),
-                    onButton = if (profile == null) actions.openLogin else actions.openCreatorApply,
+                    onButton = if (signedIn) actions.openCreatorApply else actions.openLogin,
                 )
             }
 

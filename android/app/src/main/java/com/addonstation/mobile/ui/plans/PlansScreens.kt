@@ -224,7 +224,7 @@ fun CheckoutScreen(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
-    val profile by container.state.profile.collectAsState()
+    val signedIn by container.state.signedIn.collectAsState()
     val plans by container.state.plans.collectAsState()
     val methods by container.state.paymentMethods.collectAsState()
 
@@ -282,7 +282,7 @@ fun CheckoutScreen(
                 EmptyState(unavailable)
                 return@Column
             }
-            if (profile == null) {
+            if (!signedIn) {
                 EmptyState(stringResource(R.string.msg_sign_in_needed))
                 GradientButton(
                     text = stringResource(R.string.auth_sign_in),

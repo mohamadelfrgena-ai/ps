@@ -283,6 +283,12 @@
     <string name="chat_limit_500">En fazla 500 karakter</string>
     <string name="chat_no_links">Bağlantılar ve kişisel bilgiler yasaktır</string>
     <string name="chat_image_formats">Yalnızca JPG / PNG / WEBP</string>
+    <string name="chat_uploading">Yükleniyor…</string>
+    <string name="chat_upload_failed">Yükleme başarısız</string>
+    <string name="chat_send_failed">Gönderilmedi</string>
+    <string name="chat_tap_to_retry">Yeniden denemek için dokun</string>
+    <string name="chat_play_video">Videoyu oynat</string>
+    <string name="chat_attachment_ready">Gönderilmeye hazır — istersen bir açıklama yaz</string>
     <string name="chat_image_max">Maksimum görsel boyutu 4MB</string>
     <string name="chat_media_max">Maksimum medya boyutu 100 MB.</string>
     <string name="chat_audio_sent">Ses gönderildi.</string>

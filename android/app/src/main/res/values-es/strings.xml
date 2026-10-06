@@ -283,6 +283,12 @@
     <string name="chat_limit_500">Máximo 500 caracteres</string>
     <string name="chat_no_links">No se permiten enlaces ni datos personales</string>
     <string name="chat_image_formats">Solo JPG / PNG / WEBP</string>
+    <string name="chat_uploading">Subiendo…</string>
+    <string name="chat_upload_failed">Error al subir</string>
+    <string name="chat_send_failed">No enviado</string>
+    <string name="chat_tap_to_retry">Toca para reintentar</string>
+    <string name="chat_play_video">Reproducir vídeo</string>
+    <string name="chat_attachment_ready">Listo para enviar — escribe un pie si quieres</string>
     <string name="chat_image_max">El tamaño máximo de imagen es 4MB</string>
     <string name="chat_media_max">El tamaño máximo de medios es 100 MB.</string>
     <string name="chat_audio_sent">Audio enviado.</string>

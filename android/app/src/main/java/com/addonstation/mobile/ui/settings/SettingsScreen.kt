@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.BuildConfig
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.AppContainer
+import com.addonstation.mobile.data.ProfileLoadStatus
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.common.ConfirmDialog
 import com.addonstation.mobile.ui.common.InfoDialog
@@ -83,7 +84,10 @@ import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.util.AppPrefs
 import com.addonstation.mobile.util.LocaleManager
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** بريد فريق الدعم — تُفتح عليه رسالة المستخدم تلقائياً من قسم الدعم. */
 const val SUPPORT_EMAIL = "silverfoxinteractive@gmail.com"
@@ -130,6 +134,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val profile by container.state.profile.collectAsState()
+    val signedIn by container.state.signedIn.collectAsState()
+    val profileLoadStatus by container.state.profileLoadStatus.collectAsState()
     val wallet by container.state.wallet.collectAsState()
     val currentLocale by container.prefs.locale.collectAsState(initial = "en")
     val dark by container.prefs.darkTheme.collectAsState(initial = true)
@@ -149,6 +155,7 @@ fun SettingsScreen(
 
     var username by remember { mutableStateOf(profile?.username ?: "") }
     var usernameMessage by remember { mutableStateOf<String?>(null) }
+    var profileRetryTick by remember { mutableStateOf(0) }
     var dialogKey by remember { mutableStateOf<String?>(null) }
     var languageMenu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -157,7 +164,20 @@ fun SettingsScreen(
         profile?.username?.let { username = it }
     }
 
-    val signedOut = profile == null
+    // الحساب يبقى مسجّلاً حتى لو تأخر جلب ملفه؛ أعد الجلب بدل عرض زر دخول زائف.
+    LaunchedEffect(signedIn, profileRetryTick) {
+        if (signedIn && container.state.currentProfile == null) {
+            try {
+                withContext(Dispatchers.IO) { container.profile.ensureProfileLoaded() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                // تبقى الشاشة مفتوحة ويظهر خيار إعادة المحاولة.
+            }
+        }
+    }
+
+    val signedOut = !signedIn
 
     Column(Modifier.fillMaxSize()) {
         PixelTopBar(
@@ -190,7 +210,9 @@ fun SettingsScreen(
                     Column(Modifier.weight(1f)) {
                         // رأس الحساب: الاسم فقط — أيقونة المستخدم انتقلت إلى حقل تغيير الاسم بالأسفل
                         Text(
-                            profile?.displayName ?: profile?.username ?: stringResource(R.string.common_guest),
+                            profile?.displayName ?: profile?.username ?: stringResource(
+                                if (signedIn) R.string.common_loading else R.string.common_guest,
+                            ),
                             style = AppText.sectionTitle,
                             color = AppColors.Text,
                         )
@@ -220,6 +242,16 @@ fun SettingsScreen(
                         onClick = onLogin,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                } else if (profile == null) {
+                    if (profileLoadStatus == ProfileLoadStatus.IDLE || profileLoadStatus == ProfileLoadStatus.LOADING) {
+                        com.addonstation.mobile.ui.components.LoadingBox(
+                            text = stringResource(R.string.common_loading),
+                        )
+                    } else {
+                        com.addonstation.mobile.ui.components.ErrorState(
+                            onRetry = { profileRetryTick += 1 },
+                        )
+                    }
                 } else {
                     // أيقونة المستخدم **خارج** مربع الاسم وعلى جانبه — تماماً مثل
                     // أيقونة البريد في صف البريد بالأسفل (لا leadingIcon داخل الحقل)

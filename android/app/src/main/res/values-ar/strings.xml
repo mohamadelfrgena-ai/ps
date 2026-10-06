@@ -283,6 +283,12 @@
     <string name="chat_limit_500">الحد الأقصى 500 حرف</string>
     <string name="chat_no_links">الروابط والبيانات الشخصية غير مسموحة</string>
     <string name="chat_image_formats">يسمح فقط بـ JPG / PNG / WEBP</string>
+    <string name="chat_uploading">جارٍ الرفع…</string>
+    <string name="chat_upload_failed">فشل الرفع</string>
+    <string name="chat_send_failed">لم تُرسل</string>
+    <string name="chat_tap_to_retry">اضغط لإعادة المحاولة</string>
+    <string name="chat_play_video">تشغيل الفيديو</string>
+    <string name="chat_attachment_ready">جاهز للإرسال — اكتب تعليقاً إن أحببت</string>
     <string name="chat_image_max">الحد الأقصى 4MB</string>
     <string name="chat_media_max">الحد الأقصى للملفات 100 MB.</string>
     <string name="chat_audio_sent">تم إرسال المقطع الصوتي.</string>

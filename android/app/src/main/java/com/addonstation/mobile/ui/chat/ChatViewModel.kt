@@ -3,6 +3,7 @@ package com.addonstation.mobile.ui.chat
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
+import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.AppContainer
 import com.addonstation.mobile.data.model.ChatChannel
 import com.addonstation.mobile.data.model.ChatMessage
@@ -10,6 +11,7 @@ import com.addonstation.mobile.data.model.ChatMessageUi
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.SiteAsset
 import com.addonstation.mobile.data.model.StickerPack
+import com.addonstation.mobile.data.toApiError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -167,11 +169,30 @@ class ChatViewModel(private val container: AppContainer) {
         if (lastId > 0) {
             val newer = container.chat.messagesSince(channelId, lastId)
             if (newer.isNotEmpty()) {
-                val mapped = newer.filter { m -> current.none { it.message.id == m.id } }.map { toUi(it) }
-                if (mapped.isNotEmpty()) {
-                    _messages.value = current + mapped
-                    _newMessagesBelow.value = true
+                val myId = container.supabase.session()?.userId
+                var list = current
+                val mapped = mutableListOf<ChatMessageUi>()
+                for (message in newer) {
+                    // نسختي المؤقتة (رقمها سالب) التي وصلت من الخادم ⇒ تُستبدل
+                    // في مكانها فلا تتكرّر الرسالة مرّتين ولا يهتزّ الموضع.
+                    val draft = list.firstOrNull {
+                        it.message.id < 0L && it.message.userId == message.userId && sameDraft(it.message, message)
+                    }
+                    if (draft != null) {
+                        list = list.map {
+                            if (it.message.id == draft.message.id) {
+                                it.copy(message = message, pending = false, failed = false)
+                            } else {
+                                it
+                            }
+                        }
+                    } else if (list.none { it.message.id == message.id }) {
+                        mapped += toUi(message)
+                    }
                 }
+                if (mapped.isNotEmpty() || list !== current) _messages.value = list + mapped
+                // رسائل الآخرين فقط ترفع شارة «رسائل بالأسفل» — لا رسائلي أنا
+                if (mapped.any { it.message.userId != myId }) _newMessagesBelow.value = true
             }
         }
     }
@@ -208,6 +229,17 @@ class ChatViewModel(private val container: AppContainer) {
         }
     }
 
+    /**
+     * هل الرسالتان نسختان لشيء واحد؟ (نفس المرسِل والنص والمرفقات)
+     * تستعملها المطابقة لتأكيد الرسالة المؤقتة حين يسبق الاستطلاع ردّ الإرسال.
+     */
+    private fun sameDraft(a: ChatMessage, b: ChatMessage): Boolean =
+        a.userId == b.userId &&
+            a.content.orEmpty() == b.content.orEmpty() &&
+            a.stickerUrl.orEmpty() == b.stickerUrl.orEmpty() &&
+            a.imagePath.orEmpty() == b.imagePath.orEmpty() &&
+            a.mediaPath.orEmpty() == b.mediaPath.orEmpty()
+
     fun send(
         content: String?,
         replyTo: ChatMessage? = null,
@@ -216,8 +248,12 @@ class ChatViewModel(private val container: AppContainer) {
         messageType: String = "text",
         mediaPath: String? = null,
         mediaMime: String? = null,
+        mediaDuration: Int? = null,
         mediaSize: Long? = null,
-        onDone: (Boolean, String?) -> Unit,
+        /** معاينة محلية (ملف) للصورة أو لإطار الفيديو قبل توقيع رابطها. */
+        localPreview: String? = null,
+        /** (نجح؟، سبب الفشل) — السبب **نوع خطأ** لا نصّ خام، فيُترجم في الشاشة. */
+        onDone: (Boolean, ApiErrorKind?) -> Unit,
     ) {
         val channel = _channel.value ?: return
         val myId = container.supabase.session()?.userId.orEmpty()
@@ -235,6 +271,7 @@ class ChatViewModel(private val container: AppContainer) {
             imagePath = imagePath,
             mediaPath = mediaPath,
             mediaMimeType = mediaMime,
+            mediaDuration = mediaDuration,
             mediaSize = mediaSize,
             replyToId = replyTo?.id,
             createdAt = com.addonstation.mobile.util.TimeFormat.isoNow(),
@@ -246,6 +283,7 @@ class ChatViewModel(private val container: AppContainer) {
             replyTo = replyTo,
             replyAuthorName = replyTo?.let { _authors.value[it.userId]?.username },
             pending = true,
+            localPreview = localPreview,
         )
         // رسالتي أنا: تظهر دائماً وتُمرَّر إليها، والشارة «رسائل بالأسفل» تُصفَّر
         _newMessagesBelow.value = false
@@ -264,24 +302,28 @@ class ChatViewModel(private val container: AppContainer) {
                     messageType = messageType,
                     mediaPath = mediaPath,
                     mediaMime = mediaMime,
+                    mediaDuration = mediaDuration,
                     mediaSize = mediaSize,
                     mentionIds = mentions,
                 )
             }.onSuccess { sent ->
-                // ② الخادم لم يُرجع رقماً ⇒ نحذف المؤقتة ونترك الاستطلاع يجلب النسخة الحقيقية
+                // ② الخادم لم يُرجع رقماً ⇒ نُبقيها «قيد الإرسال» ويؤكّدها
+                // الاستطلاع/الاستقبال بالمطابقة (لا تختفي ولا تتكرّر).
                 if (sent.id <= 0L) {
-                    _messages.value = _messages.value.filterNot { it.message.id == tempId }
                     onDone(true, null)
                     refreshTails()
                     return@onSuccess
                 }
                 // ③ نستبدل المؤقتة بالرسالة الحقيقية — ولو سبقها الاستقبال نُبقي نسخة واحدة فقط
                 val current = _messages.value
-                if (current.any { it.message.id == tempId }) {
-                    _messages.value = current
-                        .filterNot { it.message.id == sent.id && it.message.id != tempId }
-                        .map { if (it.message.id == tempId) it.copy(message = sent, pending = false) else it }
-                } else if (current.none { it.message.id == sent.id }) {
+                if (current.any { it.message.id == sent.id }) {
+                    // الاستقبال اللحظي سبق ردّ الإرسال ⇒ نحذف المؤقتة المكرَّرة
+                    _messages.value = current.filterNot { it.message.id == tempId }
+                } else if (current.any { it.message.id == tempId }) {
+                    _messages.value = current.map {
+                        if (it.message.id == tempId) it.copy(message = sent, pending = false) else it
+                    }
+                } else {
                     _messages.value = current + ChatMessageUi(
                         message = sent,
                         author = _authors.value[sent.userId] ?: meProfile,
@@ -292,11 +334,81 @@ class ChatViewModel(private val container: AppContainer) {
                 onDone(true, null)
                 refreshTails()
             }.onFailure { e ->
-                // ③ فشل الإرسال ⇒ تختفي الرسالة المؤقتة حتى لا تبقى معلّقة
-                _messages.value = _messages.value.filterNot { it.message.id == tempId }
-                onDone(false, e.message)
+                // ③ فشل الإرسال ⇒ الرسالة **تبقى** ظاهرة موسومة بـ«لم تُرسل»
+                // ومعها زر إعادة المحاولة (بدل أن تختفي فيظنّ صاحبها أنها أُرسلت).
+                _messages.value = _messages.value.map {
+                    if (it.message.id == tempId) it.copy(pending = false, failed = true) else it
+                }
+                onDone(false, e.toApiError().kind)
             }
         }
+    }
+
+    /**
+     * إعادة إرسال رسالة فاشلة من مكانها: تبقى في القائمة ويتبدّل وسمها من
+     * «لم تُرسل» إلى «قيد الإرسال» ثم إلى مؤكَّدة — بلا خروج من الغرفة.
+     *
+     * قبل الإرسال نتحقّق أن الخادم لم يقبلها أصلاً (انقطع الردّ مثلاً): فإن
+     * وُجدت نسختها الحقيقية اكتفينا بتأكيدها ولم نُرسلها مرّتين.
+     */
+    fun retry(messageId: Long, onDone: (Boolean, ApiErrorKind?) -> Unit = { _, _ -> }) {
+        val ui = _messages.value.firstOrNull { it.message.id == messageId } ?: return
+        if (!ui.failed) return
+        val draft = ui.message
+        _messages.value = _messages.value.map {
+            if (it.message.id == messageId) it.copy(pending = true, failed = false) else it
+        }
+        scope.launch {
+            runCatching { refreshTails() }
+            // الخادم قبلها وانقطع الردّ سابقاً ⇒ المطابقة أكّدتها برقمها الحقيقي
+            // فلا نُعيد إرسالها مرّة ثانية (اختفت برقمها المؤقت أو صارت مؤكَّدة).
+            val current = _messages.value.firstOrNull { it.message.id == messageId }
+            if (current == null || (!current.pending && !current.failed)) {
+                onDone(true, null)
+                return@launch
+            }
+            runCatching {
+                container.chat.send(
+                    channelId = draft.channelId,
+                    content = draft.content,
+                    replyToId = draft.replyToId,
+                    stickerUrl = draft.stickerUrl,
+                    imagePath = draft.imagePath,
+                    messageType = draft.messageType,
+                    mediaPath = draft.mediaPath,
+                    mediaMime = draft.mediaMimeType,
+                    mediaDuration = draft.mediaDuration,
+                    mediaSize = draft.mediaSize,
+                )
+            }.onSuccess { sent ->
+                val current = _messages.value      // لقطة واحدة: لا نقرأ القائمة مرّتين
+                if (sent.id > 0L) {
+                    _messages.value = current.map {
+                        if (it.message.id == messageId) {
+                            it.copy(message = sent, pending = false, failed = false)
+                        } else {
+                            it
+                        }
+                    }
+                } else {
+                    _messages.value = current.map {
+                        if (it.message.id == messageId) it.copy(pending = false) else it
+                    }
+                }
+                onDone(true, null)
+                refreshTails()
+            }.onFailure { e ->
+                _messages.value = _messages.value.map {
+                    if (it.message.id == messageId) it.copy(pending = false, failed = true) else it
+                }
+                onDone(false, e.toApiError().kind)
+            }
+        }
+    }
+
+    /** إسقاط رسالة فاشلة من القائمة (صاحبها قرّر ألا يعيد إرسالها). */
+    fun discard(messageId: Long) {
+        _messages.value = _messages.value.filterNot { it.message.id == messageId }
     }
 
     fun toggleReaction(messageId: Long, emoji: String) {

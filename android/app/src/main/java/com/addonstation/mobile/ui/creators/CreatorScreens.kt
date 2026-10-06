@@ -203,6 +203,7 @@ fun CreatorProfileScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val profile by container.state.profile.collectAsState()
+    val signedIn by container.state.signedIn.collectAsState()
     val methods by container.state.paymentMethods.collectAsState()
 
     var card by remember { mutableStateOf<CreatorCard?>(null) }
@@ -273,7 +274,7 @@ fun CreatorProfileScreen(
 
             SectionHeader(title = stringResource(R.string.creator_tip_title), leadingEmoji = "💛")
             GlassCard(color = AppColors.Gold.copy(alpha = 0.06f), borderColor = AppColors.Gold.copy(alpha = 0.3f)) {
-                if (profile == null) {
+                if (!signedIn) {
                     Text(stringResource(R.string.msg_sign_in_needed), style = AppText.bodySmall, color = AppColors.Muted)
                 } else {
                     OutlinedTextField(

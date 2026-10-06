@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -67,10 +68,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.R
+import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.model.ChatChannel
 import com.addonstation.mobile.data.model.ChatMessage
 import com.addonstation.mobile.data.model.ChatMessageUi
 import com.addonstation.mobile.data.model.Profile
+import com.addonstation.mobile.data.repo.ChatRepository
+import com.addonstation.mobile.ui.apiErrorText
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.community.isReadOnlyFor
 import com.addonstation.mobile.ui.components.EmptyState
@@ -88,6 +92,33 @@ import java.util.Locale
  * شاشة الشات بأسلوب Discord: الترويسة، قائمة الرسائل بالتجميع وفواصل التواريخ،
  * شريط الكتابة (إرفاق/ملصقات/إيموجي/إرسال)، المنشن، الردود، التفاعلات، والجديد ↓.
  */
+/**
+ * مرفق ينتظر الإرسال داخل مربع الإرسال (صورة · فيديو · صوت).
+ *
+ * الفكرة: يختار المستخدم الملف فتظهر **معايـنته** (صورته أو إطار الفيديو)
+ * داخل مربع الإرسال — كما في تليجرام — ويكتب تحتها ما يشاء، ثم زر الإرسال
+ * يخرجهما معاً في رسالة واحدة.
+ *
+ * @param kind نوع المرفق: "image" · "video" · "audio" (وهو نفس رسالته على الخادم).
+ * @param localPreview ملف محلي للمعاينة (صورة أو إطار فيديو) يُعرض فوراً بلا شبكة.
+ * @param remotePath مسار الملف في المخزن بعد نجاح الرفع — لا يُرسل بدونه.
+ * @param sourceUri أصل الملف من المعرض، لإعادة الرفع إن فشل.
+ */
+private data class PendingAttachment(
+    val kind: String,
+    val localPreview: String? = null,
+    val remotePath: String? = null,
+    val mime: String? = null,
+    val durationSeconds: Int? = null,
+    val sizeBytes: Long? = null,
+    val sourceUri: Uri? = null,
+    val uploading: Boolean = false,
+    val failed: Boolean = false,
+) {
+    /** جاهز للإرسال = اكتمل رفعه. */
+    val isReady: Boolean get() = !remotePath.isNullOrBlank()
+}
+
 @Composable
 fun ChatScreen(
     channel: ChatChannel,
@@ -110,6 +141,7 @@ fun ChatScreen(
     val stickers by vm.stickers.collectAsState()
     val packs by vm.packs.collectAsState()
     val profile by container.state.profile.collectAsState()
+    val signedIn by container.state.signedIn.collectAsState()
     val chatStatus by container.state.chatStatus.collectAsState()
     // **القراءة فقط**: في الغرف المقفلة أو التي صلاحيتها admin_only لا يملك
     // المستخدم حق الكتابة ⇒ نُخفي عنه شريط الكتابة بالكامل (بما فيه زر الإرسال).
@@ -119,7 +151,10 @@ fun ChatScreen(
     var replyTo by remember { mutableStateOf<ChatMessage?>(null) }
     /** ملصق أُزيل بضغطة سريعة ⇒ لوحة الملصقات تُفتح عليه مباشرة (العودة لمكانه). */
     var resentSticker by remember { mutableStateOf<String?>(null) }
-    var attachment by remember { mutableStateOf<Pair<String, String>?>(null) } // (path, kind)
+    /** المرفق الجاهز للإرسال (بعد نجاح رفعه) — صورة أو فيديو أو صوت. */
+    var attachment by remember { mutableStateOf<PendingAttachment?>(null) }
+    /** المرفق الذي ما زال يُرفع (أو فشل رفعه) — لا يُرسل قبل أن يجهز. */
+    var uploading by remember { mutableStateOf<PendingAttachment?>(null) }
     /**
      * ملصق اختاره المستخدم ولم يُرسله بعد: تظهر **معاينته داخل مربع الإرسال**،
      * ويستطيع أن يكتب معه نصاً إن أراد، ثم يضغط إرسال — فيخرجان في رسالة واحدة
@@ -139,17 +174,16 @@ fun ChatScreen(
         scope.launch { container.chat.imageUrl(path)?.let { imageViewerUrl = it } }
     }
     var statusMessage by remember { mutableStateOf<String?>(null) }
+    /** سبب فشل الإرسال (يُترجَم في الشاشة) — لا نعرض رمز الخادم الخام. */
+    var statusError by remember { mutableStateOf<ApiErrorKind?>(null) }
     var pinnedMessages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
-    var mediaToSend by remember { mutableStateOf<Triple<String, String, String>?>(null) } // path,mime,type
+    var videoViewerUrl by remember { mutableStateOf<String?>(null) }
 
     val listState = rememberLazyListState()
 
     // نصوص تُستخدم داخل لامبدات (stringResource دالة Composable فلا تُستدعى داخل اللامبدا)
-    val audioSentMsg = stringResource(R.string.chat_audio_sent)
-    val videoSentMsg = stringResource(R.string.chat_video_sent)
     val audioLabel = stringResource(R.string.chat_audio_label)
     val videoLabel = stringResource(R.string.chat_video_label)
-    val sendLabel = stringResource(R.string.chat_send)
     val reportSentMsg = stringResource(R.string.chat_report_sent)
     val deleteExpiredMsg = stringResource(R.string.chat_delete_expired)
     val mediaAdminMsg = stringResource(R.string.chat_media_admin_only)
@@ -158,8 +192,13 @@ fun ChatScreen(
     val pinMsg = stringResource(R.string.chat_pin)
     val unpinMsg = stringResource(R.string.chat_unpin)
     val imageFormatsMsg = stringResource(R.string.chat_image_formats)
+    val imageMaxMsg = stringResource(R.string.chat_image_max)
     val mediaMaxMsg = stringResource(R.string.chat_media_max)
     val failedMsg = stringResource(R.string.item_download_failed)
+    val uploadingMsg = stringResource(R.string.chat_uploading)
+    val uploadFailedMsg = stringResource(R.string.chat_upload_failed)
+    val retryLabel = stringResource(R.string.common_retry)
+    val notSentMsg = stringResource(R.string.chat_send_failed)
 
     LaunchedEffect(channel.id) { vm.open(channel) }
     DisposableEffect(channel.id) { onDispose { vm.close() } }
@@ -195,24 +234,61 @@ fun ChatScreen(
     }
     LaunchedEffect(Unit) { vm.markReadUpToBottom() }
 
+    /**
+     * رفع صورة: تُقرأ وتُصغَّر، وتُحفظ منها نسخة محلية تظهر **فوراً** في مربع
+     * الإرسال (معاينة كتليجرام) ثم في الرسالة لحظة إرسالها — فلا تبقى الصورة
+     * بيضاء في انتظار رابط الخادم.
+     */
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             val prepared = com.addonstation.mobile.util.prepareImageForUpload(context, uri, maxSide = 1080)
-            val bytes = prepared?.bytes ?: context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            val bytes = prepared?.bytes
+                ?: com.addonstation.mobile.util.readBytes(context, uri, maxBytes = ChatRepository.MAX_IMAGE_BYTES)
             if (bytes == null) {
-                statusMessage = failedMsg
+                // أكبر من ٤ ميغابايت أو ملف لا يُقرأ — نُخبره بدل صمتٍ مربك
+                statusMessage = if (prepared == null) imageMaxMsg else failedMsg
                 return@launch
             }
             val mime = prepared?.mime ?: context.contentResolver.getType(uri) ?: "image/jpeg"
+            if (mime !in ChatRepository.ALLOWED_IMAGE_MIME) {
+                statusMessage = imageFormatsMsg
+                return@launch
+            }
             val name = prepared?.fileName ?: "chat-${System.currentTimeMillis()}.jpg"
+            val preview = com.addonstation.mobile.util.cachePreviewFile(
+                context, bytes, if (mime == "image/png") "png" else "jpg",
+            )
+            val draft = PendingAttachment(
+                kind = "image",
+                localPreview = preview,
+                mime = mime,
+                sizeBytes = bytes.size.toLong(),
+                sourceUri = uri,
+                uploading = true,
+            )
+            uploading = draft
             container.chat.uploadImage(bytes, mime, name)
                 // صورة وملصق في رسالة واحدة غير واضحين ⇒ الصورة تُسقط الملصق المنتظر
-                .onSuccess { path -> attachment = path to "image"; pendingSticker = null }
-                .onFailure { statusMessage = imageFormatsMsg }
+                .onSuccess { path ->
+                    uploading = null
+                    attachment = draft.copy(uploading = false, remotePath = path)
+                    pendingSticker = null
+                    statusMessage = null
+                }
+                .onFailure {
+                    // فشل الرفع: تبقى المعاينة مع زر «إعادة المحاولة» ولا يضيع شيء
+                    uploading = draft.copy(uploading = false, failed = true)
+                    statusMessage = imageFormatsMsg
+                }
         }
     }
 
+    /**
+     * رفع فيديو/صوت (للأدمن فقط): للفيديو نستخرج **إطاراً مصغّراً ومدّته** من
+     * الملف على الجهاز فيظهر كبطاقة صورة بزر تشغيل (كتليجرام) لا صندوقاً
+     * رمادياً. الصورة المصغّرة تُرفع معه ليراها بقية الأعضاء.
+     */
     val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
@@ -222,19 +298,144 @@ fun ChatScreen(
                 statusMessage = mediaAdminMsg
                 return@launch
             }
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@launch
-            val mime = context.contentResolver.getType(uri) ?: "audio/mpeg"
+            val bytes = com.addonstation.mobile.util.readBytes(context, uri, maxBytes = ChatRepository.MAX_MEDIA_BYTES)
+            if (bytes == null) {
+                statusMessage = mediaMaxMsg
+                return@launch
+            }
+            val mime = context.contentResolver.getType(uri) ?: "video/mp4"
             val isVideo = mime.startsWith("video")
+            val kind = if (isVideo) "video" else "audio"
             val name = (if (isVideo) "video-" else "audio-") + System.currentTimeMillis()
+            // إطار + مدّة يُستخرجان مرة واحدة، ثم تُقرأ النتائج داخل اللامبدات
+            // كـ val ثابتة (المتغيّر المُلتقَط لا يقبل التحقّق من الفراغ).
+            val meta = if (isVideo) com.addonstation.mobile.util.extractVideoMeta(context, uri) else null
+            val duration = meta?.durationSeconds
+            val thumbPath = meta?.thumbPath
+            val draft = PendingAttachment(
+                kind = kind,
+                localPreview = thumbPath,
+                mime = mime,
+                durationSeconds = duration,
+                sizeBytes = bytes.size.toLong(),
+                sourceUri = uri,
+                uploading = true,
+            )
+            uploading = draft
             container.chat.uploadMedia(bytes, mime, name)
-                .onSuccess { path -> mediaToSend = Triple(path, mime, if (isVideo) "video" else "audio") }
-                .onFailure { statusMessage = mediaMaxMsg }
+                .onSuccess { path ->
+                    // إطار الفيديو يُرفع معه (مساره مشتق من مسار الفيديو) ليراه الجميع
+                    if (isVideo && thumbPath != null) {
+                        val thumb = runCatching { java.io.File(thumbPath).readBytes() }.getOrNull()
+                        if (thumb != null) runCatching { container.chat.uploadVideoThumb(thumb, path) }
+                    }
+                    uploading = null
+                    attachment = draft.copy(uploading = false, remotePath = path)
+                    statusMessage = null
+                }
+                .onFailure {
+                    uploading = draft.copy(uploading = false, failed = true)
+                    statusMessage = mediaMaxMsg
+                }
+        }
+    }
+
+    /**
+     * إعادة رفع مرفق فاشل (نفس الملف الذي اختاره) — بلا اختيارٍ من جديد.
+     */
+    fun retryUpload(draft: PendingAttachment) {
+        val uri = draft.sourceUri ?: return
+        scope.launch {
+            val bytes = com.addonstation.mobile.util.readBytes(
+                context, uri, maxBytes = if (draft.kind == "image") ChatRepository.MAX_IMAGE_BYTES else ChatRepository.MAX_MEDIA_BYTES,
+            )
+            if (bytes == null) {
+                statusMessage = if (draft.kind == "image") imageMaxMsg else mediaMaxMsg
+                return@launch
+            }
+            uploading = draft.copy(uploading = true, failed = false)
+            val result = if (draft.kind == "image") {
+                val prepared = com.addonstation.mobile.util.prepareImageForUpload(context, uri, maxSide = 1080)
+                val finalBytes = prepared?.bytes ?: bytes
+                val finalMime = prepared?.mime ?: draft.mime ?: "image/jpeg"
+                val preview = com.addonstation.mobile.util.cachePreviewFile(
+                    context, finalBytes, if (finalMime == "image/png") "png" else "jpg",
+                )
+                uploading = draft.copy(uploading = true, failed = false, localPreview = preview, mime = finalMime)
+                container.chat.uploadImage(finalBytes, finalMime, prepared?.fileName ?: "chat-${System.currentTimeMillis()}.jpg")
+            } else {
+                container.chat.uploadMedia(bytes, draft.mime ?: "video/mp4", (if (draft.kind == "video") "video-" else "audio-") + System.currentTimeMillis())
+            }
+            result.onSuccess { path ->
+                val ready = (uploading ?: draft).copy(uploading = false, failed = false, remotePath = path)
+                uploading = null
+                attachment = ready
+                statusMessage = null
+            }.onFailure {
+                uploading = (uploading ?: draft).copy(uploading = false, failed = true)
+                statusMessage = if (draft.kind == "image") imageFormatsMsg else mediaMaxMsg
+            }
+        }
+    }
+
+    /**
+     * مسار إرسال **واحد** لكل الأنواع (نص · صورة · فيديو · صوت · ملصق): ما
+     * يُكتب في الحقل هو تعليق المرفق، فيخرجان في **رسالة واحدة** كتليجرام.
+     *
+     * لماذا دالة واحدة؟ كان لكل نوع مسارٌ مستقل (زر «إرسال» للنص والملصق،
+     * ورابط «إرسال» صغير للوسائط) فتكرّر الكود وظهرت أخطاء الإرسال في مسار
+     * دون الآخر. الآن مسار واحد: الفقاعة تظهر فوراً، وإن فشل الإرسال بقيت
+     * الرسالة ظاهرة موسومة بـ«لم تُرسل» مع زر إعادة المحاولة (لا تختفي فيظنّ
+     * صاحبها أنها وصلت ويضطر إلى الخروج والعودة ليتأكد).
+     */
+    fun sendNow() {
+        val pendingUpload = uploading
+        if (pendingUpload != null) {
+            statusMessage = if (pendingUpload.failed) uploadFailedMsg else uploadingMsg
+            return
+        }
+        val attach = attachment
+        val body = text.trim()
+        val sticker = pendingSticker
+        val replySnapshot = replyTo
+        if (body.isEmpty() && attach == null && sticker == null) return
+        text = ""                // مسح فوري: الفقاعة تظهر الآن، ولا يمكن إرسالها مرّتين
+        pendingSticker = null
+        replyTo = null
+        attachment = null
+        vm.send(
+            content = body.ifEmpty { null },
+            replyTo = replySnapshot,
+            stickerUrl = sticker,
+            imagePath = if (attach?.kind == "image") attach.remotePath else null,
+            messageType = when {
+                sticker != null -> "sticker"
+                attach != null -> attach.kind
+                else -> "text"
+            },
+            mediaPath = if (attach != null && attach.kind != "image") attach.remotePath else null,
+            mediaMime = attach?.mime,
+            mediaDuration = attach?.durationSeconds,
+            mediaSize = attach?.sizeBytes,
+            localPreview = attach?.localPreview,
+        ) { ok, errorKind ->
+            statusError = null
+            if (ok) {
+                statusMessage = null
+            } else {
+                if (text.isEmpty()) text = body   // استرجاع ما كتبه إن فشل الإرسال
+                if (pendingSticker == null) pendingSticker = sticker   // الملصق لا يضيع
+                if (attachment == null) attachment = attach           // المرفق لا يضيع
+                replyTo = replySnapshot
+                // سبب الرفض **مترجَم** (مكتوم · ممنوع · حدّ المعدّل …) لا رمز خام
+                statusMessage = notSentMsg
+                statusError = errorKind
+            }
         }
     }
 
     val isMuted = chatStatus?.muted == true
     val isBanned = chatStatus?.banned == true
-    val signedIn = profile != null
     val roomLocked = channel.isLocked
     val canPost = signedIn && !isMuted && !isBanned && !roomLocked
 
@@ -294,6 +495,19 @@ fun ChatScreen(
                                 authors[userId]?.let { onOpenUser(it) }
                             },
                             stickerUrlResolver = { path -> container.siteAssetUrl(path) },
+                            onPlayVideo = {
+                                // رابط الفيديو يُوقَّع عند الضغط (صالح دقائق) ثم يُشغَّل
+                                scope.launch {
+                                    val path = ui.message.mediaPath
+                                    if (path.isNullOrBlank()) return@launch
+                                    val url = container.chat.mediaUrl(path)
+                                    if (url != null) videoViewerUrl = url else statusMessage = failedMsg
+                                }
+                            },
+                            onRetry = { statusError = null; vm.retry(ui.message.id) },
+                            onDiscard = { vm.discard(ui.message.id) },
+                            notSentLabel = notSentMsg,
+                            retryLabel = retryLabel,
                         )
                     }
                 }
@@ -358,83 +572,30 @@ fun ChatScreen(
             }
         }
 
-        attachment?.let { (path, kind) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(AppColors.Elevated)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    if (kind == "image") "🖼 " + stringResource(R.string.chat_add_photo) else "🎬 " + videoLabel,
-                    style = AppText.tiny,
-                    color = AppColors.Text,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = null,
-                    tint = AppColors.Muted,
-                    modifier = Modifier.size(16.dp).clickable { attachment = null },
-                )
-            }
+        // معاينة المرفق داخل مربع الإرسال (صورة/فيديو/صوت) — تُكتب تحتها أي
+        // تعليق في الحقل نفسه، ثم زر الإرسال يخرجهما **رسالة واحدة** كتليجرام.
+        (uploading ?: attachment)?.let { pending ->
+            PendingAttachmentPreview(
+                attachment = pending,
+                uploadingLabel = uploadingMsg,
+                failedLabel = uploadFailedMsg,
+                retryLabel = retryLabel,
+                onRemove = {
+                    uploading = null
+                    attachment = null
+                },
+                onRetry = { retryUpload(pending) },
+            )
         }
 
-        mediaToSend?.let { (path, mime, type) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(AppColors.Elevated)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    (if (type == "video") "🎬 " else "🎙️ ") + (if (type == "video") videoLabel else audioLabel),
-                    style = AppText.tiny,
-                    color = AppColors.Text,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    sendLabel,
-                    style = AppText.tiny,
-                    color = AppColors.Green,
-                    modifier = Modifier.clickable {
-                        // الوسائط مع أي كتابة ⇒ رسالة واحدة
-                        val body = text.trim()
-                        val replySnapshot = replyTo
-                        text = ""            // مسح فوري: يمنع الإرسال مرّتين بالضغط المتكرر
-                        replyTo = null
-                        vm.send(
-                            content = body.ifEmpty { null },
-                            replyTo = replySnapshot,
-                            messageType = type,
-                            mediaPath = path,
-                            mediaMime = mime,
-                        ) { ok, error ->
-                            if (ok) {
-                                mediaToSend = null
-                                statusMessage = if (type == "video") videoSentMsg else audioSentMsg
-                            } else {
-                                if (text.isEmpty()) text = body   // لا يضيع ما كتبه
-                                replyTo = replySnapshot
-                                statusMessage = error
-                            }
-                        }
-                    },
-                )
-                Spacer(Modifier.size(10.dp))
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = null,
-                    tint = AppColors.Muted,
-                    modifier = Modifier.size(16.dp).clickable { mediaToSend = null },
-                )
-            }
+        // سبب الفشل **مترجَم** (إن وُجد) فوق رسالة الحالة المعتادة
+        if (statusError != null) {
+            Text(
+                apiErrorText(statusError!!),
+                style = AppText.tiny,
+                color = AppColors.Red,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            )
         }
 
         statusMessage?.let { message ->
@@ -504,37 +665,7 @@ fun ChatScreen(
                 },
                 onAttach = { showAttach = true },
                 onEmoji = { showEmoji = true },
-                onSend = {
-                    val content = text.trim()
-                    if (content.isEmpty() && attachment == null && pendingSticker == null) return@ChatInputBar
-                    val attach = attachment
-                    val sticker = pendingSticker
-                    val replySnapshot = replyTo
-                    text = ""                // مسح فوري: الفقاعة تظهر الآن، ولا يمكن إرسالها مرّتين
-                    pendingSticker = null
-                    replyTo = null
-                    vm.send(
-                        content = content.ifEmpty { null },
-                        replyTo = replySnapshot,
-                        stickerUrl = sticker,
-                        imagePath = if (attach?.second == "image") attach.first else null,
-                        messageType = when {
-                            sticker != null -> "sticker"
-                            attach?.second == "image" -> "image"
-                            else -> "text"
-                        },
-                    ) { ok, error ->
-                        if (ok) {
-                            attachment = null
-                            statusMessage = null
-                        } else {
-                            if (text.isEmpty()) text = content   // استرجاع ما كتبه إن فشل الإرسال
-                            if (pendingSticker == null) pendingSticker = sticker   // الملصق لا يضيع
-                            replyTo = replySnapshot
-                            statusMessage = error
-                        }
-                    }
-                },
+                onSend = { sendNow() },
                 remaining = 500 - text.length,
                 mentionSuggestions = if (text.endsWith("@")) authors.values.map { it.username ?: "" }
                     .filter { it.isNotBlank() }.take(40) else emptyList(),
@@ -675,6 +806,10 @@ fun ChatScreen(
 
     imageViewerUrl?.let { url ->
         com.addonstation.mobile.ui.common.FullScreenImageViewer(url = url) { imageViewerUrl = null }
+    }
+
+    videoViewerUrl?.let { url ->
+        FullScreenVideoPlayer(url = url) { videoViewerUrl = null }
     }
 }
 
@@ -939,6 +1074,137 @@ private fun PendingStickerPreview(
     }
 }
 
+/**
+ * معاينة المرفق داخل مربع الإرسال (كتليجرام): صورة مصغّرة + اسم النوع + حالة
+ * الرفع (جارٍ الرفع · فشل ⇒ إعادة المحاولة) + زر ✕ أحمر لإلغائه.
+ *
+ * تظهر **فور** اختيار الملف من المعرض (قبل انتهاء الرفع) حتى يرى المستخدم ما
+ * أرفقه فعلاً، ويكتب تعليقه تحته ثم يضغط إرسال.
+ */
+@Composable
+private fun PendingAttachmentPreview(
+    attachment: PendingAttachment,
+    uploadingLabel: String,
+    failedLabel: String,
+    retryLabel: String,
+    onRemove: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(AppColors.Elevated)
+            .border(1.dp, AppColors.Border, RoundedCornerShape(14.dp))
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (attachment.localPreview != null && attachment.kind != "audio") {
+                VideoTile(
+                    thumbUrl = null,
+                    localPreview = attachment.localPreview,
+                    durationSeconds = if (attachment.kind == "video") attachment.durationSeconds else null,
+                    modifier = Modifier.size(78.dp),
+                    // لا تشغيل من مربع الإرسال: الضغطة = إزالة (كما في تليجرام)
+                    onClick = onRemove,
+                )
+            } else if (attachment.kind != "audio") {
+                com.addonstation.mobile.ui.components.CoverImage(
+                    url = null,
+                    radius = 12.dp,
+                    modifier = Modifier.size(78.dp),
+                )
+            } else {
+                // الصوت بلا صورة مصغّرة: رمز الميكروفون داخل بطاقة
+                Box(
+                    modifier = Modifier
+                        .size(78.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AppColors.Elevated2),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("🎙️", style = AppText.body)
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(AppColors.Red)
+                    .clickable { onRemove() }
+                    .padding(4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.chat_remove_sticker),
+                    tint = androidx.compose.ui.graphics.Color.White,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = when (attachment.kind) {
+                    "video" -> stringResource(R.string.chat_video_label)
+                    "audio" -> stringResource(R.string.chat_audio_label)
+                    else -> "🖼 " + stringResource(R.string.chat_add_photo)
+                },
+                style = AppText.bodySmall,
+                color = AppColors.Text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = buildString {
+                    if (attachment.durationSeconds != null && attachment.durationSeconds > 0) {
+                        append(TimeFormat.durationLabel(attachment.durationSeconds))
+                        append(" · ")
+                    }
+                    append(TimeFormat.fileSizeLabel(attachment.sizeBytes))
+                },
+                style = AppText.tiny,
+                color = AppColors.Muted,
+            )
+            Spacer(Modifier.height(4.dp))
+            when {
+                attachment.uploading -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    CircularProgressIndicator(
+                        color = AppColors.Green,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(12.dp),
+                    )
+                    Text(uploadingLabel, style = AppText.tiny, color = AppColors.Green)
+                }
+                attachment.failed -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(failedLabel, style = AppText.tiny, color = AppColors.Red)
+                    Text(
+                        retryLabel,
+                        style = AppText.tiny,
+                        color = AppColors.Green,
+                        modifier = Modifier.clickable { onRetry() },
+                    )
+                }
+                else -> Text(
+                    stringResource(R.string.chat_attachment_ready),
+                    style = AppText.tiny,
+                    color = AppColors.Muted,
+                )
+            }
+        }
+    }
+}
+
 /** عنصر رسالة واحدة مع التجميع، الرد المقتبس، المنشن، والتفاعلات. */
 @Composable
 private fun MessageBlock(
@@ -956,14 +1222,31 @@ private fun MessageBlock(
     onOpenImage: (String) -> Unit,
     onOpenUser: (String) -> Unit,
     stickerUrlResolver: (String) -> String?,
+    /** ضغطة على بطاقة الفيديو ⇒ تشغيله (بعد توقيع رابطه). */
+    onPlayVideo: () -> Unit = {},
+    /** إعادة إرسال رسالة فاشلة من مكانها (تبقى ظاهرة حتى تنجح). */
+    onRetry: () -> Unit = {},
+    /** إسقاط رسالة فاشلة من القائمة. */
+    onDiscard: () -> Unit = {},
+    notSentLabel: String = "",
+    retryLabel: String = "",
 ) {
     val container = rememberContainer()
     val message = ui.message
     val author = ui.author
     // رابط الصورة المرفقة: يُوقَّع من الخادم مرة واحدة لكل رسالة (بدونه تظهر فارغة)
     var imageUrl by remember(message.id, message.imagePath) { mutableStateOf<String?>(null) }
-    LaunchedEffect(message.id, message.imagePath) {
+    // إعادة توقيع الرابط عند الطلب (ضغطة على الصورة البيضاء) — لا ننتظر التحديث
+    var imageAttempt by remember(message.id) { mutableStateOf(0) }
+    LaunchedEffect(message.id, message.imagePath, imageAttempt) {
         imageUrl = message.imagePath?.let { runCatching { container.chat.imageUrl(it) }.getOrNull() }
+    }
+    val reloadImageUrl: () -> Unit = { imageAttempt += 1 }
+    // إطار الفيديو: ملف محلي إن كانت رسالتي قيد الإرسال، وإلا رابط موقّع
+    var videoThumbUrl by remember(message.id, message.mediaPath) { mutableStateOf<String?>(null) }
+    LaunchedEffect(message.id, message.mediaPath, imageAttempt) {
+        videoThumbUrl = if (ui.localPreview != null) null
+        else runCatching { container.chat.videoThumbUrl(message.mediaPath) }.getOrNull()
     }
     val grouped = previous != null &&
         previous.message.userId == message.userId &&
@@ -1137,60 +1420,20 @@ private fun MessageBlock(
                             com.addonstation.mobile.ui.components.CoverImage(url = url, radius = 12.dp, modifier = Modifier.fillMaxSize())
                         }
                         // الوقت في نهاية الرسالة (أسفل الملصق على الحافة)
-                        MessageTime(createdAt = message.createdAt)
+                        MessageStatus(
+                            ui = ui,
+                            createdAt = message.createdAt,
+                            notSentLabel = notSentLabel,
+                            retryLabel = retryLabel,
+                            onRetry = onRetry,
+                            onDiscard = onDiscard,
+                        )
                     }
                 }
             }
             "image" -> {
-                Row(
-                    modifier = Modifier.padding(start = 48.dp, top = 4.dp),
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Column {
-                        // النص أولاً وتحته الصورة — **رسالة واحدة** كما أُرسلت
-                        if (!message.content.isNullOrBlank()) {
-                            Text(
-                                text = message.content.orEmpty(),
-                                style = AppText.chatBody,
-                                color = AppColors.Text,
-                                modifier = Modifier.padding(bottom = 6.dp),
-                            )
-                        }
-                        com.addonstation.mobile.ui.components.CoverImage(
-                            // الرابط الحقيقي للصورة (يُوقَّع من الخادم عند الحاجة)
-                            url = imageUrl,
-                            radius = 12.dp,
-                            modifier = Modifier
-                                .widthIn(max = 240.dp)
-                                .height(160.dp)
-                                .combinedClickable(
-                                    onClick = {
-                                        val path = message.imagePath
-                                        if (imageUrl != null) onOpenImage(imageUrl!!)
-                                        else if (path != null) onOpenImage(path)
-                                    },
-                                    onLongClick = onLongPress,
-                                ),
-                        )
-                        Text(
-                            "🖼",
-                            style = AppText.tiny,
-                            color = AppColors.Muted,
-                            modifier = Modifier.clickable {
-                                val path = message.imagePath
-                                if (imageUrl != null) onOpenImage(imageUrl!!)
-                                else if (path != null) onOpenImage(path)
-                            },
-                        )
-                    }
-                    // الوقت في نهاية الرسالة (أسفل الصورة على الحافة)
-                    MessageTime(createdAt = message.createdAt)
-                }
-            }
-            "audio", "video" -> {
-                // النص أولاً وتحته شريط الوسائط — **رسالة واحدة** كما أُرسلت
                 Column(modifier = Modifier.padding(start = 48.dp, top = 4.dp)) {
+                    // النص أولاً وتحته الصورة — **رسالة واحدة** كما أُرسلت
                     if (!message.content.isNullOrBlank()) {
                         Text(
                             text = message.content.orEmpty(),
@@ -1199,33 +1442,119 @@ private fun MessageBlock(
                             modifier = Modifier.padding(bottom = 6.dp),
                         )
                     }
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(AppColors.Elevated)
-                        // ضغطة مطوّلة ⇒ قائمة الرسالة نفسها (رد · نسخ · إبلاغ · حذف)
-                        .combinedClickable(onClick = onReply, onLongClick = onLongPress)
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(if (message.messageType == "video") "🎬" else "🎙️", style = AppText.bodySmall)
-                    Column {
-                        Text(
-                            if (message.messageType == "video") stringResource(R.string.chat_video_label)
-                            else stringResource(R.string.chat_audio_label),
-                            style = AppText.tiny,
-                            color = AppColors.Text,
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        // ⚠️ سبب «أرسلت صورة ولم تظهر»: الصورة كانت تقيس
+                        // بـ widthIn(max) بلا حدٍّ أدنى فيصير عرضها **صفراً**.
+                        // الآن مقاس ثابت يتبع عرض الشاشة: تظهر دائماً.
+                        ChatImageTile(
+                            url = imageUrl,
+                            localPreview = ui.localPreview,
+                            onOpen = {
+                                val path = message.imagePath
+                                if (imageUrl != null) onOpenImage(imageUrl!!)
+                                else if (path != null) onOpenImage(path)
+                            },
+                            onLongPress = onLongPress,
+                            onRetryUrl = { reloadImageUrl() },
                         )
-                        Text(
-                            TimeFormat.durationLabel(message.mediaDuration) + " · " + TimeFormat.fileSizeLabel(message.mediaSize),
-                            style = AppText.tiny,
-                            color = AppColors.Muted,
+                        // الوقت في نهاية الرسالة (أسفل الصورة على الحافة)
+                        MessageStatus(
+                            ui = ui,
+                            createdAt = message.createdAt,
+                            notSentLabel = notSentLabel,
+                            retryLabel = retryLabel,
+                            onRetry = onRetry,
+                            onDiscard = onDiscard,
                         )
                     }
-                    // الوقت في نهاية الرسالة (على حافة شريط الوسائط)
-                    MessageTime(createdAt = message.createdAt)
                 }
+            }
+            "video" -> {
+                Column(modifier = Modifier.padding(start = 48.dp, top = 4.dp)) {
+                    // النص أولاً وتحته الفيديو — **رسالة واحدة** كما أُرسلت
+                    if (!message.content.isNullOrBlank()) {
+                        Text(
+                            text = message.content.orEmpty(),
+                            style = AppText.chatBody,
+                            color = AppColors.Text,
+                            modifier = Modifier.padding(bottom = 6.dp),
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        // بطاقة فيديو كتليجرام: إطار من الفيديو + ▶ + المدّة
+                        VideoTile(
+                            thumbUrl = videoThumbUrl,
+                            localPreview = ui.localPreview,
+                            durationSeconds = message.mediaDuration,
+                            modifier = Modifier.size(
+                                width = com.addonstation.mobile.ui.theme.screenWidthFraction(
+                                    fraction = 0.58f, minDp = 150, maxDp = 250,
+                                ),
+                                height = 168.dp,
+                            ),
+                            onClick = onPlayVideo,
+                            onLongPress = onLongPress,
+                        )
+                        MessageStatus(
+                            ui = ui,
+                            createdAt = message.createdAt,
+                            notSentLabel = notSentLabel,
+                            retryLabel = retryLabel,
+                            onRetry = onRetry,
+                            onDiscard = onDiscard,
+                        )
+                    }
+                }
+            }
+            "audio" -> {
+                Column(modifier = Modifier.padding(start = 48.dp, top = 4.dp)) {
+                    // النص أولاً وتحته شريط الصوت — **رسالة واحدة** كما أُرسلت
+                    if (!message.content.isNullOrBlank()) {
+                        Text(
+                            text = message.content.orEmpty(),
+                            style = AppText.chatBody,
+                            color = AppColors.Text,
+                            modifier = Modifier.padding(bottom = 6.dp),
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(AppColors.Elevated)
+                            // ضغطة مطوّلة ⇒ قائمة الرسالة نفسها (رد · نسخ · إبلاغ · حذف)
+                            .combinedClickable(onClick = onReply, onLongClick = onLongPress)
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text("🎙️", style = AppText.bodySmall)
+                        Column {
+                            Text(
+                                stringResource(R.string.chat_audio_label),
+                                style = AppText.tiny,
+                                color = AppColors.Text,
+                            )
+                            Text(
+                                TimeFormat.durationLabel(message.mediaDuration) + " · " + TimeFormat.fileSizeLabel(message.mediaSize),
+                                style = AppText.tiny,
+                                color = AppColors.Muted,
+                            )
+                        }
+                        MessageStatus(
+                            ui = ui,
+                            createdAt = message.createdAt,
+                            notSentLabel = notSentLabel,
+                            retryLabel = retryLabel,
+                            onRetry = onRetry,
+                            onDiscard = onDiscard,
+                        )
+                    }
                 }
             }
             else -> {
@@ -1240,8 +1569,15 @@ private fun MessageBlock(
                         color = AppColors.Text,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    // الوقت في نهاية السطر (على حافة الفقاعة) — صغير وباهت
-                    MessageTime(createdAt = message.createdAt)
+                    // الوقت في نهاية السطر (على حافة الفقاعة) — أو حالة الإرسال
+                    MessageStatus(
+                        ui = ui,
+                        createdAt = message.createdAt,
+                        notSentLabel = notSentLabel,
+                        retryLabel = retryLabel,
+                        onRetry = onRetry,
+                        onDiscard = onDiscard,
+                    )
                 }
             }
         }
@@ -1321,6 +1657,108 @@ private fun MessageTime(
         color = AppColors.Dim,
         modifier = modifier,
     )
+}
+
+/**
+ * حالة الرسالة في مكان الوقت نفسه:
+ *  • قيد الإرسال ⇒ 🕓 (الرسالة باهتة حتى يردّ الخادم)؛
+ *  • فشلت ⇒ ⚠️ «لم تُرسل» + «إعادة المحاولة» + ✕ (تبقى ظاهرة ولا تختفي)؛
+ *  • مؤكَّدة ⇒ الوقت المعتاد.
+ *
+ * لماذا؟ كانت الرسالة الفاشلة **تُمحى** من القائمة فلا يعرف صاحبها إن كانت
+ * وصلت، فيخرج من الغرفة ويعود ليتأكد. الآن حالته أمامه وفي مكانه زرّ إعادة.
+ */
+@Composable
+private fun MessageStatus(
+    ui: ChatMessageUi,
+    createdAt: String?,
+    notSentLabel: String,
+    retryLabel: String,
+    onRetry: () -> Unit,
+    onDiscard: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when {
+        ui.failed -> Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("⚠️", style = AppText.tiny)
+            Text(notSentLabel, style = AppText.chatTime, color = AppColors.Red)
+            Text(
+                retryLabel,
+                style = AppText.chatTime,
+                color = AppColors.Green,
+                modifier = Modifier.clickable { onRetry() },
+            )
+            Text(
+                "✕",
+                style = AppText.chatTime,
+                color = AppColors.Muted,
+                modifier = Modifier.clickable { onDiscard() },
+            )
+        }
+        ui.pending -> Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            CircularProgressIndicator(
+                color = AppColors.Muted,
+                strokeWidth = 1.5.dp,
+                modifier = Modifier.size(10.dp),
+            )
+            Text("🕓", style = AppText.tiny)
+        }
+        else -> MessageTime(createdAt = createdAt, modifier = modifier)
+    }
+}
+
+/**
+ * بطاقة صورة داخل الرسالة: **مقاس ثابت** يتبع عرض الشاشة (فلا ينهار عرضها إلى
+ * صفر كما كان) + الضغطة تفتحها بكامل حجمها، والضغطة المطوّلة تفتح قائمتها.
+ *
+ * @param localPreview ملف الصورة على الجهاز — يُعرض فوراً للرسالة التي ما زالت
+ *                     قيد الإرسال، فلا تبقى فارغة حتى يُوقَّع رابط الخادم.
+ */
+@Composable
+private fun ChatImageTile(
+    url: String?,
+    localPreview: String?,
+    onOpen: () -> Unit,
+    onLongPress: () -> Unit,
+    onRetryUrl: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(
+                width = com.addonstation.mobile.ui.theme.screenWidthFraction(
+                    fraction = 0.58f, minDp = 150, maxDp = 250,
+                ),
+                height = 168.dp,
+            )
+            .clip(RoundedCornerShape(14.dp))
+            .combinedClickable(onClick = onOpen, onLongClick = onLongPress),
+    ) {
+        com.addonstation.mobile.ui.components.CoverImage(
+            url = url,
+            model = localPreview?.let { java.io.File(it) },
+            radius = 14.dp,
+            modifier = Modifier.fillMaxSize(),
+        )
+        // لم يُوقَّع الرابط بعد (أو فشل) ⇒ زرّ إعادة محاولة واضح بدل صورة بيضاء
+        if (url.isNullOrBlank() && localPreview == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { onRetryUrl() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("🖼 " + stringResource(R.string.chat_tap_to_retry), style = AppText.tiny, color = AppColors.Muted)
+            }
+        }
+    }
 }
 
 /** زر «إضافة تفاعل» في آخر صفّ التفاعلات: كبسولة （＋ وجه مبتسم） بأسلوب ديسكورد. */

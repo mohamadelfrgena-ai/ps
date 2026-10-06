@@ -77,6 +77,7 @@ fun CommunityGate(
 ) {
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
+    val signedIn by container.state.signedIn.collectAsState()
     val status by container.state.chatStatus.collectAsState()
     val scope = rememberCoroutineScope()
 
@@ -86,7 +87,6 @@ fun CommunityGate(
     }
 
     val accepted = status?.acceptedRules == true
-    val signedIn = profile != null
 
     if (signedIn && !accepted) {
         RulesScreen(
@@ -191,6 +191,7 @@ fun RoomListScreen(
 ) {
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
+    val signedIn by container.state.signedIn.collectAsState()
     val unread by container.state.unread.collectAsState()
     val wallet by container.state.wallet.collectAsState()
 
@@ -276,7 +277,7 @@ fun RoomListScreen(
                             unread = unread[channel.id]?.unread ?: 0,
                             mentions = unread[channel.id]?.mentions ?: 0,
                             selected = false,
-                            highlighted = channel.id == "lang-$appLanguage" && profile == null,
+                            highlighted = channel.id == "lang-$appLanguage" && !signedIn,
                             onClick = { onOpenRoom(channel) },
                         )
                     }
@@ -308,7 +309,9 @@ fun RoomListScreen(
                 }
                 Column(Modifier.weight(1f)) {
                     Text(
-                        profile?.displayName ?: profile?.username ?: stringResource(R.string.common_guest),
+                        profile?.displayName ?: profile?.username ?: stringResource(
+                            if (signedIn) R.string.common_loading else R.string.common_guest,
+                        ),
                         style = AppText.chatName,
                         color = AppColors.Text,
                         maxLines = 1,
@@ -316,7 +319,7 @@ fun RoomListScreen(
                     )
                     if (profile != null) {
                         RankBadge(role = profile!!.role, plan = profile!!.effectivePlan)
-                    } else {
+                    } else if (!signedIn) {
                         Text(
                             stringResource(R.string.msg_sign_in_to_participate),
                             style = AppText.tiny,

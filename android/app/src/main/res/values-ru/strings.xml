@@ -283,6 +283,12 @@
     <string name="chat_limit_500">Максимум 500 символов</string>
     <string name="chat_no_links">Ссылки и личные данные запрещены</string>
     <string name="chat_image_formats">Только JPG / PNG / WEBP</string>
+    <string name="chat_uploading">Загрузка…</string>
+    <string name="chat_upload_failed">Не удалось загрузить</string>
+    <string name="chat_send_failed">Не отправлено</string>
+    <string name="chat_tap_to_retry">Нажмите, чтобы повторить</string>
+    <string name="chat_play_video">Смотреть видео</string>
+    <string name="chat_attachment_ready">Готово к отправке — можно добавить подпись</string>
     <string name="chat_image_max">Максимальный размер изображения 4MB</string>
     <string name="chat_media_max">Максимальный размер медиафайла 100 MB.</string>
     <string name="chat_audio_sent">Аудио отправлено.</string>

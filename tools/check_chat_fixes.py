@@ -43,7 +43,10 @@ if send_fn:
     rows.append(("الإدراج الفوري قبل نداء الخادم", ins_at != -1 and call_at != -1 and ins_at < call_at))
     rows.append(("الرسالة المؤقتة برقم سالب", "var tempId = -System.currentTimeMillis()" in send_fn))
     rows.append(("استبدالها بالرسالة الحقيقية", "it.copy(message = sent, pending = false)" in send_fn))
-    rows.append(("حذفها عند فشل الإرسال", "filterNot { it.message.id == tempId }" in send_fn))
+    # الرسالة الفاشلة **تبقى** ظاهرة (موسومة) ولا تُمحى — والـ filterNot بقي
+    # لنسخة واحدة فقط: حين يسبق الاستقبال اللحظي ردّ الإرسال (لا تكرار).
+    rows.append(("لا تكرار عند سباق الاستقبال", "filterNot { it.message.id == tempId }" in send_fn
+                 and "it.message.id == sent.id" in send_fn))
     rows.append(("علامة «قيد الإرسال» في النموذج", "val pending: Boolean = false" in models))
     rows.append(("الرسالة الباهتة تُعرض أخفّ", ".alpha(if (ui.pending)" in screen))
 else:
@@ -52,7 +55,6 @@ else:
 # الاستقبال لا يعتمد على المستخدم: آخر رسالة حقيقية فقط + استطلاع لا يُسقط نفسه
 rows.append(("تحديث الذيل يتجاهل الرسالة المؤقتة", "it.message.id > 0L" in vm))
 rows.append(("حلقة التحديث لا تموت عند فشل واحد", "runCatching { refreshTails() }" in vm))
-rows.append(("لا تكرار عند سباق الاستقبال", "filterNot { it.message.id == sent.id && it.message.id != tempId }" in vm))
 #Message must also be *seen*: the list follows my own send even when the
 # "new messages below" flag is on (this was the "I have to leave the room" bug).
 rows.append(("عدّاد تمرير لكل رسالة أرسلها", "_scrollTick.value += 1" in vm and "val scrollTick" in vm))
@@ -103,11 +105,16 @@ rows.append(("زر ✕ أحمر لإلغاء الملصق",
              and "R.string.chat_remove_sticker" in screen))
 rows.append(("الإرسال يعمل بالملصق وحده",
              "canSend = text.isNotBlank() || attachment != null || pendingSticker != null" in screen))
-sticker_send = re.search(r"onSend = \{(?:.|\n)*?\n                \},", screen)
-sticker_send = sticker_send.group(0) if sticker_send else ""
-rows.append(("الملصق يُرسل مع النص المكتوب", "content = content.ifEmpty { null }" in sticker_send
-             and "stickerUrl = sticker" in sticker_send))
-rows.append(("نوع الرسالة sticker مع النص", 'sticker != null -> "sticker"' in sticker_send))
+# مسار إرسال **واحد** لكل الأنواع (نص · صورة · فيديو · صوت · ملصق): sendNow()
+send_now = re.search(r"fun sendNow\(\)(?:.|\n)*?\n    \}", screen)
+send_now = send_now.group(0) if send_now else ""
+rows.append(("مسار إرسال واحد لكل الأنواع", send_now != ""))
+rows.append(("الملصق يُرسل مع النص المكتوب", "content = body.ifEmpty { null }" in send_now
+             and "stickerUrl = sticker" in send_now))
+rows.append(("نوع الرسالة sticker مع النص", 'sticker != null -> "sticker"' in send_now))
+rows.append(("الصورة/الفيديو يُرسلان مع النص المكتوب",
+             "imagePath = if (attach?.kind == \"image\") attach.remotePath else null" in send_now
+             and "mediaPath = if (attach != null && attach.kind != \"image\") attach.remotePath else null" in send_now))
 # الرسالة نفسها: النص فوقه والملصق تحته مباشرة
 sticker_block = re.search(r'"sticker" -> \{(?:.|\n)*?\n            \}', screen)
 sticker_block = sticker_block.group(0) if sticker_block else ""
@@ -117,13 +124,14 @@ rows.append(("عرض النص فوق الملصق في نفس الرسالة",
              and sticker_block.find("message.content.orEmpty()") < sticker_block.find("CoverImage(url = url")))
 rows.append(("النص يُمسح فوراً لا بعد النجاح", "text = \"\"            // مسح فوري" in screen
              or "text = \"\"                // مسح فوري" in screen))
-rows.append(("ما كتبه يعود لو فشل الإرسال", screen.count("val replySnapshot = replyTo") >= 2
-             and "if (text.isEmpty()) text = content" in screen
-             and "if (text.isEmpty()) text = body" in screen))
+rows.append(("ما كتبه يعود لو فشل الإرسال", "val replySnapshot = replyTo" in send_now
+             and "if (text.isEmpty()) text = body" in send_now
+             and "if (attachment == null) attachment = attach" in send_now))
 rows.append(("الملصق يعود لو فشل الإرسال",
              "if (pendingSticker == null) pendingSticker = sticker" in screen))
-media_send = re.search(r"vm\.send\(\n\s+content = body\.ifEmpty \{ null \},(?:.|\n)*?mediaMime = mime,", screen)
-rows.append(("الوسائط تحمل النص المكتوب", media_send is not None))
+rows.append(("الوسائط تحمل النص المكتوب",
+             re.search(r"content = body\.ifEmpty \{ null \},[\s\S]*?mediaMime = attach\?\.mime,", send_now)
+             is not None))
 rows.append(("الرسالة المحذوفة تختفي لكل الأنواع", "return@messageBody" in screen))
 
 # ── طباعة الجدول ───────────────────────────────────────────────────────

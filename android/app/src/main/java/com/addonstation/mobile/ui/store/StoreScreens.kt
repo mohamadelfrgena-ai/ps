@@ -253,6 +253,7 @@ fun ContentDetailScreen(
     val container = rememberContainer()
     val context = LocalContext.current
     val profile by container.state.profile.collectAsState()
+    val signedIn by container.state.signedIn.collectAsState()
     val scope = rememberCoroutineScope()
 
     var item by remember { mutableStateOf<ContentItem?>(null) }
@@ -364,7 +365,7 @@ fun ContentDetailScreen(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 when {
-                    profile == null -> GradientButton(
+                    !signedIn -> GradientButton(
                         text = stringResource(R.string.item_download),
                         onClick = onLogin,
                         modifier = Modifier.weight(1f),

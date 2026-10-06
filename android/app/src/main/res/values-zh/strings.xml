@@ -283,6 +283,12 @@
     <string name="chat_limit_500">最多 500 个字符</string>
     <string name="chat_no_links">不允许发送链接和个人信息</string>
     <string name="chat_image_formats">仅支持 JPG / PNG / WEBP</string>
+    <string name="chat_uploading">正在上传…</string>
+    <string name="chat_upload_failed">上传失败</string>
+    <string name="chat_send_failed">未发送</string>
+    <string name="chat_tap_to_retry">点击重试</string>
+    <string name="chat_play_video">播放视频</string>
+    <string name="chat_attachment_ready">可以发送了，也可以写一句说明</string>
     <string name="chat_image_max">图片最大 4MB</string>
     <string name="chat_media_max">媒体文件最大 100 MB。</string>
     <string name="chat_audio_sent">音频已发送。</string>
