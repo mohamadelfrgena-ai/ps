@@ -174,6 +174,32 @@ fun AdminGate(onExit: () -> Unit, content: @Composable () -> Unit) {
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.admin_gate_hint), style = AppText.bodySmall, color = AppColors.Muted)
             Spacer(Modifier.height(18.dp))
+            // تحقّق واحد يستدعيه كلاهما: زر «فتح» وزر «تم» ✓ في لوحة المفاتيح.
+            fun verify() {
+                if (busy || cooldown > 0L) return
+                val email = myEmail
+                if (email == null) {
+                    error = wrongMsg
+                    return
+                }
+                busy = true
+                error = null
+                scope.launch {
+                    // التحقق الفعلي بكلمة المرور عبر Supabase (نفس مسار تسجيل الدخول)
+                    val result = container.auth.signIn(email, password)
+                    busy = false
+                    if (result.isSuccess) {
+                        password = ""
+                        AdminSession.unlock(myId)
+                        state = GateState.OPEN
+                    } else {
+                        AdminSession.registerFailure()
+                        cooldown = AdminSession.cooldownRemainingSeconds()
+                        error = if (cooldown > 0L) tooManyMsg else wrongMsg
+                    }
+                }
+            }
+
             // نفس حقل كلمة المرور في شاشات الحساب: **بعين 👁 داخل الحقل**
             // تُظهر النص وتُخفيه، حتى لا يُعيد المستخدم كتابتها من الصفر.
             var visible by remember { mutableStateOf(false) }
@@ -185,6 +211,7 @@ fun AdminGate(onExit: () -> Unit, content: @Composable () -> Unit) {
                     error = null
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { verify() }),
                 singleLine = true,
                 enabled = fieldEnabled,
                 visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -225,29 +252,7 @@ fun AdminGate(onExit: () -> Unit, content: @Composable () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 420.dp),
-                onClick = {
-                    if (busy || cooldown > 0L) return@GradientButton
-                    if (myEmail == null) {
-                        error = wrongMsg
-                        return@GradientButton
-                    }
-                    busy = true
-                    error = null
-                    scope.launch {
-                        // التحقق الفعلي بكلمة المرور عبر Supabase (نفس مسار تسجيل الدخول)
-                        val result = container.auth.signIn(myEmail, password)
-                        busy = false
-                        if (result.isSuccess) {
-                            password = ""
-                            AdminSession.unlock(myId)
-                            state = GateState.OPEN
-                        } else {
-                            AdminSession.registerFailure()
-                            cooldown = AdminSession.cooldownRemainingSeconds()
-                            error = if (cooldown > 0L) tooManyMsg else wrongMsg
-                        }
-                    }
-                },
+                onClick = { verify() },
             )
             Spacer(Modifier.height(10.dp))
             Text(

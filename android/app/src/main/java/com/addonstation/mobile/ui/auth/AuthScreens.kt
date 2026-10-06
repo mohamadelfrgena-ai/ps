@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActionScope
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -71,13 +73,20 @@ private fun PasswordField(
     onValueChange: (String) -> Unit,
     label: String,
     imeAction: ImeAction = ImeAction.Done,
+    supportingText: String? = null,
+    onDone: (KeyboardActionScope.() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var visible by remember { mutableStateOf(false) }
+    val hint = supportingText
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label, style = AppText.bodySmall) },
+        supportingText = hint?.let { text ->
+            @Composable { Text(text, style = AppText.tiny, color = AppColors.Muted) }
+        },
+        keyboardActions = KeyboardActions(onDone = onDone),
         leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = AppColors.Muted) },
         trailingIcon = {
             IconButton(onClick = { visible = !visible }) {
@@ -122,6 +131,32 @@ fun LoginScreen(
     val enterEmailFirst = stringResource(R.string.msg_enter_email_first)
     val sending = stringResource(R.string.msg_sending)
 
+    // عملية دخول واحدة يستدعيها كلاهما: زر «تسجيل الدخول» وزر «تم» ✓
+    // على لوحة المفاتيح — فلا يضطر المستخدم للمس الشاشة مرّتين.
+    fun submit() {
+        if (email.isBlank() || password.isBlank()) {
+            status = enterBoth
+            return
+        }
+        scope.launch {
+            busy = true
+            status = signingIn
+            errorKind = null
+            container.auth.signIn(email, password)
+                .onSuccess {
+                    container.state.setSignedIn(true)
+                    container.state.refreshAll()
+                    status = null
+                    onSuccess()
+                }
+                .onFailure { e ->
+                    status = null
+                    errorKind = e.toApiError().kind
+                }
+            busy = false
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
         SubScreenHeader(title = stringResource(R.string.auth_sign_in), onBack = onBack)
         Column(
@@ -160,6 +195,7 @@ fun LoginScreen(
                 value = password,
                 onValueChange = { password = it },
                 label = stringResource(R.string.auth_password),
+                onDone = { submit() },
             )
 
             errorKind?.let {
@@ -174,29 +210,7 @@ fun LoginScreen(
             Spacer(Modifier.height(18.dp))
             GradientButton(
                 text = "🔑 " + stringResource(R.string.auth_sign_in),
-                onClick = {
-                    if (email.isBlank() || password.isBlank()) {
-                        status = enterBoth
-                        return@GradientButton
-                    }
-                    scope.launch {
-                        busy = true
-                        status = signingIn
-                        errorKind = null
-                        container.auth.signIn(email, password)
-                            .onSuccess {
-                                container.state.setSignedIn(true)
-                                container.state.refreshAll()
-                                status = null
-                                onSuccess()
-                            }
-                            .onFailure { e ->
-                                status = null
-                                errorKind = e.toApiError().kind
-                            }
-                        busy = false
-                    }
-                },
+                onClick = { submit() },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -292,6 +306,37 @@ fun SignUpScreen(
     val noMatch = stringResource(R.string.msg_passwords_no_match)
     val createdMsg = stringResource(R.string.msg_account_created)
 
+    // عملية إنشاء واحدة: من زر «إنشاء حساب» أو من زر «تم» ✓ بلوحة المفاتيح.
+    fun submit() {
+        when {
+            username.trim().length < 3 -> status = shortUsername
+            password.length < 6 -> status = shortPassword
+            password != confirm -> status = noMatch
+            else -> scope.launch {
+                busy = true
+                errorKind = null
+                status = creating
+                container.auth.signUp(username, email, password)
+                    .onSuccess {
+                        if (container.supabase.session() != null) {
+                            container.state.setSignedIn(true)
+                            container.state.refreshAll()
+                            status = null
+                            onSuccess()
+                        } else {
+                            // تأكيد البريد مفعّل: لا جلسة حتى يفتح المستخدم الرابط
+                            status = createdMsg
+                        }
+                    }
+                    .onFailure { e ->
+                        status = null
+                        errorKind = e.toApiError().kind
+                    }
+                busy = false
+            }
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
         SubScreenHeader(title = stringResource(R.string.auth_create_account), onBack = onBack)
         Column(
@@ -341,6 +386,7 @@ fun SignUpScreen(
                 onValueChange = { password = it },
                 label = stringResource(R.string.auth_password),
                 imeAction = ImeAction.Next,
+                supportingText = stringResource(R.string.auth_password_hint),
             )
             Spacer(Modifier.height(10.dp))
             // **حقل التأكيد**: إن اختلف الحقلان لا نُنشئ الحساب ونُظهر
@@ -349,6 +395,7 @@ fun SignUpScreen(
                 value = confirm,
                 onValueChange = { confirm = it },
                 label = stringResource(R.string.auth_confirm_password),
+                onDone = { submit() },
             )
 
             errorKind?.let {
@@ -363,35 +410,7 @@ fun SignUpScreen(
             Spacer(Modifier.height(18.dp))
             GradientButton(
                 text = stringResource(R.string.auth_create_account),
-                onClick = {
-                    when {
-                        username.trim().length < 3 -> status = shortUsername
-                        password.length < 6 -> status = shortPassword
-                        password != confirm -> status = noMatch
-                        else -> scope.launch {
-                            busy = true
-                            errorKind = null
-                            status = creating
-                            container.auth.signUp(username, email, password)
-                                .onSuccess {
-                                    if (container.supabase.session() != null) {
-                                        container.state.setSignedIn(true)
-                                        container.state.refreshAll()
-                                        status = null
-                                        onSuccess()
-                                    } else {
-                                        // تأكيد البريد مفعّل: لا جلسة حتى يفتح المستخدم الرابط
-                                        status = createdMsg
-                                    }
-                                }
-                                .onFailure { e ->
-                                    status = null
-                                    errorKind = e.toApiError().kind
-                                }
-                            busy = false
-                        }
-                    }
-                },
+                onClick = { submit() },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -442,6 +461,33 @@ fun ResetPasswordScreen(
     val saving = stringResource(R.string.msg_saving)
     val saved = stringResource(R.string.msg_password_saved)
 
+    // حفظ كلمة المرور: من زر «حفظ» أو من «تم» ✓ في لوحة المفاتيح.
+    fun save() {
+        when {
+            password.length < 6 -> {
+                status = tooShort; isError = true
+            }
+            password != confirm -> {
+                status = noMatch; isError = true
+            }
+            else -> scope.launch {
+                busy = true
+                status = saving
+                container.auth.updatePassword(password)
+                    .onSuccess {
+                        status = saved
+                        isError = false
+                        onDone()
+                    }
+                    .onFailure {
+                        status = it.message
+                        isError = true
+                    }
+                busy = false
+            }
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
         SubScreenHeader(title = stringResource(R.string.auth_new_password), onBack = onBack)
         Column(
@@ -467,12 +513,14 @@ fun ResetPasswordScreen(
                 onValueChange = { password = it },
                 label = stringResource(R.string.auth_new_password),
                 imeAction = ImeAction.Next,
+                supportingText = stringResource(R.string.auth_password_hint),
             )
             Spacer(Modifier.height(10.dp))
             PasswordField(
                 value = confirm,
                 onValueChange = { confirm = it },
                 label = stringResource(R.string.auth_confirm_password),
+                onDone = { save() },
             )
             status?.let {
                 Spacer(Modifier.height(8.dp))
@@ -481,31 +529,7 @@ fun ResetPasswordScreen(
             Spacer(Modifier.height(18.dp))
             GradientButton(
                 text = stringResource(R.string.auth_save_password),
-                onClick = {
-                    when {
-                        password.length < 6 -> {
-                            status = tooShort; isError = true
-                        }
-                        password != confirm -> {
-                            status = noMatch; isError = true
-                        }
-                        else -> scope.launch {
-                            busy = true
-                            status = saving
-                            container.auth.updatePassword(password)
-                                .onSuccess {
-                                    status = saved
-                                    isError = false
-                                    onDone()
-                                }
-                                .onFailure {
-                                    status = it.message
-                                    isError = true
-                                }
-                            busy = false
-                        }
-                    }
-                },
+                onClick = { save() },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
             )
