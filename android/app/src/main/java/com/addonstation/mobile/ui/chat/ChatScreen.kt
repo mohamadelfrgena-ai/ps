@@ -1343,6 +1343,12 @@ private fun MessageBlock(
                 // ينزل سطراً تحته** — طلب المالك: سطران بدل سطر واحد.
                 // weight بلا fill: يأخذ العمود ما يحتاجه فقط، فتبقى الأداة
                 // ملاصقةً له ولا تُدفع إلى حافة الشاشة.
+                // **اللقب تحت الاسم**: لا شيء لصاحب الخطة المجانية (طلب المالك)
+                // — «Free 🍃» لا تظهر أبداً تحت الاسم. يظهر اللقب للمشترك
+                // (Epic 💎 · Legendary 👑) ولصاحب رتبة (أدمن · مشرف · مبدع).
+                // والخطة تُقرأ لحظياً عبر effectivePlan: فإن اشترك المجّاني ظهر
+                // لقبه من تلقاء نفسه، وإن انتهى اشتراكه عاد السطر فارغاً.
+                val showRankTitle = hasRankTitle(author?.role, author?.effectivePlan)
                 Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
                         text = author?.displayName ?: author?.username ?: "—",
@@ -1351,7 +1357,7 @@ private fun MessageBlock(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (author != null) {
+                    if (author != null && showRankTitle) {
                         Spacer(Modifier.height(3.dp))
                         com.addonstation.mobile.ui.components.RankBadge(
                             role = author.role,

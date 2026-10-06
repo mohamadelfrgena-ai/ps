@@ -718,7 +718,10 @@ fun DiscordProfileCardSheet(
                 )
                 Text("@${profile.username ?: ""}", style = AppText.tiny, color = AppColors.Muted)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
-                    RankBadge(role = profile.role, plan = profile.effectivePlan)
+                    // المجّاني بلا رتبة ⇒ بلا لقب (لا «Free 🍃» في الشات)
+                    if (hasRankTitle(profile.role, profile.effectivePlan)) {
+                        RankBadge(role = profile.role, plan = profile.effectivePlan)
+                    }
                     Text(
                         stringResource(R.string.profile_stats_level) + " ${profile.userLevel}",
                         style = AppText.tiny,
@@ -820,6 +823,19 @@ fun DiscordProfileCardSheet(
 
 private fun isSelf(container: com.addonstation.mobile.data.AppContainer, profile: Profile): Boolean =
     container.supabase.session()?.userId == profile.id
+
+/**
+ * هل يستحق هذا العضو **لقباً** (TheKing ✦ · Epic 💎 · Legendary 👑 …)؟
+ *
+ * طلب المالك: «أي شخص تحت الخطة المجانية ما يظهر له شيء تحت الاسم — حتى
+ * Free 🍃 تكون فاضية» ⇒ المجّاني الذي بلا رتبة **لا سطر تحت اسمه**.
+ * اللقب يظهر للمشترك (epic · legendary) ولصاحب رتبة (أدمن · مشرف · مبدع)،
+ * ويظهر من تلقاء نفسه متى اشترك المجّاني — لأن الخطة تُقرأ لحظياً
+ * عبر `Profile.effectivePlan` (المنتهية تُحسب free فيخفي اللقب).
+ */
+fun hasRankTitle(role: String?, plan: String?): Boolean =
+    role == "admin" || role == "moderator" || role == "creator" ||
+        plan == "epic" || plan == "legendary"
 
 /** توسيع صغير لعرض بطاقة ملف عضو من الرسائل. */
 @Composable

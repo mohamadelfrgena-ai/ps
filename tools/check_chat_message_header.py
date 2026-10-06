@@ -12,6 +12,7 @@
   • عاد الاسم واللقب إلى سطر واحد بجانب الصورة.
   • صغرت الأداة عن 32dp أو كبرت حتى صارت بحجم الصورة أو أكبر.
   • تغيّر مقاس الصورة عن 40dp.
+  • ظهر لقب «Free 🍃» تحت اسم صاحب الخطة المجانية (طلب المالك: لا شيء له).
 """
 import io
 import os
@@ -64,7 +65,34 @@ else:
     if "RankBadge(" not in name_col:
         problems.append("اللقب (RankBadge) ليس تحت الاسم داخل العمود نفسه")
 
-# 2) الأداة بجانبهما (خارج العمود) وبمقاسها الجديد
+# 2) المجّاني بلا لقب: «Free 🍃» لا تظهر تحت الاسم أبداً
+if header:
+    if "hasRankTitle(" not in header:
+        problems.append("لقب الرتبة غير محكوم ببوابة hasRankTitle (المجّاني سيظهر له لقب)")
+    gate = re.search(r"if \([^)]*(showRankTitle|hasRankTitle)[^)]*\)", header)
+    if not gate:
+        problems.append("نداء RankBadge ليس داخل شرط (يجب ألّا يظهر للمجّاني)")
+# تعريف البوابة نفسها: epic و legendary فقط (لا free) + الرتب الخاصة
+sheets_path = os.path.join(ROOT, "android", "app", "src", "main", "java", "com",
+                           "addonstation", "mobile", "ui", "chat", "ChatSheets.kt")
+sheets = io.open(sheets_path, encoding="utf-8").read() if os.path.exists(sheets_path) else ""
+# جسم الدالة: من تعريفها حتى أول سطر فارغ (التعبير قد يمتدّ أسطراً)
+_i = sheets.find("fun hasRankTitle(")
+_j = sheets.find("\n\n", _i)
+gate_text = sheets[_i:_j] if _i >= 0 and _j > _i else ""
+if not gate_text:
+    problems.append("دالة hasRankTitle غير معرّفة في ChatSheets.kt")
+else:
+    for plan in ("epic", "legendary"):
+        if plan not in gate_text:
+            problems.append("بوابة اللقب لا تُظهر خطة %s" % plan)
+    if '"free"' in gate_text:
+        problems.append("بوابة اللقب تُظهر الخطة المجانية (يجب ألّا تظهر)")
+    for role in ("admin", "moderator", "creator"):
+        if role not in gate_text:
+            problems.append("بوابة اللقب تُخفي رتبة %s" % role)
+
+# 3) الأداة بجانبهما (خارج العمود) وبمقاسها الجديد
 if header:
     if "equippedItemUrl" not in header:
         problems.append("الأداة المجهّزة غير معروضة في الترويسة")
@@ -97,6 +125,9 @@ rows = [
     ("حجم الأداة 32dp (كان 16dp)", bool(re.search(r"size\(\s*32\.dp\s*\)", header or ""))),
     ("لا أثر للحجم القديم 16dp", not re.search(r"size\(?\s*=?\s*16\.dp", header or "")),
     ("الأداة أصغر من الصورة (أقلّ شوي)", not too_big),
+    ("المجّاني بلا لقب (لا Free 🍃)",
+     bool(gate_text) and '"free"' not in gate_text and "epic" in gate_text and "legendary" in gate_text),
+    ("اللقب محكوم بالبوابة في الترويسة", "hasRankTitle(" in (header or "")),
 ]
 for name, ok in rows:
     print(f"{name:<40} | {'✅' if ok else '❌'}")
@@ -107,4 +138,4 @@ if problems:
         print("✗", p)
     print(f"\n✗ عدد المشاكل: {len(problems)}")
     sys.exit(1)
-print("🟢 ترويسة الشات: صورة 40 · اسم · لقبه تحته · وأداة 32 بجانبهما — أكبر من قبل وأصغر قليلاً من الصورة.")
+print("🟢 ترويسة الشات: صورة 40 · اسم · لقبه تحته (إن كان مشتركاً أو صاحب رتبة) · وأداة 32 بجانبهما — والمجّاني بلا سطر تحت اسمه.")
