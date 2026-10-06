@@ -48,6 +48,7 @@ ORDER = [
     "28_chat_cleanup.sql",
     "29_chat_moderation_rooms.sql",
     "30_chat_members_only.sql",
+    "31_single_free_avatar.sql",
 ]
 
 HEADER = """-- ============================================================================
