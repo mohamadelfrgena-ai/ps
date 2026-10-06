@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""فحص ترويسة رسالة الشات (طلب المالك): صورة · اسم · لقب تحته · أداة بجانبهما.
+
+الترتيب المطلوب (اختاره المالك):
+    • الصورة (40dp) جنبها الاسم كما هو.
+    • **اللقب** (TheKing · Epic · Legendary …) ينزل **سطراً تحت الاسم**.
+    • **الأداة** المجهّزة **بجانبهما** — بحجمٍ أكبر (32dp): أكبر من 16dp القديم
+      وأقلّ قليلاً من الصورة (40dp) طلباً للشكل الجمالي.
+
+يفشل إذا:
+  • عاد الاسم واللقب إلى سطر واحد بجانب الصورة.
+  • صغرت الأداة عن 32dp أو كبرت حتى صارت بحجم الصورة أو أكبر.
+  • تغيّر مقاس الصورة عن 40dp.
+"""
+import io
+import os
+import re
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CHAT = os.path.join(ROOT, "android", "app", "src", "main", "java", "com",
+                    "addonstation", "mobile", "ui", "chat", "ChatScreen.kt")
+
+problems = []
+chat = io.open(CHAT, encoding="utf-8").read() if os.path.exists(CHAT) else ""
+if not chat:
+    problems.append("ChatScreen.kt مفقود")
+
+
+def branch(text: str, marker: str) -> str:
+    """الكتلة التي تبدأ بـ marker حتى قوسها المغلق المقابل."""
+    i = text.find(marker)
+    if i < 0:
+        return ""
+    start = text.find("{", i + len(marker) - 1)
+    if start < 0:
+        return ""
+    depth = 0
+    for k in range(start, len(text)):
+        if text[k] == "{":
+            depth += 1
+        elif text[k] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:k + 1]
+    return text[start:]
+
+
+header = branch(chat, "if (!grouped) {")
+name_col = branch(header, "Column(modifier = Modifier.weight(1f, fill = false))")
+
+AVATAR_DP, ITEM_DP, OLD_ITEM_DP = 40, 32, 16
+
+if not header:
+    problems.append("لا كتلة ترويسة (!grouped) في ChatScreen.kt")
+
+# 1) الاسم واللقب في عمود واحد: الاسم فوق، واللقب تحته
+if not name_col:
+    problems.append("الاسم واللقب ليسا في عمود واحد (اللقب يجب أن يكون تحت الاسم)")
+else:
+    if "AppText.chatName" not in name_col:
+        problems.append("اسم صاحب الرسالة ليس داخل عمود الترويسة")
+    if "RankBadge(" not in name_col:
+        problems.append("اللقب (RankBadge) ليس تحت الاسم داخل العمود نفسه")
+
+# 2) الأداة بجانبهما (خارج العمود) وبمقاسها الجديد
+if header:
+    if "equippedItemUrl" not in header:
+        problems.append("الأداة المجهّزة غير معروضة في الترويسة")
+    # الأداة تُقاس بـ Modifier.size(32.dp) والصورة بمعامل size = 40.dp
+    if not re.search(r"size\(\s*%d\.dp\s*\)" % ITEM_DP, header):
+        problems.append("حجم الأداة ليس %ddp" % ITEM_DP)
+    if re.search(r"size\(\s*%d\.dp\s*\)" % OLD_ITEM_DP, header) or \
+            "size = %d.dp" % OLD_ITEM_DP in header:
+        problems.append("ما زال حجم الأداة القديم %ddp" % OLD_ITEM_DP)
+    if "size = %d.dp" % AVATAR_DP not in header:
+        problems.append("مقاس صورة البروفايل تغيّر عن %ddp" % AVATAR_DP)
+    if name_col and "equippedItemUrl" in name_col:
+        problems.append("الأداة دخلت عمود الاسم — يجب أن تكون بجانبهما لا داخله")
+
+# 3) أقلّ شوي من الصورة (شرط الجمال الذي طلبه المالك)
+too_big = [
+    int(m.group(1))
+    for m in re.finditer(r"size = (\d+)\.dp", header or "")
+    if int(m.group(1)) > AVATAR_DP
+]
+
+print("الفحص                                   | النتيجة")
+print("-" * 60)
+rows = [
+    ("الصورة بمقاسها 40dp", "size = 40.dp" in (header or "")),
+    ("الاسم فوق · اللقب تحته (عمود واحد)",
+     bool(name_col) and "AppText.chatName" in name_col and "RankBadge(" in name_col),
+    ("الأداة بجانبهما لا داخلهما",
+     bool(name_col) and "equippedItemUrl" not in name_col and "equippedItemUrl" in (header or "")),
+    ("حجم الأداة 32dp (كان 16dp)", bool(re.search(r"size\(\s*32\.dp\s*\)", header or ""))),
+    ("لا أثر للحجم القديم 16dp", not re.search(r"size\(?\s*=?\s*16\.dp", header or "")),
+    ("الأداة أصغر من الصورة (أقلّ شوي)", not too_big),
+]
+for name, ok in rows:
+    print(f"{name:<40} | {'✅' if ok else '❌'}")
+
+print()
+if problems:
+    for p in problems:
+        print("✗", p)
+    print(f"\n✗ عدد المشاكل: {len(problems)}")
+    sys.exit(1)
+print("🟢 ترويسة الشات: صورة 40 · اسم · لقبه تحته · وأداة 32 بجانبهما — أكبر من قبل وأصغر قليلاً من الصورة.")

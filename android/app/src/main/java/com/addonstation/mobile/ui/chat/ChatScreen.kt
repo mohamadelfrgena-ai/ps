@@ -67,6 +67,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.model.ChatChannel
@@ -1338,26 +1339,39 @@ private fun MessageBlock(
                     online = author?.showOnlineStatus == true,
                     modifier = Modifier.clickable { onOpenUser(message.userId) },
                 )
-                Text(
-                    text = author?.displayName ?: author?.username ?: "—",
-                    style = AppText.chatName,
-                    color = com.addonstation.mobile.ui.theme.nameColor(author?.role ?: "user", author?.effectivePlan ?: "free"),
-                    maxLines = 1,
-                )
-                if (author != null) {
-                    com.addonstation.mobile.ui.components.RankBadge(role = author.role, plan = author.effectivePlan)
+                // الاسم كما هو (جنب الصورة) … و**اللقب (TheKing · Epic · …)
+                // ينزل سطراً تحته** — طلب المالك: سطران بدل سطر واحد.
+                // weight بلا fill: يأخذ العمود ما يحتاجه فقط، فتبقى الأداة
+                // ملاصقةً له ولا تُدفع إلى حافة الشاشة.
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(
+                        text = author?.displayName ?: author?.username ?: "—",
+                        style = AppText.chatName,
+                        color = com.addonstation.mobile.ui.theme.nameColor(author?.role ?: "user", author?.effectivePlan ?: "free"),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (author != null) {
+                        Spacer(Modifier.height(3.dp))
+                        com.addonstation.mobile.ui.components.RankBadge(
+                            role = author.role,
+                            plan = author.effectivePlan,
+                        )
+                    }
                 }
                 if (author?.equippedItemId != null && author.equippedItemId != "none") {
-                    // الأداة المجهّزة بجانب اسم صاحبها: صورتها الحقيقية (متحرّكة إن كانت GIF)
+                    // الأداة المجهّزة **بجانبهما** (الاسم ولقبه): أكبر من قبل
+                    // — 32dp بدل 16dp — وأقلّ قليلاً من الصورة (40dp) طلباً
+                    // للشكل الجمالي. صورتها الحقيقية (متحرّكة إن كانت GIF).
                     val itemImg = com.addonstation.mobile.ui.equippedItemUrl(container, author.equippedItemId)
                     if (itemImg != null) {
                         com.addonstation.mobile.ui.components.CoverImage(
                             url = itemImg,
-                            radius = 4.dp,
-                            modifier = Modifier.size(16.dp),
+                            radius = 8.dp,
+                            modifier = Modifier.size(32.dp),
                         )
                     } else {
-                        Text("🎖", style = AppText.tiny)
+                        Text("🎖", style = AppText.body.copy(fontSize = 24.sp))
                     }
                 }
                 // وقت الإرسال لم يعد هنا: صار في **نهاية الرسالة نفسها** (أسفل
