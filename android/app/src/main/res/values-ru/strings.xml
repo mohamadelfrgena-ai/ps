@@ -568,4 +568,14 @@
     <string name="chat_remove_sticker">Убрать стикер</string>
     <string name="chat_sticker_ready">При желании добавь текст к стикеру и отправь</string>
     <string name="chat_add_reaction">Добавить реакцию</string>
+
+    <string name="profile_lv_badge">Ур. %1$d</string>
+    <string name="profile_xp_progress">Уровень %1$s · %2$d/100 до следующего</string>
+    <string name="profile_manage">Управлять</string>
+    <string name="profile_current_plan">Ваш текущий план</string>
+    <string name="profile_all_options">Все настройки</string>
+    <string name="profile_item_none">Нет</string>
+    <string name="profile_item_equipped">Надето</string>
+    <string name="profile_content_section">Контент</string>
+    <string name="profile_no_content_published">Пока нет опубликованного контента</string>
 </resources>

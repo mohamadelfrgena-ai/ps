@@ -568,4 +568,14 @@
     <string name="chat_remove_sticker">移除贴纸</string>
     <string name="chat_sticker_ready">需要的话可以写上文字，然后发送</string>
     <string name="chat_add_reaction">添加表情回应</string>
+
+    <string name="profile_lv_badge">LV %1$d</string>
+    <string name="profile_xp_progress">等级 %1$s · 距下一级 %2$d/100</string>
+    <string name="profile_manage">管理</string>
+    <string name="profile_current_plan">您当前的套餐</string>
+    <string name="profile_all_options">全部选项</string>
+    <string name="profile_item_none">无</string>
+    <string name="profile_item_equipped">已装备</string>
+    <string name="profile_content_section">内容</string>
+    <string name="profile_no_content_published">尚未发布内容</string>
 </resources>

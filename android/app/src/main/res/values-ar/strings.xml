@@ -568,4 +568,14 @@
     <string name="chat_remove_sticker">إلغاء الملصق</string>
     <string name="chat_sticker_ready">اكتب نصاً مع الملصق إن أردت، ثم اضغط إرسال</string>
     <string name="chat_add_reaction">إضافة تفاعل</string>
+
+    <string name="profile_lv_badge">مستوى %1$d</string>
+    <string name="profile_xp_progress">المستوى %1$s · %2$d من 100 للمستوى التالي</string>
+    <string name="profile_manage">إدارة</string>
+    <string name="profile_current_plan">خطتك الحالية</string>
+    <string name="profile_all_options">كل الخيارات</string>
+    <string name="profile_item_none">لا شيء</string>
+    <string name="profile_item_equipped">مُجهَّز</string>
+    <string name="profile_content_section">المحتوى</string>
+    <string name="profile_no_content_published">لا محتوى منشور بعد</string>
 </resources>

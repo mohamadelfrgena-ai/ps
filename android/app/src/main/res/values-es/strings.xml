@@ -568,4 +568,14 @@
     <string name="chat_remove_sticker">Quitar pegatina</string>
     <string name="chat_sticker_ready">Escribe un mensaje con la pegatina si quieres y envía</string>
     <string name="chat_add_reaction">Añadir reacción</string>
+
+    <string name="profile_lv_badge">NV %1$d</string>
+    <string name="profile_xp_progress">Nivel %1$s · %2$d/100 para el siguiente</string>
+    <string name="profile_manage">Gestionar</string>
+    <string name="profile_current_plan">Tu plan actual</string>
+    <string name="profile_all_options">Todas las opciones</string>
+    <string name="profile_item_none">Ninguno</string>
+    <string name="profile_item_equipped">Equipado</string>
+    <string name="profile_content_section">Contenido</string>
+    <string name="profile_no_content_published">Aún no hay contenido publicado</string>
 </resources>

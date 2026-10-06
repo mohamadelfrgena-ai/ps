@@ -584,4 +584,14 @@
     <string name="chat_remove_sticker">Remove sticker</string>
     <string name="chat_sticker_ready">Add a message with the sticker if you like, then send</string>
     <string name="chat_add_reaction">Add reaction</string>
+
+    <string name="profile_lv_badge">LV %1$d</string>
+    <string name="profile_xp_progress">Level %1$s · %2$d/100 to next level</string>
+    <string name="profile_manage">Manage</string>
+    <string name="profile_current_plan">Your current plan</string>
+    <string name="profile_all_options">All options</string>
+    <string name="profile_item_none">None</string>
+    <string name="profile_item_equipped">Equipped</string>
+    <string name="profile_content_section">Content</string>
+    <string name="profile_no_content_published">No content published yet</string>
 </resources>

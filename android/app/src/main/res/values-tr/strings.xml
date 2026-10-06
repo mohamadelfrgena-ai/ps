@@ -568,4 +568,14 @@
     <string name="chat_remove_sticker">Çıkartmayı kaldır</string>
     <string name="chat_sticker_ready">İstersen çıkartmaya bir mesaj yaz, sonra gönder</string>
     <string name="chat_add_reaction">Tepki ekle</string>
+
+    <string name="profile_lv_badge">SV %1$d</string>
+    <string name="profile_xp_progress">Seviye %1$s · sonraki seviyeye %2$d/100</string>
+    <string name="profile_manage">Yönet</string>
+    <string name="profile_current_plan">Mevcut planınız</string>
+    <string name="profile_all_options">Tüm seçenekler</string>
+    <string name="profile_item_none">Yok</string>
+    <string name="profile_item_equipped">Takılı</string>
+    <string name="profile_content_section">İçerik</string>
+    <string name="profile_no_content_published">Henüz yayınlanmış içerik yok</string>
 </resources>

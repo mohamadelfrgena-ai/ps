@@ -568,4 +568,14 @@
     <string name="chat_remove_sticker">Remover figurinha</string>
     <string name="chat_sticker_ready">Escreva uma mensagem com a figurinha se quiser e envie</string>
     <string name="chat_add_reaction">Adicionar reação</string>
+
+    <string name="profile_lv_badge">NV %1$d</string>
+    <string name="profile_xp_progress">Nível %1$s · %2$d/100 para o próximo</string>
+    <string name="profile_manage">Gerenciar</string>
+    <string name="profile_current_plan">Seu plano atual</string>
+    <string name="profile_all_options">Todas as opções</string>
+    <string name="profile_item_none">Nenhum</string>
+    <string name="profile_item_equipped">Equipado</string>
+    <string name="profile_content_section">Conteúdo</string>
+    <string name="profile_no_content_published">Nenhum conteúdo publicado ainda</string>
 </resources>
