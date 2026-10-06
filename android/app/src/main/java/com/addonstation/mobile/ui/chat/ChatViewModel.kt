@@ -444,6 +444,38 @@ class ChatViewModel(private val container: AppContainer) {
         }
     }
 
+    /**
+     * حذف أي رسالة **مهما كان عمرها** — للأدمن ولمشرف الغرفة (لا نافذة زمنية).
+     * نافذة الثلاث دقائق تبقى على المستخدم العادي في [deleteMine] وحدها.
+     */
+    fun deleteAsStaff(messageId: Long, onResult: (Boolean) -> Unit = {}) {
+        scope.launch {
+            container.chat.deleteMessageAsStaff(messageId)
+                .onSuccess {
+                    _messages.value = _messages.value.map { ui ->
+                        if (ui.message.id == messageId) {
+                            ui.copy(
+                                message = ui.message.copy(
+                                    status = "deleted",
+                                    content = null,
+                                    stickerUrl = null,
+                                    imagePath = null,
+                                    mediaPath = null,
+                                    isPinned = false,
+                                ),
+                                reactions = emptyMap(),
+                                myReactions = emptySet(),
+                            )
+                        } else {
+                            ui
+                        }
+                    }
+                    onResult(true)
+                }
+                .onFailure { onResult(false) }
+        }
+    }
+
     fun moderate(messageId: Long, hide: Boolean) {
         scope.launch {
             container.chat.moderateMessage(messageId, hide).onSuccess { refreshTails(); reload() }

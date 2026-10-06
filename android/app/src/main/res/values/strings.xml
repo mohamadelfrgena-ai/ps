@@ -266,6 +266,14 @@
     <string name="chat_reason_other">Other</string>
     <string name="chat_report_sent">Report sent ✅</string>
     <string name="chat_delete_mine">Delete my message</string>
+    <string name="chat_delete_staff">🗑 Delete message (moderation)</string>
+    <string name="chat_delete_staff_note">Any message, however old — the 3-minute limit applies to the author only.</string>
+    <string name="chat_delete_failed">The message could not be deleted.</string>
+    <string name="admin_rooms_manage">Room moderation</string>
+    <string name="admin_rooms_all">All rooms</string>
+    <string name="admin_rooms_choose">Pick the rooms this moderator can moderate</string>
+    <string name="admin_rooms_saved">Room moderation updated ✅</string>
+    <string name="admin_rooms_hint">Admins moderate all rooms automatically.</string>
     <string name="chat_delete_expired">Delete window ended: messages can only be deleted within 3 minutes of sending.</string>
     <string name="chat_delete_left">%1$d min left to delete</string>
     <string name="chat_delete_done">Message deleted.</string>

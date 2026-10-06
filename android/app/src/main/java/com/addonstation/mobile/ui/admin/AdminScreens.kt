@@ -132,6 +132,10 @@ fun AdminPanelScreen(
     var message by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
     var dialog by remember { mutableStateOf<String?>(null) }
+    /** المستخدم الذي نفتح له نافذة «إشراف الغرف» (null ⇒ النافذة مغلقة). */
+    var roomsFor by remember { mutableStateOf<Profile?>(null) }
+    val roomsSavedMsg = stringResource(R.string.admin_rooms_saved)
+    val roomsFailedMsg = stringResource(R.string.msg_generic_error)
 
     // بوابة الوصول: لا يظهر شيء لغير الأدمن
     if (profile != null && profile?.role != "admin") {
@@ -223,6 +227,7 @@ fun AdminPanelScreen(
                     failed = failed,
                     onRetry = { reloadTick += 1 },
                     onGiveAc = { userId -> onOpenAc(userId) },
+                    onManageRooms = { user -> roomsFor = user },
                     onSaveUser = { user, plan, role, grantDays ->
                         scope.launch {
                             container.admin.updateUserPlanRole(
@@ -399,6 +404,17 @@ fun AdminPanelScreen(
     dialog?.let { url ->
         com.addonstation.mobile.ui.common.FullScreenImageViewer(url = url) { dialog = null }
     }
+
+    roomsFor?.let { user ->
+        ModeratorRoomsDialog(
+            user = user,
+            onDismiss = { roomsFor = null },
+            onResult = { ok ->
+                roomsFor = null
+                message = if (ok) roomsSavedMsg else roomsFailedMsg
+            },
+        )
+    }
 }
 
 @Composable
@@ -415,6 +431,8 @@ private fun OverviewTab(
     onRetry: () -> Unit = {},
     onGiveAc: (String) -> Unit,
     onSaveUser: (Profile, String?, String?, Int?) -> Unit,
+    /** فتح نافذة «إشراف الغرف» لهذا المستخدم. */
+    onManageRooms: (Profile) -> Unit = {},
     onEditContent: () -> Unit,
     onDeleteContent: (ContentItem) -> Unit,
     onQuick: (Int) -> Unit,
@@ -476,7 +494,12 @@ private fun OverviewTab(
             com.addonstation.mobile.ui.components.ErrorState(onRetry = onRetry)
         } else {
             users.take(40).forEach { user ->
-                AdminUserRow(user = user, onGiveAc = onGiveAc, onSave = onSaveUser)
+                AdminUserRow(
+                    user = user,
+                    onGiveAc = onGiveAc,
+                    onSave = onSaveUser,
+                    onManageRooms = onManageRooms,
+                )
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -556,11 +579,180 @@ private fun LazyRowQuick(onQuick: (Int) -> Unit) {
     }
 }
 
+/**
+ * نافذة **إشراف الغرف**: يمنح الأدمن مشرفاً صلاحية الإشراف على غرفة واحدة،
+ * أو عدّة غرف، أو كل الغرف دفعة واحدة.
+ *
+ * النطاق محفوظ في جدول chat_moderator_rooms (ملف 29) ويقرأه الخادم عند كل
+ * طلب إشراف (حذف/إخفاء/تثبيت) — فلا يُنفَّذ شيء خارج النطاق ولو عُبث بالواجهة.
+ */
+@Composable
+private fun ModeratorRoomsDialog(
+    user: Profile,
+    onDismiss: () -> Unit,
+    onResult: (Boolean) -> Unit,
+) {
+    val container = rememberContainer()
+    val scope = rememberCoroutineScope()
+    var channels by remember { mutableStateOf<List<com.addonstation.mobile.data.model.ChatChannel>>(emptyList()) }
+    var allRooms by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var loading by remember { mutableStateOf(true) }
+    var saving by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    // نصوص جاهزة: لا يُستدعى stringResource داخل لامبدا غير Composable
+    val saveLabel = stringResource(R.string.common_save)
+    val cancelLabel = stringResource(R.string.common_cancel)
+
+    LaunchedEffect(user.id) {
+        loading = true
+        channels = container.chat.channels()
+        val current = container.chat.moderatorRooms(user.id)
+        allRooms = current.allRooms
+        selected = current.channels.toSet()
+        loading = false
+    }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = AppColors.Surface,
+        title = {
+            Text(
+                stringResource(R.string.admin_rooms_manage),
+                style = AppText.sectionTitle,
+                color = AppColors.Text,
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    stringResource(R.string.admin_rooms_choose),
+                    style = AppText.bodySmall,
+                    color = AppColors.Muted,
+                )
+                Spacer(Modifier.height(8.dp))
+                // «كل الغرف» — تبديل واحد يعفيه من اختيار الغرف واحدةً واحدة
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (allRooms) AppColors.GreenGlow else AppColors.Elevated)
+                        .border(1.dp, if (allRooms) AppColors.Green else AppColors.Border, RoundedCornerShape(12.dp))
+                        .clickable { allRooms = !allRooms }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("🌐", style = AppText.body)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.admin_rooms_all),
+                        style = AppText.bodySmall,
+                        color = if (allRooms) AppColors.Green else AppColors.Text,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (allRooms) Text("✅", style = AppText.bodySmall)
+                }
+                Spacer(Modifier.height(8.dp))
+                if (loading) {
+                    com.addonstation.mobile.ui.components.LoadingBox()
+                } else {
+                    Text(
+                        stringResource(R.string.admin_rooms_hint),
+                        style = AppText.tiny,
+                        color = AppColors.Dim,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(260.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        channels.forEach { channel ->
+                            val checked = selected.contains(channel.id)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(AppColors.Elevated)
+                                    .clickable(enabled = !allRooms) {
+                                        selected = if (checked) selected - channel.id else selected + channel.id
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(channel.icon ?: "💬", style = AppText.body)
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    com.addonstation.mobile.ui.community.channelDisplayName(channel),
+                                    style = AppText.bodySmall,
+                                    color = if (allRooms) AppColors.Dim else AppColors.Text,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(if (checked && !allRooms) "✅" else "", style = AppText.bodySmall)
+                            }
+                        }
+                    }
+                }
+                if (failed) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.msg_generic_error),
+                        style = AppText.tiny,
+                        color = AppColors.Red,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            com.addonstation.mobile.ui.components.GhostButton(
+                text = saveLabel,
+                onClick = {
+                    saving = true
+                    failed = false
+                    scope.launch {
+                        container.chat.setModeratorRooms(user.id, selected.toList(), allRooms)
+                            .onSuccess {
+                                saving = false
+                                onResult(true)
+                            }
+                            .onFailure {
+                                saving = false
+                                failed = true
+                            }
+                    }
+                },
+            )
+        },
+        dismissButton = {
+            com.addonstation.mobile.ui.components.GhostButton(
+                text = cancelLabel,
+                onClick = onDismiss,
+            )
+        },
+    )
+    if (saving) {
+        // منع الضغط المتكرر أثناء الحفظ (لا نُغلق النافذة قبل ردّ الخادم)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(androidx.compose.ui.graphics.Color(0x66000000)),
+            contentAlignment = Alignment.Center,
+        ) {
+            com.addonstation.mobile.ui.components.LoadingBox()
+        }
+    }
+}
+
 @Composable
 private fun AdminUserRow(
     user: Profile,
     onGiveAc: (String) -> Unit,
     onSave: (Profile, String?, String?, Int?) -> Unit,
+    onManageRooms: (Profile) -> Unit = {},
 ) {
     val container = rememberContainer()
     var plan by remember(user.id) { mutableStateOf(user.plan) }
@@ -602,6 +794,17 @@ private fun AdminUserRow(
                 text = stringResource(R.string.admin_plan_days),
                 onClick = { onSave(user, plan, role, 30) },
                 modifier = Modifier.weight(1f),
+            )
+        }
+        // إشراف الغرف: مشرف على غرفة واحدة · عدّة غرف · كل الغرف.
+        // يظهر للمشرفين فقط — الأدمن يشرف على كل الغرف بحكم رتبته، والمستخدم
+        // العادي لا أثر لتعيين الغرف عليه قبل أن يُرقّى. يُقرأ الرتبة من شرائح
+        // الصف نفسها، فإن اخترت «moderator» ظهر الزر فوراً قبل الحفظ.
+        if (role == "moderator") {
+            GhostButton(
+                text = stringResource(R.string.admin_rooms_manage),
+                onClick = { onManageRooms(user) },
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

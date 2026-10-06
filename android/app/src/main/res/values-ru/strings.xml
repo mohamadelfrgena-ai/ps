@@ -256,6 +256,14 @@
     <string name="chat_reason_other">Другое</string>
     <string name="chat_report_sent">Жалоба отправлена ✅</string>
     <string name="chat_delete_mine">Удалить моё сообщение</string>
+    <string name="chat_delete_staff">🗑 Удалить сообщение (модерация)</string>
+    <string name="chat_delete_staff_note">Любое сообщение, независимо от давности — лимит 3 минуты только для автора.</string>
+    <string name="chat_delete_failed">Не удалось удалить сообщение.</string>
+    <string name="admin_rooms_manage">Модерация комнат</string>
+    <string name="admin_rooms_all">Все комнаты</string>
+    <string name="admin_rooms_choose">Выберите комнаты, которые может модерировать этот модератор</string>
+    <string name="admin_rooms_saved">Модерация комнат обновлена ✅</string>
+    <string name="admin_rooms_hint">Администраторы модерируют все комнаты автоматически.</string>
     <string name="chat_delete_expired">Время истекло: удалить сообщение можно только в течение 3 минут после отправки.</string>
     <string name="chat_delete_left">Осталось %1$d мин на удаление</string>
     <string name="chat_delete_done">Сообщение удалено.</string>

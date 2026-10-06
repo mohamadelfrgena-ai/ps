@@ -256,6 +256,14 @@
     <string name="chat_reason_other">其他</string>
     <string name="chat_report_sent">举报已发送 ✅</string>
     <string name="chat_delete_mine">删除我的消息</string>
+    <string name="chat_delete_staff">🗑 删除消息（管理）</string>
+    <string name="chat_delete_staff_note">任何消息，无论发送多久——3 分钟限制只针对作者本人。</string>
+    <string name="chat_delete_failed">无法删除该消息。</string>
+    <string name="admin_rooms_manage">房间管理权限</string>
+    <string name="admin_rooms_all">所有房间</string>
+    <string name="admin_rooms_choose">选择该管理员可管理的房间</string>
+    <string name="admin_rooms_saved">房间管理权限已更新 ✅</string>
+    <string name="admin_rooms_hint">管理员自动拥有所有房间的管理权限。</string>
     <string name="chat_delete_expired">已超时：消息只能在发送后 3 分钟内删除。</string>
     <string name="chat_delete_left">剩余 %1$d 分钟可删除</string>
     <string name="chat_delete_done">消息已删除。</string>

@@ -146,6 +146,13 @@ fun ChatScreen(
     // **القراءة فقط**: في الغرف المقفلة أو التي صلاحيتها admin_only لا يملك
     // المستخدم حق الكتابة ⇒ نُخفي عنه شريط الكتابة بالكامل (بما فيه زر الإرسال).
     val readOnlyRoom = isReadOnlyFor(channel, profile?.role)
+    /**
+     * هل يستطيع المستخدم **الإشراف على هذه الغرفة**؟ الأدمن في كل الغرف،
+     * والمشرف في الغرف الممنوحة له فقط (غرفة واحدة أو عدّة أو كلها).
+     * تُخفي/تُظهر أزرار الإشراف (حذف أي رسالة · إخفاء · تثبيت · كتم) —
+     * والخادم يبقى الحَكَم الأخير على كل طلب.
+     */
+    val canModerateRoom = container.chat.canModerateRoom(chatStatus, channel.id)
 
     var text by remember { mutableStateOf("") }
     var replyTo by remember { mutableStateOf<ChatMessage?>(null) }
@@ -186,6 +193,7 @@ fun ChatScreen(
     val videoLabel = stringResource(R.string.chat_video_label)
     val reportSentMsg = stringResource(R.string.chat_report_sent)
     val deleteExpiredMsg = stringResource(R.string.chat_delete_expired)
+    val deleteStaffFailedMsg = stringResource(R.string.chat_delete_failed)
     val mediaAdminMsg = stringResource(R.string.chat_media_admin_only)
     // الأدمن وحده يرسل الفيديو والصوت والتسجيل الصوتي (القاعدة هي الحكم)
     val isAdmin = profile?.role == "admin"
@@ -200,7 +208,12 @@ fun ChatScreen(
     val retryLabel = stringResource(R.string.common_retry)
     val notSentMsg = stringResource(R.string.chat_send_failed)
 
-    LaunchedEffect(channel.id) { vm.open(channel) }
+    LaunchedEffect(channel.id) {
+        // نطاق الإشراف يُجلب مع كل دخول غرفة: فإن منح الأدمن مشرفاً غرفةً
+        // جديدة (أو سحبها) تظهر أزراره الصحيحة فور فتح الغرفة.
+        runCatching { container.chat.refreshMyStatus() }
+        vm.open(channel)
+    }
     DisposableEffect(channel.id) { onDispose { vm.close() } }
 
     // هل العرض ملتصق بالأسفل؟ (= المستخدم يقرأ آخر الرسائل)
@@ -754,7 +767,7 @@ fun ChatScreen(
         MessageActionsSheet(
             ui = ui,
             myId = container.supabase.session()?.userId,
-            isStaff = profile?.let { it.role == "admin" || it.role == "moderator" } == true,
+            isStaff = canModerateRoom,
             canDeleteMine = canDeleteOwnMessage(ui.message.createdAt),
             deleteLeftText = if (deleteLeftMinutes > 0) {
                 stringResource(R.string.chat_delete_left, deleteLeftMinutes)
@@ -778,6 +791,15 @@ fun ChatScreen(
                     }
                 } else {
                     statusMessage = deleteExpiredMsg
+                }
+                actionsFor = null
+            },
+            onDeleteStaff = {
+                // حذف إشرافي: أي رسالة في هذه الغرفة مهما كان عمرها
+                // (الأدمن في كل الغرف · المشرف في غرفه فقط — والخادم يحسم)
+                vm.deleteAsStaff(ui.message.id) { ok ->
+                    statusMessage = if (ok) null else deleteStaffFailedMsg
+                    statusError = null
                 }
                 actionsFor = null
             },

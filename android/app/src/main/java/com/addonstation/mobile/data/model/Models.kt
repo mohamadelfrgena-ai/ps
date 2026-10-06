@@ -369,9 +369,27 @@ data class MyChatStatus(
     val acceptedRules: Boolean = false,
     val role: String = "user",
     val plan: String = "free",
+    /**
+     * نطاق الإشراف: `true` ⇒ يشرف على **كل الغرف** (الأدمن دائماً، أو مشرف
+     * عُمِّم). `false` ⇒ يشرف على [moderatedChannels] فقط.
+     */
+    val moderatesAll: Boolean = false,
+    /** الغرف التي يُسمح له بالإشراف عليها (حذف/إخفاء/تثبيت أي رسالة فيها). */
+    val moderatedChannels: List<String> = emptyList(),
 )
 
 data class UnreadCount(val unread: Int = 0, val mentions: Int = 0)
+
+/**
+ * نطاق إشراف مشرف على غرف الشات (لوحة الإدارة).
+ *
+ * @param allRooms `true` ⇒ مشرف على كل الغرف (وكل غرفة تُضاف لاحقاً).
+ * @param channels الغرف الممنوحة له حين لا يكون النطاق «كل الغرف».
+ */
+data class ModeratorScope(
+    val allRooms: Boolean = false,
+    val channels: List<String> = emptyList(),
+)
 
 data class AdminStats(
     val users: Int = 0,

@@ -7,6 +7,7 @@ import com.addonstation.mobile.data.SupabaseClient
 import com.addonstation.mobile.data.model.ChatChannel
 import com.addonstation.mobile.data.model.ChatMessage
 import com.addonstation.mobile.data.model.ChatReport
+import com.addonstation.mobile.data.model.ModeratorScope
 import com.addonstation.mobile.data.model.MyChatStatus
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.SiteAsset
@@ -123,10 +124,30 @@ class ChatRepository(
                 acceptedRules = obj["accepted_rules"]?.asBool() ?: false,
                 role = obj["role"]?.asString() ?: "user",
                 plan = obj["plan"]?.asString() ?: "free",
+                moderatesAll = obj["moderates_all"]?.asBool()
+                    ?: (obj["role"]?.asString() == "admin"),
+                moderatedChannels = (obj["moderated_channels"] as? JsonArray)
+                    ?.mapNotNull { it.asString() } ?: emptyList(),
             )
         }.getOrNull()
         state.setChatStatus(status)
         status
+    }
+
+    /**
+     * هل يملك هذا المستخدم حق **الإشراف** على هذه الغرفة؟
+     *
+     * • الأدمن: كل الغرف (بلا جدول ولا إعداد).
+     * • المشرف: الغرف الممنوحة له فقط — أو كلها إن مُنح `all_rooms`.
+     * • أي دور آخر: لا شيء.
+     *
+     * الخادم هو الحَكَم الأخير (chat_can_moderate_channel)؛ هذه نسخة الواجهة
+     * لتُخفي الأزرار في غير مكانها، لا لتسمح بما يرفضه الخادم.
+     */
+    fun canModerateRoom(status: MyChatStatus?, channelId: String): Boolean {
+        if (status == null || !status.signedIn || channelId.isBlank()) return false
+        if (status.role == "admin" || status.moderatesAll) return true
+        return status.role == "moderator" && status.moderatedChannels.contains(channelId)
     }
 
     suspend fun refreshUnread(): Map<String, UnreadCount> = withContext(Dispatchers.IO) {
@@ -339,6 +360,60 @@ class ChatRepository(
                 Unit
             }
         }
+
+    /**
+     * حذف **أي رسالة** مهما كان عمرها — للأدمن (كل الغرف) ولمشرف الغرفة.
+     *
+     * نافذة الثلاث دقائق تبقى على صاحب الرسالة وحده (chat_delete_my_message)؛
+     * أمّا الإدارة والمشرفون فلا حدّ زمني عليهم (طلب المالك).
+     */
+    suspend fun deleteMessageAsStaff(messageId: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc(
+                "chat_delete_message_staff",
+                mapOf("p_message_id" to JsonPrimitive(messageId)),
+            ).asOutcome().requireOk()
+            Unit
+        }
+    }
+
+    /**
+     * نطاق إشراف مستخدم: كل الغرف أم غرف بعينها (تستعملها لوحة الإدارة).
+     */
+    suspend fun moderatorRooms(userId: String): ModeratorScope = withContext(Dispatchers.IO) {
+        runCatching {
+            val rows = supabase.select(
+                "chat_moderator_rooms",
+                "select=channel_id,all_rooms&user_id=eq.$userId",
+            ) as? JsonArray
+            val objects = rows?.mapNotNull { it.asObject() } ?: emptyList()
+            ModeratorScope(
+                allRooms = objects.any { it["all_rooms"]?.asBool() == true },
+                channels = objects.mapNotNull { it["channel_id"]?.asString() },
+            )
+        }.getOrElse { ModeratorScope() }
+    }
+
+    /**
+     * تعيين نطاق إشراف مشرف: **كل الغرف** أو غرف محدَّدة (يستبدل السابق).
+     */
+    suspend fun setModeratorRooms(
+        userId: String,
+        channels: List<String>,
+        allRooms: Boolean,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc(
+                "chat_set_moderator_rooms",
+                mapOf(
+                    "p_user_id" to JsonPrimitive(userId),
+                    "p_channel_ids" to JsonArray(channels.map { JsonPrimitive(it) }),
+                    "p_all_rooms" to JsonPrimitive(allRooms),
+                ),
+            ).asOutcome().requireOk()
+            Unit
+        }
+    }
 
     suspend fun togglePin(messageId: Long): Result<Boolean> = withContext(Dispatchers.IO) {
         runCatching {

@@ -401,6 +401,11 @@ fun MessageActionsSheet(
     onCopy: () -> Unit,
     onReport: (String) -> Unit,
     onDeleteMine: () -> Unit,
+    /**
+     * حذف الرسالة **بصفة الإشراف**: يظهر للأدمن في كل الغرف، ولمشرف الغرفة
+     * داخل غرفه فقط — وبلا أي حدّ زمني (عكس [onDeleteMine] المقيَّد ب٣ دقائق).
+     */
+    onDeleteStaff: () -> Unit = {},
     onModerate: () -> Unit,
     onPin: () -> Unit,
     onMute: (Int) -> Unit,
@@ -466,6 +471,22 @@ fun MessageActionsSheet(
                 }
             }
             if (isStaff) {
+                // حذف **أي** رسالة مهما كان عمرها: لا نافذة ولا شرط زمني —
+                // النافذة (٣ دقائق) على صاحب الرسالة وحده في الخيار أعلاه.
+                if (ui.message.status != "deleted") {
+                    ActionRow(
+                        Icons.Filled.Delete,
+                        stringResource(R.string.chat_delete_staff),
+                        onDeleteStaff,
+                        AppColors.Red,
+                    )
+                    Text(
+                        stringResource(R.string.chat_delete_staff_note),
+                        style = AppText.tiny,
+                        color = AppColors.Dim,
+                        modifier = Modifier.padding(start = 38.dp, bottom = 6.dp),
+                    )
+                }
                 ActionRow(Icons.Filled.Visibility, stringResource(R.string.chat_hide_message), onModerate)
                 ActionRow(Icons.Filled.PushPin, stringResource(R.string.chat_pin), onPin)
                 ActionRow(Icons.Filled.VolumeOff, stringResource(R.string.chat_mute_user), onClick = { showMute = true })

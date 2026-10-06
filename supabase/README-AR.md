@@ -26,6 +26,16 @@
 | 11 | `08_admin_bootstrap.sql` | **بعد** إنشاء حسابك من التطبيق — عدّل البريد داخله أولاً |
 | 12 | `09_gateway_functions.sql` | اختياري — دوال بوابات الدفع الإلكتروني (Stripe) |
 
+### ملفات لاحقة (تُطبَّق بعد التجهيز الأساسي، بنفس الترتيب)
+
+`13_channels_icons` · `14_redeem_codes` · `15_assets_v2` · `16_language_room_names`
+· `17_message_delete_window` (نافذة حذف ٣ دقائق) · `18_media_admin_only` ·
+`19_admin_panel_guard` · `20_sticker_with_text` · `21_banners` · `22_plan_prices` ·
+`23_payment_order_usd` · `24_free_default_avatar` · `25_fix_send_chat_message_unnest` ·
+`26_fix_site_assets_sequence` · `27_admin_only_assets` · `28_chat_cleanup` (تنظيف اختياري) ·
+**`29_chat_moderation_rooms`** — إشراف الشات: حذف أي رسالة للأدمن والمشرف مهما كان
+عمرها، ونطاق غرف المشرف (غرفة واحدة · عدّة غرف · كل الغرف).
+
 ## نتائج متوقعة للتحقق
 
 ```sql

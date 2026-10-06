@@ -256,6 +256,14 @@
     <string name="chat_reason_other">Outro</string>
     <string name="chat_report_sent">Denúncia enviada ✅</string>
     <string name="chat_delete_mine">Excluir minha mensagem</string>
+    <string name="chat_delete_staff">🗑 Excluir mensagem (moderação)</string>
+    <string name="chat_delete_staff_note">Qualquer mensagem, por antiga que seja — o limite de 3 minutos vale só para o autor.</string>
+    <string name="chat_delete_failed">Não foi possível excluir a mensagem.</string>
+    <string name="admin_rooms_manage">Moderação de salas</string>
+    <string name="admin_rooms_all">Todas as salas</string>
+    <string name="admin_rooms_choose">Escolha as salas que este moderador pode moderar</string>
+    <string name="admin_rooms_saved">Moderação de salas atualizada ✅</string>
+    <string name="admin_rooms_hint">Os administradores moderam todas as salas automaticamente.</string>
     <string name="chat_delete_expired">Prazo encerrado: só é possível excluir a mensagem em até 3 minutos após o envio.</string>
     <string name="chat_delete_left">Restam %1$d min para excluir</string>
     <string name="chat_delete_done">Mensagem excluída.</string>
