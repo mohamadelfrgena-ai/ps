@@ -569,7 +569,7 @@ fun ChatScreen(
                         }
                         .padding(horizontal = 14.dp, vertical = 7.dp),
                 ) {
-                    Text("↓ " + stringResource(R.string.chat_new_messages), style = AppText.small, color = AppColors.OnGreen)
+                    Text(stringResource(R.string.chat_new_messages), style = AppText.small, color = AppColors.OnGreen)
                 }
             }
         }
@@ -1445,7 +1445,7 @@ private fun MessageBlock(
         // رسالة محذوفة أو مخفية: سطر واحد فقط لكل الأنواع (نص/ملصق/وسائط/صورة)
         if (message.status == "hidden" || message.status == "deleted") {
             Text(
-                "🚫 " + stringResource(R.string.chat_hidden_message),
+                stringResource(R.string.chat_hidden_message),
                 style = AppText.bodySmall,
                 color = AppColors.Muted,
                 modifier = Modifier.padding(start = 48.dp),

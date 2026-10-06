@@ -400,7 +400,7 @@ private fun AboutTab(me: Profile, onOpenSettings: () -> Unit, onSignOut: () -> U
             icon = Icons.Filled.Settings,
             title = stringResource(R.string.profile_online_status),
             subtitle = if (me.showOnlineStatus) stringResource(R.string.profile_online)
-            else "⚪ " + stringResource(R.string.profile_offline),
+            else stringResource(R.string.profile_offline),
         )
         RowItem(
             icon = Icons.Filled.Edit,

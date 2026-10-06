@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-فاحص: يمنع تكرار الإيموجي في عناوين الأقسام (SectionHeader).
+فاحص: يمنع تكرار الإيموجي في العناوين والنصوص.
+
+حالتان للتكرار:
+  أ) `SectionHeader` يضيف leadingEmoji والنص يبدأ بالإيموجي نفسه.
+  ب) **بادئة نصيّة في الكود**:  "⚪ " + stringResource(R.string.profile_offline)
+     والنص نفسه يبدأ بـ «⚪ » في كل اللغات ⇒ «⚪ ⚪ مخفي».
+     (هذا هو العيب الذي ظهر في الملف الشخصي.)
 
 العيب: `SectionHeader` يكتب العنوان هكذا
 
@@ -114,14 +120,46 @@ def main() -> int:
                     "والكود يضيفه ⇒ سيظهر مكرّراً في تلك اللغات"
                 )
 
+    # ------------------------------------------------------------------
+    # ب) بادئة إيموجي في الكود ملتصقة بنص يبدأ بها أصلاً في كل اللغات
+    # ------------------------------------------------------------------
+    prefix_checked = 0
+    PREFIX_CALL = re.compile(
+        r'"([^"]{1,8})"\s*\+\s*stringResource\(\s*R\.string\.(\w+)'
+    )
+    EMOJI_CHAR = re.compile(
+        "[\U0001F000-\U0001FAFF\u2190-\u21FF\u2300-\u27BF\u2B00-\u2BFF\uFE0F]"
+    )
+    for kt in sorted(SRC.rglob("*.kt")):
+        text = kt.read_text(encoding="utf-8")
+        for m in PREFIX_CALL.finditer(text):
+            prefix, name = m.group(1), m.group(2)
+            if not EMOJI_CHAR.search(prefix):
+                continue
+            per_locale = strings.get(name) or {}
+            values = [v for v in per_locale.values() if v.strip()]
+            if len(values) < 2:
+                continue
+            prefix_checked += 1
+            if all(EMOJI_START.match(v) for v in values) and \
+                    all(v.strip().startswith(prefix.strip()) for v in values):
+                line = text[:m.start()].count("\n") + 1
+                bad.append(
+                    f"{kt.relative_to(ROOT)}:{line}: «{prefix.strip()} » مكرّر — "
+                    f"R.string.{name} يبدأ به في كل اللغات ({len(values)})"
+                )
+
     if bad:
-        print("✗ إيموجي مكرّر في عناوين الأقسام:")
+        print("✗ إيموجي مكرّر في العناوين والنصوص:")
         for b in bad:
             print("   ", b)
         print(f"\nاحذف leadingEmoji من النداء (الإيموجي موجود داخل النص) — فُحص {checked} عنواناً.")
         return 1
 
-    print(f"✓ لا إيموجي مكرّر في عناوين الأقسام ({checked} عنواناً مُراجَعاً)")
+    print(
+        f"✓ لا إيموجي مكرّر: {checked} عنوان قسم و{prefix_checked} بادئة نصيّة "
+        "مُراجَعة في 8 لغات"
+    )
     return 0
 
 

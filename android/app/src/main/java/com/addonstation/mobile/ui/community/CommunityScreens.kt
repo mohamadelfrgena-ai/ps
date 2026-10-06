@@ -148,7 +148,7 @@ fun RulesScreen(onAccepted: () -> Unit, onDecline: () -> Unit) {
     ) {
         Spacer(Modifier.height(8.dp))
         Text(
-            "⚠️ " + stringResource(R.string.chat_rules_title),
+            stringResource(R.string.chat_rules_title),
             style = AppText.pageTitle,
             color = AppColors.Text,
             textAlign = TextAlign.Center,
