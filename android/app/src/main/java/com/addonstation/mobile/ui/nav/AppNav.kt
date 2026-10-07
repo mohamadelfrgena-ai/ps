@@ -303,29 +303,6 @@ private fun MainNavigation(
         navController.navigate(route) { launchSingleTop = true }
     }
 
-    // الوجهة القادمة من إشعار: أثر مستقل (قد تصل والتطبيق مفتوح ⇒ onNewIntent).
-    // غير مسجّل؟ نحفظها ونُنقله للدخول، ثم تُفتح تلقائياً بعد نجاح الدخول
-    // (وإلا ضاع الإشعار: المستخدم يفتحه فيرى شاشة الدخول فقط).
-    var pendingPush by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(pushRoute) {
-        val target = pushRoute ?: return@LaunchedEffect
-        if (!signedIn) {
-            pendingPush = target
-            requireSignIn(target)
-        } else {
-            openPushTarget(target)
-        }
-        onPushConsumed()
-    }
-    LaunchedEffect(signedIn, pendingPush) {
-        val target = pendingPush ?: return@LaunchedEffect
-        if (!signedIn) return@LaunchedEffect
-        pendingPush = null
-        // مهلة قصيرة حتى تكتمل تهيئة الشاشة الأولى (الملف الشخصي والتنقّل)
-        kotlinx.coroutines.delay(350)
-        openPushTarget(target)
-    }
-
     /**
      * عند كل فتح للتطبيق والمستخدم مسجّل:
      *   • نبضة حضور (تُحدّث «آخر ظهور») ⇒ بها يعرف الخادم من غاب فترة فيُذكّره.
@@ -378,6 +355,30 @@ private fun MainNavigation(
             else -> go(Routes.NOTIFICATIONS)
         }
     }
+
+    // الوجهة القادمة من إشعار: أثر مستقل (قد تصل والتطبيق مفتوح ⇒ onNewIntent).
+    // غير مسجّل؟ نحفظها ونُنقله للدخول، ثم تُفتح تلقائياً بعد نجاح الدخول
+    // (وإلا ضاع الإشعار: المستخدم يفتحه فيرى شاشة الدخول فقط).
+    var pendingPush by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(pushRoute) {
+        val target = pushRoute ?: return@LaunchedEffect
+        if (!signedIn) {
+            pendingPush = target
+            requireSignIn(target)
+        } else {
+            openPushTarget(target)
+        }
+        onPushConsumed()
+    }
+    LaunchedEffect(signedIn, pendingPush) {
+        val target = pendingPush ?: return@LaunchedEffect
+        if (!signedIn) return@LaunchedEffect
+        pendingPush = null
+        // مهلة قصيرة حتى تكتمل تهيئة الشاشة الأولى (الملف الشخصي والتنقّل)
+        kotlinx.coroutines.delay(350)
+        openPushTarget(target)
+    }
+
 
 
     // إن رجع المستخدم من شاشة الدخول بلا إتمام نُلغي الوجهة المعلّقة، فلا يقفز
