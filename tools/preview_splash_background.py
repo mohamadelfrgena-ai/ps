@@ -115,7 +115,7 @@ def main() -> int:
     d = ImageDraw.Draw(img)
     d.rectangle((0, 0, W, top - 14), fill="#111823")
     f_h = ImageFont.truetype(FONT_BOLD, 22)
-    d.text((W - 22, 16), rtl("شاشة البداية — صورة القرية عند الغروب خلفيةً للشعار والكلمات"),
+    d.text((W - 22, 16), rtl("شاشة البداية — الصورة المرفقة مقصوصةً بمقاس شاشة الهاتف خلفيةً للشعار والكلمات"),
            font=f_h, fill="#E8EEF5", anchor="ra")
     for i, (scr, label) in enumerate(screens):
         x = pad + i * (w + pad)
@@ -126,9 +126,9 @@ def main() -> int:
     bw, bh = Image.open(BG).size
     bkb = os.path.getsize(BG) / 1024
     note = [
-        "الخلفية: drawable-xxhdpi/splash_bg.jpg (%d×%d · %d KB) — الصورة كاملة (16:9) أعلى الشاشة وتحتاج بقيتها ممتلئة بنفس الصورة مغبَّشة."
+        "الخلفية: drawable-xxhdpi/splash_bg.jpg (%d×%d · %d KB) — قصّ طولي من منتصف الأصل المرفق (16:9) بنسبة شاشة الهاتف 9:19.5."
         % (bw, bh, round(bkb)),
-        "تعت림 متدرّج (شفافية 27%–55%) فوقها ليقرأ الشعار الأبيض والكلمات بوضوح، مع بقاء حركات التلاشي والتكبير وخطوط المسح والجسيمات كما هي.",
+        "تعتيم متدرّج (شفافية 27%–55%) فوقها ليقرأ الشعار الأبيض والكلمات بوضوح، مع بقاء حركات التلاشي والتكبير وخطوط المسح والجسيمات كما هي.",
     ]
     for i, line in enumerate(note):
         d.text((W - 22, top + h + 48 + i * 20), rtl(line), font=ImageFont.truetype(FONT_BOLD, 14),

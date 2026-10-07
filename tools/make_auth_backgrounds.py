@@ -20,7 +20,7 @@
 المخرجات:
     drawable-{mdpi,hdpi,xhdpi,xxhdpi}/login_bg.jpg     (لوحة 16:9 أعلى الشاشة)
     drawable-{mdpi,hdpi,xhdpi,xxhdpi}/signup_bg.jpg    (لوحة 16:9 أعلى الشاشة)
-    drawable-{mdpi,hdpi,xhdpi,xxhdpi}/splash_bg.jpg    (ملء شاشة طولي)
+    drawable-{mdpi,hdpi,xhdpi,xxhdpi}/splash_bg.jpg    (قصّ طولي من منتصف الصورة)
 
 ملاحظة عن الصورة القديمة لشاشة الترحيب:
     محفوظة كما هي في `drawable-nodpi/splash_bg_legacy.jpg` (والصورة الأصلية
@@ -79,62 +79,47 @@ def band_job(out_name: str, master: str) -> int:
 
 def splash_job() -> int:
     """
-    ملء شاشة **طولي** لشاشة الترحيب من صورة **عريضة**.
+    خلفية شاشة الترحيب: **قصّ طولي من منتصف الصورة الأصلية** بمقاس الهاتف.
 
-    المشكلة: هاتف طولي (9:19.5) وصورة عريضة (16:9) ⇒ القصّ المباشر يُظهر
-    **26% فقط** من عرض الصورة (نحو ربعها) وتُمطَّر البقية خارج الشاشة.
+    طلب المالك (حرفياً): «صورة شاشة الترحيب قصّها حتى تناسب مقاسات شاشة الهاتف»
+    — والصورة المرفقة هي نفسها الأصل `splash_bg_master.jpg` (مطابقة بايتاً ببايت).
 
-    الحل (تركيب واحد يُخبَز في ملف JPEG واحد — بلا أي تعقيد في Kotlin):
-      ١) خلفية ملء الشاشة: الصورة مكبَّرة لتغطية الشاشة، **باهتة ومغبَّشة**
-         (GaussianBlur) ومُعتَّمة قليلاً ⇒ لا فراغ أسود ولا شريط جانبي،
-         والألوان نفسها تمتدّ على كل الشاشة بإحساس سينمائي.
-      ٢) الصورة كاملة (16:9) ظاهرة أعلى الشاشة بعرضها الكامل، **حادّة**
-         (UnsharpMask) — فلا يُقتطع من لقطة المالك شيء.
-      ٣) تلاشٍ ناعم (تدرّج ألفا) أسفل الصورة ⇒ تذوب في الخلفية بلا خط فاصل.
+    لماذا قصّ لا تركيب؟
+        الأصل 1920×1080 (16:9) والهاتف 9:19.5. القصّ المركزي إلى نسبة الهاتف
+        يُظهر عموداً بعرض **498** بكسل من أصل 1920 (26%) بكامل ارتفاعه 1080 —
+        وهذا العمود يقع على المجموعة كاملةً: الأريكة والطاولة في الوسط،
+        والبطلان أمامهما، والبطل ذو القبعة في يمين-وسط الكادر، والأشجار
+        والزهور على الجانبين. فالناتج كادر طولي طبيعي: بلا فراغ أسود، بلا
+        تغبيش، بلا خطّ فاصل، ولقطة المالك سليمة التركيب.
 
-    الحصيلة: كل الصورة ظاهرة · شاشة ممتلئة بلا فراغ · ومقاس مضبوط لكل كثافة.
+    ولماذا المنتصف تحديداً؟ لأن موضع العمود الأمثل = (1920 − 498) ÷ 2 = **711**
+        وهو منتصف الصورة تماماً ⇒ لا رقم سحري في الكود: قصّ مركزي صِرف.
+
+    الجودة: 1080 → 2340 تكبير ×2.17 (لأن أطول شاشة هاتف هي 2340 بكسل)،
+        ويُخفَّف حدّته بـUnsharpMask خفيف (radius=2 · percent=55) فيبدو حاداً
+        على الجهاز بلا هالة (halo). والبكسل الفعلي للأصل كامل: لا اقتطاع
+        للارتفاع إطلاقاً (1080 من 1080).
     """
     src = Image.open(os.path.join(ROOT, "design", SPLASH_MASTER)).convert("RGB")
     w, h = src.size
-    print(f"\n{SPLASH_MASTER}  ({w}×{h} · نسبة {w / h:.3f})  ← ملء شاشة طولي")
+    crop_w = min(w, round(h * PHONE_ASPECT))          # نافذة بنسبة الهاتف
+    left = (w - crop_w) // 2                           # 711 للأصل 1920×1080
+    window = src.crop((left, 0, left + crop_w, h))
+    print(f"\n{SPLASH_MASTER}  ({w}×{h} · نسبة {w / h:.3f})  ← قصّ طولي")
+    print(f"   نافذة القص: {crop_w}×{h} من ({left}،0) — المنتصف تماماً")
     total = 0
     for density, factor in DENSITIES:
         out_w = round(BASE_WIDTH_DP * factor)
         out_h = round(out_w / PHONE_ASPECT)
-        canvas_h = out_h
-
-        # ١) الخلفية: تغطية الشاشة ثم تغبيش واعتام خفيف
-        cover = max(out_w / w, canvas_h / h)
-        big = src.resize((max(out_w, round(w * cover)), max(canvas_h, round(h * cover))), Image.LANCZOS)
-        left = (big.width - out_w) // 2
-        top = (big.height - canvas_h) // 2
-        bg = big.crop((left, top, left + out_w, top + canvas_h))
-        bg = bg.filter(ImageFilter.GaussianBlur(radius=out_w / 22))
-        bg = ImageEnhance.Brightness(bg).enhance(0.72)
-
-        # ٢) الصورة كاملة أعلى الشاشة بعرضها (16:9) وحادّة
-        band_h = round(out_w * h / w)
-        band = src.resize((out_w, band_h), Image.LANCZOS)
-        band = band.filter(ImageFilter.UnsharpMask(radius=2, percent=58, threshold=3))
-
-        # ٣) قناع تلاشٍ على حافة الصورة السفلية (20% من ارتفاعها)
-        feather = max(24, round(band_h * 0.20))
-        mask = Image.new("L", (out_w, band_h), 255)
-        mpx = mask.load()
-        for y in range(band_h - feather, band_h):
-            value = int(255 * (1 - (y - (band_h - feather)) / feather))
-            for x in range(out_w):
-                mpx[x, y] = value
-        bg.paste(band, (0, 0), mask)
-
+        shot = window.resize((out_w, out_h), Image.LANCZOS)
+        shot = shot.filter(ImageFilter.UnsharpMask(radius=2, percent=55, threshold=3))
         folder = os.path.join(RES, f"drawable-{density}")
         os.makedirs(folder, exist_ok=True)
         out = os.path.join(folder, "splash_bg.jpg")
-        bg.save(out, "JPEG", quality=88, optimize=True, progressive=True)
+        shot.save(out, "JPEG", quality=88, optimize=True, progressive=True)
         size = os.path.getsize(out)
         total += size
-        print(f"   drawable-{density:<8} {out_w:4d} × {canvas_h:4d}   {size / 1024:6.1f} KB"
-              f"   (الصورة {out_w}×{band_h} أعلى + خلفية مغبَّشة)")
+        print(f"   drawable-{density:<8} {out_w:4d} × {out_h:4d}   {size / 1024:6.1f} KB")
     return total
 
 
