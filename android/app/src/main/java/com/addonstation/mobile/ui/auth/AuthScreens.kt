@@ -41,7 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -67,11 +66,11 @@ import com.addonstation.mobile.ui.theme.AppText
 import kotlinx.coroutines.launch
 
 /**
- * نسبة العرض إلى الارتفاع لخلفية تسجيل الدخول (`login_bg.jpg` بمقاس
- * ‏1080×607) — يُحسب منها ارتفاع اللوحة على أي هاتف، فتظهر الصورة كاملة
- * وواضحة على كل الكثافات (من mdpi إلى xxhdpi) بلا تمديد.
+ * نسبة العرض إلى الارتفاع لخلفيتَي الدخول وإنشاء الحساب (الصورتان
+ * ‏1920×1080 ⇒ 16:9) — يُحسب منها ارتفاع اللوحة على أي هاتف، فتظهر الصورة
+ * كاملة وواضحة على كل الكثافات (من mdpi إلى xxhdpi) بلا تمديد ولا تشويه.
  */
-private const val LOGIN_BG_ASPECT = 1.779f
+private const val AUTH_BG_ASPECT = 1.778f
 
 /**
  * ما يقبله الخادم في اسم المستخدم (نفس القاعدة في AuthRepository):
@@ -82,6 +81,51 @@ private const val LOGIN_BG_ASPECT = 1.779f
 private val USERNAME_RE = Regex("^[A-Za-z0-9_]+$")
 private const val USERNAME_MIN = 3
 private const val USERNAME_MAX = 24
+
+/**
+ * لوحة خلفية أعلى شاشات الدخول وإنشاء الحساب — **مكوّن واحد للشاشتين**
+ * فيبقى المقاس والإحساس واحداً مهما تغيّرت الصور.
+ *
+ * المقاس: عرض الشاشة كاملاً وارتفاع = العرض ÷ نسبة الصورة (16:9)، بحدٍّ أقصى
+ * ‏34% من ارتفاع الشاشة للأجهزة العريضة. لماذا لا ملء الشاشة؟ لأن الصورة
+ * عريضة والهاتف طولي، فملء الشاشة بها يكبّرها ~٣.٩ مرة ⇒ تُمسح تفاصيلها.
+ *
+ * البناء ثلاث طبقات:
+ *   ١) الصورة (ContentScale.Crop ⇒ قصّ من المنتصف لا مطّ ولا تشويه)؛
+ *   ٢) تعتيم خفيف يحفظ وضوح أي نص يُوضع فوقها لاحقاً؛
+ *   ٣) تلاشٍ متدرّج إلى `AppColors.Bg` ⇒ تنتهي اللوحة في خلفية التطبيق
+ *      كانسياب واحد، **بلا أي لون جديد** (شفافيات من لون الخلفية فقط).
+ */
+@androidx.annotation.DrawableRes
+@Composable
+private fun AuthBackdrop(res: Int) {
+    val width = LocalConfiguration.current.screenWidthDp.dp
+    val bandHeight = (width / AUTH_BG_ASPECT)
+        .coerceAtMost(LocalConfiguration.current.screenHeightDp.dp * 0.34f)
+
+    Box(Modifier.fillMaxWidth().height(bandHeight)) {
+        // الطبقة ١: الصورة — عرض الهاتف كاملاً بلا حواف
+        Image(
+            painter = painterResource(res),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize(),
+        )
+        // الطبقة ٢ + ٣: تعتيم متدرّج ثم تلاشٍ إلى خلفية التطبيق (بلا لون جديد)
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to AppColors.Bg.copy(alpha = 0.18f),
+                        0.45f to AppColors.Bg.copy(alpha = 0.30f),
+                        1.0f to AppColors.Bg,
+                    ),
+                ),
+        )
+    }
+}
 
 /**
  * حقل كلمة مرور **بعين 👁 داخل الحقل**: لمسة واحدة تُظهر كلمة المرور كما
@@ -187,12 +231,6 @@ fun LoginScreen(
         }
     }
 
-    // خلفية الشاشة: لوحة العرض بعرض الهاتف كاملاً وبارتفاع **يناسب نسبتها**
-    // (الصورة عريضة 16:9 والهاتف طولي ⇒ ملء الشاشة بها يكبّرها ٣.٩ مرة
-    // فيطمسها؛ والارتفاع المحسوب يُبقيها بوضوحها الأصلي بلا تمديد ولا قصّ).
-    val bandHeight = (LocalConfiguration.current.screenWidthDp.dp / LOGIN_BG_ASPECT)
-        .coerceAtMost(LocalConfiguration.current.screenHeightDp.dp * 0.34f)
-
     Column(Modifier.fillMaxSize()) {
         SubScreenHeader(title = stringResource(R.string.auth_sign_in), onBack = onBack)
         Column(
@@ -201,29 +239,7 @@ fun LoginScreen(
                 .imePadding()
                 .verticalScroll(rememberScrollState()),
         ) {
-            // الطبقة ١: خلفية تسجيل الدخول — عرض كامل بلا حواف
-            Box(Modifier.fillMaxWidth().height(bandHeight)) {
-                Image(
-                    painter = painterResource(R.drawable.login_bg),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    alignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                // الطبقة ٢: تلاشٍ إلى خلفية التطبيق — بلا لون جديد (AppColors فقط)
-                // فتنتهي اللوحة في خلفية التطبيق كانسياب واحد، ويبقى النص واضحاً.
-                Box(
-                    Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                0.0f to Color.Transparent,
-                                0.45f to AppColors.Bg.copy(alpha = 0.30f),
-                                1.0f to AppColors.Bg,
-                            ),
-                        ),
-                )
-            }
+            AuthBackdrop(R.drawable.login_bg)
             Column(
                 Modifier.padding(horizontal = 18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -426,104 +442,111 @@ fun SignUpScreen(
             Modifier
                 .fillMaxSize()
                 .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .verticalScroll(rememberScrollState()),
         ) {
-            Spacer(Modifier.height(16.dp))
-            // صورة البروفايل الافتراضية (صورة المالك) قبل إنشاء الحساب
-            com.addonstation.mobile.ui.components.DefaultProfileAvatar(size = 92.dp)
-            Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.auth_signup_title), style = AppText.pageTitle, color = AppColors.Text)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(R.string.auth_signup_subtitle),
-                style = AppText.bodySmall,
-                color = AppColors.Muted,
-                textAlign = TextAlign.Center,
-            )
-
-            Spacer(Modifier.height(20.dp))
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                label = { Text(stringResource(R.string.auth_username)) },
-                leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null, tint = AppColors.Muted) },
-                supportingText = {
-                    Text(
-                        stringResource(R.string.auth_username_hint),
-                        style = AppText.tiny,
-                        color = AppColors.Muted,
-                    )
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text(stringResource(R.string.auth_email)) },
-                leadingIcon = { Icon(Icons.Filled.Mail, contentDescription = null, tint = AppColors.Muted) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(10.dp))
-            PasswordField(
-                value = password,
-                onValueChange = { password = it },
-                label = stringResource(R.string.auth_password),
-                imeAction = ImeAction.Next,
-                supportingText = stringResource(R.string.auth_password_hint),
-            )
-            Spacer(Modifier.height(10.dp))
-            // **حقل التأكيد**: إن اختلف الحقلان لا نُنشئ الحساب ونُظهر
-            // السبب، بدل أن يكتشف المستخدم الخطأ بعد التسجيل.
-            PasswordField(
-                value = confirm,
-                onValueChange = { confirm = it },
-                label = stringResource(R.string.auth_confirm_password),
-                onDone = { submit() },
-            )
-
-            errorKind?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(apiErrorText(it), style = AppText.bodySmall, color = AppColors.Red)
-            }
-            status?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, style = AppText.bodySmall, color = AppColors.Green, textAlign = TextAlign.Center)
-            }
-
-            Spacer(Modifier.height(18.dp))
-            GradientButton(
-                text = stringResource(R.string.auth_create_account),
-                onClick = { submit() },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(Modifier.height(12.dp))
-            Text(
-                stringResource(R.string.auth_terms_note),
-                style = AppText.tiny,
-                color = AppColors.Dim,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.auth_have_account), style = AppText.bodySmall, color = AppColors.Muted)
-                Spacer(Modifier.size(6.dp))
+            AuthBackdrop(R.drawable.signup_bg)
+            Column(
+                Modifier.padding(horizontal = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spacer(Modifier.height(6.dp))
+                // صورة البروفايل الافتراضية (صورة المالك) تركب الحافة السفلية
+                // للوحة — نفس لغة شاشة الدخول (أفاتار فوق الخلفية)
+                Box(Modifier.offset(y = (-34).dp)) {
+                    com.addonstation.mobile.ui.components.DefaultProfileAvatar(size = 92.dp)
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(R.string.auth_signup_title), style = AppText.pageTitle, color = AppColors.Text)
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    stringResource(R.string.auth_sign_in),
+                    stringResource(R.string.auth_signup_subtitle),
                     style = AppText.bodySmall,
-                    color = AppColors.Green,
-                    modifier = Modifier.clickable { onOpenLogin() },
+                    color = AppColors.Muted,
+                    textAlign = TextAlign.Center,
                 )
+
+                Spacer(Modifier.height(20.dp))
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                    label = { Text(stringResource(R.string.auth_username)) },
+                    leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null, tint = AppColors.Muted) },
+                    supportingText = {
+                        Text(
+                            stringResource(R.string.auth_username_hint),
+                            style = AppText.tiny,
+                            color = AppColors.Muted,
+                        )
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text(stringResource(R.string.auth_email)) },
+                    leadingIcon = { Icon(Icons.Filled.Mail, contentDescription = null, tint = AppColors.Muted) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                PasswordField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = stringResource(R.string.auth_password),
+                    imeAction = ImeAction.Next,
+                    supportingText = stringResource(R.string.auth_password_hint),
+                )
+                Spacer(Modifier.height(10.dp))
+                // **حقل التأكيد**: إن اختلف الحقلان لا نُنشئ الحساب ونُظهر
+                // السبب، بدل أن يكتشف المستخدم الخطأ بعد التسجيل.
+                PasswordField(
+                    value = confirm,
+                    onValueChange = { confirm = it },
+                    label = stringResource(R.string.auth_confirm_password),
+                    onDone = { submit() },
+                )
+
+                errorKind?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(apiErrorText(it), style = AppText.bodySmall, color = AppColors.Red)
+                }
+                status?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, style = AppText.bodySmall, color = AppColors.Green, textAlign = TextAlign.Center)
+                }
+
+                Spacer(Modifier.height(18.dp))
+                GradientButton(
+                    text = stringResource(R.string.auth_create_account),
+                    onClick = { submit() },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.auth_terms_note),
+                    style = AppText.tiny,
+                    color = AppColors.Dim,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.auth_have_account), style = AppText.bodySmall, color = AppColors.Muted)
+                    Spacer(Modifier.size(6.dp))
+                    Text(
+                        stringResource(R.string.auth_sign_in),
+                        style = AppText.bodySmall,
+                        color = AppColors.Green,
+                        modifier = Modifier.clickable { onOpenLogin() },
+                    )
+                }
+                Spacer(Modifier.height(40.dp))
             }
-            Spacer(Modifier.height(40.dp))
         }
     }
 }
