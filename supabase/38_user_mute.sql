@@ -48,8 +48,16 @@ revoke all on public.user_mutes from anon, authenticated;
 grant select on public.user_mutes to authenticated;
 grant all on public.user_mutes to service_role;
 
--- إصلاح أمني: الحظر كان بلا RLS مفعّلة (سياسة بلا تفعيل = كل الصفوف مقروءة)
-alter table public.user_blocks enable row level security;
+-- إصلاح أمني: الحظر كان بلا RLS مفعّلة (سياسة بلا تفعيل = كل الصفوف مقروءة).
+-- مغلّف بشرطٍ لأن جدول `user_blocks` يأتي من ملف الحظر (33) وقد لا يكون على القاعدة بعد؛
+-- فحينها لا تُسقط هذه الجملة بقية الملف.
+do $do$
+begin
+  if to_regclass('public.user_blocks') is not null then
+    execute 'alter table public.user_blocks enable row level security';
+  end if;
+end
+$do$;
 
 -- ---------------------------------------------------------------------------
 -- 2) من يحقّ له الكتم؟ اشتراك Legendary (أو إدارة/مشرف للتجربة)

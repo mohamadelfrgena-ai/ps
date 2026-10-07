@@ -9,6 +9,7 @@
     GITHUB_REPOSITORY · GITHUB_SHA · GITHUB_TOKEN
 
 ماذا ينفّذ؟ الملفات بالترتيب — وكلٌّ آمن للتكرار:
+    33_user_block.sql       حظر المستخدمين (ينشئ user_blocks الذي يلمسه 38)
     35_push_live.sql        الإشعارات الحقيقية + جدولة الطابور
     36_profile_stats.sql    إحصاءات الملف الشخصي (أصدقاء · تنزيلات · مفضّلة · مستوى)
     37_profile_reports.sql  الإبلاغ عن عضو من ملفّه
@@ -28,6 +29,7 @@ import urllib.error
 import urllib.request
 
 FILES = [
+    "supabase/33_user_block.sql",
     "supabase/35_push_live.sql",
     "supabase/36_profile_stats.sql",
     "supabase/37_profile_reports.sql",
@@ -52,7 +54,12 @@ CHECK = (
     "where table_schema = 'public' and table_name = 'user_mutes')::text"
     " || ' muted_users=' || (select count(*) from information_schema.columns "
     "where table_schema = 'public' and table_name = 'push_prefs' "
-    "and column_name = 'muted_users')::text as report"
+    "and column_name = 'muted_users')::text"
+    " || ' user_blocks=' || (select count(*) from information_schema.tables "
+    "where table_schema = 'public' and table_name = 'user_blocks')::text"
+    " || ' is_blocked_pair=' || (select count(*) from pg_proc p "
+    "join pg_namespace n on n.oid = p.pronamespace "
+    "where n.nspname = 'public' and p.proname = 'is_blocked_pair')::text as report"
 )
 
 
@@ -107,7 +114,7 @@ def write_status(notes, ok: bool) -> None:
         return
     body = json.dumps({
         "state": "success" if ok else "failure",
-        "context": "خادم SQL (35 · 36 · 37 · 38)",
+        "context": "خادم SQL (33 · 35 · 36 · 37 · 38)",
         "description": " · ".join(notes)[:130],
     }).encode()
     req = urllib.request.Request(

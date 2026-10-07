@@ -158,7 +158,9 @@ check("38 مُدرَج في 00_ALL_IN_ONE (باني الملف الجامع)",
       "38_user_mute.sql" in read(os.path.join(ROOT, "tools", "build_all_in_one_sql.py"))
       and "user_mutes" in all_in_one)
 check("السير ينفّذ 38 تلقائياً مع البقية",
-      'run_sql("supabase/38_user_mute.sql")' in workflow)
+      ('run_sql("supabase/38_user_mute.sql")' in workflow)
+      or ("run_server_sql.py" in workflow
+          and "38_user_mute.sql" in read(os.path.join(ROOT, "tools", "run_server_sql.py"))))
 check("الفاحص 99 فيه بند 56 لـ38_user_mute",
       "select 56," in verify and "38_user_mute" in verify)
 
