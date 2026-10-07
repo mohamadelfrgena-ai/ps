@@ -202,6 +202,11 @@ for needle, why in (
     if needle not in base34:
         problems.append(f"supabase/34_push_notifications.sql: {why}")
 
+# دليل التشغيل من الجوال + سير التشغيل نفسه
+for doc in ("docs/15-PUSH-LIVE-AR.md", "docs/16-PUSH-SETUP-PHONE-AR.md"):
+    if not os.path.exists(os.path.join(ROOT, doc)):
+        problems.append(f"{doc}: دليل التشغيل مفقود (المالك يحتاجه خطوة بخطوة)")
+
 # سير التشغيل: يدوي فقط ولا يبني APK ولا يلمس .build-request
 wf = read("push-live.yml", WORKFLOWS) if os.path.exists(os.path.join(WORKFLOWS, "push-live.yml")) else ""
 if wf:
