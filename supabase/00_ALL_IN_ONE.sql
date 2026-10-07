@@ -9395,6 +9395,10 @@ $fn$;
 comment on function public.user_unmute(uuid) is
   'إلغاء كتم عضو — متاح للجميع (الإلغاء لا يحتاج اشتراكاً).';
 
+-- نُسقطها أولاً لأن نسخةً سابقة على القاعدة ترجع أعمدةً أكثر (PostgreSQL
+-- يرفض تغيير نوع الإرجاع بـ`create or replace` وحده: 42P13).
+drop function if exists public.my_muted_users();
+
 create or replace function public.my_muted_users()
 returns table (muted_id uuid, created_at timestamptz)
 language sql stable security definer set search_path = public
