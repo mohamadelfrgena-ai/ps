@@ -347,6 +347,33 @@ jobs:
               print("::warning title=تعذّرت قراءة الردّ::" + str(exc)[:160])
           PY
 
+      - name: التحقق من ملف Firebase الموجود في الأسرار
+        if: always()
+        env:
+          FCM_JSON: ${{ secrets.ADDONSTATION_GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$FCM_JSON" ]; then
+            echo "::warning title=ملف Firebase غير موجود في الأسرار::أضف ADDONSTATION_GOOGLE_SERVICES_JSON وإلا فكل نسخة تُبنى لن تستقبل أي إشعار."
+            exit 0
+          fi
+          printf '%s' "$FCM_JSON" > /tmp/google-services.json
+          python3 - <<'PY'
+          import json
+          d = json.load(open("/tmp/google-services.json"))
+          pid = d["project_info"]["project_id"]
+          pkgs = [c["client_info"]["android_client_info"]["package_name"] for c in d.get("client", [])]
+          print("project_id =", pid, "· الحزم =", pkgs)
+          if "com.addonstation.mobile" in pkgs:
+              print("::notice::✓ ملف Firebase سليم وحزمة التطبيق مطابقة (project_id = " + pid + ")")
+          else:
+              print("::error title=حزمة غير مطابقة في ملف Firebase::الحزم في الملف " + str(pkgs) + " والمطلوب com.addonstation.mobile — لن يصل أي إشعار. أنشئ تطبيق أندرويد في Firebase بهذا الاسم حرفياً ثم نزّل الملف من جديد.")
+          PY
+          if grep -q '"project_number"' /tmp/google-services.json; then
+            echo "✓ الملف يحوي project_number (بنية سليمة)."
+          else
+            echo "::error title=ملف Firebase غير مكتمل::لا يحوي project_number — تأكّد أنك نسخت الملف كاملاً كما نزّلته من Firebase."
+          fi
+
       - name: تشغيل الطبيب (تقرير كامل بالعربية)
         if: always()
         env:
