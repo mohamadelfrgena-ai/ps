@@ -632,4 +632,12 @@
     <string name="profile_item_equipped">Надето</string>
     <string name="profile_content_section">Контент</string>
     <string name="profile_no_content_published">Пока нет опубликованного контента</string>
+    <string name="auth_confirm_title">Аккаунт создан ✓</string>
+    <string name="auth_confirm_text">Мы отправили ссылку для подтверждения на вашу почту. Откройте её и нажмите кнопку ниже.</string>
+    <string name="auth_confirm_retry">Я подтвердил — войти</string>
+    <string name="auth_confirm_resend">Отправить ссылку снова</string>
+    <string name="auth_confirm_resent">Ссылка отправлена повторно ✓</string>
+    <string name="auth_confirm_hint">Нет письма? Проверьте также папку «Спам».</string>
+    <string name="profile_guest_title">Вы просматриваете как гость</string>
+    <string name="profile_guest_text">Войдите или создайте аккаунт, чтобы приложение сохраняло избранное, ваш контент и баланс AC.</string>
 </resources>

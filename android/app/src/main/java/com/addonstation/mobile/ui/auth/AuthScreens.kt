@@ -57,6 +57,7 @@ import com.addonstation.mobile.R
 import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.toApiError
 import com.addonstation.mobile.ui.apiErrorText
+import com.addonstation.mobile.ui.components.GlassCard
 import com.addonstation.mobile.ui.components.GhostButton
 import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.SubScreenHeader
@@ -391,6 +392,16 @@ fun SignUpScreen(
     var status by remember { mutableStateOf<String?>(null) }
     var errorKind by remember { mutableStateOf<ApiErrorKind?>(null) }
     var busy by remember { mutableStateOf(false) }
+    /**
+     * «الحساب أُنشئ لكن تأكيد البريد مطلوب» — حالة صريحة لا رسالة عابرة.
+     *
+     * كانت المشكلة: `signup` بلا جلسة (تأكيد البريد مفعّل) يترك المستخدم خارج
+     * التطبيق، فيضغط «ملف شخصي» فيجد شاشة الدخول فيظنّ أن التطبيق لم يعرف
+     * أنه سجّل. الآن: بطاقة واضحة + «أكّدت بريدي — سجّلني» + «أعِد إرسال الرابط».
+     */
+    var pendingConfirm by remember { mutableStateOf(false) }
+    var resendMessage by remember { mutableStateOf<String?>(null) }
+    var resendOk by remember { mutableStateOf(false) }
 
     val creating = stringResource(R.string.msg_creating_account)
     val shortUsername = stringResource(R.string.msg_username_too_short)
@@ -400,6 +411,51 @@ fun SignUpScreen(
     val longUsername = stringResource(R.string.msg_username_too_long)
     val invalidEmail = stringResource(R.string.msg_invalid_email)
     val createdMsg = stringResource(R.string.msg_account_created)
+    val confirmTitle = stringResource(R.string.auth_confirm_title)
+    val confirmText = stringResource(R.string.auth_confirm_text)
+    val confirmHint = stringResource(R.string.auth_confirm_hint)
+    val resentMsg = stringResource(R.string.auth_confirm_resent)
+    val resendFailedMsg = stringResource(R.string.msg_network_error)
+    val signingInMsg = stringResource(R.string.msg_signing_in)
+
+    /**
+     * «أكّدت بريدي — سجّلني الآن»: يحاول الدخول بنفس البيانات بعد تأكيد البريد.
+     * إن نجح يدخل المستخدم التطبيق فوراً (والتطبيق بكامله يعرف ذلك: الجلسة +
+     * `setSignedIn(true)` + `refreshAll`).
+     */
+    fun confirmAndSignIn() {
+        if (busy) return
+        scope.launch {
+            busy = true
+            resendOk = false
+            resendMessage = signingInMsg
+            container.auth.signIn(email, password)
+                .onSuccess {
+                    container.state.setSignedIn(true)
+                    container.state.refreshAll()
+                    resendMessage = null
+                    onSuccess()
+                }
+                .onFailure { e ->
+                    resendOk = false
+                    resendMessage = apiErrorText(e.toApiError().kind)
+                }
+            busy = false
+        }
+    }
+
+    /** إعادة إرسال رابط التأكيد (بلا مغادرة التطبيق). */
+    fun resend() {
+        if (busy) return
+        scope.launch {
+            busy = true
+            resendMessage = null
+            container.auth.resendConfirmation(email)
+                .onSuccess { resendOk = true; resendMessage = resentMsg }
+                .onFailure { resendOk = false; resendMessage = resendFailedMsg }
+            busy = false
+        }
+    }
 
     // عملية إنشاء واحدة: من زر «إنشاء حساب» أو من زر «تم» ✓ بلوحة المفاتيح.
     fun submit() {
@@ -424,7 +480,10 @@ fun SignUpScreen(
                             onSuccess()
                         } else {
                             // تأكيد البريد مفعّل: لا جلسة حتى يفتح المستخدم الرابط
+                            // ⇒ نُظهِر بطاقة التأكيد بزرّيها (لا رسالة عابرة تُترك
+                            // المستخدم خارج التطبيق بلا مخرج).
                             status = createdMsg
+                            pendingConfirm = true
                         }
                     }
                     .onFailure { e ->
@@ -519,13 +578,66 @@ fun SignUpScreen(
                     Text(it, style = AppText.bodySmall, color = AppColors.Green, textAlign = TextAlign.Center)
                 }
 
+                // بطاقة تأكيد البريد: تظهر عند إنشاء حساب بتأكيد بريد مفعّل
+                if (pendingConfirm) {
+                    Spacer(Modifier.height(12.dp))
+                    GlassCard(
+                        color = AppColors.Green.copy(alpha = 0.08f),
+                        borderColor = AppColors.Green.copy(alpha = 0.40f),
+                    ) {
+                        Text(confirmTitle, style = AppText.sectionTitle, color = AppColors.Green)
+                        Text(confirmText, style = AppText.bodySmall, color = AppColors.Muted)
+                        Text(
+                            email.trim(),
+                            style = AppText.bodySmall,
+                            color = AppColors.Text,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        GradientButton(
+                            text = stringResource(R.string.auth_confirm_retry),
+                            onClick = { confirmAndSignIn() },
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        GhostButton(
+                            text = stringResource(R.string.auth_confirm_resend),
+                            onClick = { resend() },
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        resendMessage?.let {
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                it,
+                                style = AppText.tiny,
+                                color = if (resendOk) AppColors.Green else AppColors.Red,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            confirmHint,
+                            style = AppText.tiny,
+                            color = AppColors.Dim,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+
                 Spacer(Modifier.height(18.dp))
-                GradientButton(
-                    text = stringResource(R.string.auth_create_account),
-                    onClick = { submit() },
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (!pendingConfirm) {
+                    GradientButton(
+                        text = stringResource(R.string.auth_create_account),
+                        onClick = { submit() },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
 
                 Spacer(Modifier.height(12.dp))
                 Text(

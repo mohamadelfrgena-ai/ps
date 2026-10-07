@@ -78,17 +78,22 @@ class SessionStore(context: Context) {
         loaded = true
     }
 
-    private fun readFromDisk(): Session? {
+    private fun readFromDisk(): Session? = try {
         val access = prefs.getString(K_ACCESS, null) ?: return null
         val refresh = prefs.getString(K_REFRESH, null) ?: return null
         val user = prefs.getString(K_USER, null) ?: return null
-        return Session(
+        Session(
             accessToken = access,
             refreshToken = refresh,
             userId = user,
             email = prefs.getString(K_EMAIL, null),
             expiresAtEpochSeconds = prefs.getLong(K_EXPIRES, 0L),
         )
+    } catch (t: Throwable) {
+        // فشل فكّ التشفير (Keystore تغيّر أو تُبطِل بعد تحديث النظام/قفل جديد):
+        // نُنظّف المخزن ونرتدي «بلا جلسة» بدل الانهيار أو حالة غامضة.
+        runCatching { prefs.edit().clear().commit() }
+        null
     }
 
     fun clear() {

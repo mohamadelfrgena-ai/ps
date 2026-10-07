@@ -540,7 +540,10 @@ fun FriendsScreen(onBack: () -> Unit, onOpenProfile: (String) -> Unit) {
     var failed by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableStateOf(0) }
 
-    LaunchedEffect(reloadTick) {
+    // حالة الدخول جزء من المفاتيح: بعد تسجيل الدخول تُعاد القوائم فوراً
+    // (كانت تبقى فارغة حتى يبدّل المستخدم شيئاً آخر).
+    val signedIn by container.state.signedIn.collectAsState()
+    LaunchedEffect(reloadTick, signedIn) {
         loading = true
         failed = false
         try {

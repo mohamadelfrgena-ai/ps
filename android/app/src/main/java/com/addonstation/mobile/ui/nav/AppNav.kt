@@ -319,8 +319,13 @@ private fun MainNavigation(
      *   • تسجيل توكن الجهاز (أول مرة وبعد إعادة التثبيت) مع لغته ومنطقته الزمنية.
      */
     LaunchedEffect(signedIn) {
-        if (!signedIn) return@LaunchedEffect
         val ctx = container.appContext
+        if (!signedIn) {
+            // خروج (أو جلسة انتهت): يُلغى توكن الجهاز من الحساب كي لا تصل
+            // إشعارات صاحب الحساب السابق إلى من يستعمل الجهاز بعده.
+            com.addonstation.mobile.push.PushRegistrar.onSessionChanged(ctx, false)
+            return@LaunchedEffect
+        }
         withContext(Dispatchers.IO) {
             com.addonstation.mobile.push.PushRegistrar.heartbeat(container)
             com.addonstation.mobile.push.PushRegistrar.register(ctx)
@@ -486,6 +491,8 @@ private fun MainNavigation(
                 composable(Routes.PROFILE) {
                     ProfileScreen(
                         onLogin = { go(Routes.LOGIN) },
+                        onOpenSignup = { go(Routes.SIGNUP) },
+                        onSignedOut = { goTab(MainTab.Home) },
                         onOpenSettings = { goTab(MainTab.Settings) },
                         onOpenPlans = { go(Routes.PLANS) },
                         onOpenEdit = { go(Routes.EDIT_PROFILE) },

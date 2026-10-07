@@ -648,4 +648,12 @@
     <string name="profile_item_equipped">Equipped</string>
     <string name="profile_content_section">Content</string>
     <string name="profile_no_content_published">No content published yet</string>
+    <string name="auth_confirm_title">Your account is created ✓</string>
+    <string name="auth_confirm_text">We sent a confirmation link to your email. Open it, then tap the button below.</string>
+    <string name="auth_confirm_retry">I confirmed — sign me in</string>
+    <string name="auth_confirm_resend">Resend the confirmation link</string>
+    <string name="auth_confirm_resent">Confirmation link sent again ✓</string>
+    <string name="auth_confirm_hint">No message? Check the spam folder as well.</string>
+    <string name="profile_guest_title">You are browsing as a guest</string>
+    <string name="profile_guest_text">Sign in or create an account so the app keeps your favourites, your content and your AC balance.</string>
 </resources>

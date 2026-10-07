@@ -125,7 +125,10 @@ fun StoreScreen(
         }
     }
 
-    LaunchedEffect(type, sort, query, reloadTick) { reload() }
+    // `signedIn` ضمن المفاتيح: بعد الدخول أو إنشاء الحساب يُعاد التحميل
+    // فيظهر ما حفظه المستخدم (المفضّلة) بدل قائمة فارغة من زمن الضيف.
+    val signedIn by container.state.signedIn.collectAsState()
+    LaunchedEffect(type, sort, query, reloadTick, signedIn) { reload() }
 
     Column(Modifier.fillMaxSize()) {
         PixelTopBar(

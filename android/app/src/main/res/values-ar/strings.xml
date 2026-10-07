@@ -632,4 +632,12 @@
     <string name="profile_item_equipped">مُجهَّز</string>
     <string name="profile_content_section">المحتوى</string>
     <string name="profile_no_content_published">لا محتوى منشور بعد</string>
+    <string name="auth_confirm_title">تم إنشاء حسابك ✓</string>
+    <string name="auth_confirm_text">أرسلنا رابط تأكيد إلى بريدك الإلكتروني. افتحه ثم اضغط الزرّ بالأسفل.</string>
+    <string name="auth_confirm_retry">أكّدت بريدي — سجّلني الآن</string>
+    <string name="auth_confirm_resend">أعِد إرسال رابط التأكيد</string>
+    <string name="auth_confirm_resent">تم إرسال رابط التأكيد مرة أخرى ✓</string>
+    <string name="auth_confirm_hint">لم تجد الرسالة؟ تحقّق من مجلّد «الرسائل غير المرغوبة» أيضاً.</string>
+    <string name="profile_guest_title">أنت تتصفّح كضيف</string>
+    <string name="profile_guest_text">سجّل الدخول أو أنشئ حساباً ليحفظ التطبيق مفضّلتك ومحتواك ورصيد AC الخاص بك.</string>
 </resources>

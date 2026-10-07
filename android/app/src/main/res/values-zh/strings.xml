@@ -632,4 +632,12 @@
     <string name="profile_item_equipped">已装备</string>
     <string name="profile_content_section">内容</string>
     <string name="profile_no_content_published">尚未发布内容</string>
+    <string name="auth_confirm_title">账号已创建 ✓</string>
+    <string name="auth_confirm_text">我们已向你的邮箱发送确认链接。请打开链接，然后点击下面的按钮。</string>
+    <string name="auth_confirm_retry">我已确认 — 登录</string>
+    <string name="auth_confirm_resend">重新发送确认链接</string>
+    <string name="auth_confirm_resent">确认链接已重新发送 ✓</string>
+    <string name="auth_confirm_hint">没收到？也请检查垃圾邮件文件夹。</string>
+    <string name="profile_guest_title">你正在以访客身份浏览</string>
+    <string name="profile_guest_text">登录或创建账号，应用才能保存你的收藏、内容和 AC 余额。</string>
 </resources>

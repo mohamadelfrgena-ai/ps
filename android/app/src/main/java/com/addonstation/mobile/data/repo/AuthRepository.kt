@@ -63,6 +63,15 @@ class AuthRepository(
         supabase.signOut()
     }
 
+    /**
+     * إعادة إرسال رابط تأكيد البريد (بعد إنشاء حساب بتأكيد بريد مفعّل).
+     * تُرجع `Result` لتُعرَض رسالة نجاح/فشل صريحة في الشاشة.
+     */
+    suspend fun resendConfirmation(email: String): Result<Unit> = runCatching {
+        validateEmail(email)
+        supabase.resendConfirmation(email.trim())
+    }
+
     suspend fun sendRecovery(email: String): Result<Unit> = runCatching {
         validateEmail(email)
         supabase.sendRecovery(email.trim())

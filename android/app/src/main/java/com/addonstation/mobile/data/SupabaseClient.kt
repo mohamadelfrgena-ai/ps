@@ -107,7 +107,15 @@ class SupabaseClient(
         )
     }
 
-    /** تحديث الجلسة بالـ refresh token. */
+    /**
+     * تحديث الجلسة بالـ refresh token.
+     *
+     * **تمييز مهم**: إن رفض **الخادم** التوكن (400/401 — منتهٍ أو مُبطَل بعد
+     * تغيير كلمة المرور أو خروج من جهاز آخر) فالجلسة **ميتة**: نُنظّفها فوراً
+     * كي لا يبقى المستخدم في حالة «التطبيق يظنّني مسجّلاً وكل طلب يفشل»،
+     * فيتحوّل تلقائياً إلى شاشة الدخول بشكل صريح.
+     * أمّا انقطاع الشبكة (بلا رمز HTTP) فلا يمسّ الجلسة إطلاقاً.
+     */
     suspend fun refreshSession(): Boolean = refreshMutex.withLock {
         val current = sessionStore.current() ?: return false
         return try {
@@ -118,6 +126,10 @@ class SupabaseClient(
             storeSession(obj, access, fallbackEmail = current.email)
             true
         } catch (t: Throwable) {
+            val err = t.toApiError()
+            val rejected = err.status == 400 || err.status == 401
+            val refreshGone = err.raw?.lowercase()?.contains("refresh token") == true
+            if (rejected || refreshGone) sessionStore.clear()
             false
         }
     }
@@ -146,6 +158,24 @@ class SupabaseClient(
             put("redirect_to", RECOVERY_REDIRECT)
         }
         authPost("recover", body, token = null)
+    }
+
+    /**
+     * إعادة إرسال رسالة تأكيد البريد.
+     *
+     * لماذا؟ إن كان «Confirm email» مفعّلاً في Supabase (وهو الافتراضي) فلا
+     * تُرجِع `signup` جلسة، ويبقى المستخدم خارج التطبيق حتى يفتح رابط البريد.
+     * هذه الدالة تُمكّنه من طلب رسالة جديدة من داخل التطبيق بدل البحث في البريد.
+     */
+    suspend fun resendConfirmation(email: String) {
+        authPost(
+            "resend",
+            buildJsonObject {
+                put("type", "signup")
+                put("email", email)
+            },
+            token = null,
+        )
     }
 
     suspend fun updatePassword(newPassword: String) {

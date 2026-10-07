@@ -137,6 +137,13 @@ jobs:
             exit 1
           }
 
+      - name: حارس حالة الدخول قبل البناء (لا عودة لـ«صفحة التسجيل مرة أخرى»)
+        run: |
+          python3 tools/check_auth_state.py || {
+            echo "::error::عاد أحد أسباب «التطبيق لا يعرف أني سجّلت» (طرد قسري إلى الدخول · تأكيد بريد بلا مخرج · جلسة ميتة تُترك)"
+            exit 1
+          }
+
       - name: Build debug APK
         working-directory: android
         run: |

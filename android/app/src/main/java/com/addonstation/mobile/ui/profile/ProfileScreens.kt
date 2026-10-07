@@ -31,6 +31,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Icon
@@ -103,9 +105,83 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /** شاشة الملف الشخصي (تتطلب تسجيل الدخول — وإلا ينتقل المستخدم لتسجيل الدخول). */
+/**
+ * شاشة «ملف شخصي» للزائر (بلا حساب): تشرح ما الذي يحفظه الحساب، وتعطي
+ * زرّي الدخول/الإنشاء — **بلا نقل قسري** إلى شاشة الدخول.
+ *
+ * كانت قبل ذلك: `LaunchedEffect(signedIn) { onLogin() }` ⇒ بمجرّد لمس تبويب
+ * «ملف شخصي» يُقتلع المستخدم إلى شاشة الدخول. ذلك سلوك مربك، خصوصاً لمن أنشأ
+ * حساباً للتوّ وينتظر تأكيد بريده: يظنّ التطبيق نسي أنه سجّل.
+ */
+@Composable
+private fun GuestProfileScreen(
+    onLogin: () -> Unit,
+    onOpenSignup: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        PixelTopBar(
+            title = stringResource(R.string.nav_profile),
+            showWallet = false,
+            icon = Icons.Filled.Person,
+        )
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(Modifier.height(26.dp))
+            // صورة المجهول (صورة المالك) — نفس صورة شاشة الدخول
+            com.addonstation.mobile.ui.components.AnonymousAvatarImage(
+                size = 104.dp,
+                borderColor = AppColors.Green,
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                stringResource(R.string.profile_guest_title),
+                style = AppText.pageTitle,
+                color = AppColors.Text,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.profile_guest_text),
+                style = AppText.bodySmall,
+                color = AppColors.Muted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 10.dp),
+            )
+            Spacer(Modifier.height(20.dp))
+            GradientButton(
+                text = stringResource(R.string.auth_sign_in),
+                onClick = onLogin,
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Filled.Login,
+            )
+            Spacer(Modifier.height(10.dp))
+            GhostButton(
+                text = stringResource(R.string.auth_new_account),
+                onClick = onOpenSignup,
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Filled.Person,
+            )
+            Spacer(Modifier.height(22.dp))
+        }
+    }
+}
+
 @Composable
 fun ProfileScreen(
     onLogin: () -> Unit,
+    /** إنشاء حساب من شاشة الضيف (كانت تُحوّل إلى الدخول فقط). */
+    onOpenSignup: () -> Unit = onLogin,
+    /**
+     * بعد تسجيل الخروج: نعود إلى الرئيسية كضيف (مع بطاقة دعوة للدخول) بدل
+     * إظهار شاشة الدخول فوراً — كانت تُفتح بلا طلب من المستخدم فيبدو الأمر
+     * كأنّه «طُرد» من التطبيق.
+     */
+    onSignedOut: () -> Unit = onLogin,
     onOpenSettings: () -> Unit,
     onOpenPlans: () -> Unit,
     onOpenEdit: () -> Unit,
@@ -170,10 +246,11 @@ fun ProfileScreen(
     }
 
     if (!signedIn) {
-        LaunchedEffect(signedIn) { onLogin() }
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            LoadingBox(text = stringResource(R.string.msg_sign_in_needed))
-        }
+        // **لا نُخرِج المستخدم من التبويب قسراً** (كان `LaunchedEffect { onLogin() }`
+        // ينقله إلى شاشة الدخول بمجرّد فتح «ملف شخصي» — وهو ما جعل صاحب التطبيق
+        // يظنّ أن التطبيق «لا يعرف» أنه مسجّل). الآن: شاشة ضيف واضحة بزرّين،
+        // والتنقّل يبقى بيد المستخدم.
+        GuestProfileScreen(onLogin = onLogin, onOpenSignup = onOpenSignup)
         return
     }
     if (profile == null) {
@@ -359,7 +436,10 @@ fun ProfileScreen(
                         scope.launch {
                             container.auth.signOut()
                             container.state.setSignedIn(false)
-                            onLogin()
+                            // يُلغي توكن الجهاز من الحساب (لا تصله إشعارات حساب آخر)
+                            com.addonstation.mobile.push.PushRegistrar
+                                .onSessionChanged(container.appContext, false)
+                            onSignedOut()
                         }
                     },
                 )

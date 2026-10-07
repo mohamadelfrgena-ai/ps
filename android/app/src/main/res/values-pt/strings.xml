@@ -632,4 +632,12 @@
     <string name="profile_item_equipped">Equipado</string>
     <string name="profile_content_section">Conteúdo</string>
     <string name="profile_no_content_published">Nenhum conteúdo publicado ainda</string>
+    <string name="auth_confirm_title">A sua conta foi criada ✓</string>
+    <string name="auth_confirm_text">Enviámos um link de confirmação para o seu e-mail. Abra-o e toque no botão abaixo.</string>
+    <string name="auth_confirm_retry">Confirmei — entrar</string>
+    <string name="auth_confirm_resend">Reenviar o link de confirmação</string>
+    <string name="auth_confirm_resent">Link de confirmação reenviado ✓</string>
+    <string name="auth_confirm_hint">Não encontrou? Verifique também a pasta de spam.</string>
+    <string name="profile_guest_title">Está a navegar como convidado</string>
+    <string name="profile_guest_text">Entre ou crie uma conta para o app guardar os seus favoritos, o seu conteúdo e o saldo AC.</string>
 </resources>
