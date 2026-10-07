@@ -234,6 +234,25 @@ jobs:
                   print("✓ نُفِّذ 35_push_live.sql:", res.read().decode()[:200])
           except Exception as exc:
               print("::warning::تعذّر التنفيذ التلقائي (" + str(exc)[:140] + ") — انسخ الملف في SQL Editor واضغط Run.")
+              raise SystemExit(0)
+
+          # نُشغّل الطابور من نفس القناة (لا نعتمد على PostgREST — كان يردّ 404 للحظات)
+          secret = os.environ.get("PUSH_SECRET", "").replace("'", "''")
+          if not secret:
+              print("::warning::بلا سرّ تشغيل — نفّذ التفعيل يدوياً من SQL Editor.")
+              raise SystemExit(0)
+          q = ("select public.push_live_enable('https://" + ref +
+               ".supabase.co/functions/v1/send-push', '" + secret + "')::text")
+          req2 = urllib.request.Request(
+              f"https://api.supabase.com/v1/projects/{ref}/database/query",
+              data=json.dumps({"query": q}).encode(), method="POST")
+          req2.add_header("Authorization", "Bearer " + token)
+          req2.add_header("Content-Type", "application/json")
+          try:
+              with urllib.request.urlopen(req2, timeout=60) as res2:
+                  print("push_live_enable:", res2.read().decode()[:300])
+          except Exception as exc:
+              print("::warning::push_live_enable لم يُنفَّذ (" + str(exc)[:140] + ") — نفّذه من SQL Editor.")
           PY
 
       - name: (اختياري) تشغيل الطابور تلقائياً (push_live_enable)
@@ -255,11 +274,18 @@ jobs:
           req.add_header("apikey", key)
           req.add_header("Authorization", "Bearer " + key)
           req.add_header("Content-Type", "application/json")
-          try:
-              with urllib.request.urlopen(req, timeout=60) as res:
-                  print("push_live_enable:", res.read().decode())
-          except Exception as exc:
-              print("::warning::push_live_enable لم يُنفَّذ (" + str(exc)[:140] + ") — نفّذه من SQL Editor.")
+          import time
+          for attempt in range(1, 4):
+              try:
+                  with urllib.request.urlopen(req, timeout=60) as res:
+                      print("push_live_enable:", res.read().decode())
+                      break
+              except Exception as exc:
+                  if attempt == 3:
+                      print("::warning::push_live_enable لم يُنفَّذ (" + str(exc)[:140] + ") — نفّذه من SQL Editor.")
+                  else:
+                      print(f"… محاولة {attempt} فشلت — أعيد بعد 6 ثوانٍ")
+                      time.sleep(6)
           PY
 
       - name: تشغيل الطبيب (تقرير كامل بالعربية)
