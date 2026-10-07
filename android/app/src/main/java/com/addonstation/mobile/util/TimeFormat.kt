@@ -42,8 +42,12 @@ object TimeFormat {
         return SimpleDateFormat("HH:mm", locale).format(Date(millis))
     }
 
-    /** "اليوم" / "أمس" / التاريخ الكامل — لفاصل التواريخ في الشات. */
-    fun dayLabel(iso: String?, locale: Locale): String {
+    /**
+     * فاصل التواريخ في الشات: "اليوم" / "أمس" / التاريخ الكامل.
+     * النصّان يُمرَّران جاهزين من الموارد (R.string.chat_today · chat_yesterday)
+     * لأن كل اللغات الثمانية يجب أن تعمل — لا مقارنة على "ar" هنا.
+     */
+    fun dayLabel(iso: String?, locale: Locale, todayLabel: String, yesterdayLabel: String): String {
         val millis = parseMillis(iso) ?: return ""
         val now = Calendar.getInstance()
         val then = Calendar.getInstance().apply { timeInMillis = millis }
@@ -52,8 +56,8 @@ object TimeFormat {
         val today = dayDiff == 0 && sameYear
         val yesterday = dayDiff == 1 && sameYear
         return when {
-            today -> if (LocaleManager.byCode(locale.language).code == "ar") "اليوم" else "Today"
-            yesterday -> if (locale.language == "ar") "أمس" else "Yesterday"
+            today -> todayLabel
+            yesterday -> yesterdayLabel
             else -> SimpleDateFormat(if (sameYear) "dd MMM" else "dd MMM yyyy", locale)
                 .format(Date(millis))
         }

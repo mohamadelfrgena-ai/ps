@@ -474,6 +474,9 @@
     <string name="creator_title">Programa de criadores AddonStation</string>
     <string name="creator_subtitle">Conheça as pessoas que constroem sua próxima aventura no Minecraft.</string>
     <string name="creator_search">Buscar criadores...</string>
+    <string name="creator_guidelines_ok">Regras ✓</string>
+    <string name="creator_own_work">Trabalho próprio / permissão</string>
+    <string name="creator_cover_failed">Não foi possível enviar a capa — tente novamente.</string>
     <string name="creator_featured">Criadores em destaque</string>
     <string name="creator_popular">Criadores populares</string>
     <string name="creator_new">Novos criadores</string>

@@ -474,6 +474,9 @@
     <string name="creator_title">AddonStation üretici programı</string>
     <string name="creator_subtitle">Bir sonraki Minecraft maceranı inşa eden kişileri keşfet.</string>
     <string name="creator_search">Üretici ara...</string>
+    <string name="creator_guidelines_ok">Kurallar ✓</string>
+    <string name="creator_own_work">Kendi işim / izinli</string>
+    <string name="creator_cover_failed">Kapak yüklenemedi — tekrar dene.</string>
     <string name="creator_featured">Öne çıkan üreticiler</string>
     <string name="creator_popular">Popüler üreticiler</string>
     <string name="creator_new">Yeni üreticiler</string>

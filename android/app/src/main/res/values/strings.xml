@@ -488,6 +488,9 @@
     <string name="creator_title">AddonStation creator program</string>
     <string name="creator_subtitle">Discover the people building your next Minecraft adventure.</string>
     <string name="creator_search">Search creators...</string>
+    <string name="creator_guidelines_ok">Guidelines ✓</string>
+    <string name="creator_own_work">Own work / permission</string>
+    <string name="creator_cover_failed">Couldn\'t upload the cover — please try again.</string>
     <string name="creator_featured">Featured creators</string>
     <string name="creator_popular">Popular creators</string>
     <string name="creator_new">New creators</string>

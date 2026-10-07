@@ -474,6 +474,9 @@
     <string name="creator_title">AddonStation 创作者计划</string>
     <string name="creator_subtitle">认识正在打造你下一次 Minecraft 冒险的人。</string>
     <string name="creator_search">搜索创作者...</string>
+    <string name="creator_guidelines_ok">已遵守规则 ✓</string>
+    <string name="creator_own_work">原创 / 已获授权</string>
+    <string name="creator_cover_failed">封面上传失败 — 请重试。</string>
     <string name="creator_featured">精选创作者</string>
     <string name="creator_popular">热门创作者</string>
     <string name="creator_new">新创作者</string>

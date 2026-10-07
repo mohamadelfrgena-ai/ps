@@ -474,6 +474,9 @@
     <string name="creator_title">Программа авторов AddonStation</string>
     <string name="creator_subtitle">Познакомьтесь с теми, кто создаёт ваше следующее приключение в Minecraft.</string>
     <string name="creator_search">Поиск авторов...</string>
+    <string name="creator_guidelines_ok">Правила ✓</string>
+    <string name="creator_own_work">Своя работа / разрешение</string>
+    <string name="creator_cover_failed">Не удалось загрузить обложку — попробуйте ещё раз.</string>
     <string name="creator_featured">Избранные авторы</string>
     <string name="creator_popular">Популярные авторы</string>
     <string name="creator_new">Новые авторы</string>

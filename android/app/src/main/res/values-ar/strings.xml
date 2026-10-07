@@ -474,6 +474,9 @@
     <string name="creator_title">برنامج منشئي AddonStation</string>
     <string name="creator_subtitle">اكتشف الأشخاص الذين يبنون مغامرتك القادمة في ماينكرافت.</string>
     <string name="creator_search">ابحث عن منشئين...</string>
+    <string name="creator_guidelines_ok">الإرشادات ✓</string>
+    <string name="creator_own_work">عمل خاص / بإذن</string>
+    <string name="creator_cover_failed">تعذّر رفع الغلاف — حاول مرة أخرى.</string>
     <string name="creator_featured">المبدعون المميزون</string>
     <string name="creator_popular">الأكثر شهرة</string>
     <string name="creator_new">المبدعون الجدد</string>

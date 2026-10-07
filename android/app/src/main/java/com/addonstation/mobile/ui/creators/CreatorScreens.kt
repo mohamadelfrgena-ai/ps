@@ -430,8 +430,8 @@ fun CreatorApplicationScreen(onBack: () -> Unit, onSubmitted: () -> Unit) {
 
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip("Guidelines ✓", guideline, { guideline = true })
-                FilterChip("Own work / permission", !guideline, { guideline = false })
+                FilterChip(guidelinesLabel, guideline, { guideline = true })
+                FilterChip(ownWorkLabel, !guideline, { guideline = false })
             }
 
             Spacer(Modifier.height(14.dp))
@@ -523,6 +523,10 @@ fun CreatorStudioScreen(
                 .onFailure { message = it.message }
         }
     }
+    // نصوص جاهزة من الموارد: كانت مكتوبة في الكود (إنجليزي/عربي) ⇒ لا تُترجم
+    val guidelinesLabel = stringResource(R.string.creator_guidelines_ok)
+    val ownWorkLabel = stringResource(R.string.creator_own_work)
+    val coverFailedMsg = stringResource(R.string.creator_cover_failed)
     val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
@@ -534,7 +538,7 @@ fun CreatorStudioScreen(
             val fileName = prepared?.fileName ?: "cover-${System.currentTimeMillis()}.jpg"
             container.creators.uploadCreatorFile(bytes, mime, fileName, "cover")
                 .onSuccess { coverPath = it }
-                .onFailure { message = "فشل رفع الغلاف: ${it.message ?: it::class.simpleName}" }
+                .onFailure { message = coverFailedMsg }
         }
     }
 

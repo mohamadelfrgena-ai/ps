@@ -501,6 +501,10 @@ fun ChatScreen(
             onSettings = onOpenSettings,
         )
 
+        // فاصل تواريخ الرسائل: نصّان من الموارد (كانا مكتوبين عربي/إنجليزي فقط)
+        val todayLabel = stringResource(R.string.chat_today)
+        val yesterdayLabel = stringResource(R.string.chat_yesterday)
+
         Box(Modifier.weight(1f)) {
             when {
                 loading -> LoadingBox(text = stringResource(R.string.chat_loading_messages))
@@ -522,8 +526,14 @@ fun ChatScreen(
                             ui = ui,
                             previous = previous,
                             showDate = previous == null ||
-                                TimeFormat.dayLabel(previous.message.createdAt, Locale.getDefault()) !=
-                                TimeFormat.dayLabel(ui.message.createdAt, Locale.getDefault()),
+                                TimeFormat.dayLabel(
+                                    previous.message.createdAt, Locale.getDefault(),
+                                    todayLabel, yesterdayLabel,
+                                ) !=
+                                TimeFormat.dayLabel(
+                                    ui.message.createdAt, Locale.getDefault(),
+                                    todayLabel, yesterdayLabel,
+                                ),
                             isNewDivider = false,
                             myId = container.supabase.session()?.userId,
                             onLongPress = { actionsFor = ui },
