@@ -58,7 +58,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.Profile
@@ -340,34 +339,39 @@ private fun SiteAssetOrLocal(
     modifier: Modifier = Modifier,
 ) {
     val container = com.addonstation.mobile.ui.rememberContainer()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
     var index by remember(paths) { mutableStateOf(0) }
     val url = remember(paths, index) { paths.getOrNull(index)?.let { container.siteAssetUrl(it) } }
-    val localImage: @Composable () -> Unit = {
+    // الصورة المحلية (مورد داخل التطبيق) تُرسم كـplaceholder وكخطأ معاً:
+    // painterResource لا يبني توليفاً فرعياً (بخلاف SubcomposeAsyncImage) فلا
+    // يُثقل عناصر القوائم — وهي التي كانت تُقطّع التمرير.
+    val localPainter = painterResource(local)
+    if (url.isNullOrBlank()) {
         Image(
-            painter = painterResource(local),
+            painter = localPainter,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(size),
+            modifier = modifier.size(size),
         )
-    }
-    if (url.isNullOrBlank()) {
-        localImage()
     } else {
-        SubcomposeAsyncImage(
-            model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+        val px = with(density) { size.roundToPx() }.coerceAtLeast(1)
+        AsyncImage(
+            model = ImageRequest.Builder(context)
                 .data(url)
+                // مقاس الفكّ = مقاس العرض على الشاشة (لا أبعاد الأصل) ⇒ ذاكرة
+                // أقلّ بمرات، وبلا تقطيع عند تمرير شبكات الصور الكبيرة.
+                .size(px)
                 .crossfade(true)
                 .build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            placeholder = localPainter,
+            error = localPainter,
             modifier = modifier.size(size),
-            loading = { localImage() },
-            error = {
-                if (index + 1 < paths.size) {
-                    // المسار التالي قبل الاستسلام للصورة المحلية
-                    LaunchedEffect(url) { index += 1 }
-                }
-                localImage()
+            onError = {
+                // المسار التالي قبل الاستسلام للصورة المحلية (بلا توليف فرعي)
+                if (index + 1 < paths.size) index += 1
             },
         )
     }
@@ -534,21 +538,16 @@ fun AvatarImage(
                 .background(AppColors.Elevated2)
                 .border(borderWidth, borderColor, shape),
         ) {
-            if (!url.isNullOrBlank()) {
-                SubcomposeAsyncImage(
-                    model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                        .data(url)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(size).clip(shape),
-                    loading = { },
-                    error = { AvatarFallback(size) },
-                )
-            } else {
-                AvatarFallback(size)
-            }
+            // سلسلة احتياطية بلا توليف فرعي: صورة المستخدم ⇒ `onefree` من مكتبة
+            // الأصول ⇒ المورد المحلي. (كانت SubcomposeAsyncImage تبني توليفاً
+            // فرعياً لكل صورة في كل قائمة ⇒ تقطيع في الشات وفي كل شبكة صور.)
+            val paths = if (url.isNullOrBlank()) ASSET_FREE_DEFAULT else listOf(url) + ASSET_FREE_DEFAULT
+            SiteAssetOrLocal(
+                paths = paths,
+                local = R.drawable.ic_user,
+                size = size,
+                modifier = Modifier.size(size).clip(shape),
+            )
         }
         if (online != null) {
             Box(
@@ -576,29 +575,37 @@ fun CoverImage(
     radius: Dp = 16.dp,
     model: Any? = null,
 ) {
+    var failed by remember(url, model) { mutableStateOf(false) }
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(radius))
             .background(AppColors.Elevated2),
     ) {
         if (!url.isNullOrBlank() || model != null) {
-            SubcomposeAsyncImage(
-                model = model ?: url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize(),
-                loading = { },
-                error = {
-                    Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.BrokenImage,
-                            contentDescription = null,
-                            tint = AppColors.Muted,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                },
-            )
+            if (failed) {
+                Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.BrokenImage,
+                        contentDescription = null,
+                        tint = AppColors.Muted,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            } else {
+                // AsyncImage بدل SubcomposeAsyncImage: الأغلفة تملأ الخلايا في
+                // كل الشبكات (المتجر · الأغلفة · الأدوات) — والتوليف الفرعي فيها
+                // كان من أكبر أسباب التقطيع عند التمرير.
+                AsyncImage(
+                    model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(model ?: url)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize(),
+                    onError = { failed = true },
+                )
+            }
         }
     }
 }

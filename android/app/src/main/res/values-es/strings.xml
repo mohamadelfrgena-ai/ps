@@ -10,6 +10,7 @@
     <string name="splash_dream_it">SUÉÑALO.</string>
     <string name="splash_build_it">CONSTRÚYELO.</string>
     <string name="splash_create_it">CRÉALO.</string>
+    <string name="splash_skip">Toca para omitir</string>
 
     <string name="nav_home">Inicio</string>
     <string name="nav_store">Tienda</string>

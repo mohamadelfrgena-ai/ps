@@ -234,7 +234,16 @@ data class ChatMessageUi(
      * فوراً من الجهاز قبل أن يوقّع الخادم رابطها — فلا تبقى الصورة بيضاء.
      */
     val localPreview: String? = null,
-)
+) {
+    /**
+     * مفتاح اليوم (بالتوقيت المحلي) — يُحسب **مرة واحدة** عند أول عرض ويُخزَّن.
+     * تقارنه شاشة الشات نصّياً لرسم فاصل التاريخ، فلا يُحسب نصّ التاريخ مرّتين
+     * لكل رسالة في كل إطار (سبب تقطيع أثناء التمرير — انظر [TimeFormat.dayLabel]).
+     */
+    val dayKey: String by lazy(LazyThreadSafetyMode.NONE) {
+        com.addonstation.mobile.util.TimeFormat.localDayKey(message.createdAt)
+    }
+}
 
 @Serializable
 data class ChatReport(

@@ -10,6 +10,7 @@
     <string name="splash_dream_it">МЕЧТАЙ.</string>
     <string name="splash_build_it">СТРОЙ.</string>
     <string name="splash_create_it">СОЗДАВАЙ.</string>
+    <string name="splash_skip">Нажмите, чтобы пропустить</string>
 
     <string name="nav_home">Главная</string>
     <string name="nav_store">Магазин</string>

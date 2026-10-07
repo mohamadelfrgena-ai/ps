@@ -10,6 +10,7 @@
     <string name="splash_dream_it">HAYAL ET.</string>
     <string name="splash_build_it">İNŞA ET.</string>
     <string name="splash_create_it">YARAT.</string>
+    <string name="splash_skip">Atlamak için dokun</string>
 
     <string name="nav_home">Ana Sayfa</string>
     <string name="nav_store">Mağaza</string>

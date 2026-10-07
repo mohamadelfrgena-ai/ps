@@ -189,14 +189,24 @@ fun AppRoot(
                         .windowInsetsTopHeight(WindowInsets.statusBars.union(WindowInsets.displayCutout)),
                 )
                 Box(Modifier.fillMaxSize()) {
-                    when {
-                        !splashDone -> SplashScreen(onFinished = { splashDone = true })
-                        !configured -> SetupScreen(onDone = { configured = container.isConfigured })
-                        else -> MainNavigation(
+                    // **البناء خلف شاشة الترحيب لا بعدها**: كانت الشاشة الأولى
+                    // (وكل شبكاتها وصورها) لا تبدأ البناء إلا بعد انتهاء حركة
+                    // البداية ⇒ انتظار مضاعف يحسّه المستخدم «يطول». الآن يُبنى
+                    // المحتوى فوراً وتُغطّيه شاشة الترحيب، فحين تنقشع يكون جاهزاً.
+                    if (configured) {
+                        MainNavigation(
                             startAtReset = deepLinkSession,
                             pushRoute = pushRoute,
                             onPushConsumed = onPushConsumed,
                         )
+                    } else if (splashDone) {
+                        // الإعداد الأول (رابط/مفتاح Supabase) يظهر بعد انقشاع
+                        // شاشة الترحيب — لا فوقها.
+                        SetupScreen(onDone = { configured = container.isConfigured })
+                    }
+                    if (!splashDone) {
+                        // الشاشة نفسها فوق كل شيء، وتخرج بتلاشٍ يكشف ما تحتها
+                        SplashScreen(onFinished = { splashDone = true })
                     }
                 }
             }

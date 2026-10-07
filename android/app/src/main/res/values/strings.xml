@@ -11,6 +11,7 @@
     <string name="splash_dream_it">DREAM IT.</string>
     <string name="splash_build_it">BUILD IT.</string>
     <string name="splash_create_it">CREATE IT.</string>
+    <string name="splash_skip">Tap to skip</string>
 
     <!-- Navigation -->
     <string name="nav_home">Home</string>

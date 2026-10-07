@@ -130,6 +130,13 @@ jobs:
             exit 1
           }
 
+      - name: حارس الأداء قبل البناء (لا عودة للتقطيع/الثِقَل)
+        run: |
+          python3 tools/check_jank_guard.py || {
+            echo "::error::عاد أحد أسباب التقطيع/الثِقَل (توليف فرعي · قراءة الجلسة من Keystore · بحث خطّي · عمود متمرّر · بداية حاجبة)"
+            exit 1
+          }
+
       - name: Build debug APK
         working-directory: android
         run: |

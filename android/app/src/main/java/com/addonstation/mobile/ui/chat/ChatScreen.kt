@@ -479,6 +479,17 @@ fun ChatScreen(
 
     val isMuted = chatStatus?.muted == true
     val isBanned = chatStatus?.banned == true
+    /**
+     * معرّف المستخدم الحالي **مرة واحدة لكل تركيبة شاشة** (لا داخل كل عنصر
+     * رسالة كما كان): قراءة الجلسة كانت تُنادى لكل رسالة في كل إطار.
+     */
+    val myId = container.supabase.session()?.userId
+    /**
+     * محلّل روابط الملصقات بمرجع **ثابت** (remember): لامبدا جديدة في كل
+     * تركيبة تمنع Compose من تخطّي إعادة تركيب عناصر الرسائل ⇒ ترميم كل
+     * العناصر المرئية مع كل تحديث.
+     */
+    val stickerUrlResolver = remember(container) { { path: String -> container.siteAssetUrl(path) } }
     val roomLocked = channel.isLocked
     val canPost = signedIn && !isMuted && !isBanned && !roomLocked
 
@@ -502,10 +513,6 @@ fun ChatScreen(
             onSettings = onOpenSettings,
         )
 
-        // فاصل تواريخ الرسائل: نصّان من الموارد (كانا مكتوبين عربي/إنجليزي فقط)
-        val todayLabel = stringResource(R.string.chat_today)
-        val yesterdayLabel = stringResource(R.string.chat_yesterday)
-
         Box(Modifier.weight(1f)) {
             when {
                 loading -> LoadingBox(text = stringResource(R.string.chat_loading_messages))
@@ -526,17 +533,11 @@ fun ChatScreen(
                         MessageBlock(
                             ui = ui,
                             previous = previous,
-                            showDate = previous == null ||
-                                TimeFormat.dayLabel(
-                                    previous.message.createdAt, Locale.getDefault(),
-                                    todayLabel, yesterdayLabel,
-                                ) !=
-                                TimeFormat.dayLabel(
-                                    ui.message.createdAt, Locale.getDefault(),
-                                    todayLabel, yesterdayLabel,
-                                ),
+                            // مقارنة مفتاح اليوم (مُخزَّن في العنصر) بدل حساب
+                            // نصّ التاريخ مرّتين لكل رسالة — انظر Models.dayKey.
+                            showDate = previous == null || previous.dayKey != ui.dayKey,
                             isNewDivider = false,
-                            myId = container.supabase.session()?.userId,
+                            myId = myId,
                             onLongPress = { actionsFor = ui },
                             onReply = { replyTo = ui.message },
                             onOpenImage = openFullSize,
@@ -553,7 +554,7 @@ fun ChatScreen(
                             onOpenUser = { userId ->
                                 authors[userId]?.let { onOpenUser(it) }
                             },
-                            stickerUrlResolver = { path -> container.siteAssetUrl(path) },
+                            stickerUrlResolver = stickerUrlResolver,
                             onPlayVideo = {
                                 // رابط الفيديو يُوقَّع عند الضغط (صالح دقائق) ثم يُشغَّل
                                 scope.launch {

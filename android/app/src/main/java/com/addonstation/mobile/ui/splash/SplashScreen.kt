@@ -9,6 +9,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,16 +91,25 @@ fun SplashScreen(onFinished: () -> Unit) {
     val brand = remember { Animatable(0f) }
     val exit = remember { Animatable(1f) }
 
+    // **لمسة واحدة تتخطّى الحركة**: من لا يريد الانتظار ينقر الشاشة فتظهر
+    // كل العناصر فوراً وتنتهي البداية (كان أمامه ٤ ثوانٍ إلزامية).
+    var skipped by remember { mutableStateOf(false) }
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+
     LaunchedEffect(Unit) {
+        // الجدول أقصر من قبل (٣٦٠٠ms ← ٢٣٠٠ms) لأن المحتوى يُبنى **خلف**
+        // شاشة الترحيب الآن، فلا داعي لانتظار طويل يشعر المستخدم بالثِقَل.
         coroutineScope {
             launch { alphaSky.animateTo(0.38f, tween(900, easing = FastOutSlowInEasing)) }
             launch { scaleSky.animateTo(1.05f, tween(900, easing = FastOutSlowInEasing)) }
             launch { logo.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
-            launch { delay(400); line1.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
-            launch { delay(1300); line2.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
-            launch { delay(2200); line3.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
-            launch { delay(3000); brand.animateTo(1f, tween(480, easing = FastOutSlowInEasing)) }
-            launch { delay(3600); exit.animateTo(0f, tween(500, easing = FastOutSlowInEasing)) }
+            // ملاحظة مهمّة: نمرّر **لامبدا** تقرأ الحالة لحظياً، لا قيمة منطقية
+            // مجمّدة عند إطلاق الأثر (وإلا لن يرى الكوروتين نقرة المستخدم أبداً).
+            launch { val s = waitOrSkip(250) { skipped }; line1.animateTo(1f, tween(lineMs(s, 380), easing = FastOutSlowInEasing)) }
+            launch { val s = waitOrSkip(850) { skipped }; line2.animateTo(1f, tween(lineMs(s, 380), easing = FastOutSlowInEasing)) }
+            launch { val s = waitOrSkip(1450) { skipped }; line3.animateTo(1f, tween(lineMs(s, 380), easing = FastOutSlowInEasing)) }
+            launch { val s = waitOrSkip(1950) { skipped }; brand.animateTo(1f, tween(lineMs(s, 480), easing = FastOutSlowInEasing)) }
+            launch { val s = waitOrSkip(2300) { skipped }; exit.animateTo(0f, tween(lineMs(s, 460), easing = FastOutSlowInEasing)) }
         }
         onFinished()
     }
@@ -106,6 +118,10 @@ fun SplashScreen(onFinished: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF020406))
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+            ) { skipped = true }
             .graphicsLayer {
                 // تُقرأ في مرحلة الرسم — بلا إعادة تركيب (recomposition) لكل إطار.
                 alpha = exit.value
@@ -214,6 +230,17 @@ fun SplashScreen(onFinished: () -> Unit) {
                 )
             }
         }
+
+        // تلميح «اضغط للتخطّي» — يظهر مع العلامة التجارية في أسفل الشاشة
+        Text(
+            text = stringResource(R.string.splash_skip),
+            style = AppText.tiny,
+            color = Color.White.copy(alpha = 0.5f),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 30.dp)
+                .graphicsLayer { alpha = brand.value },
+        )
     }
 }
 
@@ -301,4 +328,27 @@ private fun Particles(count: Int) {
             )
         }
     }
+}
+
+/** مدة الحركة: قصيرة إن تخطّى المستخدم الشاشة بالنقر. */
+private fun lineMs(skipped: Boolean, normal: Int): Int = if (skipped) 120 else normal
+
+/**
+ * انتظار قابل للتخطي: ينتظر [ms] على دفعات صغيرة، فإن نقر المستخدم عاد فوراً
+ * فتُستكمل بقية الحركات بلا انتظار. (الدفعات ٦٠ms: استجابة شبه فورية للنقر
+ * بلا إبقاء الخيط مشغولاً.)
+ *
+ * @param skipped دالة تُقرأ في كل دفعة — لا قيمة مجمّدة — لأن أثر الإطلاق لا
+ *                يُعاد تشغيله عند تغيّر الحالة.
+ * @return هل تخطّى المستخدم الحركة؟
+ */
+private suspend fun waitOrSkip(ms: Long, skipped: () -> Boolean): Boolean {
+    var left = ms
+    while (left > 0) {
+        if (skipped()) return true
+        val slice = minOf(60L, left)
+        delay(slice)
+        left -= slice
+    }
+    return skipped()
 }

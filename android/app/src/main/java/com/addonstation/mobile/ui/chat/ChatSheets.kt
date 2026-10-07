@@ -148,8 +148,15 @@ fun EmojiStickerSheet(
             } else {
                 // الملصقات في **فقرات منفصلة**: عنوان لكل قسم/مجلد (Memes · Minecraft Memes 1 …)
                 // ثم شبكة ملصقاته — وعناوين الأقسام تمتد بعرض الشبكة كاملاً.
-                val visible = stickers.filter { selectedPack == null || it.packId == selectedPack }
-                val groups = com.addonstation.mobile.ui.groupAssetsByCollection(visible)
+                // **الفلترة والتجميع مرة واحدة** عند تغيّر القائمة أو الحزمة المختارة
+                // (كانا يُعادان في كل إعادة تركيب للوحة: ١٩٣ ملصقاً تُصنَّف من جديد
+                // مع كل ضغطة بحث ⇒ ثِقَل واضح داخل لوحة الملصقات).
+                val visible = remember(stickers, selectedPack) {
+                    stickers.filter { selectedPack == null || it.packId == selectedPack }
+                }
+                val groups = remember(visible) {
+                    com.addonstation.mobile.ui.groupAssetsByCollection(visible)
+                }
                 // الملصقات: عدد الأعمدة والارتفاع يتبعان شاشة الهاتف (أوسع ⇒ أعمدة أكثر)
                 val stickerColumns = com.addonstation.mobile.ui.theme.adaptiveColumns(
                     minCellDp = 78, maxCellDp = 104, maxColumns = 6,

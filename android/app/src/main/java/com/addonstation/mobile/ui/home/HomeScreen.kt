@@ -22,15 +22,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FileDownload
@@ -160,165 +159,262 @@ fun HomeScreen(
             onWalletClick = actions.openWallet,
             icon = Icons.Filled.Games,
         )
-        Column(
-            Modifier
+        // **قائمة كسولة لا عمود تمرير**: كل قسم يُبنى حين يظهر فقط. قبل ذلك
+        // كانت الأقسام كلها (٤ صفوف + شبكة + بطاقات) تُبنى مع أول إطار ⇒
+        // إقلاع ثقيل للشاشة الأولى وتقطيع. الآن الإقلاع خفيف والتمرير سلس.
+        LazyColumn(
+            modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp),
         ) {
-            Spacer(Modifier.height(12.dp))
-
-            /* 4.1 رأس الترحيب — سطرا التحية واسم AddonStation يسار مربّع البروفايل
-               في LTR، والصورة يميناً؛ وفي RTL (العربية) ينعكس موضعهما تلقائياً.
-               محاذاة End تُبقي النص قريباً من الصورة في كلا الاتجاهين. */
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Column(
-                    Modifier.weight(1f),
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+            item {
+                Spacer(Modifier.height(12.dp))
+            }
+            item {
+                /* 4.1 رأس الترحيب — سطرا التحية واسم AddonStation يسار مربّع البروفايل
+                   في LTR، والصورة يميناً؛ وفي RTL (العربية) ينعكس موضعهما تلقائياً.
+                   محاذاة End تُبقي النص قريباً من الصورة في كلا الاتجاهين. */
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(
-                        "$greeting 👋",
-                        style = AppText.greeting,
-                        color = AppColors.Muted,
-                        textAlign = TextAlign.End,
-                    )
-                    Text(
-                        text = when {
-                            !signedIn -> stringResource(R.string.home_welcome_guest)
-                            profile == null -> stringResource(R.string.common_loading)
-                            else -> stringResource(R.string.home_welcome_back, profile?.username ?: "")
-                        },
-                        style = AppText.welcomeName,
-                        color = AppColors.Text,
-                        textAlign = TextAlign.End,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = stringResource(R.string.brand_wordmark),
-                        style = AppText.brand,
-                        color = Color.White,
-                        textAlign = TextAlign.End,
-                    )
-                    if (profile != null) {
-                        RankBadge(role = profile!!.role, plan = profile!!.effectivePlan)
+                    Column(
+                        Modifier.weight(1f),
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            "$greeting 👋",
+                            style = AppText.greeting,
+                            color = AppColors.Muted,
+                            textAlign = TextAlign.End,
+                        )
+                        Text(
+                            text = when {
+                                !signedIn -> stringResource(R.string.home_welcome_guest)
+                                profile == null -> stringResource(R.string.common_loading)
+                                else -> stringResource(R.string.home_welcome_back, profile?.username ?: "")
+                            },
+                            style = AppText.welcomeName,
+                            color = AppColors.Text,
+                            textAlign = TextAlign.End,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = stringResource(R.string.brand_wordmark),
+                            style = AppText.brand,
+                            color = Color.White,
+                            textAlign = TextAlign.End,
+                        )
+                        if (profile != null) {
+                            RankBadge(role = profile!!.role, plan = profile!!.effectivePlan)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(
+                                Brush.linearGradient(listOf(AppColors.Green.copy(alpha = 0.35f), AppColors.Blue.copy(alpha = 0.35f))),
+                            )
+                            .padding(3.dp)
+                            .clip(RoundedCornerShape(19.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.55f), RoundedCornerShape(19.dp))
+                            .clickable { if (signedIn) actions.openProfile() else actions.openLogin() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        // الزائر (بلا حساب / بعد تسجيل الخروج) ⇒ صورة المجهول التي أرسلها المالك
+                        if (profile == null) {
+                            com.addonstation.mobile.ui.components.AnonymousAvatarImage(
+                                size = 62.dp,
+                                shape = RoundedCornerShape(19.dp),
+                            )
+                        } else {
+                            com.addonstation.mobile.ui.components.AvatarImage(
+                                url = assetUrl(container, profile?.avatarUrl),
+                                size = 62.dp,
+                                shape = RoundedCornerShape(19.dp),
+                            )
+                        }
                     }
                 }
-                Box(
+
+                Spacer(Modifier.height(14.dp))
+            }
+            item {
+                /* 4.2 بطاقة الحالة */
+                when {
+                    !signedIn -> GuestCard(actions)
+                    profile == null && profileLoadStatus in setOf(ProfileLoadStatus.IDLE, ProfileLoadStatus.LOADING) ->
+                        LoadingBox(text = stringResource(R.string.common_loading))
+                    profile == null -> ErrorState(
+                        onRetry = { profileRetryTick += 1 },
+                    )
+                    profile!!.effectivePlan == "free" -> FreePlanCard(planName = stringResource(R.string.plan_free_name), onUpgrade = actions.openPlans)
+                    else -> ActivePlanCard(
+                        planLabel = stringResource(R.string.home_plan_active, planLabelOf(profile!!.effectivePlan)),
+                        expiryIso = profile!!.planExpiresAt,
+                        plan = profile!!.effectivePlan,
+                    )
+                }
+            }
+            item {
+                /* 4.3 شريط البحث */
+                Spacer(Modifier.height(12.dp))
+                Row(
                     modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(
-                            Brush.linearGradient(listOf(AppColors.Green.copy(alpha = 0.35f), AppColors.Blue.copy(alpha = 0.35f))),
-                        )
-                        .padding(3.dp)
-                        .clip(RoundedCornerShape(19.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.55f), RoundedCornerShape(19.dp))
-                        .clickable { if (signedIn) actions.openProfile() else actions.openLogin() },
-                    contentAlignment = Alignment.Center,
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(AppColors.Elevated)
+                        .border(1.dp, AppColors.Border, RoundedCornerShape(13.dp))
+                        .clickable { actions.openStore() }
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    // الزائر (بلا حساب / بعد تسجيل الخروج) ⇒ صورة المجهول التي أرسلها المالك
-                    if (profile == null) {
-                        com.addonstation.mobile.ui.components.AnonymousAvatarImage(
-                            size = 62.dp,
-                            shape = RoundedCornerShape(19.dp),
-                        )
-                    } else {
-                        com.addonstation.mobile.ui.components.AvatarImage(
-                            url = assetUrl(container, profile?.avatarUrl),
-                            size = 62.dp,
-                            shape = RoundedCornerShape(19.dp),
+                    Icon(Icons.Filled.Search, contentDescription = null, tint = AppColors.Muted, modifier = Modifier.size(16.dp))
+                    Text(stringResource(R.string.home_search_hint), style = AppText.bodySmall, color = AppColors.Dim)
+                }
+            }
+            item {
+                /* 4.4 إجراءات سريعة */
+                SectionHeader(title = stringResource(R.string.home_quick_actions))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    IconTile(Icons.Filled.Favorite, stringResource(R.string.home_qa_favorites), actions.openFavorites, Modifier.weight(1f), tint = AppColors.Red)
+                    IconTile(Icons.Filled.FileDownload, stringResource(R.string.home_qa_downloads), actions.openDownloads, Modifier.weight(1f), tint = AppColors.Blue)
+                    IconTile(Icons.Filled.WorkspacePremium, stringResource(R.string.home_qa_upgrade), actions.openPlans, Modifier.weight(1f), tint = AppColors.Gold)
+                    IconTile(Icons.Filled.Games, stringResource(R.string.home_qa_device), actions.openSupport, Modifier.weight(1f), tint = AppColors.Green)
+                }
+            }
+            item {
+                /* 4.5 معاينة الخطط */
+                SectionHeader(
+                    title = stringResource(R.string.home_plans),
+                    actionText = stringResource(R.string.view_all),
+                    onAction = actions.openPlans,
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(plans.sortedBy { it.sortOrder }) { plan ->
+                        PlanPreviewCard(
+                            title = plan.name,
+                            tagline = plan.tagline.orEmpty(),
+                            accent = when (plan.id) {
+                                "legendary" -> AppColors.Gold
+                                "epic" -> AppColors.Purple
+                                else -> AppColors.FreeGray
+                            },
+                            emoji = when (plan.id) {
+                                "legendary" -> "👑"
+                                "epic" -> "💎"
+                                else -> "🍃"
+                            },
+                            onClick = actions.openPlans,
                         )
                     }
                 }
             }
-
-            Spacer(Modifier.height(14.dp))
-
-            /* 4.2 بطاقة الحالة */
-            when {
-                !signedIn -> GuestCard(actions)
-                profile == null && profileLoadStatus in setOf(ProfileLoadStatus.IDLE, ProfileLoadStatus.LOADING) ->
-                    LoadingBox(text = stringResource(R.string.common_loading))
-                profile == null -> ErrorState(
-                    onRetry = { profileRetryTick += 1 },
+            item {
+                /* 4.6 المميز */
+                SectionHeader(
+                    title = stringResource(R.string.home_featured),
+                    actionText = stringResource(R.string.view_all),
+                    onAction = actions.openStore,
                 )
-                profile!!.effectivePlan == "free" -> FreePlanCard(planName = stringResource(R.string.plan_free_name), onUpgrade = actions.openPlans)
-                else -> ActivePlanCard(
-                    planLabel = stringResource(R.string.home_plan_active, planLabelOf(profile!!.effectivePlan)),
-                    expiryIso = profile!!.planExpiresAt,
-                    plan = profile!!.effectivePlan,
+                if (loading && featured.isEmpty()) {
+                    LoadingBox()
+                } else {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(featured, key = { it.id }) { item ->
+                            ContentCard(
+                                title = item.title,
+                                coverUrl = assetUrl(container, item.coverUrl),
+                                planLabel = planLabelOf(item.plan),
+                                metaLine = metaOf(item),
+                                onClick = { actions.openItem(item) },
+                                large = true,
+                            )
+                        }
+                    }
+                }
+            }
+            item {
+                /* 4.7 أحدث */
+                SectionHeader(
+                    title = stringResource(R.string.home_latest),
+                    actionText = stringResource(R.string.view_all),
+                    onAction = actions.openStore,
                 )
+                if (latest.isNotEmpty()) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier.height(if (latest.size > 2) 470.dp else 240.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        userScrollEnabled = false,
+                    ) {
+                        items(latest, key = { it.id }) { item ->
+                            ContentCard(
+                                title = item.title,
+                                coverUrl = assetUrl(container, item.coverUrl),
+                                planLabel = planLabelOf(item.plan),
+                                metaLine = metaOf(item),
+                                onClick = { actions.openItem(item) },
+                            )
+                        }
+                    }
+                }
             }
-
-            /* 4.3 شريط البحث */
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(AppColors.Elevated)
-                    .border(1.dp, AppColors.Border, RoundedCornerShape(13.dp))
-                    .clickable { actions.openStore() }
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(Icons.Filled.Search, contentDescription = null, tint = AppColors.Muted, modifier = Modifier.size(16.dp))
-                Text(stringResource(R.string.home_search_hint), style = AppText.bodySmall, color = AppColors.Dim)
+            item {
+                /* 4.8 المبدعون المميزون */
+                SectionHeader(
+                    title = stringResource(R.string.home_creators),
+                    actionText = stringResource(R.string.view_all),
+                    onAction = actions.openCreators,
+                    leadingEmoji = "🎨",
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(creators, key = { it.profile.id }) { card ->
+                        CreatorMiniCard(card = card, onClick = { actions.openCreatorProfile(card.profile.id) })
+                    }
+                }
             }
-
-            /* 4.4 إجراءات سريعة */
-            SectionHeader(title = stringResource(R.string.home_quick_actions))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                IconTile(Icons.Filled.Favorite, stringResource(R.string.home_qa_favorites), actions.openFavorites, Modifier.weight(1f), tint = AppColors.Red)
-                IconTile(Icons.Filled.FileDownload, stringResource(R.string.home_qa_downloads), actions.openDownloads, Modifier.weight(1f), tint = AppColors.Blue)
-                IconTile(Icons.Filled.WorkspacePremium, stringResource(R.string.home_qa_upgrade), actions.openPlans, Modifier.weight(1f), tint = AppColors.Gold)
-                IconTile(Icons.Filled.Games, stringResource(R.string.home_qa_device), actions.openSupport, Modifier.weight(1f), tint = AppColors.Green)
-            }
-
-            /* 4.5 معاينة الخطط */
-            SectionHeader(
-                title = stringResource(R.string.home_plans),
-                actionText = stringResource(R.string.view_all),
-                onAction = actions.openPlans,
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(plans.sortedBy { it.sortOrder }) { plan ->
-                    PlanPreviewCard(
-                        title = plan.name,
-                        tagline = plan.tagline.orEmpty(),
-                        accent = when (plan.id) {
-                            "legendary" -> AppColors.Gold
-                            "epic" -> AppColors.Purple
-                            else -> AppColors.FreeGray
-                        },
-                        emoji = when (plan.id) {
-                            "legendary" -> "👑"
-                            "epic" -> "💎"
-                            else -> "🍃"
-                        },
-                        onClick = actions.openPlans,
+            item {
+                /* 4.9 كن مبدعاً */
+                Spacer(Modifier.height(18.dp))
+                if (profile?.isCreator == true) {
+                    PromoCard(
+                        kicker = "CREATOR PROGRAM",
+                        title = stringResource(R.string.home_creator_dashboard),
+                        text = stringResource(R.string.home_creator_text),
+                        buttonText = stringResource(R.string.home_creator_open),
+                        onButton = actions.openStudio,
+                    )
+                } else {
+                    PromoCard(
+                        kicker = "CREATOR PROGRAM",
+                        title = stringResource(R.string.home_creator_title),
+                        text = stringResource(R.string.home_creator_text),
+                        buttonText = stringResource(R.string.home_creator_cta),
+                        onButton = if (signedIn) actions.openCreatorApply else actions.openLogin,
                     )
                 }
             }
-
-            /* 4.6 المميز */
-            SectionHeader(
-                title = stringResource(R.string.home_featured),
-                actionText = stringResource(R.string.view_all),
-                onAction = actions.openStore,
-            )
-            if (loading && featured.isEmpty()) {
-                LoadingBox()
-            } else {
+            item {
+                /* 4.10 الحصريات */
+                Spacer(Modifier.height(10.dp))
+                LinkRow(
+                    title = stringResource(R.string.home_exclusives),
+                    subtitle = stringResource(R.string.home_exclusives_sub),
+                    onClick = actions.openExclusives,
+                )
+            }
+            item {
+                /* 4.11 موصى به لك */
+                SectionHeader(title = stringResource(R.string.home_recommended))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(featured, key = { it.id }) { item ->
+                    items(recommended, key = { it.id }) { item ->
                         ContentCard(
                             title = item.title,
                             coverUrl = assetUrl(container, item.coverUrl),
@@ -330,125 +426,45 @@ fun HomeScreen(
                     }
                 }
             }
-
-            /* 4.7 أحدث */
-            SectionHeader(
-                title = stringResource(R.string.home_latest),
-                actionText = stringResource(R.string.view_all),
-                onAction = actions.openStore,
-            )
-            if (latest.isNotEmpty()) {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier.height(if (latest.size > 2) 470.dp else 240.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    userScrollEnabled = false,
+            item {
+                /* 4.12 التذييل */
+                Spacer(Modifier.height(22.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(AppColors.Green.copy(alpha = 0.10f), AppColors.Blue.copy(alpha = 0.10f)),
+                            )
+                        )
+                        .border(1.dp, AppColors.Border, RoundedCornerShape(16.dp))
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    items(latest, key = { it.id }) { item ->
-                        ContentCard(
-                            title = item.title,
-                            coverUrl = assetUrl(container, item.coverUrl),
-                            planLabel = planLabelOf(item.plan),
-                            metaLine = metaOf(item),
-                            onClick = { actions.openItem(item) },
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(stringResource(R.string.brand_wordmark), style = AppText.brandFooter, color = Color.White)
+                        Text(
+                            stringResource(R.string.brand_mobile),
+                            style = AppText.brandFooter,
+                            color = Color(0xFF005B9F),
                         )
                     }
-                }
-            }
-
-            /* 4.8 المبدعون المميزون */
-            SectionHeader(
-                title = stringResource(R.string.home_creators),
-                actionText = stringResource(R.string.view_all),
-                onAction = actions.openCreators,
-                leadingEmoji = "🎨",
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(creators, key = { it.profile.id }) { card ->
-                    CreatorMiniCard(card = card, onClick = { actions.openCreatorProfile(card.profile.id) })
-                }
-            }
-
-            /* 4.9 كن مبدعاً */
-            Spacer(Modifier.height(18.dp))
-            if (profile?.isCreator == true) {
-                PromoCard(
-                    kicker = "CREATOR PROGRAM",
-                    title = stringResource(R.string.home_creator_dashboard),
-                    text = stringResource(R.string.home_creator_text),
-                    buttonText = stringResource(R.string.home_creator_open),
-                    onButton = actions.openStudio,
-                )
-            } else {
-                PromoCard(
-                    kicker = "CREATOR PROGRAM",
-                    title = stringResource(R.string.home_creator_title),
-                    text = stringResource(R.string.home_creator_text),
-                    buttonText = stringResource(R.string.home_creator_cta),
-                    onButton = if (signedIn) actions.openCreatorApply else actions.openLogin,
-                )
-            }
-
-            /* 4.10 الحصريات */
-            Spacer(Modifier.height(10.dp))
-            LinkRow(
-                title = stringResource(R.string.home_exclusives),
-                subtitle = stringResource(R.string.home_exclusives_sub),
-                onClick = actions.openExclusives,
-            )
-
-            /* 4.11 موصى به لك */
-            SectionHeader(title = stringResource(R.string.home_recommended))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(recommended, key = { it.id }) { item ->
-                    ContentCard(
-                        title = item.title,
-                        coverUrl = assetUrl(container, item.coverUrl),
-                        planLabel = planLabelOf(item.plan),
-                        metaLine = metaOf(item),
-                        onClick = { actions.openItem(item) },
-                        large = true,
-                    )
-                }
-            }
-
-            /* 4.12 التذييل */
-            Spacer(Modifier.height(22.dp))
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(AppColors.Green.copy(alpha = 0.10f), AppColors.Blue.copy(alpha = 0.10f)),
-                        )
-                    )
-                    .border(1.dp, AppColors.Border, RoundedCornerShape(16.dp))
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(stringResource(R.string.brand_wordmark), style = AppText.brandFooter, color = Color.White)
+                    Text(stringResource(R.string.brand_platform), style = AppText.tiny, color = AppColors.Muted)
                     Text(
-                        stringResource(R.string.brand_mobile),
-                        style = AppText.brandFooter,
-                        color = Color(0xFF005B9F),
+                        stringResource(R.string.brand_rights),
+                        style = AppText.tiny,
+                        color = AppColors.FreeGray.copy(alpha = 0.8f),
                     )
+                    Text(stringResource(R.string.brand_tagline), style = AppText.tiny, color = AppColors.Dim)
                 }
-                Text(stringResource(R.string.brand_platform), style = AppText.tiny, color = AppColors.Muted)
-                Text(
-                    stringResource(R.string.brand_rights),
-                    style = AppText.tiny,
-                    color = AppColors.FreeGray.copy(alpha = 0.8f),
-                )
-                Text(stringResource(R.string.brand_tagline), style = AppText.tiny, color = AppColors.Dim)
             }
-            Spacer(Modifier.height(96.dp))
+            item { Spacer(Modifier.height(96.dp)) }
         }
     }
 }
+
 
 @Composable
 private fun GuestCard(actions: HomeActions) {
