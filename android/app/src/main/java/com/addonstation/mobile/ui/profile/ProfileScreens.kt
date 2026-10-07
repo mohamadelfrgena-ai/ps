@@ -387,6 +387,94 @@ fun ProfileScreen(
 }
 
 /**
+ * شبكة محتوى داخل «ملفي» (محتواي · المفضّلة): صفّان في الصف الواحد بنفس بطاقة
+ * المتجر. كانت الشاشة تنادي ContentGrid وهي غير معرَّفة أصلاً ⇒ لم يُصرَّف
+ * المشروع؛ وهذه نسختها الكاملة.
+ *
+ * ملاحظة مهمة: الشبكة الكسولة داخل عمود قابل للتمرير تحتاج **ارتفاعاً ثابتاً**
+ * و`userScrollEnabled = false` وإلا انهار القياس وقت التشغيل (نفس حلّ المتجر).
+ */
+@Composable
+private fun ContentGrid(
+    items: List<ContentItem>,
+    loading: Boolean,
+    failed: Boolean,
+    onRetry: () -> Unit,
+    emptyText: String,
+    onClick: (ContentItem) -> Unit,
+) {
+    val container = rememberContainer()
+    when {
+        loading -> LoadingBox(text = stringResource(R.string.common_loading))
+        failed -> com.addonstation.mobile.ui.components.ErrorState(onRetry = onRetry)
+        items.isEmpty() -> EmptyState(emptyText)
+        else -> LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.height((((items.size + 1) / 2) * 210).dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            userScrollEnabled = false,
+        ) {
+            items(items, key = { it.id }) { item ->
+                ContentCard(
+                    title = item.title,
+                    coverUrl = assetUrl(container, item.coverUrl),
+                    planLabel = planLabelOf(item.plan),
+                    metaLine = metaOf(item),
+                    onClick = { onClick(item) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * تبويب «الخطة» في ملفي: الخطّة الحالية، وإن كان مجانياً فدعوة مباشرة إلى
+ * الاشتراك (نفس نبرة إشعار العرض: «أفضل وأجدد الإضافات والعوالم»).
+ */
+@Composable
+private fun PlanTab(me: Profile, onOpenPlans: () -> Unit) {
+    val free = me.effectivePlan == "free"
+    SectionHeader(title = stringResource(R.string.profile_tab_plan))
+    GlassCard {
+        Text(
+            planLabelOf(me.effectivePlan),
+            style = AppText.sectionTitle,
+            color = if (free) AppColors.Muted else AppColors.Gold,
+        )
+        Text(
+            when (me.effectivePlan) {
+                "legendary" -> stringResource(R.string.plan_current_legendary)
+                "epic" -> stringResource(R.string.plan_current_epic)
+                else -> stringResource(R.string.plan_current_free)
+            },
+            style = AppText.bodySmall,
+            color = AppColors.Muted,
+        )
+        Spacer(Modifier.height(10.dp))
+        if (free) {
+            Text(
+                stringResource(R.string.plan_intro),
+                style = AppText.bodySmall,
+                color = AppColors.Text,
+            )
+            Spacer(Modifier.height(10.dp))
+            GradientButton(
+                text = stringResource(R.string.plan_choose),
+                onClick = onOpenPlans,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            GhostButton(
+                text = stringResource(R.string.plan_my_orders),
+                onClick = onOpenPlans,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/**
  * تبويب «حول» في ملفي: النبذة، ثم قسم الحساب — بطاقة الخطّة الذهبية وشبكة ٢×٢
  * (حالة الاتصال · الأفاتار/الأداة · البريد · كل الإعدادات).
  */

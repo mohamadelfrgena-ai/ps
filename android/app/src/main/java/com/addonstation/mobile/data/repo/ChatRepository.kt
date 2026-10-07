@@ -4,6 +4,7 @@ import com.addonstation.mobile.data.ApiError
 import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.AppState
 import com.addonstation.mobile.data.SupabaseClient
+import com.addonstation.mobile.data.model.BlockedUser
 import com.addonstation.mobile.data.model.ChatChannel
 import com.addonstation.mobile.data.model.ChatMessage
 import com.addonstation.mobile.data.model.ChatReport

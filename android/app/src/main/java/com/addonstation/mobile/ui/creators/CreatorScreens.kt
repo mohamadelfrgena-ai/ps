@@ -429,6 +429,8 @@ fun CreatorApplicationScreen(onBack: () -> Unit, onSubmitted: () -> Unit) {
             Field(stringResource(R.string.profile_about_me), bio, lines = 2) { bio = it }
 
             Spacer(Modifier.height(8.dp))
+            val guidelinesLabel = stringResource(R.string.creator_guidelines_ok)
+            val ownWorkLabel = stringResource(R.string.creator_own_work)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(guidelinesLabel, guideline, { guideline = true })
                 FilterChip(ownWorkLabel, !guideline, { guideline = false })

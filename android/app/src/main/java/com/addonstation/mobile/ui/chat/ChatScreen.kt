@@ -189,21 +189,22 @@ fun ChatScreen(
     // · ورقة المرفقات · ورقة الوسائط) يُغلق أولاً قبل مغادرة الغرفة — فلا
     // تُقفل الغرفة كلها بضربة إيماءة واحدة كانت تقصد إغلاق ورقة.
     // (المعالج الأخير هو الذي يستلم الرجوع، فالأخصّ يُسجَّل أخيراً.)
+    // تعريف حالتَي العارضين **قبل** معالجات الرجوع: Kotlin يمنع استعمال
+    // متغيّر محلّي قبل تعريفه داخل الدالة نفسها.
+    var videoViewerUrl by remember { mutableStateOf<String?>(null) }
+    BackHandler(enabled = videoViewerUrl != null) { videoViewerUrl = null }
     BackHandler(enabled = mediaSheet) { mediaSheet = false }
     BackHandler(enabled = showAttach) { showAttach = false }
     BackHandler(enabled = showMembers) { showMembers = false }
     BackHandler(enabled = showPinned) { showPinned = false }
     BackHandler(enabled = actionsFor != null) { actionsFor = null }
     BackHandler(enabled = showEmoji) { showEmoji = false }
-    BackHandler(enabled = videoViewerUrl != null) { videoViewerUrl = null }
     BackHandler(enabled = imageViewerUrl != null) { imageViewerUrl = null }
 
     var statusMessage by remember { mutableStateOf<String?>(null) }
     /** سبب فشل الإرسال (يُترجَم في الشاشة) — لا نعرض رمز الخادم الخام. */
     var statusError by remember { mutableStateOf<ApiErrorKind?>(null) }
     var pinnedMessages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
-    var videoViewerUrl by remember { mutableStateOf<String?>(null) }
-
     val listState = rememberLazyListState()
 
     // نصوص تُستخدم داخل لامبدات (stringResource دالة Composable فلا تُستدعى داخل اللامبدا)
@@ -1337,7 +1338,10 @@ private fun MessageBlock(
         ) {
             Box(Modifier.weight(1f).height(1.dp).background(AppColors.Border))
             Text(
-                TimeFormat.dayLabel(message.createdAt, Locale.getDefault()),
+                TimeFormat.dayLabel(
+                    message.createdAt, Locale.getDefault(),
+                    stringResource(R.string.chat_today), stringResource(R.string.chat_yesterday),
+                ),
                 style = AppText.tiny,
                 color = AppColors.Muted,
                 modifier = Modifier.padding(horizontal = 8.dp),

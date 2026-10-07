@@ -182,14 +182,29 @@ object PushNotifications {
      * تنزيل الصورة مع سقف حجم وتصغير أثناء فك الضغط (لا نُحمّل صورة بحجم الشاشة
      * إلى الذاكرة). أي فشل ⇒ null ⇒ الإشعار يظهر نصّاً بلا صورة.
      */
-    private fun loadBitmap(url: String, maxWidth: Int): Bitmap? = runCatching {
-        val bytes = withTimeoutOrNull(8_000L) {
-            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 4_000
-                readTimeout = 6_000
-                instanceFollowRedirects = true
-                setRequestProperty("Accept", "image/*")
-            }
+    private suspend fun loadBitmap(url: String, maxWidth: Int): Bitmap? {
+        val bytes = runCatching { fetchBytes(url) }.getOrNull()
+        if (bytes == null || bytes.isEmpty()) return null
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= maxWidth) sample *= 2
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) }.getOrNull()
+    }
+
+    /** جلب بايتات الصورة بمهلة قصيرة (خدمة FCM قصيرة العمر ⇒ لا نُطيل عملها). */
+    private suspend fun fetchBytes(url: String): ByteArray? {
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 4_000
+            readTimeout = 6_000
+            instanceFollowRedirects = true
+            setRequestProperty("Accept", "image/*")
+        }
+        return withTimeoutOrNull(8_000L) {
             try {
                 if (conn.responseCode !in 200..299) return@withTimeoutOrNull null
                 conn.inputStream.use { input ->
@@ -208,18 +223,8 @@ object PushNotifications {
             } finally {
                 conn.disconnect()
             }
-        } ?: return null
-
-        if (bytes.isEmpty()) return null
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-
-        var sample = 1
-        while (bounds.outWidth / (sample * 2) >= maxWidth) sample *= 2
-        val options = BitmapFactory.Options().apply { inSampleSize = sample }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-    }.getOrNull()
+        }
+    }
 
     /** صورة المرسل دائرية كما تظهر في التطبيق (لا مربّع). */
     private fun circle(source: Bitmap): Bitmap = runCatching {

@@ -47,7 +47,7 @@ object PushRegistrar {
     /** يطلب التوكن من FCM (يرجع null إن لم تكن مُهيّأة أو فشل الاتصال). */
     private suspend fun fetchToken(): String? {
         if (fcmUnavailable) return null
-        if (!PushNotifications.configured(AppContextHolder.current ?: return null)) return null
+        if (!PushNotifications.configured(AppContainerHolder.current ?: return null)) return null
         return suspendCancellableCoroutine { cont ->
             runCatching {
                 FirebaseMessaging.getInstance().token

@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -35,6 +36,7 @@ import com.addonstation.mobile.ui.components.BottomNavBar
 import com.addonstation.mobile.ui.components.ContentColumn
 import com.addonstation.mobile.ui.home.HomeActions
 import com.addonstation.mobile.ui.home.HomeScreen
+import com.addonstation.mobile.R
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.splash.SplashScreen
 import com.addonstation.mobile.ui.store.StoreScreen
@@ -190,7 +192,11 @@ fun AppRoot(
                     when {
                         !splashDone -> SplashScreen(onFinished = { splashDone = true })
                         !configured -> SetupScreen(onDone = { configured = container.isConfigured })
-                        else -> MainNavigation(startAtReset = deepLinkSession)
+                        else -> MainNavigation(
+                            startAtReset = deepLinkSession,
+                            pushRoute = pushRoute,
+                            onPushConsumed = onPushConsumed,
+                        )
                     }
                 }
             }
@@ -201,7 +207,12 @@ fun AppRoot(
 }
 
 @Composable
-private fun MainNavigation(startAtReset: Boolean) {
+private fun MainNavigation(
+    startAtReset: Boolean,
+    /** وجهة طلبها إشعار FCM (chat:<id> · item:<id> · notifications · plans …). */
+    pushRoute: String? = null,
+    onPushConsumed: () -> Unit = {},
+) {
     val container = rememberContainer()
     val scope = rememberCoroutineScope()
     val navController = rememberNavController()
@@ -292,33 +303,6 @@ private fun MainNavigation(startAtReset: Boolean) {
         navController.navigate(route) { launchSingleTop = true }
     }
 
-    /**
-     * فتح الوجهة التي طلبها الإشعار — بترتيب آمن:
-     *   • غير مسجّل دخول ⇒ نحفظ الوجهة ونُنقله للدخول (وتُفتح بعد الدخول).
-     *   • شاشة تحتاج تسجيلاً (الشات) ⇒ نفس المعالجة.
-     *   • غير ذلك ⇒ تنقّل مباشر (singleTop حتى لا تتكدّس نسخ).
-     */
-    fun openPushTarget(raw: String) {
-        when {
-            raw.startsWith("chat:") -> {
-                val id = raw.removePrefix("chat:")
-                if (id.isBlank()) go(Routes.NOTIFICATIONS) else go(Routes.chat(id))
-            }
-            raw.startsWith("item:") -> {
-                val id = raw.removePrefix("item:")
-                if (id.isBlank()) goTab(MainTab.Store) else go(Routes.item(id))
-            }
-            raw == "notifications" -> go(Routes.NOTIFICATIONS)
-            raw == "plans" -> go(Routes.PLANS)
-            raw == "orders" -> go(Routes.ORDERS)
-            raw == "creators" -> go(Routes.CREATORS)
-            raw == "wallet" -> go(Routes.WALLET)
-            raw == "store" -> goTab(MainTab.Store)
-            raw == "community" -> goTab(MainTab.Community)
-            else -> go(Routes.NOTIFICATIONS)
-        }
-    }
-
     // الوجهة القادمة من إشعار: أثر مستقل (قد تصل والتطبيق مفتوح ⇒ onNewIntent).
     // غير مسجّل؟ نحفظها ونُنقله للدخول، ثم تُفتح تلقائياً بعد نجاح الدخول
     // (وإلا ضاع الإشعار: المستخدم يفتحه فيرى شاشة الدخول فقط).
@@ -367,6 +351,34 @@ private fun MainNavigation(startAtReset: Boolean) {
             restoreState = true
         }
     }
+
+    /**
+     * فتح الوجهة التي طلبها الإشعار — بترتيب آمن:
+     *   • غير مسجّل دخول ⇒ نحفظ الوجهة ونُنقله للدخول (وتُفتح بعد الدخول).
+     *   • شاشة تحتاج تسجيلاً (الشات) ⇒ نفس المعالجة.
+     *   • غير ذلك ⇒ تنقّل مباشر (singleTop حتى لا تتكدّس نسخ).
+     */
+    fun openPushTarget(raw: String) {
+        when {
+            raw.startsWith("chat:") -> {
+                val id = raw.removePrefix("chat:")
+                if (id.isBlank()) go(Routes.NOTIFICATIONS) else go(Routes.chat(id))
+            }
+            raw.startsWith("item:") -> {
+                val id = raw.removePrefix("item:")
+                if (id.isBlank()) goTab(MainTab.Store) else go(Routes.item(id))
+            }
+            raw == "notifications" -> go(Routes.NOTIFICATIONS)
+            raw == "plans" -> go(Routes.PLANS)
+            raw == "orders" -> go(Routes.ORDERS)
+            raw == "creators" -> go(Routes.CREATORS)
+            raw == "wallet" -> go(Routes.WALLET)
+            raw == "store" -> goTab(MainTab.Store)
+            raw == "community" -> goTab(MainTab.Community)
+            else -> go(Routes.NOTIFICATIONS)
+        }
+    }
+
 
     // إن رجع المستخدم من شاشة الدخول بلا إتمام نُلغي الوجهة المعلّقة، فلا يقفز
     // إلى الشات في دخولٍ تالٍ لا علاقة له به. (الدخول الناجح يُفرغها بنفسه.)
