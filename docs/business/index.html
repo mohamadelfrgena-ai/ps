@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>حاسبة أرباح AddonStation</title>
+<style>
+  :root{
+    --bg:#0B0F14; --surface:#131A24; --elev:#1A2330; --elev2:#212D3D;
+    --border:#263240; --border2:#334152; --text:#E8EEF5; --muted:#8EA0B3;
+    --green:#3DDC84; --green2:#2FAE67; --gold:#FFD479; --blue:#6FB8FF;
+    --purple:#B98CFF; --red:#FF5A5A; --onGreen:#04210F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font-family:"Noto Naskh Arabic","Segoe UI",Tahoma,Arial,sans-serif;line-height:1.7}
+  header{padding:26px 20px 8px;text-align:center}
+  h1{margin:0 0 6px;font-size:26px}
+  header p{margin:0;color:var(--muted);font-size:14px}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px 16px 60px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 16px 12px}
+  .card h2{margin:0 0 12px;font-size:16px;color:var(--gold);font-weight:700}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+  input[type=number]{width:100%;padding:9px 11px;background:var(--elev);color:var(--text);
+    border:1px solid var(--border2);border-radius:10px;font-size:15px;font-family:inherit;
+    direction:ltr;text-align:left}
+  input[type=range]{width:100%;accent-color:var(--green)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .out{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+  .kpi{background:var(--elev);border:1px solid var(--border);border-radius:12px;padding:11px 12px}
+  .kpi .t{font-size:12px;color:var(--muted)}
+  .kpi .v{font-size:19px;font-weight:700;direction:ltr;text-align:right;unicode-bidi:plaintext}
+  .kpi .v small{font-size:12px;color:var(--muted);font-weight:400}
+  .v.green{color:var(--green)} .v.gold{color:var(--gold)} .v.blue{color:var(--blue)}
+  .v.red{color:var(--red)} .v.purple{color:var(--purple)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+  th,td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  td.num{direction:ltr;text-align:left;unicode-bidi:plaintext}
+  tr:last-child td{border-bottom:none}
+  .chart{display:flex;align-items:flex-end;gap:6px;height:170px;margin-top:14px}
+  .bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+  .bar .fill{width:100%;border-radius:6px 6px 0 0;background:linear-gradient(180deg,var(--green),var(--green2));min-height:2px}
+  .bar .fill.neg{background:linear-gradient(180deg,var(--red),#D63A3A)}
+  .bar .lb{font-size:10px;color:var(--muted);margin-top:4px}
+  .hint{color:var(--muted);font-size:12px;margin-top:10px}
+  .btns{display:flex;gap:10px;justify-content:center;margin-top:16px}
+  button{background:var(--elev2);color:var(--text);border:1px solid var(--border2);
+    padding:9px 18px;border-radius:10px;font-family:inherit;font-size:14px;cursor:pointer}
+  button:hover{border-color:var(--green);color:var(--green)}
+  .badge{display:inline-block;background:rgba(61,220,132,.12);color:var(--green);
+    border:1px solid rgba(61,220,132,.3);border-radius:999px;padding:2px 10px;font-size:12px}
+  code{background:var(--elev);padding:1px 5px;border-radius:5px;direction:ltr;display:inline-block}
+</style>
+</head>
+<body>
+<header>
+  <h1>💰 حاسبة أرباح AddonStation</h1>
+  <p>غيّر أي رقم — كل النتائج تتحدّث فوراً · <span class="badge">قيم افتراضية مبنية على وضع مشروعك</span></p>
+</header>
+
+<div class="wrap">
+<div class="grid">
+
+  <!-- المدخلات -->
+  <div class="card">
+    <h2>١) الجمهور والتحويل</h2>
+    <div class="row">
+      <div><label>مستخدمون نشطون شهرياً (MAU)</label><input type="number" id="mau" value="25000" min="0" step="500"></div>
+      <div><label>نسبة المشتركين %</label><input type="number" id="conv" value="2" min="0" max="100" step="0.1"></div>
+    </div>
+    <div class="row">
+      <div><label>نسبة خطة Epic من المشتركين: <b id="mixLb">65%</b></label>
+        <input type="range" id="mix" min="0" max="100" value="65"></div>
+      <div><label>معدل نمو المستخدمين شهرياً % <small style="color:#5C6F82">(10–15% = نمو قوي مستدام)</small></label><input type="number" id="growth" value="12" step="1"></div>
+    </div>
+
+    <h2 style="margin-top:18px">٢) الأسعار والرسوم</h2>
+    <div class="row">
+      <div><label>سعر Epic (د.ل/شهر)</label><input type="number" id="pEpic" value="20" step="1"></div>
+      <div><label>سعر Legendary (د.ل/شهر)</label><input type="number" id="pLeg" value="30" step="1"></div>
+    </div>
+    <div class="row">
+      <div><label>نسبة الدفع عبر متجر جوجل %</label><input type="number" id="storeShare" value="30" step="5"></div>
+      <div><label>رسوم المتجر %</label><input type="number" id="storeFee" value="15" step="1"></div>
+    </div>
+    <div class="row">
+      <div><label>نسبة التحصيل عبر وكيل (من الدفعات المحلية) %</label><input type="number" id="agentShare" value="100" step="5"></div>
+      <div><label>عمولة الوكيل %</label><input type="number" id="agentFee" value="5" step="1"></div>
+    </div>
+
+    <h2 style="margin-top:18px">٣) التكاليف والخروج</h2>
+    <div class="row">
+      <div><label>تكاليف ثابتة شهرياً ($)</label><input type="number" id="fixed" value="28" step="1"></div>
+      <div><label>سعر الصرف (د.ل لكل $)</label><input type="number" id="fx" value="6.43" step="0.01"></div>
+    </div>
+    <div class="row">
+      <div><label>متوسط حجم الملف (MB)</label><input type="number" id="mb" value="15" step="1"></div>
+      <div><label>خروج مشمول شهرياً (GB)</label><input type="number" id="freeGb" value="250" step="50"></div>
+    </div>
+    <div class="row">
+      <div><label>تحميلات المستخدم الحر شهرياً</label><input type="number" id="dlFree" value="3" step="1"></div>
+      <div><label>تحميلات المشترك شهرياً</label><input type="number" id="dlPay" value="25" step="1"></div>
+    </div>
+    <div class="row">
+      <div><label>سعر خروج الشبكة ($/GB)</label><input type="number" id="gbPrice" value="0.03" step="0.01"></div>
+      <div><label>معدل انسحاب المشتركين %/شهر</label><input type="number" id="churn" value="15" step="1"></div>
+    </div>
+
+    <h2 style="margin-top:18px">٤) إعلانات المكافأة (اختياري)</h2>
+    <div class="row">
+      <div><label>نسبة من يشاهد إعلاناً %</label><input type="number" id="adShare" value="25" step="5"></div>
+      <div><label>مشاهدات للشخص شهرياً</label><input type="number" id="adViews" value="8" step="1"></div>
+    </div>
+    <div class="row">
+      <div><label>eCPM ($ لكل 1000 ظهور)</label><input type="number" id="ecpm" value="2" step="0.5"></div>
+      <div><label>ميزانية تسويق شهرية ($)</label><input type="number" id="mkt" value="0" step="10"></div>
+    </div>
+  </div>
+
+  <!-- النتائج -->
+  <div class="card">
+    <h2>النتيجة الشهرية</h2>
+    <div class="out">
+      <div class="kpi"><div class="t">مشتركون فعّالون</div><div class="v blue" id="oSubs">—</div></div>
+      <div class="kpi"><div class="t">متوسط دخل المشترك (ARPPU)</div><div class="v gold" id="oArpu">—</div></div>
+      <div class="kpi"><div class="t">إيراد إجمالي</div><div class="v" id="oGross">—</div></div>
+      <div class="kpi"><div class="t">صافي بعد رسوم المتجر/الوكلاء</div><div class="v" id="oNet">—</div></div>
+      <div class="kpi"><div class="t">دخل الإعلانات</div><div class="v purple" id="oAds">—</div></div>
+      <div class="kpi"><div class="t">تكلفة خروج الشبكة</div><div class="v" id="oEgress">—</div></div>
+      <div class="kpi"><div class="t">إجمالي التكاليف</div><div class="v red" id="oCost">—</div></div>
+      <div class="kpi"><div class="t">صافي الربح الشهري</div><div class="v green" id="oProfit">—</div></div>
+      <div class="kpi"><div class="t">الربح السنوي (بنفس الوتيرة)</div><div class="v green" id="oYear">—</div></div>
+      <div class="kpi"><div class="t">هامش الربح</div><div class="v" id="oMargin">—</div></div>
+      <div class="kpi"><div class="t">نقطة التعادل (مشتركون)</div><div class="v" id="oBe">—</div></div>
+      <div class="kpi"><div class="t">LTV ÷ سقف CAC (لكل مشترك)</div><div class="v" id="oLtv">—</div></div>
+    </div>
+
+    <h2 style="margin-top:18px">توقّع 12 شهراً (بنسبة النمو المدخلة)</h2>
+    <div class="hint" style="margin-top:0">⚠️ التوقّع يفترض نسبة النمو نفسها كل شهر — وهي توقّعات «لو استمر الحال»، لا وعد. 10–15% شهرياً = نمو قوي جداً ومستدام في الواقع.</div>
+    <div class="chart" id="chart"></div>
+    <table>
+      <thead><tr><th>الشهر</th><th>مستخدمون</th><th>مشتركون</th><th>إيراد د.ل</th><th>صافي الربح $</th></tr></thead>
+      <tbody id="proj"></tbody>
+    </table>
+    <div class="hint" id="cum">—</div>
+    <div class="btns">
+      <button onclick="reset()">↺ القيم الافتراضية</button>
+      <button onclick="window.print()">🖨️ طباعة / PDF</button>
+    </div>
+    <div class="hint">
+      القيم الافتراضية هي وضع مشروعك: Epic 20 د.ل · Legendary 30 د.ل · خروج 15MB للملف ·
+      Supabase Pro مضمّن في 28$. اجعل «نسبة التحصيل عبر وكيل» 0% لو تحصّل بنفسك (يرفع الصافي ~1.2 د.ل لكل مشترك)،
+      واجعل «سعر خروج الشبكة» 0.09$ لو بلا تخزين مؤقت، أو 0$ لو نقلت الملفات الضخمة إلى استضافة خارجية. الأرقام تقديرية وتعتمد على جودة التنفيذ والتوزيع.
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const IDS = ["mau","conv","mix","growth","pEpic","pLeg","storeShare","storeFee",
+             "agentShare","agentFee","fixed","fx","mb","freeGb","dlFree","dlPay",
+             "gbPrice","churn","adShare","adViews","ecpm","mkt"];
+const DEF = {};
+IDS.forEach(i => DEF[i] = document.getElementById(i).value);
+
+const $ = id => document.getElementById(id);
+const n = id => { const v = parseFloat($(id).value); return isFinite(v) ? v : 0; };
+const fmt = (x, d=0) => x.toLocaleString("en-US", {minimumFractionDigits:d, maximumFractionDigits:d});
+const money = (usd, d=0) => "$" + fmt(usd, d);
+const lyd   = (v, d=0) => fmt(v, d) + " د.ل";
+
+function calc(){
+  const mau = n("mau"), conv = n("conv")/100, mix = n("mix")/100, growth = n("growth")/100;
+  const pE = n("pEpic"), pL = n("pLeg"), fx = n("fx") || 6.43;
+  const storeShare = n("storeShare")/100, storeFee = n("storeFee")/100;
+  const agentShare = n("agentShare")/100, agentFee = n("agentFee")/100;
+  const fixed = n("fixed"), mb = n("mb"), freeGb = n("freeGb");
+  const dlFree = n("dlFree"), dlPay = n("dlPay"), gbPrice = n("gbPrice");
+  const churn = (n("churn")/100) || 0.15;
+  const mkt = n("mkt");
+
+  // وحدة الاقتصاد
+  const arppuL = mix*pE + (1-mix)*pL;                       // د.ل
+  const feeRate = storeShare*storeFee + agentShare*(1-storeShare)*agentFee;
+  const netL = arppuL * (1 - feeRate);                       // د.ل صافي
+  const arppuU = arppuL / fx, netU = netL / fx;
+
+  // الشهر الحالي
+  const subs = mau * conv;
+  const grossL = subs * arppuL, grossU = grossL / fx;
+  const netU_ = subs * netU;
+
+  // خروج الشبكة
+  const gb = (mau - subs) * dlFree * mb / 1024 + subs * dlPay * mb / 1024;
+  const over = Math.max(0, gb - freeGb);
+  const egress = over * gbPrice;
+
+  // إعلانات
+  const freeUsers = mau - subs;
+  const ads = freeUsers * (n("adShare")/100) * n("adViews") * n("ecpm") / 1000;
+
+  const cost = fixed + egress + mkt;
+  const profit = netU_ + ads - cost;
+  const margin = (netU_ + ads) > 0 ? profit / (netU_ + ads) * 100 : 0;
+  const be = netU > 0 ? Math.ceil((fixed) / netU) : 0;
+  const ltv = netL / churn;                                  // د.ل
+  const cacCeil = (ltv/fx)/3;
+
+  // العرض
+  $("mixLb").textContent = Math.round(mix*100) + "%";
+  $("oSubs").textContent   = fmt(subs, subs < 10 ? 1 : 0);
+  $("oArpu").innerHTML     = fmt(arppuL, 1) + " د.ل <small>(" + money(arppuU, 2) + ")</small>";
+  $("oGross").innerHTML    = lyd(grossL) + " <small>(" + money(grossU) + ")</small>";
+  $("oNet").innerHTML      = lyd(subs*netL) + " <small>(" + money(netU_) + ")</small>";
+  $("oAds").textContent    = money(ads);
+  $("oEgress").innerHTML   = money(egress) + " <small>(" + fmt(gb) + " GB)</small>";
+  $("oCost").textContent   = money(cost);
+  $("oProfit").innerHTML   = money(profit) + " <small>(" + lyd(profit*fx) + ")</small>";
+  $("oProfit").className   = "v " + (profit >= 0 ? "green" : "red");
+  $("oYear").textContent   = money(profit*12);
+  $("oMargin").textContent = fmt(margin,1) + "%";
+  $("oBe").textContent     = be + " مشتركاً";
+  $("oLtv").innerHTML      = lyd(ltv) + " <small>سقف CAC " + money(cacCeil,1) + "</small>";
+
+  // توقّع 12 شهراً
+  let m = mau, rows = [], cum = 0, bars = "";
+  let maxAbs = 0, vals = [];
+  for (let i=1; i<=12; i++){
+    const s = m*conv, gL = s*arppuL, nU = s*netU;
+    const gbM = (m-s)*dlFree*mb/1024 + s*dlPay*mb/1024;
+    const egM = Math.max(0, gbM-freeGb)*gbPrice;
+    const adM = (m-s)*(n("adShare")/100)*n("adViews")*n("ecpm")/1000;
+    const p = nU + adM - (fixed+egM+mkt);
+    cum += p; vals.push(p); maxAbs = Math.max(maxAbs, Math.abs(p));
+    rows.push(`<tr><td class="num">${i}</td><td class="num">${fmt(m)}</td><td class="num">${fmt(s,0)}</td>
+      <td class="num">${fmt(gL)}</td><td class="num" style="color:${p>=0?'#3DDC84':'#FF5A5A'}">${money(p)}</td></tr>`);
+    m = m*(1+growth);
+  }
+  vals.forEach((p,i) => {
+    const h = maxAbs > 0 ? Math.max(2, Math.abs(p)/maxAbs*140) : 2;
+    bars += `<div class="bar" title="الشهر ${i+1}: ${money(p)}">
+      <div class="fill ${p<0?'neg':''}" style="height:${h}px"></div><div class="lb">${i+1}</div></div>`;
+  });
+  $("chart").innerHTML = bars;
+  $("proj").innerHTML = rows.join("");
+  $("cum").innerHTML = `الإجمالي التراكمي في 12 شهراً: <b style="color:#FFD479">${money(cum)}</b>
+    (${lyd(cum*fx)}) · بعد 12 شهراً يصبح عدد المستخدمين ${fmt(mau*Math.pow(1+growth,12))}`;
+}
+
+function reset(){ IDS.forEach(i => $(i).value = DEF[i]); calc(); }
+IDS.forEach(i => $(i).addEventListener("input", calc));
+calc();
+</script>
+</body>
+</html>
