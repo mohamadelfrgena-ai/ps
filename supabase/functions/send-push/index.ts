@@ -11,11 +11,12 @@
 //      إشعارات لكل المستخدمين).
 //    • التطبيق قد يكون مغلقاً — لا يرسل شيئاً حينها. الخادم هو الذي يوقظه.
 //
-//  ثلاثة أوامر (action):
+//  الأوامر (action):
 //    dispatch  (افتراضي) — يفرّغ الطابور: كل صف مُستحق الإرسال ⇒ إشعارات.
 //    reengage            — يبحث عن الغائبين طويلاً ويضيف تذكيراً لهم (مرة/14 يوماً).
+//    offer               — عرض اشتراك لمن هو على الخطة المجانية (مرة/30 يوماً).
 //    cleanup             — ينظّف السجل والأجهزة المهجورة.
-//    all                 — الثلاثة معاً (للمهمة اليومية).
+//    all                 — الأربعة معاً (للمهمة اليومية).
 //
 //  الأمان: تُنادى بمفتاح سري في الترويسة x-push-secret (اضبطه في أسرار الدالة).
 //  الأسرار المطلوبة (Settings → Edge Functions → Secrets):
@@ -58,6 +59,8 @@ const I18N: Record<string, Record<string, string>> = {
     push_creator_body: "Tap to explore the latest uploads.",
     push_system_title: "AddonStation",
     push_system_body: "You have a new update in the app.",
+    push_offer_title: "The best addons & worlds are waiting 🔥",
+    push_offer_body: "You're on the free plan — subscribe to unlock all exclusive addons and worlds, and get new drops first.",
   },
   ar: {
     push_test_title: "الإشعارات تعمل 🎉",
@@ -82,6 +85,8 @@ const I18N: Record<string, Record<string, string>> = {
     push_creator_body: "اضغط لاستكشاف أحدث ما نُشر.",
     push_system_title: "AddonStation",
     push_system_body: "لديك تحديث جديد في التطبيق.",
+    push_offer_title: "أفضل وأجدد الإضافات والعوالم 🔥",
+    push_offer_body: "أنت على الخطة المجانية — اشترك لتفتح كل الإضافات والعوالم الحصرية، وتصلك الجديدات أولاً.",
   },
   fr: {
     push_test_title: "Les notifications fonctionnent 🎉",
@@ -106,6 +111,8 @@ const I18N: Record<string, Record<string, string>> = {
     push_creator_body: "Touchez pour découvrir les nouveautés.",
     push_system_title: "AddonStation",
     push_system_body: "Vous avez une nouvelle mise à jour.",
+    push_offer_title: "Les meilleurs addons et mondes vous attendent 🔥",
+    push_offer_body: "Vous êtes sur le plan gratuit — abonnez-vous pour débloquer tous les addons et mondes exclusifs, et recevoir les nouveautés en premier.",
   },
   es: {
     push_test_title: "Las notificaciones funcionan 🎉",
@@ -130,6 +137,8 @@ const I18N: Record<string, Record<string, string>> = {
     push_creator_body: "Toca para explorar lo último.",
     push_system_title: "AddonStation",
     push_system_body: "Tienes una novedad en la app.",
+    push_offer_title: "Los mejores addons y mundos te esperan 🔥",
+    push_offer_body: "Estás en el plan gratuito — suscríbete para desbloquear todos los addons y mundos exclusivos, y recibir las novedades primero.",
   },
   tr: {
     push_test_title: "Bildirimler çalışıyor 🎉",
@@ -154,6 +163,8 @@ const I18N: Record<string, Record<string, string>> = {
     push_creator_body: "En yenileri keşfetmek için dokun.",
     push_system_title: "AddonStation",
     push_system_body: "Uygulamada yeni bir gelişme var.",
+    push_offer_title: "En iyi addonlar ve dünyalar seni bekliyor 🔥",
+    push_offer_body: "Ücretsiz plandasın — tüm özel addon ve dünyaların kilidini açmak ve yenileri ilk sen almak için abone ol.",
   },
   ru: {
     push_test_title: "Уведомления работают 🎉",
@@ -178,6 +189,8 @@ const I18N: Record<string, Record<string, string>> = {
     push_creator_body: "Нажмите, чтобы посмотреть новинки.",
     push_system_title: "AddonStation",
     push_system_body: "В приложении новое обновление.",
+    push_offer_title: "Лучшие аддоны и миры ждут вас 🔥",
+    push_offer_body: "У вас бесплатный план — оформите подписку, чтобы открыть все эксклюзивные аддоны и миры и получать новинки первыми.",
   },
   pt: {
     push_test_title: "As notificações funcionam 🎉",
@@ -202,6 +215,8 @@ const I18N: Record<string, Record<string, string>> = {
     push_creator_body: "Toque para explorar as novidades.",
     push_system_title: "AddonStation",
     push_system_body: "Há uma novidade no app.",
+    push_offer_title: "Os melhores addons e mundos esperam por você 🔥",
+    push_offer_body: "Você está no plano gratuito — assine para desbloquear todos os addons e mundos exclusivos e receber as novidades primeiro.",
   },
   zh: {
     push_test_title: "通知正常工作 🎉",
@@ -226,6 +241,8 @@ const I18N: Record<string, Record<string, string>> = {
     push_creator_body: "点按浏览最新发布。",
     push_system_title: "AddonStation",
     push_system_body: "应用有新的更新。",
+    push_offer_title: "最好的附加包与世界在等你 🔥",
+    push_offer_body: "你目前是免费方案 — 订阅即可解锁全部独家附加包与世界，并第一时间收到新内容。",
   },
 };
 
@@ -502,6 +519,9 @@ Deno.serve(async (req: Request) => {
     }
     if (action === "reengage" || action === "all") {
       out.reengage = await rpc<number>("push_reengage_scan", { p_limit: 500 });
+    }
+    if (action === "offer" || action === "all") {
+      out.offer = await rpc<number>("push_offer_scan", { p_limit: 200 });
     }
     if (action === "cleanup" || action === "all") {
       out.cleanup = await rpc<number>("push_cleanup", { p_days: 7 });

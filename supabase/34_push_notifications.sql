@@ -57,8 +57,18 @@ create table if not exists public.push_prefs (
   quiet_from     int not null default 23 check (quiet_from between 0 and 23),
   quiet_to       int not null default 8  check (quiet_to between 0 and 23),
   reengage_days  int not null default 7  check (reengage_days between 3 and 60),
+  -- تتبّع دائم (عمود لا صف في الطابور): صفوف الطابور تُنظَّف بعد 7 أيام،
+  -- فلو اعتمدنا عليها لضاعت قاعدة «مرة كل 14 يوماً» بعد أسبوع.
+  last_reengage_at timestamptz,                   -- آخر تذكير عودة أُرسل له
+  last_offer_at    timestamptz,                   -- آخر عرض اشتراك أُرسل له
   updated_at     timestamptz not null default now()
 );
+
+-- ترقية آمنة لقاعدة سبق تنفيذها قبل إضافة عمودَي التتبّع
+do $$ begin
+  alter table public.push_prefs add column if not exists last_reengage_at timestamptz;
+  alter table public.push_prefs add column if not exists last_offer_at timestamptz;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- 3) طابور الإرسال (السجل الكامل: ماذا أُرسل ولمن ومتى — يُنظَّف تلقائياً)
@@ -463,7 +473,9 @@ begin
        and exists (select 1 from public.push_devices d where d.user_id = p.id and d.enabled)
        and p.created_at < now() - interval '3 days'                    -- حساب جديد لا يُذكَّر
        and p.last_seen_at < now() - make_interval(days => coalesce(pr.reengage_days, 7))
-       and not exists (                                                    -- مرة كل 14 يوماً
+       and (pr.last_reengage_at is null                                     -- مرة كل 14 يوماً
+            or pr.last_reengage_at < now() - interval '14 days')
+       and not exists (                                                     -- وحرصاً مضاعفاً: لا صف حديث
          select 1 from public.push_queue q
           where q.user_id = p.id and q.category = 'reminders'
             and q.created_at > now() - interval '14 days'
@@ -477,6 +489,7 @@ begin
       jsonb_build_object('days', v_days),
       'store', 'reminder', 'normal', 0
     );
+    update public.push_prefs set last_reengage_at = now() where user_id = v_row.id;
     v_count := v_count + 1;
   end loop;
   return v_count;
@@ -652,6 +665,61 @@ begin
   return jsonb_build_object('ok', true, 'queued', v_id);
 end $$;
 
+/**
+ * كشف «عرض الاشتراك»: لمن هو على **الخطة المجانية** ويريد أفضل وأجدد
+ * الإضافات والعوالم — عرض واحد كل 30 يوماً، وبقواعد صارمة تمنع الإزعاج:
+ *   • لا يُرسل لحساب عمره أقل من 7 أيام.
+ *   • لا يُرسل لغائب (الغياب له تذكير آخر) ولا لصاحب اشتراك ساري.
+ *   • لا يُرسل لصاحب اشتراك انتهى للتوّ؟ — بلى يُرسل (اشتراكه انتهى ⇒ يعود مجانياً).
+ *   • لا يُرسل لمن وصله أي إشعار آخر خلال 7 أيام (لا نبيع لمن نزعجه).
+ *   • عرض واحد كل 30 يوماً لكل مستخدم، ويُحترم فيها المفتاح الرئيسي ومفتاح
+ *     قسم «المحتوى» وساعات الهدوء ومهلة 20 صفاً في الدورة.
+ */
+create or replace function public.push_offer_scan(p_limit int default 200)
+returns int
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_row   record;
+  v_count int := 0;
+begin
+  for v_row in
+    select p.id
+      from public.profiles p
+      join public.push_prefs pr on pr.user_id = p.id and pr.master and pr.content
+     where
+       -- مجاني **فعلاً** — بنفس منطق التطبيق (Profile.effectivePlan):
+       --   • plan = 'free' ⇒ مجاني.
+       --   • plan مدفوع وانتهى تاريخه ⇒ عاد مجانياً ⇒ يُعرض عليه.
+       --   • plan مدفوع بلا تاريخ انتهاء (اشتراك مفتوح/مُهدى) ⇒ **مشترك، لا يُزعج**.
+       (
+         p.plan = 'free'
+         or (p.plan_expires_at is not null and p.plan_expires_at <= now())
+       )
+       and exists (select 1 from public.push_devices d where d.user_id = p.id and d.enabled)
+       and p.created_at < now() - interval '7 days'                       -- لا نعرض على حساب صغير
+       and p.last_seen_at > now() - interval '21 days'                    -- فعّال (الغائب له تذكير آخر)
+       and (pr.last_offer_at is null
+            or pr.last_offer_at < now() - interval '30 days')             -- عرض واحد كل 30 يوماً
+       and not exists (                                                   -- لا نبيع لمن أزعجناه هذا الأسبوع
+         select 1 from public.push_queue q
+          where q.user_id = p.id and q.created_at > now() - interval '7 days'
+       )
+     order by p.last_seen_at desc
+     limit greatest(coalesce(p_limit, 200), 1)
+  loop
+    perform public.push_enqueue(
+      v_row.id, 'content', 'push_offer_title', 'push_offer_body',
+      '{}'::jsonb,
+      'plans',        -- يفتح شاشة الخطط مباشرة
+      'offer', 'normal', 0
+    );
+    update public.push_prefs set last_offer_at = now() where user_id = v_row.id;
+    v_count := v_count + 1;
+  end loop;
+  return v_count;
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- 10) الصلاحيات: DML مباشر ممنوع، والدوال للمسجّلين
 -- ---------------------------------------------------------------------------
@@ -662,6 +730,7 @@ revoke all on function public.push_enqueue(uuid, text, text, text, jsonb, text, 
 revoke all on function public.push_broadcast(text, text, text, jsonb, text, text, text) from public;
 revoke all on function public.push_reengage_scan(int) from public;
 revoke all on function public.push_cleanup(int) from public;
+revoke all on function public.push_offer_scan(int) from public;
 
 grant execute on function public.push_heartbeat() to authenticated;
 grant execute on function public.push_register_device(text, text, text, text, int) to authenticated;
@@ -672,6 +741,7 @@ grant execute on function public.push_test_me() to authenticated;
 grant execute on function public.push_targets(text, uuid) to service_role;
 grant execute on function public.push_reengage_scan(int) to service_role;
 grant execute on function public.push_cleanup(int) to service_role;
+grant execute on function public.push_offer_scan(int) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- 11) التحقق — نفّذ الملف ثم انظر هذا الجدول: المفروض «✅» في كل صف
@@ -702,6 +772,6 @@ union all select 'إشعارات في الطابور',
 
 do $$
 begin
-  raise notice '٣٤) الإشعارات جاهزة: 5 أقسام · ساعات هدوء · تجميع · تذكير غياب كل 14 يوماً · إشعارات بصور الأغلفة وصور المرسلين.';
+  raise notice '٣٤) الإشعارات جاهزة: 5 أقسام · ساعات هدوء · تجميع · تذكير غياب كل 14 يوماً · إشعارات بصور الأغلفة وصور المرسلين · عرض اشتراك واحد كل 30 يوماً للمجانيين.';
   raise notice 'الخطوة التالية: انشر دالة send-push على Supabase وضع مفاتيح FCM (docs/11-PUSH-AR.md).';
 end $$;
