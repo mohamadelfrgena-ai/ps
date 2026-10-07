@@ -214,6 +214,7 @@ jobs:
         if: ${{ always() && steps.flags.outputs.enable == 'true' }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
             echo "::warning::بلا SUPABASE_ACCESS_TOKEN: انسخ supabase/35_push_live.sql في SQL Editor واضغط Run."
@@ -237,27 +238,36 @@ jobs:
                   return res.read().decode()
 
 
+          notes = []
+
+
           def run_sql(path: str, tries: int = 3) -> bool:
               """ينفّذ ملف SQL — مع إعادة محاولة (الشبكة للخارج قد تسقط لحظة)،
               ويطبع سبب الفشل الحقيقي (نصّ ردّ Supabase) حتى نعرف بالضبط."""
-              sql = open(path, encoding="utf-8").read()
+              try:
+                  sql = open(path, encoding="utf-8").read()
+              except Exception as exc:
+                  notes.append(path + ": " + type(exc).__name__ + " " + str(exc)[:120])
+                  return False
               last = ""
               for attempt in range(1, tries + 1):
                   try:
                       sql_api(sql)
+                      notes.append(path.split("/")[-1] + "=ok")
                       print("::notice title=نُفِّذ " + path + "::كل عباراته نجحت (محاولة " + str(attempt) + ")")
                       return True
                   except urllib.error.HTTPError as exc:
                       body = ""
                       try:
-                          body = exc.read().decode()[:400]
+                          body = exc.read().decode()[:300]
                       except Exception:
                           pass
-                      last = "HTTP " + str(exc.code) + ": " + body
+                      last = "HTTP " + str(exc.code) + " " + body
                   except Exception as exc:
-                      last = type(exc).__name__ + ": " + str(exc)[:300]
+                      last = type(exc).__name__ + " " + str(exc)[:200]
                   if attempt < tries:
                       time.sleep(5)
+              notes.append(path.split("/")[-1] + "=FAIL " + last.replace("\n", " ")[:200])
               print("::error title=فشل تنفيذ " + path + "::" + last.replace("\n", " ")[:400])
               return False
 
@@ -291,8 +301,33 @@ jobs:
           try:
               raw = sql_api(check).strip()
               print("::notice title=تحقّق الخادم::" + raw[:300])
+              notes.append(raw[:200])
           except Exception as exc:
               print("::warning::تعذّر التحقّق: " + str(exc)[:140])
+              notes.append("check=FAIL " + str(exc)[:120])
+
+          # الحصيلة في **حالة الالتزام** — تُقرأ من أي مكان (سجلّ التشغيل محجوب
+          # أحياناً)، فتُعرف النتيجة من: gh api repos/…/commits/<sha>/statuses
+          import urllib.request as _r
+          ok_all = all("=FAIL" not in n for n in notes)
+          report = " · ".join(notes)[:130]
+          try:
+              body = json.dumps({
+                  "state": "success" if ok_all else "failure",
+                  "context": "خادم SQL (36 · 37 · 38)",
+                  "description": report,
+              }).encode()
+              req3 = _r.Request(
+                  "https://api.github.com/repos/" + os.environ["GITHUB_REPOSITORY"]
+                  + "/statuses/" + os.environ["GITHUB_SHA"],
+                  data=body, method="POST")
+              req3.add_header("Authorization", "Bearer " + os.environ["GITHUB_TOKEN"])
+              req3.add_header("Content-Type", "application/json")
+              req3.add_header("Accept", "application/vnd.github+json")
+              with _r.urlopen(req3, timeout=60) as res:
+                  print("✓ كُتبت الحصيلة في حالة الالتزام:", res.status)
+          except Exception as exc:
+              print("::warning::تعذّر كتابة الحصيلة في حالة الالتزام: " + str(exc)[:140])
 
           if not ok:
               raise SystemExit(0)
