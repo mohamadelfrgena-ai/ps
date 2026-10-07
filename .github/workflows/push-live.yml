@@ -210,146 +210,16 @@ jobs:
           fi
           exit 0
 
-      - name: (اختياري) تنفيذ 35_push_live.sql عبر واجهة الإدارة
+      - name: (اختياري) تنفيذ ملفات الخادم عبر واجهة الإدارة
         if: ${{ always() && steps.flags.outputs.enable == 'true' }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
-            echo "::warning::بلا SUPABASE_ACCESS_TOKEN: انسخ supabase/35_push_live.sql في SQL Editor واضغط Run."
-            exit 0
-          fi
-          python3 - <<'PY'
-          import json, os, time, urllib.error, urllib.request
-
-          REF = os.environ["PROJECT_REF"]
-          TOKEN = os.environ["SUPABASE_ACCESS_TOKEN"]
-
-
-          def sql_api(query: str):
-              """ينفّذ استعلاماً عبر واجهة الإدارة. يرفع HTTPError عند الفشل."""
-              req = urllib.request.Request(
-                  f"https://api.supabase.com/v1/projects/{REF}/database/query",
-                  data=json.dumps({"query": query}).encode(), method="POST")
-              req.add_header("Authorization", "Bearer " + TOKEN)
-              req.add_header("Content-Type", "application/json")
-              with urllib.request.urlopen(req, timeout=180) as res:
-                  return res.read().decode()
-
-
-          notes = []
-
-
-          def run_sql(path: str, tries: int = 3) -> bool:
-              """ينفّذ ملف SQL — مع إعادة محاولة (الشبكة للخارج قد تسقط لحظة)،
-              ويطبع سبب الفشل الحقيقي (نصّ ردّ Supabase) حتى نعرف بالضبط."""
-              try:
-                  sql = open(path, encoding="utf-8").read()
-              except Exception as exc:
-                  notes.append(path + ": " + type(exc).__name__ + " " + str(exc)[:120])
-                  return False
-              last = ""
-              for attempt in range(1, tries + 1):
-                  try:
-                      sql_api(sql)
-                      notes.append(path.split("/")[-1] + "=ok")
-                      print("::notice title=نُفِّذ " + path + "::كل عباراته نجحت (محاولة " + str(attempt) + ")")
-                      return True
-                  except urllib.error.HTTPError as exc:
-                      body = ""
-                      try:
-                          body = exc.read().decode()[:300]
-                      except Exception:
-                          pass
-                      last = "HTTP " + str(exc.code) + " " + body
-                  except Exception as exc:
-                      last = type(exc).__name__ + " " + str(exc)[:200]
-                  if attempt < tries:
-                      time.sleep(5)
-              notes.append(path.split("/")[-1] + "=FAIL " + last.replace("\n", " ")[:200])
-              print("::error title=فشل تنفيذ " + path + "::" + last.replace("\n", " ")[:400])
-              return False
-
-
-          # 35 يشغّل الإشعارات الحقيقية · 36 إحصاءات الملف الشخصي (أرقام الأصدقاء/
-          # التنزيلات/المفضّلة/المستوى) · 37 الإبلاغ عن عضو من ملفّه ·
-          # 38 كتم العضو (لا رسائل ولا إشعارات · ميزة Legendary)
-          ok = run_sql("supabase/35_push_live.sql")
-          run_sql("supabase/36_profile_stats.sql")
-          run_sql("supabase/37_profile_reports.sql")
-          run_sql("supabase/38_user_mute.sql")
-
-          # تحقّق صريح: هل وصلت الدوال/الأعمدة إلى القاعدة فعلاً؟ (يظهر كتنبيه
-          # في صفحة التشغيل مباشرةً فلا نبقى نخمّن)
-          check = (
-              "select 'profile_stats=' || (select count(*) from pg_proc p "
-              "join pg_namespace n on n.oid = p.pronamespace "
-              "where n.nspname = 'public' and p.proname = 'profile_stats')::text"
-              " || ' chat_report_user=' || (select count(*) from pg_proc p "
-              "join pg_namespace n on n.oid = p.pronamespace "
-              "where n.nspname = 'public' and p.proname = 'chat_report_user')::text"
-              " || ' user_mute=' || (select count(*) from pg_proc p "
-              "join pg_namespace n on n.oid = p.pronamespace "
-              "where n.nspname = 'public' and p.proname = 'user_mute')::text"
-              " || ' user_mutes=' || (select count(*) from information_schema.tables "
-              "where table_schema = 'public' and table_name = 'user_mutes')::text"
-              " || ' muted_users=' || (select count(*) from information_schema.columns "
-              "where table_schema = 'public' and table_name = 'push_prefs' "
-              "and column_name = 'muted_users')::text as report"
-          )
-          try:
-              raw = sql_api(check).strip()
-              print("::notice title=تحقّق الخادم::" + raw[:300])
-              notes.append(raw[:200])
-          except Exception as exc:
-              print("::warning::تعذّر التحقّق: " + str(exc)[:140])
-              notes.append("check=FAIL " + str(exc)[:120])
-
-          # الحصيلة في **حالة الالتزام** — تُقرأ من أي مكان (سجلّ التشغيل محجوب
-          # أحياناً)، فتُعرف النتيجة من: gh api repos/…/commits/<sha>/statuses
-          import urllib.request as _r
-          ok_all = all("=FAIL" not in n for n in notes)
-          report = " · ".join(notes)[:130]
-          try:
-              body = json.dumps({
-                  "state": "success" if ok_all else "failure",
-                  "context": "خادم SQL (36 · 37 · 38)",
-                  "description": report,
-              }).encode()
-              req3 = _r.Request(
-                  "https://api.github.com/repos/" + os.environ["GITHUB_REPOSITORY"]
-                  + "/statuses/" + os.environ["GITHUB_SHA"],
-                  data=body, method="POST")
-              req3.add_header("Authorization", "Bearer " + os.environ["GITHUB_TOKEN"])
-              req3.add_header("Content-Type", "application/json")
-              req3.add_header("Accept", "application/vnd.github+json")
-              with _r.urlopen(req3, timeout=60) as res:
-                  print("✓ كُتبت الحصيلة في حالة الالتزام:", res.status)
-          except Exception as exc:
-              print("::warning::تعذّر كتابة الحصيلة في حالة الالتزام: " + str(exc)[:140])
-
-          if not ok:
-              raise SystemExit(0)
-
-          # نُشغّل الطابور من نفس القناة (لا نعتمد على PostgREST — كان يردّ 404 للحظات)
-          secret = os.environ.get("PUSH_SECRET", "").replace("'", "''")
-          if not secret:
-              print("::warning::بلا سرّ تشغيل — نفّذ التفعيل يدوياً من SQL Editor.")
-              raise SystemExit(0)
-          q = ("select public.push_live_enable('https://" + ref +
-               ".supabase.co/functions/v1/send-push', '" + secret + "')::text")
-          req2 = urllib.request.Request(
-              f"https://api.supabase.com/v1/projects/{ref}/database/query",
-              data=json.dumps({"query": q}).encode(), method="POST")
-          req2.add_header("Authorization", "Bearer " + token)
-          req2.add_header("Content-Type", "application/json")
-          try:
-              with urllib.request.urlopen(req2, timeout=60) as res2:
-                  print("push_live_enable:", res2.read().decode()[:300])
-          except Exception as exc:
-              print("::warning::push_live_enable لم يُنفَّذ (" + str(exc)[:140] + ") — نفّذه من SQL Editor.")
-          PY
+          # تنفيذ 35 (الإشعارات) · 36 (إحصاءات الملف) · 37 (الإبلاغ) · 38 (الكتم)
+          # السكربت في المودع (tools/run_server_sql.py) — لا heredoc هنا حتى لا
+          # تختفي المخرجات، والحصيلة تُكتب في حالة الالتزام. لا يُسقط السير أبداً.
+          python3 tools/run_server_sql.py || true
 
       - name: (اختياري) تشغيل الطابور تلقائياً (push_live_enable)
         if: ${{ always() && steps.flags.outputs.enable == 'true' }}
