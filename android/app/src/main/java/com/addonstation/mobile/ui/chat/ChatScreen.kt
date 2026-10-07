@@ -1539,21 +1539,16 @@ private fun MessageBlock(
                 // لقبه من تلقاء نفسه، وإن انتهى اشتراكه عاد السطر فارغاً.
                 val showRankTitle = hasRankTitle(author?.role, author?.effectivePlan)
                 Column(modifier = Modifier.weight(1f, fill = false)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(
-                            text = author?.displayName ?: author?.username ?: "—",
-                            style = Spec.msgAuthor,
-                            // لون الدور من لوحة الوثيقة (الأدمن ذهبي · المبدع أخضر …)
-                            color = roleColorOf(author?.role, author?.effectivePlan, message.userId),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        // الوقت في سطر الرأس (§٤٫٣) — صغير باهت لا يزاحم الاسم
-                        MessageTime(createdAt = message.createdAt)
-                    }
+                    // الاسم كما هو (جنب الصورة)، واللقب ينزل سطراً تحته — ووقت
+                    // الرسالة يبقى **في نهاية الرسالة نفسها** (طلب المالك السابق)
+                    Text(
+                        text = author?.displayName ?: author?.username ?: "—",
+                        style = Spec.msgAuthor,
+                        // لون الدور من لوحة الوثيقة (الأدمن ذهبي · المبدع أخضر …)
+                        color = roleColorOf(author?.role, author?.effectivePlan, message.userId),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     if (author != null && showRankTitle) {
                         // اللقب تحت الاسم (طلب المالك السابق — يبقى كما هو)
                         Spacer(Modifier.height(3.dp))
@@ -1671,7 +1666,6 @@ private fun MessageBlock(
                             retryLabel = retryLabel,
                             onRetry = onRetry,
                             onDiscard = onDiscard,
-                            showConfirmedTime = isMine,
                         )
                     }
                 }
@@ -1714,7 +1708,6 @@ private fun MessageBlock(
                             retryLabel = retryLabel,
                             onRetry = onRetry,
                             onDiscard = onDiscard,
-                            showConfirmedTime = isMine,
                         )
                     }
                 }
@@ -1759,7 +1752,6 @@ private fun MessageBlock(
                             retryLabel = retryLabel,
                             onRetry = onRetry,
                             onDiscard = onDiscard,
-                            showConfirmedTime = isMine,
                         )
                     }
                 }
@@ -1808,20 +1800,29 @@ private fun MessageBlock(
                             retryLabel = retryLabel,
                             onRetry = onRetry,
                             onDiscard = onDiscard,
-                            showConfirmedTime = isMine,
                         )
                     }
                 }
             }
             else -> {
                 if (isMine) {
-                    // ── رسالتي: فقاعة زرقاء يميناً (§٤٫٣) بلا صورة ولا اسم
+                    // ── رسالتي: فقاعة زرقاء يميناً (§٤٫٣) بلا صورة ولا اسم،
+                    //    والوقت **في نهاية الرسالة** على حافتها السفلية (طلب المالك)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = if (grouped) 2.dp else 10.dp),
-                        horizontalArrangement = Arrangement.End,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.Bottom,
                     ) {
+                        MessageStatus(
+                            ui = ui,
+                            createdAt = message.createdAt,
+                            notSentLabel = notSentLabel,
+                            retryLabel = retryLabel,
+                            onRetry = onRetry,
+                            onDiscard = onDiscard,
+                        )
                         Column(
                             modifier = Modifier
                                 .widthIn(max = Spec.ownBubbleMax)
@@ -1842,33 +1843,6 @@ private fun MessageBlock(
                                 style = Spec.msgBody,
                                 color = Color.White,
                             )
-                            // وقت الإرسال أسفل الفقاعة نفسها (وضوح بلا مزاحمة النص)
-                            if (!ui.pending && !ui.failed) {
-                                MessageTime(
-                                    createdAt = message.createdAt,
-                                    color = Color.White.copy(alpha = 0.75f),
-                                    modifier = Modifier
-                                        .align(Alignment.End)
-                                        .padding(top = 3.dp),
-                                )
-                            }
-                        }
-                    }
-                    // فشل الإرسال: زرّ إعادة المحاولة والإسقاط تحت الفقاعة يميناً
-                    if (ui.pending || ui.failed) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
-                            horizontalArrangement = Arrangement.End,
-                        ) {
-                            MessageStatus(
-                                ui = ui,
-                                createdAt = message.createdAt,
-                                notSentLabel = notSentLabel,
-                                retryLabel = retryLabel,
-                                onRetry = onRetry,
-                                onDiscard = onDiscard,
-                                showConfirmedTime = false,
-                            )
                         }
                     }
                 } else {
@@ -1883,7 +1857,7 @@ private fun MessageBlock(
                             color = Spec.text,
                             modifier = Modifier.weight(1f, fill = false),
                         )
-                        // الوارد: وقته في سطر الرأس (§٤٫٣) — وهنا حالة الفشل فقط
+                        // الوقت في نهاية السطر (على حافة الرسالة) — طلب المالك
                         MessageStatus(
                             ui = ui,
                             createdAt = message.createdAt,
@@ -1891,7 +1865,6 @@ private fun MessageBlock(
                             retryLabel = retryLabel,
                             onRetry = onRetry,
                             onDiscard = onDiscard,
-                            showConfirmedTime = false,
                         )
                     }
                 }
@@ -1903,15 +1876,8 @@ private fun MessageBlock(
         // الصفّ زر «إضافة تفاعل» (＋) الذي يفتح لوحة الرموز.
         if (ui.reactions.isNotEmpty()) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // أقراص التفاعل: 28 ارتفاعاً · نصف قطر 14 · خلفية surfaceHigh (§٤٫٣)
-                    .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
-                horizontalArrangement = if (isMine) {
-                    Arrangement.End
-                } else {
-                    Arrangement.spacedBy(6.dp)
-                },
+                modifier = Modifier.padding(start = 48.dp, top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ui.reactions.forEach { (emoji, count) ->
@@ -1942,24 +1908,24 @@ private fun ReactionPill(
 ) {
     Row(
         modifier = modifier
-            .height(28.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) Spec.blue.copy(alpha = 0.22f) else Spec.surfaceHigh)
+            .height(26.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(if (selected) AppColors.GreenGlow else AppColors.Elevated)
             .border(
-                width = 1.dp,
-                color = if (selected) Spec.blue else Spec.border,
-                shape = RoundedCornerShape(14.dp),
+                width = if (selected) 1.5.dp else 1.dp,
+                color = if (selected) AppColors.Green else AppColors.Border,
+                shape = RoundedCornerShape(13.dp),
             )
             .clickable { onClick() }
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Text(emoji, style = Spec.msgQuote)
+        Text(emoji, style = AppText.small)
         Text(
             text = "$count",
-            style = Spec.msgQuote.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold),
-            color = if (selected) Spec.blueLink else Spec.chipLabel,
+            style = AppText.tiny,
+            color = if (selected) AppColors.Green else AppColors.Muted,
         )
     }
 }
@@ -1973,12 +1939,11 @@ private fun ReactionPill(
 private fun MessageTime(
     createdAt: String?,
     modifier: Modifier = Modifier,
-    color: Color = Spec.textMuted,
 ) {
     Text(
         text = TimeFormat.timeOnly(createdAt, Locale.getDefault()),
-        style = Spec.msgTime,
-        color = color,
+        style = AppText.chatTime,
+        color = AppColors.Dim,
         modifier = modifier,
     )
 }
@@ -2001,11 +1966,6 @@ private fun MessageStatus(
     onRetry: () -> Unit,
     onDiscard: () -> Unit,
     modifier: Modifier = Modifier,
-    /**
-     * هل يُعرض الوقت أسفل الرسالة المؤكَّدة؟ الرسائل الواردة تُظهر وقتها في
-     * **سطر الرأس** (§٤٫٣) فلا يتكرّر؛ ورسائلي تُظهره أسفل الفقاعة الزرقاء.
-     */
-    showConfirmedTime: Boolean = true,
 ) {
     when {
         ui.failed -> Row(
@@ -2040,7 +2000,7 @@ private fun MessageStatus(
             )
             Text("🕓", style = Spec.msgTime)
         }
-        else -> if (showConfirmedTime) MessageTime(createdAt = createdAt, modifier = modifier)
+        else -> MessageTime(createdAt = createdAt, modifier = modifier)
     }
 }
 
@@ -2094,18 +2054,17 @@ private fun AddReactionPill(
 ) {
     Box(
         modifier = modifier
-            .height(28.dp)
-            .widthIn(min = 48.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(Spec.surfaceHigh)
-            .border(1.dp, Spec.border, RoundedCornerShape(14.dp))
+            .size(width = 46.dp, height = 26.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(AppColors.Elevated)
+            .border(1.dp, AppColors.Border, RoundedCornerShape(13.dp))
             .clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             Icons.Filled.EmojiEmotions,
             contentDescription = stringResource(R.string.chat_add_reaction),
-            tint = Spec.textMuted,
+            tint = AppColors.Muted,
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(start = 7.dp)
@@ -2114,7 +2073,7 @@ private fun AddReactionPill(
         Icon(
             Icons.Filled.Add,
             contentDescription = null,
-            tint = Spec.textMuted,
+            tint = AppColors.Muted,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 6.dp)

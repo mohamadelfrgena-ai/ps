@@ -1,5 +1,6 @@
 package com.addonstation.mobile.ui.community
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -240,6 +243,31 @@ fun RoomListScreen(
         ) {
             Text(stringResource(R.string.comm_title), style = Spec.screenTitle, color = Spec.gold, maxLines = 1)
             Spacer(Modifier.weight(1f))
+            // قرص رصيد AC: يبقي طريق المحفظة الذي كان في الشريط العلوي القديم
+            // (الرئيسية فيها قرصها، وهنا قرص الغرف — فلا يفقد المستخدم مدخلاً)
+            Row(
+                modifier = Modifier
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(Spec.pillRadius))
+                    .background(Spec.surfaceHigh)
+                    .clickable { onOpenWallet() }
+                    .padding(start = 6.dp, end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.coin_ac),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                )
+                Text(
+                    text = (wallet?.balance ?: 0).toString(),
+                    style = Spec.cardTitle.copy(fontFamily = Spec.NumberFont),
+                    color = Spec.gold,
+                    maxLines = 1,
+                )
+            }
+            Spacer(Modifier.width(10.dp))
             Text(stringResource(R.string.comm_all_rooms), style = Spec.secondary, color = Spec.textMuted)
         }
         // ── لافتة قواعد المجتمع

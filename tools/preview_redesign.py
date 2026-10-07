@@ -43,6 +43,7 @@ PIN_BORDER = "#5A4416"
 HERO_SUB = "#D3DDF0"
 LEGEND_TEXT = "#E8D5A3"
 WHITE = "#FFFFFF"
+DIM_TEXT = "#5C6F82"
 
 F_PIXEL = os.path.join(FONTS, "pixel_regular.ttf")
 F_NUM = os.path.join(FONTS, "roboto_medium_numbers.ttf")
@@ -349,6 +350,9 @@ def draw_rooms(x0):
 
     txt(o + 16, y, "COMMUNITY", size=16, color=GOLD, pixel=True)
     ar(o + PW - 16, y, "كل الغرف", size=12, color=MUTED, bold=True, anchor="rm")
+    rr((o + PW - 158, y - 18, o + PW - 78, y + 18), 22, fill=SURFACE_HIGH)
+    paste_img("coin_ac.png", (o + PW - 152, y - 12, o + PW - 128, y + 12), circle_mask=True)
+    txt(o + PW - 84, y, "250", size=13, color=GOLD, bold=True, anchor="rm", num=True)
     y += 26
 
     # لافتة القواعد
@@ -423,10 +427,12 @@ def draw_chat(x0):
     # رسالة واردة: صورة 40 + [اسم بلون الدور + وقت 11] + اللقب + النص
     paste_img("ic_default_profile.jpg", (o + 12, y, o + 52, y + 40), circle_mask=True)
     txt(o + 64, y + 10, "TheKing", size=14, color=EPIC, bold=True)
-    txt(o + 132, y + 10, "12:38", size=11, color=MUTED)
     rr((o + 64, y + 24, o + 146, y + 42), 11, fill=EPIC)
     txt(o + 105, y + 33, "EPIC", size=10, color=WHITE, bold=True, anchor="mm")
+    # الوقت في نهاية الرسالة (طلب المالك السابق: أسفل النص على حافة الرسالة)
     txt(o + 64, y + 56, "Welcome everyone to the General room", size=14, color=TEXT)
+    txt(o + 64 + d.textlength("Welcome everyone to the General room", font=font(14)) + 14, y + 59,
+        "12:38", size=9, color=DIM_TEXT)
     y += 80
 
     # اقتباس رد: خلفية surface + شريط أزرق 3dp · ثم نصّ الردّ تحته (بلا تداخل)
@@ -438,13 +444,14 @@ def draw_chat(x0):
     y += 26
 
     # تفاعلات: أقراص 28 · نصف قطر 14
-    rr((o + 64, y, o + 116, y + 28), 14, fill=SURFACE_HIGH, outline=BORDER)
-    txt(o + 80, y + 14, "♥", size=13, color=CHIP_LABEL, anchor="mm")
-    txt(o + 106, y + 14, "3", size=12, color=CHIP_LABEL, bold=True, anchor="mm")
-    rr((o + 124, y, o + 172, y + 28), 14, fill=BLUE)
-    txt(o + 139, y + 14, "★", size=13, color=WHITE, anchor="mm")
-    txt(o + 160, y + 14, "1", size=12, color=WHITE, bold=True, anchor="mm")
-    y += 44
+    # أقراص التفاعل كما كانت: تفاعلك بخلفية مضيئة وإطار أخضر ورقم أخضر
+    rr((o + 64, y, o + 112, y + 26), 13, fill=SURFACE_HIGH, outline=BORDER)
+    txt(o + 78, y + 13, "♥", size=12, color=MUTED, anchor="mm")
+    txt(o + 100, y + 13, "2", size=10, color=MUTED, bold=True, anchor="mm")
+    rr((o + 120, y, o + 168, y + 26), 13, fill="#123322", outline=GREEN, width=2)
+    txt(o + 134, y + 13, "★", size=12, color=GREEN, anchor="mm")
+    txt(o + 156, y + 13, "1", size=10, color=GREEN, bold=True, anchor="mm")
+    y += 42
 
     # صورتان: واردة صورة 230×130 (radius 12) + رسالتي فقاعة زرقاء
     paste_img("thumb_placeholder.jpg", (o + 64, y, o + 294, y + 130), radius=12, cover=True)
@@ -453,12 +460,13 @@ def draw_chat(x0):
     # رسالتي: فقاعة زرقاء يميناً · نصف قطر 16/16/4/16 · عرض ≤260
     bw = 236
     bx = o + PW - 12 - bw
-    rr((bx, y, o + PW - 12, y + 62), 16, fill=BLUE)
-    rr((o + PW - 28, y + 46, o + PW - 12, y + 62), 4, fill=BLUE)
-    d.rectangle((bx + 6, y + 10, o + PW - 22, y + 52), fill=BLUE)
+    rr((bx, y, o + PW - 12, y + 58), 16, fill=BLUE)
+    rr((o + PW - 28, y + 42, o + PW - 12, y + 58), 4, fill=BLUE)
+    d.rectangle((bx + 6, y + 10, o + PW - 22, y + 48), fill=BLUE)
     ar(o + PW - 26, y + 18, "شكراً لك! سأجرّبها الآن.", size=14, color=WHITE, anchor="rm")
-    txt(o + PW - 26, y + 46, "12:41", size=10, color="#CFE0FF", anchor="rm")
-    y += 76
+    # وقت رسالتي في نهاية الرسالة (عند حافتها، على الخلفية الداكنة)
+    txt(bx - 8, y + 54, "12:41", size=10, color=DIM_TEXT, anchor="rm")
+    y += 72
 
     # مؤشّر الكتابة (12sp باهت · حشو بداية 50)
     ar(o + PW - 50, y, "Sara تكتب…", size=11, color=MUTED, anchor="rm")
