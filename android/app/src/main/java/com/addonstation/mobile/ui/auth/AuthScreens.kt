@@ -2,6 +2,7 @@ package com.addonstation.mobile.ui.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,7 +40,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -58,6 +65,13 @@ import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import kotlinx.coroutines.launch
+
+/**
+ * نسبة العرض إلى الارتفاع لخلفية تسجيل الدخول (`login_bg.jpg` بمقاس
+ * ‏1080×607) — يُحسب منها ارتفاع اللوحة على أي هاتف، فتظهر الصورة كاملة
+ * وواضحة على كل الكثافات (من mdpi إلى xxhdpi) بلا تمديد.
+ */
+private const val LOGIN_BG_ASPECT = 1.779f
 
 /**
  * ما يقبله الخادم في اسم المستخدم (نفس القاعدة في AuthRepository):
@@ -173,138 +187,173 @@ fun LoginScreen(
         }
     }
 
+    // خلفية الشاشة: لوحة العرض بعرض الهاتف كاملاً وبارتفاع **يناسب نسبتها**
+    // (الصورة عريضة 16:9 والهاتف طولي ⇒ ملء الشاشة بها يكبّرها ٣.٩ مرة
+    // فيطمسها؛ والارتفاع المحسوب يُبقيها بوضوحها الأصلي بلا تمديد ولا قصّ).
+    val bandHeight = (LocalConfiguration.current.screenWidthDp.dp / LOGIN_BG_ASPECT)
+        .coerceAtMost(LocalConfiguration.current.screenHeightDp.dp * 0.34f)
+
     Column(Modifier.fillMaxSize()) {
         SubScreenHeader(title = stringResource(R.string.auth_sign_in), onBack = onBack)
         Column(
             Modifier
                 .fillMaxSize()
                 .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .verticalScroll(rememberScrollState()),
         ) {
-            Spacer(Modifier.height(18.dp))
-            // صورة البروفايل الافتراضية (صورة المالك) قبل تسجيل الدخول
-            com.addonstation.mobile.ui.components.DefaultProfileAvatar(size = 92.dp)
-            Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.brand_wordmark), style = AppText.pageTitle, color = AppColors.Text)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(R.string.auth_login_subtitle),
-                style = AppText.bodySmall,
-                color = AppColors.Muted,
-                textAlign = TextAlign.Center,
-            )
-            if (notice != null) {
-                // لماذا فُتحت شاشة الدخول؟ (مثال: الشات لا يُفتح لغير مسجّل)
+            // الطبقة ١: خلفية تسجيل الدخول — عرض كامل بلا حواف
+            Box(Modifier.fillMaxWidth().height(bandHeight)) {
+                Image(
+                    painter = painterResource(R.drawable.login_bg),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                // الطبقة ٢: تلاشٍ إلى خلفية التطبيق — بلا لون جديد (AppColors فقط)
+                // فتنتهي اللوحة في خلفية التطبيق كانسياب واحد، ويبقى النص واضحاً.
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0.0f to Color.Transparent,
+                                0.45f to AppColors.Bg.copy(alpha = 0.30f),
+                                1.0f to AppColors.Bg,
+                            ),
+                        ),
+                )
+            }
+            Column(
+                Modifier.padding(horizontal = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spacer(Modifier.height(6.dp))
+                // صورة البروفايل الافتراضية (صورة المالك) تركب الحافة السفلية
+                // للوحة — نفس لغة شاشة الملف الشخصي (أفاتار فوق الغلاف)
+                Box(Modifier.offset(y = (-34).dp)) {
+                    com.addonstation.mobile.ui.components.DefaultProfileAvatar(size = 92.dp)
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(R.string.brand_wordmark), style = AppText.pageTitle, color = AppColors.Text)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(R.string.auth_login_subtitle),
+                    style = AppText.bodySmall,
+                    color = AppColors.Muted,
+                    textAlign = TextAlign.Center,
+                )
+                if (notice != null) {
+                    // لماذا فُتحت شاشة الدخول؟ (مثال: الشات لا يُفتح لغير مسجّل)
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "🔒 $notice",
+                        style = AppText.bodySmall,
+                        color = AppColors.Gold,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+
+                Spacer(Modifier.height(22.dp))
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text(stringResource(R.string.auth_email)) },
+                    leadingIcon = { Icon(Icons.Filled.Mail, contentDescription = null, tint = AppColors.Muted) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                PasswordField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = stringResource(R.string.auth_password),
+                    onDone = { submit() },
+                )
+
+                errorKind?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(apiErrorText(it), style = AppText.bodySmall, color = AppColors.Red)
+                }
+                status?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, style = AppText.bodySmall, color = AppColors.Green)
+                }
+
+                Spacer(Modifier.height(18.dp))
+                GradientButton(
+                    text = "🔑 " + stringResource(R.string.auth_sign_in),
+                    onClick = { submit() },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "🔒 $notice",
+                    text = stringResource(R.string.auth_forgot),
                     style = AppText.bodySmall,
-                    color = AppColors.Gold,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold,
+                    color = AppColors.Blue,
+                    modifier = Modifier.clickable { showRecovery = !showRecovery },
                 )
-            }
 
-            Spacer(Modifier.height(22.dp))
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text(stringResource(R.string.auth_email)) },
-                leadingIcon = { Icon(Icons.Filled.Mail, contentDescription = null, tint = AppColors.Muted) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(10.dp))
-            PasswordField(
-                value = password,
-                onValueChange = { password = it },
-                label = stringResource(R.string.auth_password),
-                onDone = { submit() },
-            )
-
-            errorKind?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(apiErrorText(it), style = AppText.bodySmall, color = AppColors.Red)
-            }
-            status?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, style = AppText.bodySmall, color = AppColors.Green)
-            }
-
-            Spacer(Modifier.height(18.dp))
-            GradientButton(
-                text = "🔑 " + stringResource(R.string.auth_sign_in),
-                onClick = { submit() },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = stringResource(R.string.auth_forgot),
-                style = AppText.bodySmall,
-                color = AppColors.Blue,
-                modifier = Modifier.clickable { showRecovery = !showRecovery },
-            )
-
-            if (showRecovery) {
-                Spacer(Modifier.height(14.dp))
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(AppColors.Surface)
-                        .border(1.dp, AppColors.Border, RoundedCornerShape(16.dp))
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text(stringResource(R.string.auth_recovery_title), style = AppText.sectionTitle, color = AppColors.Text)
-                    Text(stringResource(R.string.auth_recovery_text), style = AppText.bodySmall, color = AppColors.Muted)
-                    OutlinedTextField(
-                        value = recoveryEmail,
-                        onValueChange = { recoveryEmail = it },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                        label = { Text(stringResource(R.string.auth_email)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    GradientButton(
-                        text = stringResource(R.string.auth_send_recovery),
-                        onClick = {
-                            if (recoveryEmail.isBlank()) {
-                                recoveryStatus = enterEmailFirst
-                                return@GradientButton
-                            }
-                            scope.launch {
-                                recoveryStatus = sending
-                                container.auth.sendRecovery(recoveryEmail)
-                                    .onSuccess { recoveryStatus = checkEmail }
-                                    .onFailure { recoveryStatus = null; errorKind = it.toApiError().kind }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    recoveryStatus?.let {
-                        Text(it, style = AppText.bodySmall, color = AppColors.Green)
+                if (showRecovery) {
+                    Spacer(Modifier.height(14.dp))
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(AppColors.Surface)
+                            .border(1.dp, AppColors.Border, RoundedCornerShape(16.dp))
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(stringResource(R.string.auth_recovery_title), style = AppText.sectionTitle, color = AppColors.Text)
+                        Text(stringResource(R.string.auth_recovery_text), style = AppText.bodySmall, color = AppColors.Muted)
+                        OutlinedTextField(
+                            value = recoveryEmail,
+                            onValueChange = { recoveryEmail = it },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                            label = { Text(stringResource(R.string.auth_email)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        GradientButton(
+                            text = stringResource(R.string.auth_send_recovery),
+                            onClick = {
+                                if (recoveryEmail.isBlank()) {
+                                    recoveryStatus = enterEmailFirst
+                                    return@GradientButton
+                                }
+                                scope.launch {
+                                    recoveryStatus = sending
+                                    container.auth.sendRecovery(recoveryEmail)
+                                        .onSuccess { recoveryStatus = checkEmail }
+                                        .onFailure { recoveryStatus = null; errorKind = it.toApiError().kind }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        recoveryStatus?.let {
+                            Text(it, style = AppText.bodySmall, color = AppColors.Green)
+                        }
                     }
                 }
-            }
 
-            Spacer(Modifier.height(24.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.auth_no_account), style = AppText.bodySmall, color = AppColors.Muted)
-                Spacer(Modifier.size(6.dp))
-                Text(
-                    stringResource(R.string.auth_create_account),
-                    style = AppText.bodySmall,
-                    color = AppColors.Green,
-                    modifier = Modifier.clickable { onOpenSignup() },
-                )
+                Spacer(Modifier.height(24.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.auth_no_account), style = AppText.bodySmall, color = AppColors.Muted)
+                    Spacer(Modifier.size(6.dp))
+                    Text(
+                        stringResource(R.string.auth_create_account),
+                        style = AppText.bodySmall,
+                        color = AppColors.Green,
+                        modifier = Modifier.clickable { onOpenSignup() },
+                    )
+                }
+                Spacer(Modifier.height(40.dp))
             }
-            Spacer(Modifier.height(40.dp))
         }
     }
 }
