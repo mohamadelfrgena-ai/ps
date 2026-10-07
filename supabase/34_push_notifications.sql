@@ -759,14 +759,18 @@ union all select 'الزناد على إشعارات الشات',
        (select count(*) from pg_trigger where tgname = 'trg_push_on_notification' and not tgisinternal)::text, '1'
 union all select 'الزناد على المحتوى الجديد',
        (select count(*) from pg_trigger where tgname = 'trg_push_on_content' and not tgisinternal)::text, '1'
-union all select 'دوال الإشعارات (11 دالة)',
+union all select 'دوال الإشعارات (18 دالة)',
        (select count(*) from pg_proc where proname in (
-          'push_prefs_for','push_allowed','push_schedule_at','push_enqueue','push_broadcast',
-          'push_reengage_scan','push_cleanup','push_targets','push_heartbeat',
-          'push_register_device','push_unregister_device','my_push_prefs','push_set_prefs',
-          'push_test_me','push_on_notification','push_on_content'))::text, '16'
+          'push_prefs_for','push_allowed','push_local_now','push_schedule_at','push_enqueue',
+          'push_broadcast','push_reengage_scan','push_cleanup','push_offer_scan','push_targets',
+          'push_heartbeat','push_register_device','push_unregister_device','my_push_prefs',
+          'push_set_prefs','push_test_me','push_on_notification','push_on_content'))::text, '18'
 union all select 'أجهزة مسجّلة',
        (select count(*) from public.push_devices)::text, 'حسب أجهزتك'
+union all select 'تتبّع دائم لقواعد عدم الإزعاج (عمودان)',
+       (select count(*) from information_schema.columns
+         where table_schema = 'public' and table_name = 'push_prefs'
+           and column_name in ('last_reengage_at', 'last_offer_at'))::text, '2'
 union all select 'إشعارات في الطابور',
        (select count(*) from public.push_queue where status = 'pending')::text, '—';
 
