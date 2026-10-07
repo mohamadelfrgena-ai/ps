@@ -98,6 +98,7 @@ import com.addonstation.mobile.ui.components.SpecAboutCard
 import com.addonstation.mobile.ui.components.SpecDangerButton
 import com.addonstation.mobile.ui.components.SpecFillButton
 import com.addonstation.mobile.ui.components.SpecActionRow
+import com.addonstation.mobile.ui.components.SpecBadgeChip
 import com.addonstation.mobile.ui.components.SpecBannerIconButton
 import com.addonstation.mobile.ui.components.SpecCard
 import com.addonstation.mobile.ui.components.SpecGridTile
@@ -1211,10 +1212,18 @@ fun UserProfileScreen(
     onUnblock: (Profile) -> Unit = {},
     /** أدوات الإشراف (الأدمن/المشرف): تُفتح شاشة إشراف الشات حيث الحذف والكتم. */
     onOpenAdminTools: () -> Unit = {},
+    /**
+     * فتح **صفحة الاشتراك** — كتم الأعضاء ميزة اشتراك Legendary (طلب المالك:
+     * «وينفتح في اشتراك ليغسي»)، فمن لا اشتراك له يُنادى هنا بدل تنفيذ الكتم.
+     */
+    onOpenPlans: () -> Unit = {},
 ) {
     val container = rememberContainer()
+    val myProfile by container.state.profile.collectAsState()
     val isMyProfile = container.supabase.session()?.userId == userId
     val scope = rememberCoroutineScope()
+    // كتم الأعضاء ميزة Legendary (والخادم يتحقق أيضاً — هذا للواجهة فقط)
+    val canMute = myProfile?.let { it.effectivePlan == "legendary" || it.isStaff } == true
 
     var profile by remember { mutableStateOf<Profile?>(null) }
     var stats by remember { mutableStateOf<ProfileStats?>(null) }
@@ -1236,6 +1245,7 @@ fun UserProfileScreen(
     val failedMsg = stringResource(R.string.profile_action_failed)
     val muteDoneMsg = stringResource(R.string.profile_mute_done)
     val unmuteDoneMsg = stringResource(R.string.profile_unmute_done)
+    val muteLockedMsg = stringResource(R.string.mute_member_needs_plan)
     val blockDoneMsg = stringResource(R.string.block_done)
     val reportSentMsg = stringResource(R.string.chat_report_sent)
 
@@ -1245,17 +1255,35 @@ fun UserProfileScreen(
         friendEntry = container.profile.friendshipState(userId)
         blockedByMe = container.chat.iBlockedUser(userId)
         blockedPair = container.chat.blockedPair(userId)
-        muted = runCatching { container.prefs.readMutedUsers() }
-            .getOrDefault(emptySet()).contains(userId)
+        // قائمة المكتومين من الخادم (وتُحفظ محلياً فيُخفى كلامه فوراً في الشات)
+        val mutedIds = container.chat.mutedMemberIds()
+        runCatching { container.prefs.setMutedUsers(mutedIds) }
+        muted = mutedIds.contains(userId)
     }
 
+    /**
+     * زرّ الكتم الواحد: يُنفَّذ على الخادم (لا رسائل ولا إشعارات)، ومن لا اشتراك
+     * Legendary له تُفتح صفحة الاشتراك ويُشرح السبب في سطر واحد.
+     */
     fun toggleMute() {
+        if (!canMute) {
+            note = muteLockedMsg
+            onOpenPlans()
+            return
+        }
         scope.launch {
-            val current = runCatching { container.prefs.readMutedUsers() }.getOrDefault(emptySet())
-            val next = if (muted) current - userId else current + userId
-            container.prefs.setMutedUsers(next)
-            note = if (muted) unmuteDoneMsg else muteDoneMsg
-            tick += 1
+            working = true
+            val ok = if (muted) container.chat.unmuteMember(userId).isSuccess
+            else container.chat.muteMember(userId).isSuccess
+            if (ok) {
+                val ids = container.chat.mutedMemberIds()
+                runCatching { container.prefs.setMutedUsers(ids) }
+                muted = ids.contains(userId)
+                note = if (muted) muteDoneMsg else unmuteDoneMsg
+            } else {
+                note = failedMsg
+            }
+            working = false
         }
     }
 
@@ -1306,7 +1334,13 @@ fun UserProfileScreen(
                         containerColor = AppColors.Surface,
                     ) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(if (muted) R.string.chat_unmute_user else R.string.chat_mute_user), color = Spec.text) },
+                            text = {
+                                Text(
+                                    stringResource(if (muted) R.string.chat_unmute_user else R.string.chat_mute_user) +
+                                        if (canMute) "" else " · " + stringResource(R.string.mute_member_locked),
+                                    color = Spec.text,
+                                )
+                            },
                             onClick = { showMore = false; toggleMute() },
                         )
                         DropdownMenuItem(
@@ -1432,10 +1466,15 @@ fun UserProfileScreen(
             Spacer(Modifier.height(12.dp))
             SpecCard(padding = 0.dp) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+                    // زرّ الكتم **الواحد** (طلب المالك): يُخفي رسائله ويُسقط إشعاراته،
+                    // ومعه شارة «Legendary» لمن لا اشتراك له.
                     SpecActionRow(
                         text = stringResource(if (muted) R.string.chat_unmute_user else R.string.chat_mute_user),
-                        color = Spec.text,
+                        color = if (muted) Spec.blueLink else Spec.text,
                         onClick = { toggleMute() },
+                        trailing = if (canMute) null else {
+                            { SpecBadgeChip(stringResource(R.string.mute_member_locked), Spec.gold, Spec.goldDeepBg) }
+                        },
                     )
                     SpecActionRow(
                         text = stringResource(if (blockedByMe) R.string.block_user_undo else R.string.block_user),

@@ -712,4 +712,10 @@
     <string name="profile_blocked_state">Взаимодействие с этим участником недоступно</string>
     <string name="profile_unfriend">Удалить из друзей</string>
     <string name="profile_unfriend_confirm">Удалить этого участника из друзей?</string>
+    <string name="mute_member_locked">Legendary</string>
+    <string name="mute_member_needs_plan">Заглушение участников — функция Legendary. Открываем подписку.</string>
+    <string name="notif_muted_users">Отключить уведомления от заглушённых</string>
+    <string name="notif_muted_users_desc">Вкл.: ни сообщений, ни уведомлений от заглушённых.</string>
+    <string name="notif_muted_users_locked">Функция подписки Legendary</string>
+    <string name="notif_mute_section">Заглушение участников</string>
 </resources>

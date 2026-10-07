@@ -122,6 +122,15 @@ class ChatViewModel(private val container: AppContainer) {
             // فشل أول جلب لا يجوز أن يُبقي الشات على «جارٍ التحميل» للأبد:
             // الاستطلاع (كل ثانيتين) يجلب الرسائل بعده في أي حال.
             runCatching { _blockedIds.value = container.chat.blockedIds() }
+            // المكتومون: نُحدّث القائمة المحلية من الخادم (الكتم ميزة Legendary
+            // وقد يكون مُنفَّذاً من جهاز آخر) ثم نُبقي المتابعة الحيّة أعلاه.
+            runCatching {
+                val ids = container.chat.mutedMemberIds()
+                if (ids.isNotEmpty()) {
+                    container.prefs.setMutedUsers(ids)
+                    _mutedIds.value = ids
+                }
+            }
             // الكتم المحلي: متابعة مستمرّة (تتحدّث لحظة الكتم من ملف العضو)
             scope.launch {
                 container.prefs.mutedUsers.collect { ids -> _mutedIds.value = ids }

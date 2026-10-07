@@ -241,10 +241,12 @@ jobs:
                   return False
 
           # 35 يشغّل الإشعارات الحقيقية · 36 إحصاءات الملف الشخصي (أرقام الأصدقاء/
-          # التنزيلات/المفضّلة/المستوى) · 37 الإبلاغ عن عضو من ملفّه
+          # التنزيلات/المفضّلة/المستوى) · 37 الإبلاغ عن عضو من ملفّه ·
+          # 38 كتم العضو (لا رسائل ولا إشعارات · ميزة Legendary)
           ok = run_sql("supabase/35_push_live.sql")
           run_sql("supabase/36_profile_stats.sql")
           run_sql("supabase/37_profile_reports.sql")
+          run_sql("supabase/38_user_mute.sql")
           if not ok:
               raise SystemExit(0)
 

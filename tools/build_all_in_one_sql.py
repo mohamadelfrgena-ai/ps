@@ -55,6 +55,7 @@ ORDER = [
     "35_push_live.sql",
     "36_profile_stats.sql",
     "37_profile_reports.sql",
+    "38_user_mute.sql",
 ]
 
 HEADER = """-- ============================================================================

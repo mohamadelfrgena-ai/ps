@@ -298,6 +298,8 @@ data class PushPrefs(
     @SerialName("quiet_from") val quietFrom: Int = 23,
     @SerialName("quiet_to") val quietTo: Int = 8,
     @SerialName("reengage_days") val reengageDays: Int = 7,
+    /** مفتاح الإعدادات: هل يوقف كتمُ العضو إشعاراته أيضاً؟ (38_user_mute.sql) */
+    @SerialName("muted_users") val mutedUsers: Boolean = true,
 )
 
 /** نتيجة «جرّب الإشعار الآن» (دالة push_test_me). */
@@ -309,6 +311,12 @@ data class PushTestResult(val ok: Boolean = false, val message: String? = null)
 data class BlockedUser(
     @SerialName("blocked_id") val blockedId: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
+)
+
+/** صف من جدول الكتم: من كتمتُه أنا (my_muted_users). */
+@Serializable
+data class MutedUser(
+    @SerialName("muted_id") val mutedId: String? = null,
 )
 
 @Serializable

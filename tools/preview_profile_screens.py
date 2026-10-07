@@ -40,6 +40,7 @@ DANGER_BORDER = "#B3414B"
 DASH_BORDER = "#2E3C58"
 DOT_START = (140, 242, 173)
 DOT_END = (47, 179, 92)
+DIM = "#5C6F82"       # نصّ باهت (وصف المفتاح)
 WHITE = "#FFFFFF"
 
 F_PIXEL = os.path.join(FONTS, "pixel_regular.ttf")
@@ -49,8 +50,8 @@ F_REG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
 PW = 390                       # عرض الشاشة (dp)
 GAP, MARGIN = 42, 44
-TITLE_H, CAPTION_H, FOOT_H = 104, 96, 74
-COLS = 3
+TITLE_H, CAPTION_H, FOOT_H = 104, 96, 96
+COLS = 4
 W = MARGIN * 2 + PW * COLS + GAP * (COLS - 1)
 
 # الصور تُرسم أولاً على طبقات (لاستخراج أطول شاشة) ثم تُركَّب في النهاية
@@ -217,7 +218,8 @@ def card(d, y, h, pad=14):
 
 
 def small_caps(d, x, y, label, color=GOLD):
-    txt(d, x, y, label, size=11, color=color, bold=True, pixel=False)
+    """تسمية القسم الصغيرة — تُرسى من **يمين** نقطة x (اتجاه عربي)."""
+    ar(d, x, y, label, size=11, color=color, bold=True)
 
 
 def fill_level(d, y, fraction):
@@ -377,6 +379,8 @@ def draw_b():
     for i, (label, col) in enumerate(rows):
         yy = y + i * 52
         ar(d, PW - 30, yy + 26, label, size=14, color=col, bold=True)
+        if i == 0:                                            # زرّ الكتم الواحد: شارة الميزة
+            chip(d, 30, yy + 16, "Legendary", GOLD, GOLD_DEEP, size=10)
         if i:
             d.line((30, yy, PW - 30, yy), fill=BORDER)
     y += 168
@@ -450,8 +454,52 @@ def draw_c():
     return img, y + 68 + 24
 
 
+# ═════════ الشاشة الرابعة: إعدادات الإشعارات — زرّ إطفاء/تشغيل الكتم ═════════
+def draw_settings():
+    img = Image.new("RGB", (PW, 1400), BG)
+    d = ImageDraw.Draw(img)
+    # شريط علوي: رجوع + عنوان
+    d.rectangle((0, 0, PW, 56), fill=BAR)
+    d.line((0, 56, PW, 56), fill=BORDER)
+    d.line((24, 20, 15, 28), fill=TEXT, width=2)
+    d.line((15, 28, 24, 36), fill=TEXT, width=2)
+    ar(d, PW - 16, 28, "إعدادات الإشعارات", size=16, color=TEXT, bold=True, anchor="rm")
+    y = 76
+    # قسم «كتم الأعضاء» + صفّ المفتاح (مشغَّل)
+    small_caps(d, PW - 16, y, "كتم الأعضاء", GOLD)
+    y += 22
+    rr(d, (16, y, PW - 16, y + 92), 16, fill=SURFACE, outline=BORDER)
+    ar(d, PW - 30, y + 26, "كتم إشعارات الأعضاء المكتومين", size=14, color=TEXT, bold=True)
+    ar(d, PW - 30, y + 48, "مُشغَّل: المكتوم لا تصلك رسائله ولا إشعاراته.", size=12, color=DIM)
+    # مفتاح مفعَّل (أخضر) على اليسار (نهاية السطر في RTL)
+    rr(d, (30, y + 34, 30 + 46, y + 58), 12, fill=GREEN)
+    d.ellipse((30 + 24, y + 36, 30 + 44, y + 56), fill=WHITE)
+    y += 104
+    # بقية الأقسام (للسياق): المفتاح الرئيسي + قسمان
+    small_caps(d, PW - 16, y, "المفتاح الرئيسي", GOLD)
+    y += 22
+    rr(d, (16, y, PW - 16, y + 64), 16, fill=SURFACE, outline=BORDER)
+    ar(d, PW - 30, y + 26, "كل الإشعارات", size=14, color=TEXT, bold=True)
+    ar(d, PW - 30, y + 46, "مفتاح واحد يوقف كل شيء.", size=12, color=DIM)
+    rr(d, (30, y + 20, 30 + 46, y + 44), 12, fill=GREEN)
+    d.ellipse((30 + 24, y + 22, 30 + 44, y + 42), fill=WHITE)
+    y += 76
+    small_caps(d, PW - 16, y, "الأقسام", GOLD)
+    y += 22
+    for label in ("رسائل الغرف والمنشن", "محتوى جديد من المبدعين", "طلبات الصداقة", "الاشتراك والدفع"):
+        rr(d, (16, y, PW - 16, y + 46), 12, fill=SURFACE, outline=BORDER)
+        ar(d, PW - 30, y + 23, label, size=13, color=CHIP_LABEL)
+        rr(d, (30, y + 15, 30 + 40, y + 31), 8, fill=GREEN)
+        d.ellipse((30 + 22, y + 16, 30 + 36, y + 30), fill=WHITE)
+        y += 54
+    y += 6
+    ar(d, PW - 16, y + 8, "أطفئ مفتاح «كتم إشعارات الأعضاء المكتومين»", size=12, color=MUTED)
+    ar(d, PW - 16, y + 30, "فيبقى الكتم على الرسائل وحدها — بلمسة واحدة.", size=12, color=MUTED)
+    return img, y + 52
+
+
 heights = {}
-for key, fn in (("A", draw_a), ("B", draw_b), ("C", draw_c)):
+for key, fn in (("A", draw_a), ("B", draw_b), ("C", draw_c), ("S", draw_settings)):
     im, end = fn()
     im = im.crop((0, 0, PW, end))
     heights[key] = im
@@ -463,10 +511,11 @@ d = ImageDraw.Draw(img)
 
 captions = {
     "A": ("ملفي — الشاشة A", "A · My profile — SPEC_PROFILES §3"),
+    "S": ("الإعدادات — كتم الأعضاء", "Settings · Mute switch (Legendary)"),
     "B": ("ملف عضو — الشاشة B (من الشات)", "B · Member profile — §4 (Message hidden by owner)"),
     "C": ("ملفي كما يراه الآخرون — الشاشة C", "C · View as others — §5 (dashed wallet)"),
 }
-for i, key in enumerate(("A", "B", "C")):
+for i, key in enumerate(("A", "B", "C", "S")):
     x0 = MARGIN + i * (PW + GAP)
     rr(d, (x0 - 8, TITLE_H - 8, x0 + PW + 8, TITLE_H + PH + 8), 26, fill="#05080F", outline=BORDER)
     rr(d, (x0, TITLE_H, x0 + PW, TITLE_H + PH), 18, fill=BG)
@@ -479,10 +528,12 @@ ar(d, W // 2, 42, "شاشات الملف الشخصي الثلاث — وثيق�
 txt(d, W // 2, 74, "My profile · Member profile · View as others   —   tokens from ui/theme/Spec.kt   —   390dp",
     size=13, color=MUTED, anchor="mm")
 
-ar(d, W // 2, H - 44, "زرّ «مراسلة العضو» مخفيّ مؤقتاً بقرارك (لا محادثات خاصة في الخادم بعد) · "
-                      "الأرقام من دالة الخادم profile_stats", size=12, color=MUTED, anchor="mm")
-ar(d, W // 2, H - 22, "المستوى = كل 100 AC مكتسَب · تعديلات غرفة الشات السابقة كما هي · "
-                      "الشاشات تُمرَّر (مقاس 390dp)", size=12, color=MUTED, anchor="mm")
+ar(d, W // 2, H - 66, "زرّ «مراسلة العضو» مخفيّ مؤقتاً (لا محادثات خاصة في الخادم بعد) · "
+                      "الأرقام من دالة الخادم profile_stats · المستوى = كل 100 AC مكتسَب", size=12, color=MUTED, anchor="mm")
+ar(d, W // 2, H - 44, "الكتم: زرّ واحد في بطاقة السلامة ⇒ لا رسائل ولا إشعارات · "
+                      "ومن لا اشتراك Legendary له تُفتح صفحة الاشتراك", size=12, color=MUTED, anchor="mm")
+ar(d, W // 2, H - 22, "وفي الإعدادات: مفتاح إطفاء/تشغيل لكتم الإشعارات · "
+                      "تعديلات غرفة الشات السابقة كما هي", size=12, color=MUTED, anchor="mm")
 
 img.save(OUT)
 print("saved", OUT, img.size)

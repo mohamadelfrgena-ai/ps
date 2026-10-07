@@ -9,6 +9,7 @@ import com.addonstation.mobile.data.model.ChatChannel
 import com.addonstation.mobile.data.model.ChatMessage
 import com.addonstation.mobile.data.model.ChatReport
 import com.addonstation.mobile.data.model.ModeratorScope
+import com.addonstation.mobile.data.model.MutedUser
 import com.addonstation.mobile.data.model.MyChatStatus
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.SiteAsset
@@ -714,6 +715,45 @@ class ChatRepository(
                 supabase.select("user_blocks", "select=blocked_id&order=created_at.desc"),
             ).mapNotNull { it.blockedId }.filter { it.isNotBlank() }.toSet()
         }.getOrElse { emptySet() }
+    }
+
+    // ── كتم الأعضاء (38_user_mute.sql) — زرّ واحد: لا رسائل ولا إشعارات ──────
+
+    /**
+     * كتم عضو: تُخفى رسائله **ولا يصل منه أي إشعار** (لا جرس ولا دفع).
+     * ميزة اشتراك Legendary — والخادم يردّ `legendary_required` لغيره، والشاشة
+     * تفتح صفحة الاشتراك قبل أن يُنادى الخادم أصلاً.
+     */
+    suspend fun muteMember(userId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc("user_mute", mapOf("p_user_id" to JsonPrimitive(userId)))
+                .asOutcome().requireOk()
+            Unit
+        }
+    }
+
+    suspend fun unmuteMember(userId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc("user_unmute", mapOf("p_user_id" to JsonPrimitive(userId)))
+                .asOutcome().requireOk()
+            Unit
+        }
+    }
+
+    /** من كتمتُهم — تُحفظ نسخة محلية (UserPrefs) فيُخفى كلامهم فوراً في الشات. */
+    suspend fun mutedMemberIds(): Set<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.decodeList<MutedUser>(
+                supabase.rpc("my_muted_users", emptyMap(), signedOnly = true),
+            ).mapNotNull { it.mutedId }.filter { it.isNotBlank() }.toSet()
+        }.getOrElse { emptySet() }
+    }
+
+    /** هل كتمتُ هذا العضو؟ (بطاقة السلامة: «كتم» أم «إلغاء الكتم»). */
+    suspend fun iMutedMember(userId: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc("i_muted_user", mapOf("p_user_id" to JsonPrimitive(userId))).asBool() ?: false
+        }.getOrElse { false }
     }
 
     /** هل حظرتُ هذا العضو؟ (شاشة ملفه تُظهر «إلغاء الحظر» بدل «حظر»). */

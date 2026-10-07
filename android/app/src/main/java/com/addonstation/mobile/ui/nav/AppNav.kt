@@ -776,6 +776,8 @@ private fun MainNavigation(
                         onUnblock = { profile -> scope.launch { container.chat.unblockUser(profile.id) } },
                         // «حذف رسالة» في بطاقة الإشراف تُفتح في شاشة إشراف الشات
                         onOpenAdminTools = { go(Routes.ADMIN_CHAT) },
+                        // كتم الأعضاء ميزة Legendary ⇒ صفحة اشتراك Legendary نفسها
+                        onOpenPlans = { go(Routes.checkout("legendary")) },
                     )
                 }
 

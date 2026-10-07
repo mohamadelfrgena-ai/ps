@@ -712,4 +712,10 @@ YARAT.</string>
     <string name="profile_blocked_state">Bu üyeyle etkileşime geçemezsiniz</string>
     <string name="profile_unfriend">Arkadaşlıktan çıkar</string>
     <string name="profile_unfriend_confirm">Bu üyeyi arkadaşlarınızdan çıkaralım mı?</string>
+    <string name="mute_member_locked">Legendary</string>
+    <string name="mute_member_needs_plan">Üye sessize alma Legendary özelliğidir — abonelik açılıyor.</string>
+    <string name="notif_muted_users">Sessize alınanların bildirimlerini kes</string>
+    <string name="notif_muted_users_desc">Açık: sessize alınan üyeden mesaj ve bildirim gelmez.</string>
+    <string name="notif_muted_users_locked">Legendary abonelik özelliği</string>
+    <string name="notif_mute_section">Üye sessize alma</string>
 </resources>

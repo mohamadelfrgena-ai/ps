@@ -24,6 +24,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +70,9 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    val myProfile by container.state.profile.collectAsState()
+    /** ميزة الكتم (اشتراك Legendary) — والمشرف/الأدمن مستثنان لتجربة الميزة. */
+    val canMute = myProfile?.let { it.effectivePlan == "legendary" || it.isStaff } == true
     var prefs by remember { mutableStateOf<PushPrefs?>(null) }
     var loading by remember { mutableStateOf(true) }
     var status by remember { mutableStateOf<String?>(null) }
@@ -105,6 +109,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 quietFrom = next.quietFrom,
                 quietTo = next.quietTo,
                 reengageDays = next.reengageDays,
+                mutedUsers = next.mutedUsers,
             )
             if (saved != null) prefs = saved
         }
@@ -216,6 +221,21 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                 subtitle = stringResource(R.string.notif_cat_reminders_desc),
                 checked = p.reminders, enabled = p.master,
                 onCheckedChange = { v -> save { it.copy(reminders = v) } },
+            )
+        }
+
+        // ── ٢ب) الكتم: مفتاح إطفاء/تشغيل — «زرّ واحد» في ملف العضو يُخفي الرسائل
+        //        والإشعارات معاً؛ أطفئ هذا المفتاح فيبقى الكتم على الرسائل وحدها.
+        SectionHeader(title = stringResource(R.string.notif_mute_section))
+        GlassCard(padding = 10.dp) {
+            ToggleRow(
+                title = stringResource(R.string.notif_muted_users),
+                subtitle = stringResource(
+                    if (canMute) R.string.notif_muted_users_desc else R.string.notif_muted_users_locked
+                ),
+                checked = prefs?.mutedUsers != false,
+                enabled = canMute && p.master,
+                onCheckedChange = { v -> save { it.copy(mutedUsers = v) } },
             )
         }
 

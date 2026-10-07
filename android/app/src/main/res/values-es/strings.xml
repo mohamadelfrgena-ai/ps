@@ -712,4 +712,10 @@ CRÉALO.</string>
     <string name="profile_blocked_state">No puedes interactuar con este miembro</string>
     <string name="profile_unfriend">Eliminar amigo</string>
     <string name="profile_unfriend_confirm">¿Eliminar a este miembro de tus amigos?</string>
+    <string name="mute_member_locked">Legendary</string>
+    <string name="mute_member_needs_plan">Silenciar miembros es una función Legendary — abriendo la suscripción.</string>
+    <string name="notif_muted_users">Silenciar notificaciones de miembros silenciados</string>
+    <string name="notif_muted_users_desc">Activado: del miembro silenciado no te llega ni mensajes ni avisos.</string>
+    <string name="notif_muted_users_locked">Función de la suscripción Legendary</string>
+    <string name="notif_mute_section">Silenciar miembros</string>
 </resources>

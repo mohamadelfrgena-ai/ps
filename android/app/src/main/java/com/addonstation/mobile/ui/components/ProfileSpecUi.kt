@@ -667,7 +667,10 @@ fun SpecGridTile(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
     }
 }
 
-/** صفّ داخل بطاقة السلامة/الإشراف (52h · 14/800 محاذاة يسار · فواصل 1dp). */
+/**
+ * صفّ داخل بطاقة السلامة/الإشراف (52h · 14/800 محاذاة يسار · فواصل 1dp).
+ * `trailing` شريحة في الطرف — تُستعمل لشارة «Legendary» على زرّ الكتم.
+ */
 @Composable
 fun SpecActionRow(
     text: String,
@@ -675,17 +678,22 @@ fun SpecActionRow(
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     showDivider: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier.fillMaxWidth()) {
         if (showDivider) Box(Modifier.fillMaxWidth().height(1.dp).background(Spec.border))
-        Box(
+        Row(
             Modifier
                 .fillMaxWidth()
                 .height(Spec.safetyRowH)
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-            contentAlignment = Alignment.CenterStart,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(text, style = Spec.button, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (trailing != null) {
+                Spacer(Modifier.weight(1f))
+                trailing()
+            }
         }
     }
 }
