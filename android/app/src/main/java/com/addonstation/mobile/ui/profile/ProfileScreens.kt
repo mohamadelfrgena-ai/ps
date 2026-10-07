@@ -297,7 +297,7 @@ fun ProfileScreen(
             Box(Modifier.fillMaxWidth().height(bannerHeight + avatarSize / 2 + 12.dp)) {
                 ProfileBanner(height = bannerHeight) {
                     assetUrl(container, me.bannerUrl)?.let { banner ->
-                        CoverImage(url = banner, radius = 20.dp, modifier = Modifier.fillMaxSize())
+                        CoverImage(url = banner, radius = 20.dp, animate = true, modifier = Modifier.fillMaxSize())
                     }
                     // رصيد AC أعلى يمين البانر
                     Row(
@@ -996,9 +996,13 @@ fun EditProfileScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                                                         .weight(1f)
                                                         .fillMaxWidth(),
                                                 ) {
+                                                    // الشبكة تعرض لقطة ثابتة (40 غلافاً فيها عشرات
+                                                    // الـGIF؛ تشغيلها كلها معاً كان يُثقل الشاشة).
+                                                    // المتحرّك يظهر بحركته في **معاينة الغلاف المختار**
+                                                    // أعلى الشاشة وفي الملف الشخصي.
                                                     BannerThumb(
                                                         url = assetUrl(container, asset.fileUrl),
-                                                        animate = true,
+                                                        animate = false,
                                                         modifier = Modifier.matchParentSize(),
                                                     )
                                                     if (asset.animated) {
@@ -1248,7 +1252,7 @@ fun UserProfileScreen(
         Box(Modifier.fillMaxWidth().height(bannerHeight + avatarSize / 2 + 12.dp)) {
             ProfileBanner(height = bannerHeight) {
                 assetUrl(container, me.bannerUrl)?.let { banner ->
-                    CoverImage(url = banner, radius = 20.dp, modifier = Modifier.fillMaxSize())
+                    CoverImage(url = banner, radius = 20.dp, animate = true, modifier = Modifier.fillMaxSize())
                 }
                 // زرّ الرجوع: رجوعٌ واحد نظيف عبر back() في التنقّل
                 Box(

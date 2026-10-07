@@ -310,6 +310,8 @@ fun ContentDetailScreen(
                 CoverImage(
                     url = assetUrl(container, current.coverUrl),
                     radius = 20.dp,
+                    // صفحة العنصر: صورة واحدة على الشاشة ⇒ تُعرض بحركتها كاملة
+                    animate = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(195.dp),

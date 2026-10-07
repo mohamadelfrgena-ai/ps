@@ -144,6 +144,9 @@ jobs:
             exit 1
           }
 
+      - name: حارس وزن الصور قبل البناء (لا عودة للأصول الثقيلة والتقطيع)
+        run: python3 tools/check_media_optimize.py
+
       - name: Build debug APK
         working-directory: android
         run: |

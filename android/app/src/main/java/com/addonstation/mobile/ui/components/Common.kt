@@ -319,6 +319,17 @@ fun roomIconRes(channelId: String): Int = when (channelId) {
 }
 
 /** الأصول الافتراضية في مكتبة الصور: المجاني للحساب، و«Default Profile» قبل الحساب. */
+/**
+ * روابط **ثبت غياب** لقطتها الثابتة (`…thumb.jpg`) — نسجّلها مرة واحدة في
+ * الجلسة حتى لا يُعاد طلب رابط 404 مع كل تمرير أو إعادة تركيب.
+ *
+ * صور الأصول تُصلَّر في المخزن (بأداة `tools/optimize_site_assets.py` أو زر
+ * الأدمن) فتُوجد اللقطة لكل GIF. قبل ذلك، أو إن غابت لصورة بعينها، نرجع
+ * إلى الأصل بلا تكرار محاولات فاشلة.
+ */
+private val missingThumbUrls: MutableSet<String> =
+    java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
 private val ASSET_FREE_DEFAULT = listOf("profiles/profiles/onefree.png", "profiles/onefree.png")
 private val ASSET_AUTH_DEFAULT = listOf("profiles/profiles/default-profile.jpg")
 
@@ -461,14 +472,20 @@ fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier, animate: B
             val thumb = remember(url, animate) {
                 if (!animate && url.contains(".gif", ignoreCase = true)) "$url.thumb.jpg" else null
             }
-            var thumbFailed by remember(url, animate) { mutableStateOf(false) }
+            // غياب اللقطة يُسجَّل في ذاكرة الجلسة (لا تُفقد مع إعادة تدوير الخلية)
+            var thumbFailed by remember(url, animate) {
+                mutableStateOf(thumb == null || thumb in missingThumbUrls)
+            }
             if (thumb != null && !thumbFailed) {
                 AsyncImage(
                     model = thumb,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(size),
-                    onError = { thumbFailed = true },
+                    onError = {
+                        if (thumb != null) missingThumbUrls.add(thumb)
+                        thumbFailed = true
+                    },
                 )
             } else {
                 AsyncImage(
@@ -507,13 +524,18 @@ fun BannerThumb(
             val thumb = remember(url, animate) {
                 if (!animate && url.contains(".gif", ignoreCase = true)) "$url.thumb.jpg" else null
             }
-            var thumbFailed by remember(url, animate) { mutableStateOf(false) }
+            var thumbFailed by remember(url, animate) {
+                mutableStateOf(thumb == null || thumb in missingThumbUrls)
+            }
             AsyncImage(
                 model = if (thumb != null && !thumbFailed) thumb else url,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
-                onError = { thumbFailed = true },
+                onError = {
+                    if (thumb != null && !thumbFailed) missingThumbUrls.add(thumb)
+                    thumbFailed = true
+                },
             )
         }
     }
@@ -574,14 +596,41 @@ fun CoverImage(
     modifier: Modifier = Modifier,
     radius: Dp = 16.dp,
     model: Any? = null,
+    /**
+     * `true` ⇒ يُعرض الملف كما هو بحركته (GIF متحرّك) — **للمعاينات المفردة
+     * فقط**: صفحة العنصر · الغلاف المختار · عارض الصورة.
+     *
+     * الافتراضي `false`: الشبكات (المتجر · المفضّلة · بطاقات الرئيسية · الأدوات)
+     * تعرض **لقطة ثابتة خفيفة** `…thumb.jpg` إن وُجدت. لماذا؟ تشغيل عشرات
+     * الرسوم المتحركة في شبكة واحدة يستهلك الذاكرة والمعالج ويرهن التمرير —
+     * وهو أشهر سبب لتقطيع القوائم. اللقطة تُولَّد بأداة
+     * `tools/optimize_site_assets.py` (أو بزر الأدمن)، وإن غابت نرجع للأصل
+     * بلا محاولات فاشلة متكرّرة (انظر [missingThumbUrls]).
+     */
+    animate: Boolean = false,
 ) {
+    val thumbCandidate = remember(url, animate) {
+        if (url?.contains(".gif", ignoreCase = true) == true) "$url.thumb.jpg" else null
+    }
+    // غياب اللقطة يُسجَّل في ذاكرة الجلسة (لا تُفقد مع إعادة تدوير الخلية)
+    var thumbMissing by remember(url) {
+        mutableStateOf(thumbCandidate == null || thumbCandidate in missingThumbUrls)
+    }
     var failed by remember(url, model) { mutableStateOf(false) }
+
+    val thumb = if (thumbCandidate != null && !thumbMissing) thumbCandidate else null
+    // الأساس المعروض: اللقطة الخفيفة إن وُجدت (تظهر فوراً)، وإلا الملف الأصلي
+    val base: Any? = thumb ?: (model ?: url)
+    // الملف المتحرّك يُعرض **فوق** اللقطة عند جهوزيته — في المعاينات المفردة فقط
+    // (صفحة العنصر · بانر الملف الشخصي). النتيجة: ظهور فوري ثم حركة، لا انتظار.
+    val motion: Any? = if (animate && thumb != null) url else null
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(radius))
             .background(AppColors.Elevated2),
     ) {
-        if (!url.isNullOrBlank() || model != null) {
+        if (base != null) {
             if (failed) {
                 Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
                     Icon(
@@ -592,19 +641,36 @@ fun CoverImage(
                     )
                 }
             } else {
+                val ctx = androidx.compose.ui.platform.LocalContext.current
                 // AsyncImage بدل SubcomposeAsyncImage: الأغلفة تملأ الخلايا في
                 // كل الشبكات (المتجر · الأغلفة · الأدوات) — والتوليف الفرعي فيها
                 // كان من أكبر أسباب التقطيع عند التمرير.
                 AsyncImage(
-                    model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                        .data(model ?: url)
-                        .crossfade(true)
-                        .build(),
+                    model = ImageRequest.Builder(ctx).data(base).crossfade(true).build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.matchParentSize(),
-                    onError = { failed = true },
+                    onError = {
+                        // غابت اللقطة؟ نعود للأصل فوراً ونسجّلها فلا نُعيد الطلب.
+                        if (thumb != null) {
+                            missingThumbUrls.add(thumb)
+                            thumbMissing = true
+                        } else {
+                            failed = true
+                        }
+                    },
                 )
+                if (motion != null) {
+                    var motionReady by remember(url) { mutableStateOf(false) }
+                    AsyncImage(
+                        model = ImageRequest.Builder(ctx).data(motion).crossfade(true).build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize(),
+                        alpha = if (motionReady) 1f else 0f,
+                        onSuccess = { motionReady = true },
+                    )
+                }
             }
         }
     }
