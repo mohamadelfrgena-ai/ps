@@ -11,3 +11,4 @@
 
 enable: true
 deploy: true
+run: 2
