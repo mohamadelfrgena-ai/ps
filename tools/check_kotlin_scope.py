@@ -52,16 +52,75 @@ KEYWORDS = {
 
 
 def strip_code(src: str) -> str:
-    """يُفرّغ التعليقات والنصوص مع الحفاظ على أطوال السطور ومواضع الأحرف."""
-    def blank(m):
-        return re.sub(r"[^\n]", " ", m.group(0))
-    src = re.sub(r"/\*.*?\*/", blank, src, flags=re.S)
-    src = re.sub(r"//[^\n]*", blank, src)
-    src = re.sub(r'""".*?"""', blank, src, flags=re.S)
-    src = re.sub(r'"(\\.|[^"\\])*"', blank, src)
-    # محرف واحد فقط بين الفاصلتين (لا نلتقط نصاً طويلاً بالخطأ: 'a' و'\\n' وليس 'it’s')
-    src = re.sub(r"'(\\.|[^'\\\n])'", blank, src)
-    return src
+    """
+    يُفرّغ التعليقات والنصوص والمعرّفات بين `backticks` بماسح حالة واحد، مع
+    الحفاظ على أطوال السطور ومواضع الأحرف.
+
+    لماذا ماسح وليس تعبيرات نمطية متتالية؟ لأن التنقية بالتعابير النمطية تنهار
+    على ترتيبها: `"image/*"` يُظنّ بداية تعليق كتلة فيُفرَّغ الملف كله، والعكس
+    كذلك (`// "…`). الماسح يقرّر بالحالة الحالية فيمرّ عليها بسلام.
+    """
+    out = list(src)
+    i, n = 0, len(src)
+
+    def blank_range(a: int, b: int) -> None:
+        for k in range(a, min(b, n)):
+            if out[k] != "\n":
+                out[k] = " "
+
+    while i < n:
+        c = src[i]
+        if c == "/" and i + 1 < n and src[i + 1] == "/":              # تعليق سطر
+            j = src.find("\n", i)
+            blank_range(i, n if j == -1 else j)
+            i = n if j == -1 else j
+        elif c == "/" and i + 1 < n and src[i + 1] == "*":           # تعليق كتلة (متشعّب)
+            depth, j = 1, i + 2
+            while j < n and depth:
+                if src[j] == "/" and j + 1 < n and src[j + 1] == "*":
+                    depth += 1
+                    j += 2
+                elif src[j] == "*" and j + 1 < n and src[j + 1] == "/":
+                    depth -= 1
+                    j += 2
+                else:
+                    j += 1
+            blank_range(i, j)
+            i = j
+        elif src.startswith('"""', i):                               # نص خام
+            j = src.find('"""', i + 3)
+            j = n if j == -1 else j + 3
+            blank_range(i, j)
+            i = j
+        elif c == '"':                                              # نص عادي
+            j = i + 1
+            while j < n:
+                if src[j] == "\\":
+                    j += 2
+                    continue
+                if src[j] == '"':
+                    j += 1
+                    break
+                if src[j] == "\n":
+                    break
+                j += 1
+            blank_range(i, j)
+            i = j
+        elif c == "'":                                              # محرف واحد
+            m = re.match(r"'(\\\\.|[^'\\\\\n])'", src[i:])
+            if m:
+                blank_range(i, i + m.end())
+                i += m.end()
+            else:
+                i += 1
+        elif c == "`":                                              # `معرّف`
+            j = src.find("`", i + 1)
+            j = n if j == -1 else j + 1
+            blank_range(i, j)
+            i = j
+        else:
+            i += 1
+    return "".join(out)
 
 
 def function_body_ranges(src: str):
@@ -248,7 +307,7 @@ def module_symbols() -> set:
             names |= set(FUN_HEAD.findall(src))
             names |= set(d for _, d in DECL.findall(src))
             names |= set(re.findall(r"\b(?:class|object|interface|typealias|enum\s+class)\s+([A-Za-z_][A-Za-z0-9_]*)", src))
-            names |= set(re.findall(r"^\s*([A-Z][A-Za-z0-9_]*)\s*[,;]?\s*$", src, re.M))  # عناصر enum
+            names |= set(re.findall(r"(?m)^\s*([A-Z][A-Za-z0-9_]*)\s*\(", src))   # عناصر enum في enum class
     return names
 
 
@@ -289,6 +348,9 @@ def undefined_calls(path: str, known: set, allowed: set):
         if name in known or name in allowed or name in imports or name in local:
             continue
         if name in STDLIB:
+            continue
+        # تعليق توضيحي: @OptIn(…) · @file:OptIn(…) · @Suppress(…)
+        if re.search(r"@[\w.:]*$", src[max(0, m.start() - 24):m.start()]):
             continue
         if name in KEYWORDS or name.isupper():          # ثوابت عامة مثل JSON/HTTP
             continue
