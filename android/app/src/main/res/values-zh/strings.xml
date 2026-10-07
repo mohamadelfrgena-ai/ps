@@ -644,4 +644,33 @@
     <string name="notif_prompt_text">即使应用关闭，也能收到聊天消息、提及和新增内容。之后可在设置中分别调整。</string>
     <string name="notif_prompt_allow">立即开启</string>
     <string name="notif_prompt_later">稍后</string>
+    <string name="home_hero_slogan">去梦想。
+去建造。
+去创造。</string>
+    <string name="home_hero_subtitle">为你的冒险准备好的附加内容与世界</string>
+    <string name="home_hero_start">立即开始</string>
+    <string name="home_hero_family">加入大家庭</string>
+    <string name="home_plan_current">你当前的方案</string>
+    <string name="home_plan_free_desc">免费内容 · 基础权限 · 无需订阅</string>
+    <string name="home_legend_title">加入 LEGENDARY</string>
+    <string name="home_legend_text">传奇附加内容 · 传奇世界 · 优先访问</string>
+    <string name="home_legend_view">查看</string>
+    <string name="home_chip_all">全部</string>
+    <string name="home_chip_addons">附加内容</string>
+    <string name="home_chip_worlds">世界</string>
+    <string name="home_chip_favorites">收藏</string>
+    <string name="home_latest_addons">最新附加内容</string>
+    <string name="home_most_downloaded">下载最多</string>
+    <string name="home_featured_creators">精选创作者</string>
+    <string name="home_creators_caption">由 AddonStation 精选</string>
+    <string name="home_no_content">暂无已发布内容</string>
+    <string name="home_error">出了点问题</string>
+    <string name="home_error_tap">点击重试</string>
+    <string name="comm_all_rooms">所有房间</string>
+    <string name="comm_rules_banner">⚠️ 社区规则 · 违规可能导致禁言或封禁</string>
+    <string name="comm_members_only">聊天仅限成员 — 登录后进入房间</string>
+    <string name="chat_online">%1$d 人在线</string>
+    <string name="chat_pinned_strip">置顶消息 · %1$s</string>
+    <string name="home_by_creator">作者 %1$s</string>
+    <string name="chat_nobody_online">现在没有人在线</string>
 </resources>

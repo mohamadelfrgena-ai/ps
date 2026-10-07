@@ -644,4 +644,33 @@
     <string name="notif_prompt_text">Получайте сообщения чата, упоминания и новые аддоны даже при закрытом приложении. Каждую категорию можно настроить позже.</string>
     <string name="notif_prompt_allow">Включить сейчас</string>
     <string name="notif_prompt_later">Позже</string>
+    <string name="home_hero_slogan">МЕЧТАЙ.
+СТРОЙ.
+СОЗДАВАЙ.</string>
+    <string name="home_hero_subtitle">Аддоны и миры готовы к твоему приключению</string>
+    <string name="home_hero_start">Начать сейчас</string>
+    <string name="home_hero_family">Вступить в семью</string>
+    <string name="home_plan_current">Ваш текущий план</string>
+    <string name="home_plan_free_desc">Бесплатный контент · Базовый доступ · Без подписки</string>
+    <string name="home_legend_title">ВСТУПИТЬ В LEGENDARY</string>
+    <string name="home_legend_text">Легендарные аддоны · Легендарные миры · Приоритетный доступ</string>
+    <string name="home_legend_view">Открыть</string>
+    <string name="home_chip_all">Все</string>
+    <string name="home_chip_addons">Аддоны</string>
+    <string name="home_chip_worlds">Миры</string>
+    <string name="home_chip_favorites">Избранное</string>
+    <string name="home_latest_addons">Новые аддоны</string>
+    <string name="home_most_downloaded">Самые скачиваемые</string>
+    <string name="home_featured_creators">Избранные авторы</string>
+    <string name="home_creators_caption">Особый выбор AddonStation</string>
+    <string name="home_no_content">Пока нет опубликованного контента</string>
+    <string name="home_error">Что-то пошло не так</string>
+    <string name="home_error_tap">Нажмите, чтобы повторить</string>
+    <string name="comm_all_rooms">Все комнаты</string>
+    <string name="comm_rules_banner">⚠️ Правила сообщества · Нарушения могут привести к мьюту или бану</string>
+    <string name="comm_members_only">Чат только для участников — войдите, чтобы открыть комнаты</string>
+    <string name="chat_online">%1$d онлайн</string>
+    <string name="chat_pinned_strip">Закреплённые · %1$s</string>
+    <string name="home_by_creator">От %1$s</string>
+    <string name="chat_nobody_online">Сейчас никого нет онлайн</string>
 </resources>

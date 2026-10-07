@@ -644,4 +644,33 @@
     <string name="notif_prompt_text">Recibe mensajes del chat, menciones y nuevos addons aunque la app esté cerrada. Puedes ajustar cada categoría luego en Ajustes.</string>
     <string name="notif_prompt_allow">Activar ahora</string>
     <string name="notif_prompt_later">Más tarde</string>
+    <string name="home_hero_slogan">SUÉÑALO.
+CONSTRÚYELO.
+CRÉALO.</string>
+    <string name="home_hero_subtitle">Addons y mundos listos para tu aventura</string>
+    <string name="home_hero_start">Empezar ahora</string>
+    <string name="home_hero_family">Únete a la familia</string>
+    <string name="home_plan_current">Tu plan actual</string>
+    <string name="home_plan_free_desc">Contenido gratis · Acceso básico · Sin suscripción</string>
+    <string name="home_legend_title">ÚNETE A LEGENDARY</string>
+    <string name="home_legend_text">Addons legendarios · Mundos legendarios · Acceso prioritario</string>
+    <string name="home_legend_view">Ver</string>
+    <string name="home_chip_all">Todo</string>
+    <string name="home_chip_addons">Addons</string>
+    <string name="home_chip_worlds">Mundos</string>
+    <string name="home_chip_favorites">Favoritos</string>
+    <string name="home_latest_addons">Últimos addons</string>
+    <string name="home_most_downloaded">Más descargados</string>
+    <string name="home_featured_creators">Creadores destacados</string>
+    <string name="home_creators_caption">Selección especial de AddonStation</string>
+    <string name="home_no_content">Aún no hay contenido publicado</string>
+    <string name="home_error">Algo salió mal</string>
+    <string name="home_error_tap">Toca para reintentar</string>
+    <string name="comm_all_rooms">Todas las salas</string>
+    <string name="comm_rules_banner">⚠️ Reglas de la comunidad · Las infracciones pueden causar silencio o expulsión</string>
+    <string name="comm_members_only">El chat es solo para miembros — entra para acceder a las salas</string>
+    <string name="chat_online">%1$d en línea</string>
+    <string name="chat_pinned_strip">Mensajes fijados · %1$s</string>
+    <string name="home_by_creator">Por %1$s</string>
+    <string name="chat_nobody_online">Nadie está en línea ahora</string>
 </resources>

@@ -4,7 +4,8 @@
 
 الشكل المعتمد (بأسلوب ديسكورد — بطلب المالك):
   1) بسولات دائرية تحت الرسالة: رمز + عدد، ارتفاع 26dp ونصف قطر 13.
-  2) البسولة التي تفاعلتَ بها: خلفية مضيئة (GreenGlow) + إطار أخضر + رقم أخضر.
+  2) البسولة التي تفاعلتَ بها: خلفية مضيئة + إطار أزرق + رقم أزرق — بمقاس
+     الوثيقة الجديدة: ارتفاع 28dp ونصف قطر 14dp وخلفية `surfaceHigh`.
   3) زر «إضافة تفاعل» （＋ 😊） في آخر صفّ التفاعلات.
   4) لا صفّ ثابت (👍 ❤️ ＋) تحت كل رسالة — التفاعلات تظهر فقط إن وُجدت.
   5) لوحة الضغط المطوّل تُضيء الرموز التي أضافها المستخدم نفسه.
@@ -40,11 +41,13 @@ add_pill = block(screen, "private fun AddReactionPill(")
 reactions_row = block(screen, "if (ui.reactions.isNotEmpty()) {", "\n        }\n    }\n}")
 
 rows.append(("بسولة التفاعل معرَّفة", "private fun ReactionPill(" in screen))
-rows.append(("البسولة دائرية (نصف قطر 13)", "RoundedCornerShape(13.dp)" in pill))
-rows.append(("ارتفاع البسولة 26dp", ".height(26.dp)" in pill))
-rows.append(("تفاعلك بخلفية مضيئة", "AppColors.GreenGlow" in pill))
-rows.append(("تفاعلك بإطار أخضر", "AppColors.Green" in pill and "1.5.dp" in pill))
-rows.append(("رقم التفاعل أخضر لك", "if (selected) AppColors.Green else AppColors.Muted" in pill))
+rows.append(("البسولة دائرية (نصف قطر 14 — الوثيقة)", "RoundedCornerShape(14.dp)" in pill))
+rows.append(("ارتفاع البسولة 28dp (الوثيقة)", ".height(28.dp)" in pill))
+rows.append(("تفاعلك بخلفية مضيئة (Spec.blue شفّاف)",
+             "Spec.blue.copy(alpha" in pill and "Spec.surfaceHigh" in pill))
+rows.append(("تفاعلك بإطار أزرق", "if (selected) Spec.blue else Spec.border" in pill))
+rows.append(("رقم التفاعل أزرق لك",
+             "if (selected) Spec.blueLink else Spec.chipLabel" in pill))
 rows.append(("زر «إضافة تفاعل» معرَّف", "private fun AddReactionPill(" in screen))
 rows.append(("وصف الزر من ملف اللغة", "R.string.chat_add_reaction" in add_pill))
 rows.append(("الزر يفتح لوحة الرموز (الضغط المطوّل)", "AddReactionPill(onClick = onLongPress)" in screen))

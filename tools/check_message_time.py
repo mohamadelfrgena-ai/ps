@@ -23,12 +23,15 @@ rows = []
 time_fn = screen[screen.find("private fun MessageTime("):]
 time_fn = time_fn[:time_fn.find("\n}\n")] if "\n}\n" in time_fn else time_fn
 rows.append(("بانية وقت الرسالة معرَّفة", "private fun MessageTime(" in screen))
-rows.append(("الوقت بخطّ صغير باهت", "AppText.chatTime" in time_fn and "AppColors.Dim" in time_fn))
+rows.append(("الوقت بخطّ صغير باهت (Spec.msgTime/textMuted)",
+             "Spec.msgTime" in time_fn and "Spec.textMuted" in time_fn))
 
-# 2) الوقت لم يعد في سطر الاسم: TimeFormat.timeOnly يُستدعى مرة واحدة فقط (داخل MessageTime)
-rows.append(("لا وقت بجانب اسم صاحب الرسالة",
+# 2) الوقت في سطر الرأس (§٤٫٣): يُنادى داخل كتلة الترويسة مرة واحدة لكل رسالة،
+#    والتنسيق يبقى في MessageTime وحده (TimeFormat.timeOnly مرة واحدة)
+rows.append(("الوقت في سطر الرأس (الترويسة)",
              screen.count("TimeFormat.timeOnly(") == 1
-             and "TimeFormat.timeOnly(createdAt" in time_fn))
+             and "TimeFormat.timeOnly(createdAt" in time_fn
+             and "MessageTime(" in screen[screen.find("if (!grouped) {"):screen.find("ui.replyTo?.let")]))
 
 # 3) الوقت مع كل الأنواع — يُعرض اليوم عبر MessageStatus (الوقت حين تُؤكَّد
 #    الرسالة، وحالة الإرسال حين تكون قيده أو فاشلة) في نهاية كل نوع.
@@ -44,7 +47,7 @@ rows.append(("وقت مع الصورة", branch_has('            "image" -> {'))
 rows.append(("وقت مع الصوت/الفيديو", branch_has('            "video" -> {')
              and branch_has('            "audio" -> {')))
 rows.append(("الوقت يظهر عبر بانية الحالة", "MessageStatus(" in screen
-             and "else -> MessageTime(createdAt = createdAt" in screen))
+             and "if (showConfirmedTime) MessageTime(createdAt = createdAt" in screen))
 rows.append(("الوقت في نهاية السطر (محاذاة سفلية)",
              "verticalAlignment = Alignment.Bottom" in screen))
 

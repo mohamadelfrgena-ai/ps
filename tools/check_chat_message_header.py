@@ -60,7 +60,8 @@ if not header:
 if not name_col:
     problems.append("الاسم واللقب ليسا في عمود واحد (اللقب يجب أن يكون تحت الاسم)")
 else:
-    if "AppText.chatName" not in name_col:
+    # الخط: وثيقة التصميم تعتمد Spec.msgAuthor (14sp/800) — والقديم AppText.chatName
+    if "AppText.chatName" not in name_col and "Spec.msgAuthor" not in name_col:
         problems.append("اسم صاحب الرسالة ليس داخل عمود الترويسة")
     if "RankBadge(" not in name_col:
         problems.append("اللقب (RankBadge) ليس تحت الاسم داخل العمود نفسه")

@@ -644,4 +644,33 @@
     <string name="notif_prompt_text">تصلك رسائل الشات والإشارات والإضافات الجديدة حتى والتطبيق مغلق. وتقدر تتحكّم بكل قسم لاحقاً من الإعدادات.</string>
     <string name="notif_prompt_allow">فعّلها الآن</string>
     <string name="notif_prompt_later">لاحقاً</string>
+    <string name="home_hero_slogan">احلمها.
+ابنِها.
+أبدِعها.</string>
+    <string name="home_hero_subtitle">إضافات وعوالم جاهزة لمغامرتك</string>
+    <string name="home_hero_start">ابدأ الآن</string>
+    <string name="home_hero_family">انضم للعائلة</string>
+    <string name="home_plan_current">خطتك الحالية</string>
+    <string name="home_plan_free_desc">محتوى مجاني · وصول أساسي · بلا اشتراك</string>
+    <string name="home_legend_title">انضم إلى LEGENDARY</string>
+    <string name="home_legend_text">إضافات أسطورية · عوالم أسطورية · أولوية وصول</string>
+    <string name="home_legend_view">عرض</string>
+    <string name="home_chip_all">الكل</string>
+    <string name="home_chip_addons">إضافات</string>
+    <string name="home_chip_worlds">عوالم</string>
+    <string name="home_chip_favorites">المفضّلة</string>
+    <string name="home_latest_addons">أحدث الإضافات</string>
+    <string name="home_most_downloaded">الأكثر تنزيلاً</string>
+    <string name="home_featured_creators">مبدعون مميّزون</string>
+    <string name="home_creators_caption">إبداعات مختارة من AddonStation</string>
+    <string name="home_no_content">لم يُنشر محتوى بعد</string>
+    <string name="home_error">حدث خطأ ما</string>
+    <string name="home_error_tap">اضغط للمحاولة مرة أخرى</string>
+    <string name="comm_all_rooms">كل الغرف</string>
+    <string name="comm_rules_banner">⚠️ قواعد المجتمع · المخالفة قد تؤدي إلى الكتم أو الحظر</string>
+    <string name="comm_members_only">الشات للأعضاء فقط — سجّل الدخول لتدخل الغرف</string>
+    <string name="chat_online">%1$d متصل الآن</string>
+    <string name="chat_pinned_strip">الرسائل المثبتة · %1$s</string>
+    <string name="home_by_creator">بواسطة %1$s</string>
+    <string name="chat_nobody_online">لا أحد متصل الآن</string>
 </resources>

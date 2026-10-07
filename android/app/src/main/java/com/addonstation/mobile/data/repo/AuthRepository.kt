@@ -61,6 +61,8 @@ class AuthRepository(
 
     suspend fun signOut() {
         supabase.signOut()
+        // أوقات آخر رسالة في قائمة الغرف = ذاكرة جلسة: تُفرَّغ مع الخروج
+        com.addonstation.mobile.ui.chat.ChatPeek.clear()
     }
 
     /**

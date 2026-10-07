@@ -56,11 +56,13 @@ import com.addonstation.mobile.ui.components.GlassCard
 import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.LoadingBox
 import com.addonstation.mobile.ui.components.RoomIcon
-import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.defaultMinSize
 import com.addonstation.mobile.ui.theme.AppText
+import com.addonstation.mobile.ui.theme.Spec
 import com.addonstation.mobile.util.LocaleManager
 import kotlinx.coroutines.launch
 
@@ -228,13 +230,31 @@ fun RoomListScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        PixelTopBar(
-            title = stringResource(R.string.nav_community),
-            walletBalance = wallet?.balance,
-            onWalletClick = { onOpenWallet() },
-            icon = Icons.Filled.Group,
-        )
+    Column(Modifier.fillMaxSize().background(Spec.bg)) {
+        // ── رأس الشاشة: COMMUNITY + «كل الغرف»
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = Spec.screenPad, end = Spec.screenPad, top = 16.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.comm_title), style = Spec.screenTitle, color = Spec.gold, maxLines = 1)
+            Spacer(Modifier.weight(1f))
+            Text(stringResource(R.string.comm_all_rooms), style = Spec.secondary, color = Spec.textMuted)
+        }
+        // ── لافتة قواعد المجتمع
+        Row(
+            modifier = Modifier
+                .padding(horizontal = Spec.screenPad, vertical = 8.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Spec.cardRadius))
+                .background(Spec.surface)
+                .border(1.dp, Spec.border, RoundedCornerShape(Spec.cardRadius))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.comm_rules_banner), style = Spec.roomPreview, color = Spec.chipLabel)
+        }
         if (loading && channels.isEmpty()) {
             LoadingBox(text = stringResource(R.string.common_loading))
         } else if (failed && channels.isEmpty()) {
@@ -243,9 +263,9 @@ fun RoomListScreen(
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
-                    top = 10.dp,
+                    start = Spec.chatListPad,
+                    end = Spec.chatListPad,
+                    top = 4.dp,
                     bottom = 12.dp,
                 ),
             ) {
@@ -290,12 +310,12 @@ fun RoomListScreen(
             }
 
             // لوحة المستخدم أسفل الشاشة (كما في Discord)
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Spec.border))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(AppColors.Bg.copy(alpha = 0.96f))
-                    .border(1.dp, AppColors.Border)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .background(Spec.barSurface)
+                    .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -317,8 +337,8 @@ fun RoomListScreen(
                         profile?.displayName ?: profile?.username ?: stringResource(
                             if (signedIn) R.string.common_loading else R.string.common_guest,
                         ),
-                        style = AppText.chatName,
-                        color = AppColors.Text,
+                        style = Spec.roomName,
+                        color = Spec.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -327,26 +347,27 @@ fun RoomListScreen(
                     } else if (!signedIn) {
                         Text(
                             stringResource(R.string.msg_sign_in_to_participate),
-                            style = AppText.tiny,
-                            color = AppColors.Muted,
+                            style = Spec.roomTime,
+                            color = Spec.textMuted,
                             modifier = Modifier.clickable { onLogin() },
                         )
                     }
                 }
                 // ترس لوحة المستخدم: ينقل إلى تعديل الملف الشخصي (لا إلى إعدادات التطبيق)
+                // ترس الملف الشخصي: هدف لمس 44dp كامل (وثيقة التصميم)
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(AppColors.Elevated2)
+                        .size(Spec.touch)
+                        .clip(CircleShape)
+                        .background(Spec.surfaceHigh)
                         .clickable { onOpenEditProfile() },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         Icons.Filled.Settings,
                         contentDescription = stringResource(R.string.profile_edit),
-                        tint = AppColors.Muted,
-                        modifier = Modifier.size(18.dp),
+                        tint = Spec.text,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -392,53 +413,90 @@ private fun RoomRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(Spec.cardRadius))
             .background(
                 when {
-                    selected -> AppColors.Elevated
-                    highlighted -> AppColors.GreenGlow
+                    selected -> Spec.surfaceHigh
+                    highlighted -> Spec.blue.copy(alpha = 0.12f)
                     else -> androidx.compose.ui.graphics.Color.Transparent
                 }
             )
             .clickable { onClick() }
-            .height(48.dp)
-            .padding(horizontal = 10.dp),
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (selected) {
-            Box(
-                Modifier
-                    .size(width = 3.dp, height = 22.dp)
-                    .clip(CircleShape)
-                    .background(AppColors.Green),
+        // أيقونة الغرفة 44 دائرية (الصور نفسها مستديرة أصلاً)
+        RoomIcon(channelId = channel.id, size = 44.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    // غرف اللغات باسمها بلغتها (العربية · Русский · 中文 …) كما في ChannelNames.kt
+                    text = channelDisplayName(channel),
+                    style = Spec.roomName,
+                    color = Spec.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                // قفل ظاهر لكل غرفة لا يملك صاحبُها حق الكتابة فيها (قراءة فقط)
+                if (channel.isLocked || channel.postPermission == "admin_only" || channel.postPermission == "creators_admin") {
+                    Icon(Icons.Filled.Lock, contentDescription = null, tint = Spec.textMuted, modifier = Modifier.size(14.dp))
+                }
+            }
+            Text(
+                text = channelDisplayDescription(channel).orEmpty(),
+                style = Spec.roomPreview,
+                color = Spec.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        RoomIcon(channelId = channel.id, size = 22.dp)
-        Text(
-            // غرف اللغات باسمها بلغتها (العربية · Русский · 中文 …) كما في ChannelNames.kt
-            text = channelDisplayName(channel),
-            style = AppText.body.copy(fontWeight = if (unread > 0 || mentions > 0) FontWeight.Bold else FontWeight.Normal),
-            color = if (unread > 0 || mentions > 0) AppColors.Text else AppColors.Muted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        // قفل ظاهر لكل غرفة لا يملك صاحبُها حق الكتابة فيها (قراءة فقط)
-        if (channel.isLocked || channel.postPermission == "admin_only" || channel.postPermission == "creators_admin") {
-            Icon(Icons.Filled.Lock, contentDescription = null, tint = AppColors.Dim, modifier = Modifier.size(15.dp))
-        }
-        if (mentions > 0) {
-            CountPill(mentions)
-        } else if (unread > 0) {
-            Box(
-                Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(androidx.compose.ui.graphics.Color.White),
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = lastTimeOf(channel.id),
+                style = Spec.roomTime,
+                color = Spec.textMuted,
+                maxLines = 1,
             )
+            if (mentions > 0) {
+                Box(
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = 22.dp, minHeight = 22.dp)
+                        .clip(CircleShape)
+                        .background(Spec.blue)
+                        .padding(horizontal = 6.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(mentions.toString(), style = Spec.badge, color = androidx.compose.ui.graphics.Color.White)
+                }
+            } else if (unread > 0) {
+                Box(
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = 22.dp, minHeight = 22.dp)
+                        .clip(CircleShape)
+                        .background(Spec.blue)
+                        .padding(horizontal = 6.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(unread.toString(), style = Spec.badge, color = androidx.compose.ui.graphics.Color.White)
+                }
+            }
         }
     }
+}
+
+/**
+ * وقت آخر رسالة في الغرفة (11sp).
+ *
+ * [ChatChannel] لا يحمل حقل «آخر رسالة» (الوثيقة تفترضه)، ولذلك نأخذه من
+ * **آخر رسالة محفوظة في ذاكرة الشات** إن وُجدت — بلا أي رحلة شبكة إضافية.
+ * وإن لم توجد (غرفة لم تُفتح في هذه الجلسة) نُعيد فراغاً فلا يظهر وقت كاذب.
+ */
+private fun lastTimeOf(channelId: String): String {
+    val iso = com.addonstation.mobile.ui.chat.ChatPeek.last(channelId) ?: return ""
+    return com.addonstation.mobile.util.TimeFormat.timeOnly(iso, java.util.Locale.getDefault())
 }
 
 /** نص ترحيبي لقائمة الغرف الفارغة. */

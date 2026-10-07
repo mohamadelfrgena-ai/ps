@@ -75,6 +75,17 @@ class ChatViewModel(private val container: AppContainer) {
     private val _typing = MutableStateFlow<List<String>>(emptyList())
     val typing: StateFlow<List<String>> = _typing.asStateFlow()
 
+    /** عدد الحاضرين في الغرفة الآن (Realtime presence) — «[N] online» في الشريط. */
+    private val _online = MutableStateFlow(0)
+    val online: StateFlow<Int> = _online.asStateFlow()
+
+    /**
+     * المثبّتات — تُجلب عند **دخول الغرفة** لا عند ضغط الزر فقط، لأن وثيقة
+     * التصميم تعرض شريطاً ذهبياً أعلى الرسائل حين يوجد شيء مثبَّت.
+     */
+    private val _pinned = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val pinned: StateFlow<List<ChatMessage>> = _pinned.asStateFlow()
+
     /**
      * من حظرتُهم (من قاعدة البيانات). الفلترة الأصلية في الخادم (RLS)، وهذه
      * نسخة محلية للفلترة الفورية: يُخفى المحظور من اللحظة نفسها بلا انتظار
@@ -124,6 +135,8 @@ class ChatViewModel(private val container: AppContainer) {
         }
         val byId = list.associateBy { it.id }
         _authors.value = profiles
+        // وقت آخر رسالة يُسجَّل لقائمة الغرف (تصميم ٣: وقت في كل صف)
+        list.maxByOrNull { it.createdAt ?: "" }?.let { ChatPeek.note(it.channelId, it.createdAt) }
         _messages.value = list.map { message ->
             val reply = message.replyToId?.let { byId[it] }
             ChatMessageUi(
@@ -155,6 +168,8 @@ class ChatViewModel(private val container: AppContainer) {
                 realtimeHealthy = status == "joined"
                 if (status == "failed") scope.launch { refreshTails() }
             },
+            // عدّاد الحضور: من نفس المقبس، وبلا أي طلب إضافي
+            onPresence = { count -> if (count != _online.value) _online.value = count },
         )
         container.realtime.replace(sub)
     }
@@ -610,6 +625,7 @@ class ChatViewModel(private val container: AppContainer) {
     fun close() {
         pollJob?.cancel()
         container.realtime.close()
+        resetPresence()
         scope.cancel()
     }
 }

@@ -644,4 +644,33 @@
     <string name="notif_prompt_text">Recevez les messages du chat, les mentions et les nouveaux addons même app fermée. Chaque catégorie reste réglable dans les Paramètres.</string>
     <string name="notif_prompt_allow">Activer maintenant</string>
     <string name="notif_prompt_later">Plus tard</string>
+    <string name="home_hero_slogan">RÊVE-LE.
+CONSTRUIS-LE.
+CRÉE-LE.</string>
+    <string name="home_hero_subtitle">Des addons et des mondes prêts pour ton aventure</string>
+    <string name="home_hero_start">Commencer</string>
+    <string name="home_hero_family">Rejoindre la famille</string>
+    <string name="home_plan_current">Votre forfait actuel</string>
+    <string name="home_plan_free_desc">Contenu gratuit · Accès de base · Sans abonnement</string>
+    <string name="home_legend_title">REJOINDRE LEGENDARY</string>
+    <string name="home_legend_text">Addons légendaires · Mondes légendaires · Accès prioritaire</string>
+    <string name="home_legend_view">Voir</string>
+    <string name="home_chip_all">Tout</string>
+    <string name="home_chip_addons">Addons</string>
+    <string name="home_chip_worlds">Mondes</string>
+    <string name="home_chip_favorites">Favoris</string>
+    <string name="home_latest_addons">Derniers addons</string>
+    <string name="home_most_downloaded">Les plus téléchargés</string>
+    <string name="home_featured_creators">Créateurs en vedette</string>
+    <string name="home_creators_caption">Sélection spéciale AddonStation</string>
+    <string name="home_no_content">Aucun contenu publié pour le moment</string>
+    <string name="home_error">Une erreur est survenue</string>
+    <string name="home_error_tap">Touchez pour réessayer</string>
+    <string name="comm_all_rooms">Toutes les salles</string>
+    <string name="comm_rules_banner">⚠️ Règles de la communauté · Les violations peuvent entraîner un mute ou un bannissement</string>
+    <string name="comm_members_only">Le chat est réservé aux membres — connectez-vous pour entrer</string>
+    <string name="chat_online">%1$d en ligne</string>
+    <string name="chat_pinned_strip">Messages épinglés · %1$s</string>
+    <string name="home_by_creator">Par %1$s</string>
+    <string name="chat_nobody_online">Personne n’est en ligne pour le moment</string>
 </resources>

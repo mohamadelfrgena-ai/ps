@@ -457,6 +457,7 @@ private fun MainNavigation(
                             openLogin = { go(Routes.LOGIN) },
                             openSignup = { go(Routes.SIGNUP) },
                             openWallet = { go(Routes.WALLET) },
+                            openNotifications = { go(Routes.NOTIFICATIONS) },
                             openItem = { item -> go(Routes.item(item.id)) },
                             openCreatorProfile = { id -> go(Routes.creatorProfile(id)) },
                         ),

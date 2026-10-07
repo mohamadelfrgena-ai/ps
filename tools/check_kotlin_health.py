@@ -115,6 +115,17 @@ def main() -> int:
         for d in sorted(dupes):
             problems.append(f"استيراد مكرّر · {rel} → {d}")
 
+        # أعضاء النطاقات (RowScope/BoxScope/ColumnScope) لا تُستورد كدوال عليا:
+        # `weight` و`align` و`matchParentSize` تُنادى داخل النطاق مباشرةً.
+        # استيرادها يمنع البناء بخطأ «unresolved reference» — حدث فعلاً مرةً.
+        for imp in imports:
+            if imp in (
+                "import androidx.compose.foundation.layout.weight",
+                "import androidx.compose.foundation.layout.align",
+                "import androidx.compose.foundation.layout.matchParentSize",
+            ):
+                problems.append(f"استيراد غير صالح (عضو نطاق) · {rel} → {imp}")
+
         for n, line in enumerate(text.split("\n"), 1):
             if "TODO" in line or "FIXME" in line:
                 problems.append(f"TODO/FIXME منسيّ · {rel}:{n}")

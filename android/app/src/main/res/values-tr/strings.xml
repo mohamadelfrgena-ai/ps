@@ -644,4 +644,33 @@
     <string name="notif_prompt_text">Uygulama kapalıyken bile sohbet mesajlarını, bahsetmeleri ve yeni eklentileri al. Her bölümü sonradan Ayarlar\'dan değiştirebilirsin.</string>
     <string name="notif_prompt_allow">Şimdi aç</string>
     <string name="notif_prompt_later">Sonra</string>
+    <string name="home_hero_slogan">HAYAL ET.
+İNŞA ET.
+YARAT.</string>
+    <string name="home_hero_subtitle">Macera için hazır eklentiler ve dünyalar</string>
+    <string name="home_hero_start">Şimdi başla</string>
+    <string name="home_hero_family">Aileye katıl</string>
+    <string name="home_plan_current">Mevcut planın</string>
+    <string name="home_plan_free_desc">Ücretsiz içerik · Temel erişim · Abonelik yok</string>
+    <string name="home_legend_title">LEGENDARY\'E KATIL</string>
+    <string name="home_legend_text">Efsanevi eklentiler · Efsanevi dünyalar · Öncelikli erişim</string>
+    <string name="home_legend_view">Gör</string>
+    <string name="home_chip_all">Tümü</string>
+    <string name="home_chip_addons">Eklentiler</string>
+    <string name="home_chip_worlds">Dünyalar</string>
+    <string name="home_chip_favorites">Favoriler</string>
+    <string name="home_latest_addons">En yeni eklentiler</string>
+    <string name="home_most_downloaded">En çok indirilen</string>
+    <string name="home_featured_creators">Öne çıkan üreticiler</string>
+    <string name="home_creators_caption">AddonStation özel seçkisi</string>
+    <string name="home_no_content">Henüz içerik yayınlanmadı</string>
+    <string name="home_error">Bir şeyler ters gitti</string>
+    <string name="home_error_tap">Yeniden denemek için dokun</string>
+    <string name="comm_all_rooms">Tüm odalar</string>
+    <string name="comm_rules_banner">⚠️ Topluluk kuralları · İhlaller susturma veya yasak getirebilir</string>
+    <string name="comm_members_only">Sohbet yalnızca üyelere — odalara girmek için giriş yap</string>
+    <string name="chat_online">%1$d çevrimiçi</string>
+    <string name="chat_pinned_strip">Sabitlenenler · %1$s</string>
+    <string name="home_by_creator">%1$s tarafından</string>
+    <string name="chat_nobody_online">Şu anda kimse çevrimiçi değil</string>
 </resources>

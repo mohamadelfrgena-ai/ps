@@ -660,4 +660,33 @@
     <string name="notif_prompt_text">Get chat messages, mentions and new addons even when the app is closed. You can change every part later from Settings.</string>
     <string name="notif_prompt_allow">Turn on now</string>
     <string name="notif_prompt_later">Later</string>
+    <string name="home_hero_slogan">DREAM IT.
+BUILD IT.
+CREATE IT.</string>
+    <string name="home_hero_subtitle">Addons and worlds ready for your adventure</string>
+    <string name="home_hero_start">Start now</string>
+    <string name="home_hero_family">Join the family</string>
+    <string name="home_plan_current">Your current plan</string>
+    <string name="home_plan_free_desc">Free content · Basic access · No subscription</string>
+    <string name="home_legend_title">JOIN LEGENDARY</string>
+    <string name="home_legend_text">Legendary addons · Legendary worlds · Priority access</string>
+    <string name="home_legend_view">View</string>
+    <string name="home_chip_all">All</string>
+    <string name="home_chip_addons">Addons</string>
+    <string name="home_chip_worlds">Worlds</string>
+    <string name="home_chip_favorites">Favorites</string>
+    <string name="home_latest_addons">Latest addons</string>
+    <string name="home_most_downloaded">Most downloaded</string>
+    <string name="home_featured_creators">Featured creators</string>
+    <string name="home_creators_caption">Creator specials selected by AddonStation</string>
+    <string name="home_no_content">No content published yet</string>
+    <string name="home_error">Something went wrong</string>
+    <string name="home_error_tap">Tap to retry</string>
+    <string name="comm_all_rooms">All rooms</string>
+    <string name="comm_rules_banner">⚠️ Community rules · Violations may lead to a mute or a ban</string>
+    <string name="comm_members_only">Chat is for members only — sign in to enter the rooms</string>
+    <string name="chat_online">%1$d online</string>
+    <string name="chat_pinned_strip">Pinned messages · %1$s</string>
+    <string name="home_by_creator">By %1$s</string>
+    <string name="chat_nobody_online">Nobody is online right now</string>
 </resources>

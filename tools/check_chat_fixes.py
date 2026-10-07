@@ -116,12 +116,23 @@ rows.append(("الصورة/الفيديو يُرسلان مع النص المك�
              "imagePath = if (attach?.kind == \"image\") attach.remotePath else null" in send_now
              and "mediaPath = if (attach != null && attach.kind != \"image\") attach.remotePath else null" in send_now))
 # الرسالة نفسها: النص فوقه والملصق تحته مباشرة
-sticker_block = re.search(r'"sticker" -> \{(?:.|\n)*?\n            \}', screen)
-sticker_block = sticker_block.group(0) if sticker_block else ""
+# كتلة الملصق بموازنة الأقواس (النمط النمطي القديم كان يقف عند أول قوس مغلق)
+_i = screen.find('"sticker" -> {')
+sticker_block = ""
+if _i >= 0:
+    _d, _j = 0, screen.index("{", _i)
+    for _k in range(_j, len(screen)):
+        if screen[_k] == "{":
+            _d += 1
+        elif screen[_k] == "}":
+            _d -= 1
+            if _d == 0:
+                sticker_block = screen[_j:_k + 1]
+                break
 rows.append(("عرض النص فوق الملصق في نفس الرسالة",
              "message.content.orEmpty()" in sticker_block
-             and "CoverImage(url = url" in sticker_block
-             and sticker_block.find("message.content.orEmpty()") < sticker_block.find("CoverImage(url = url")))
+             and "CoverImage(" in sticker_block
+             and sticker_block.find("message.content.orEmpty()") < sticker_block.find("CoverImage(")))
 rows.append(("النص يُمسح فوراً لا بعد النجاح", "text = \"\"            // مسح فوري" in screen
              or "text = \"\"                // مسح فوري" in screen))
 rows.append(("ما كتبه يعود لو فشل الإرسال", "val replySnapshot = replyTo" in send_now
