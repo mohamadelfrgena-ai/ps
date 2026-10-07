@@ -730,8 +730,4 @@ CREATE IT.</string>
     <string name="profile_unfriend_confirm">Remove this member from your friends?</string>
     <string name="mute_member_locked">Legendary</string>
     <string name="mute_member_needs_plan">Muting members is a Legendary feature — opening the subscription.</string>
-    <string name="notif_muted_users">Mute muted members’ notifications</string>
-    <string name="notif_muted_users_desc">On: a muted member’s messages and notifications never reach you.</string>
-    <string name="notif_muted_users_locked">Legendary subscription feature</string>
-    <string name="notif_mute_section">Member mute</string>
 </resources>

@@ -14,7 +14,8 @@
     35_push_live.sql        الإشعارات الحقيقية + جدولة الطابور
     36_profile_stats.sql    إحصاءات الملف الشخصي (أصدقاء · تنزيلات · مفضّلة · مستوى)
     37_profile_reports.sql  الإبلاغ عن عضو من ملفّه
-    38_user_mute.sql        كتم العضو (لا رسائل ولا إشعارات · ميزة Legendary)
+    38_user_mute.sql        كتم العضو (رسائله فقط · ميزة Legendary)
+    39_notif_revert.sql     إرجاع الإشعارات كما كانت (إزالة إسقاط إشعارات المكتوم)
 
 لماذا سكربت بدل كتابة SQL داخل YAML؟ لأن heredoc داخل ملف سير العمل سبق أن
 أخفى سبب الفشل تماماً (لا مخرجات ولا ملاحظات). هنا: كل ملف يُطبع نتاجه، وإعادة
@@ -39,6 +40,7 @@ FILES = [
     "supabase/36_profile_stats.sql",
     "supabase/37_profile_reports.sql",
     "supabase/38_user_mute.sql",
+    "supabase/39_notif_revert.sql",
 ]
 
 # فحص صريح بعد التنفيذ: هل وصلت الدوال/الأعمدة فعلاً؟
@@ -57,9 +59,14 @@ CHECK = (
     "where n.nspname = 'public' and p.proname = 'can_mute_members')::text"
     " || ' user_mutes=' || (select count(*) from information_schema.tables "
     "where table_schema = 'public' and table_name = 'user_mutes')::text"
-    " || ' muted_users=' || (select count(*) from information_schema.columns "
+    " || ' notif_drop_trigger=' || (select count(*) from pg_trigger "
+    "where not tgisinternal and tgname = 'trg_push_drop_muted_actor')::text"
+    " || ' muted_users_col=' || (select count(*) from information_schema.columns "
     "where table_schema = 'public' and table_name = 'push_prefs' "
     "and column_name = 'muted_users')::text"
+    " || ' push_set_prefs_args=' || (select count(*) from information_schema.parameters p "
+    "join information_schema.routines r on r.specific_name = p.specific_name "
+    "where r.routine_schema = 'public' and r.routine_name = 'push_set_prefs')::text"
     " || ' user_blocks=' || (select count(*) from information_schema.tables "
     "where table_schema = 'public' and table_name = 'user_blocks')::text"
     " || ' is_blocked_pair=' || (select count(*) from pg_proc p "
@@ -197,7 +204,7 @@ def write_status(notes, ok: bool) -> None:
         return
     body = json.dumps({
         "state": "success" if ok else "failure",
-        "context": "خادم SQL (33 · 34 · 35 · 36 · 37 · 38)",
+        "context": "خادم SQL (33 · 34 · 35 · 36 · 37 · 38 · 39)",
         "description": " · ".join(notes)[:130],
     }).encode()
     req = urllib.request.Request(

@@ -1,35 +1,27 @@
 -- ============================================================================
---  38) كتم عضو — زرّ واحد: تُخفى رسائله **وإشعاراته** · ميزة اشتراك Legendary
+--  38) كتم عضو — زرّ واحد: تُخفى رسائله · ميزة اشتراك Legendary
 -- ============================================================================
---  المطلوب من المالك (حرفياً): «نحتاج زر واحد وكتم الإشعارات وينفتح في اشتراك
---  ليغسي وايضا يكون في الاعدادت التطبيق زر اطفاء وتشغيل» — فيُنفَّذ هنا بند بند:
+--  طلب المالك: «نحتاج زر واحد ... وينفتح في اشتراك ليغسي» — ثم قراره الأخير:
+--  «اعني الشعارات رجعها كما كنت» ⇒ **الإشعارات رجعت كما كانت**:  الكتم لا يمسّ
+--  الإشعارات إطلاقاً (لا إسقاط صفٍّ ولا مفتاح في الإعدادات ولا عمود جديد)،
+--  وإنما يمنع الرسائل: تُخفى رسائل المكتوم في التطبيق من قائمة المكتومين،
+--  والقائمة تأتي من هذا الملف (user_mutes) فتسري على كل أجهزة المستخدم.
 --
---  ① «زرّ واحد»: صفٌّ واحد في بطاقة السلامة (كتم هذا العضو / إلغاء الكتم)
---      يقوم بالأمرين معاً — لا زرّ للرسائل وزرّ للإشعارات.
---  ② «كتم الإشعارات»: المكتوم لا يصل منه **أي إشعار** (لا جرس في التطبيق ولا
---      دفع للهاتف). التنفيذ زناد BEFORE INSERT على `chat_notifications` يُلغي
---      صفّ الإشعار كاملاً حين يكون صاحبه مكتوماً ⇒ زناد الدفع (بعد الإدراج)
---      لا يعمل أصلاً، ولا يبقى شيء في الجرس. (ولا يمسّ رسائل الغرفة نفسها:
---      إخفاؤها يجري في التطبيق من قائمة المكتومين.)
---  ③ «ينفتح في اشتراك Legendary»: الكتم ميزة اشتراك Legendary — الخادم يرفض
+--  ① «زرّ واحد»: صفٌّ واحد في بطاقة السلامة (كتم هذا العضو / إلغاء الكتم) —
+--      لا زرّ للرسائل وزرّ للإشعارات.
+--  ② «ينفتح في اشتراك Legendary»: الكتم ميزة اشتراك Legendary — الخادم يرفض
 --      `legendary_required` لمن لا اشتراك له (والإدارة/المشرفون مستثنون لتجربة
 --      الميزة). والحظر والإبلاغ يبقيان للجميع (سياسة Google Play — لا يُقيَّدان).
---  ④ «زرّ اطفاء وتشغيل في الإعدادات»: عمود `push_prefs.muted_users` — أطفئه
---      فيبقى الكتم على الرسائل وحدها وتصل إشعارات المكتوم.
+--  ③ الإشعارات: لا شأن لها بهذا الملف — زناد الإشعارات (34) وطابور الدفع (35)
+--      يعملان كما كانا لكل الرسائل، مكتوماً كان المرسل أو غير مكتوم.
 --
---  أسماء الكائنات كما يسأل عنها الفاحص: الجدول 'user_mutes' · العمود 'muted_users'
---  في push_prefs · الزناد 'trg_push_drop_muted_actor'.
+--  أسماء الكائنات كما يسأل عنها الفاحص: الجدول 'user_mutes' · الدوال
+--  'can_mute_members' · 'user_mute' · 'user_unmute' · 'my_muted_users' ·
+--  'i_muted_user' · وسياسة 'user_mutes_read'.
 --
 --  آمن للتكرار · لا يحذف شيئاً · ويعيد تفعيل RLS على `user_blocks` (كانت
 --  مُعطَّلة فيه، فيقرأ أيُّ مستخدمٍ كلَّ الحظرات — إصلاح أمني بسيط هنا).
 -- ============================================================================
-
--- ---------------------------------------------------------------------------
--- 0) عمود المفتاح قبل كل شيء: تقرأه `is_muted_by` أدناه ⇒ يجب أن يسبقها
---    (نُكرّره في §4 لمن يقرأ الملف على أجزاء؛ و`if not exists` تجعله بلا أثر).
--- ---------------------------------------------------------------------------
-alter table public.push_prefs
-  add column if not exists muted_users boolean not null default true;
 
 -- ---------------------------------------------------------------------------
 -- 1) جدول الكتم: من كتم من
@@ -41,12 +33,12 @@ create table if not exists public.user_mutes (
   primary key (muter_id, muted_id),
   constraint user_mutes_not_self check (muter_id <> muted_id)
 );
-create index if not exists user_mutes_muted_idx on public.user_mutes(muted_id);
 
 comment on table public.user_mutes is
-  'كتم عضو (ميزة Legendary): تُخفى رسائله في التطبيق **ولا يصل منه أي إشعار** — بلا أثر على الطرف الآخر.';
+  'كتم عضو: صاحب الصفّ (muter_id) لا يرى رسائل (muted_id) في التطبيق — ولا شأن للإشعارات به (قرار المالك: الإشعارات كما كانت).';
 
 alter table public.user_mutes enable row level security;
+
 drop policy if exists user_mutes_read on public.user_mutes;
 create policy user_mutes_read on public.user_mutes
   for select using (muter_id = auth.uid());
@@ -107,6 +99,9 @@ begin
 end;
 $fn$;
 
+comment on function public.user_mute(uuid) is
+  'كتم عضو (رسائله فقط): يشترط اشتراك Legendary — ويُخزَّن على الخادم فتسري القائمة على كل الأجهزة.';
+
 create or replace function public.user_unmute(p_user_id uuid)
 returns jsonb
 language plpgsql security definer set search_path = public
@@ -114,134 +109,45 @@ as $fn$
 declare v_uid uuid := auth.uid();
 begin
   if v_uid is null then return jsonb_build_object('ok', false, 'message', 'sign_in_required'); end if;
+
   delete from public.user_mutes
    where muter_id = v_uid and muted_id = p_user_id;
+
   return jsonb_build_object('ok', true);
 end;
 $fn$;
 
-/** من كتمتُهم أنا (يقرأها التطبيق ليخفي رسائلهم في الشات). */
+comment on function public.user_unmute(uuid) is
+  'إلغاء كتم عضو — متاح للجميع (الإلغاء لا يحتاج اشتراكاً).';
+
 create or replace function public.my_muted_users()
-returns table (muted_id uuid)
+returns table (muted_id uuid, created_at timestamptz)
 language sql stable security definer set search_path = public
 as $fn$
-  select m.muted_id
+  select m.muted_id, m.created_at
     from public.user_mutes m
-   where m.muter_id = auth.uid();
+   where m.muter_id = auth.uid()
+   order by m.created_at desc;
 $fn$;
 
-/** هل كتمتُ هذا العضو؟ (لبطاقة السلامة: «كتم» أم «إلغاء الكتم») */
+comment on function public.my_muted_users() is
+  'قائمة المكتومين عندي — يقرأها التطبيق ليُخفي رسائلهم.';
+
 create or replace function public.i_muted_user(p_user_id uuid)
 returns boolean
 language sql stable security definer set search_path = public
 as $fn$
   select exists (
-    select 1 from public.user_mutes m
-     where m.muter_id = auth.uid() and m.muted_id = p_user_id
+    select 1 from public.user_mutes
+     where muter_id = auth.uid() and muted_id = p_user_id
   );
 $fn$;
 
-/**
- * هل يُكتم هذا المرسل عند هذا المستلم الآن؟
- *   • صفّ في `user_mutes` (المستلم كاتم المرسل)، **و**
- *   • مفتاح «كتم إشعارات المكتومين» في push_prefs مُشغَّل (الافتراضي: مُشغَّل).
- */
-create or replace function public.is_muted_by(p_recipient uuid, p_actor uuid)
-returns boolean
-language sql stable security definer set search_path = public
-as $fn$
-  select p_recipient is not null and p_actor is not null
-     and exists (
-       select 1 from public.user_mutes m
-        where m.muter_id = p_recipient and m.muted_id = p_actor
-     )
-     and coalesce(
-       (select pr.muted_users from public.push_prefs pr where pr.user_id = p_recipient),
-       true
-     );
-$fn$;
-
-comment on function public.is_muted_by(uuid, uuid) is
-  'هل المستلم كاتم المرسل (ومفتاح كتم الإشعارات مُشغَّل)؟ يستعمله زناد إسقاط الإشعارات.';
+comment on function public.i_muted_user(uuid) is
+  'هل أنا كاتم هذا العضو؟ — لعرض صفّ «إلغاء الكتم» بدل «كتم العضو».';
 
 -- ---------------------------------------------------------------------------
--- 4) زرّ الإطفاء/التشغيل في الإعدادات: عمود push_prefs.muted_users
---    + زناد يُسقط إشعارات المكتومين (لا جرس ولا دفع)
--- ---------------------------------------------------------------------------
-alter table public.push_prefs
-  add column if not exists muted_users boolean not null default true;
-
-comment on column public.push_prefs.muted_users is
-  'مفتاح الإعدادات: هل يوقف الكتمُ إشعارات المكتوم أيضاً؟ (أطفئه ⇒ الكتم على الرسائل وحدها).';
-
-create or replace function public.push_drop_muted_actor()
-returns trigger
-language plpgsql security definer set search_path = public
-as $fn$
-begin
-  -- BEFORE INSERT: إرجاع null يُلغي صفّ الإشعار ⇒ لا جرس ولا دفع،
-  -- ولا يعمل زناد الدفع (وهو AFTER INSERT) أصلاً.
-  if new.actor_id is not null and public.is_muted_by(new.recipient_id, new.actor_id) then
-    return null;
-  end if;
-  return new;
-end;
-$fn$;
-
-drop trigger if exists trg_push_drop_muted_actor on public.chat_notifications;
-create trigger trg_push_drop_muted_actor
-  before insert on public.chat_notifications
-  for each row execute function public.push_drop_muted_actor();
-
--- ---------------------------------------------------------------------------
--- 5) حفظ المفتاح: push_set_prefs + وسيط واحد
---    (نُسقط النسخة القديمة أولاً وإلا صار لدينا نسختان يتحيّر PostgREST بينهما)
--- ---------------------------------------------------------------------------
-drop function if exists public.push_set_prefs(
-  boolean, boolean, boolean, boolean, boolean, boolean, boolean, int, int, int);
-
-create or replace function public.push_set_prefs(
-  p_master        boolean default null,
-  p_chat          boolean default null,
-  p_content       boolean default null,
-  p_social        boolean default null,
-  p_account       boolean default null,
-  p_reminders     boolean default null,
-  p_quiet_enabled boolean default null,
-  p_quiet_from    int default null,
-  p_quiet_to      int default null,
-  p_reengage_days int default null,
-  p_muted_users   boolean default null
-)
-returns public.push_prefs
-language plpgsql security definer set search_path = public
-as $fn$
-declare v_uid uuid := auth.uid(); v public.push_prefs;
-begin
-  if v_uid is null then return null; end if;
-  perform public.push_prefs_for(v_uid);
-
-  update public.push_prefs
-     set master        = coalesce(p_master, master),
-         chat          = coalesce(p_chat, chat),
-         content       = coalesce(p_content, content),
-         social        = coalesce(p_social, social),
-         account       = coalesce(p_account, account),
-         reminders     = coalesce(p_reminders, reminders),
-         quiet_enabled = coalesce(p_quiet_enabled, quiet_enabled),
-         quiet_from    = coalesce(p_quiet_from, quiet_from),
-         quiet_to      = coalesce(p_quiet_to, quiet_to),
-         reengage_days = coalesce(p_reengage_days, reengage_days),
-         muted_users   = coalesce(p_muted_users, muted_users),
-         updated_at    = now()
-   where user_id = v_uid
-   returning * into v;
-  return v;
-end;
-$fn$;
-
--- ---------------------------------------------------------------------------
--- 6) المنح (بعد الإسقاط تُفقد المنح القديمة ⇒ نُعيدها)
+-- 4) المنح
 -- ---------------------------------------------------------------------------
 revoke all on function public.can_mute_members(uuid) from public, anon;
 grant execute on function public.can_mute_members(uuid) to authenticated;
@@ -249,8 +155,5 @@ grant execute on function public.user_mute(uuid) to authenticated;
 grant execute on function public.user_unmute(uuid) to authenticated;
 grant execute on function public.my_muted_users() to authenticated;
 grant execute on function public.i_muted_user(uuid) to authenticated;
-grant execute on function public.push_set_prefs(boolean, boolean, boolean, boolean, boolean,
-                                                boolean, boolean, int, int, int, boolean) to authenticated;
 
--- فهرس PostgREST يتحدّث فوراً (وإلا ردّ 404 لدالة جديدة — درس سابق)
 notify pgrst, 'reload schema';

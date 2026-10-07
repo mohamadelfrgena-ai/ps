@@ -110,7 +110,7 @@ must = {
     "chat_messages": ["id", "user_id", "status", "created_at"],
     "chat_notifications": ["recipient_id", "actor_id", "type", "message_id",
                            "channel_id", "meta"],
-    "push_prefs": ["user_id", "muted_users"],
+    "push_prefs": ["user_id", "master", "chat", "content", "social", "account"],
 }
 for table, cols in must.items():
     known = TABLES.get(table, set())
@@ -118,8 +118,12 @@ for table, cols in must.items():
     check(f"أعمدة {table} الحسّاسة موجودة ({len(cols)})", not missing, str(missing))
 
 # ── ⑤ ما يعتمد عليه ملفّا الكتم والإبلاغ ────────────────────────────────────
-check("38 يضيف عمود push_prefs.muted_users",
-      "muted_users" in TABLES.get("push_prefs", set()))
+check("لا عمود push_prefs.muted_users (الإشعارات كما كانت)",
+      "muted_users" not in TABLES.get("push_prefs", set()))
+_revert = read("39_notif_revert.sql")
+check("39 يُزيل زناد إسقاط إشعارات المكتوم وعمود المفتاح",
+      "drop trigger if exists trg_push_drop_muted_actor" in _revert
+      and "drop column if exists muted_users" in _revert)
 check("37 يضيف `target_user_id` إلى chat_reports",
       "target_user_id" in read("37_profile_reports.sql"))
 

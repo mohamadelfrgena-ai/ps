@@ -714,8 +714,4 @@
     <string name="profile_unfriend_confirm">إزالة هذا العضو من أصدقائك؟</string>
     <string name="mute_member_locked">Legendary</string>
     <string name="mute_member_needs_plan">كتم الأعضاء ميزة اشتراك Legendary — نفتح لك صفحة الاشتراك.</string>
-    <string name="notif_muted_users">كتم إشعارات الأعضاء المكتومين</string>
-    <string name="notif_muted_users_desc">مُشغَّل: المكتوم لا تصلك رسائله ولا إشعاراته.</string>
-    <string name="notif_muted_users_locked">ميزة اشتراك Legendary</string>
-    <string name="notif_mute_section">كتم الأعضاء</string>
 </resources>

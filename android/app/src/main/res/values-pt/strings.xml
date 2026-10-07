@@ -714,8 +714,4 @@ CRIE.</string>
     <string name="profile_unfriend_confirm">Remover este membro dos seus amigos?</string>
     <string name="mute_member_locked">Legendary</string>
     <string name="mute_member_needs_plan">Silenciar membros é um recurso Legendary — abrindo a assinatura.</string>
-    <string name="notif_muted_users">Silenciar notificações dos membros silenciados</string>
-    <string name="notif_muted_users_desc">Ativado: nada do membro silenciado chega até você.</string>
-    <string name="notif_muted_users_locked">Recurso da assinatura Legendary</string>
-    <string name="notif_mute_section">Soneca de membros</string>
 </resources>

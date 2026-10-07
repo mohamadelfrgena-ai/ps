@@ -714,8 +714,4 @@
     <string name="profile_unfriend_confirm">将该成员从好友中移除？</string>
     <string name="mute_member_locked">Legendary</string>
     <string name="mute_member_needs_plan">静音成员是 Legendary 订阅功能——正在打开订阅页。</string>
-    <string name="notif_muted_users">不接收已静音成员的通知</string>
-    <string name="notif_muted_users_desc">开启：已静音成员的消息和通知都不会送达。</string>
-    <string name="notif_muted_users_locked">Legendary 订阅功能</string>
-    <string name="notif_mute_section">成员静音</string>
 </resources>

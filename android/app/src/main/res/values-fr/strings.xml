@@ -714,8 +714,4 @@ CRÉE-LE.</string>
     <string name="profile_unfriend_confirm">Retirer ce membre de vos amis ?</string>
     <string name="mute_member_locked">Legendary</string>
     <string name="mute_member_needs_plan">Le mode sourdine est réservé à l’abonnement Legendary — ouverture de l’abonnement.</string>
-    <string name="notif_muted_users">Couper les notifications des membres en sourdine</string>
-    <string name="notif_muted_users_desc">Activé : aucune message ni notification d’un membre en sourdine.</string>
-    <string name="notif_muted_users_locked">Réservé à l’abonnement Legendary</string>
-    <string name="notif_mute_section">Sourdine des membres</string>
 </resources>

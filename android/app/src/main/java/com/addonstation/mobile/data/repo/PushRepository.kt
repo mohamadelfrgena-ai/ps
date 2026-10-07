@@ -94,8 +94,6 @@ class PushRepository(private val supabase: SupabaseClient) {
         quietFrom: Int? = null,
         quietTo: Int? = null,
         reengageDays: Int? = null,
-        /** مفتاح «كتم إشعارات المكتومين» (زرّ الإطفاء/التشغيل في الإعدادات). */
-        mutedUsers: Boolean? = null,
     ): PushPrefs? = withContext(Dispatchers.IO) {
         runCatching {
             composite<PushPrefs>(
@@ -112,7 +110,6 @@ class PushRepository(private val supabase: SupabaseClient) {
                         "p_quiet_from" to p(quietFrom),
                         "p_quiet_to" to p(quietTo),
                         "p_reengage_days" to p(reengageDays),
-                        "p_muted_users" to p(mutedUsers),
                     ),
                     signedOnly = true,
                 ),
