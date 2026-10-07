@@ -199,6 +199,39 @@ def main() -> int:
                for t in re.findall(r"'([a-z_]+)'", t) if t not in cat["indexes"]]
     rows.append(("لا فهرس مذكوراً بغير اسمه الصحيح", not bad_idx, " · ".join(bad_idx)))
 
+    # ٣أ) الأعمدة: كل (جدول، عمود) يفحصه الفاحص يجب أن يكون عموداً حقيقياً في
+    #     نفس الجدول — وهذا ما لم يمسكه الفحص السابق (فحص `cover_url` وقد كان
+    #     الصحيح `banner_url` ⇒ بند يفشل دائماً).
+    tables_cols = {}
+    for p3 in sorted(SUPABASE.glob("*.sql")):
+        if p3.name in ("00_ALL_IN_ONE.sql", "99_VERIFY_ALL.sql"):
+            continue
+        text = read(p3)
+        for tname, body in re.findall(
+                r"create table (?:if not exists )?public\.([a-z_]+)\s*\((.*?)\n\);", text, re.S):
+            cols = set()
+            for line in body.split("\n"):
+                m = re.match(r"\s*([a-z_][a-z0-9_]*)\s+(?:uuid|text|int|integer|bigint|boolean|"
+                             r"timestamptz|timestamp|citext|numeric|jsonb|json|date|smallint|real|"
+                             r"serial|bigserial|inet|bytea|interval)\b", line, re.I)
+                if m and m.group(1).lower() not in ("primary", "unique", "check", "constraint",
+                                                    "foreign", "references", "not", "default"):
+                    cols.add(m.group(1).lower())
+            tables_cols.setdefault(tname, set()).update(cols)
+        for tname, col in re.findall(
+                r"alter table public\.([a-z_]+)\s+add column (?:if not exists )?([a-z_]+)", text, re.I):
+            tables_cols.setdefault(tname, set()).add(col.lower())
+
+    bad_pairs = []
+    for tname, cols in re.findall(
+            r"table_name = '([a-z_]+)'[\s\S]{0,120}?column_name in \(([^)]*)\)", sql):
+        for col in re.findall(r"'([a-z_]+)'", cols):
+            known = tables_cols.get(tname)
+            if known is not None and col not in known:
+                bad_pairs.append(f"{tname}.{col}")
+    rows.append(("كل عمود مذكور موجود في جدوله فعلاً", not bad_pairs,
+                 " · ".join(sorted(set(bad_pairs))[:6])))
+
     # ٣ب) القيم الحرفية: كل قيمة يقارنها الفاحص بعمود يجب أن تكون قيمة حقيقية
     #     في ملفات الترحيل — هكذا لا نطالب بقيمة لا وجود لها (مثال وقع فعلاً:
     #     post_permission = 'admin' والصحيح 'admin_only').
@@ -216,6 +249,52 @@ def main() -> int:
     bad_values = sorted(set(bad_values))
     rows.append(("كل قيمة حرفية مذكورة موجودة في الترحيلات", not bad_values,
                  " · ".join(bad_values[:6])))
+
+    # ٣ث) أقسام الأصول: الأعداد المتوقّعة في الفاحص يجب أن تُطابق أعداد ملفات
+    #     البذرة (15 · 21) بالحرف — لا رقم مخترع ولا قسم منسي.
+    def seed_collections():
+        counts = {}
+        for fname in ("15_assets_v2.sql", "21_banners.sql"):
+            for line in read(SUPABASE / fname).split("\n"):
+                t = line.strip()
+                if not t.startswith("('"):
+                    continue
+                # قسّم الحقول مع مراعاة النصوص
+                body = t[t.find("(") + 1: t.rfind(")")]
+                fields, buf, q, i = [], [], False, 0
+                while i < len(body):
+                    ch = body[i]
+                    if ch == "'":
+                        if q and i + 1 < len(body) and body[i + 1] == "'":
+                            i += 2
+                            continue
+                        q = not q
+                        i += 1
+                        continue
+                    if ch == "," and not q:
+                        fields.append("".join(buf).strip())
+                        buf = []
+                        i += 1
+                        continue
+                    buf.append(ch)
+                    i += 1
+                fields.append("".join(buf).strip())
+                if len(fields) < 9 or fields[0] not in ("avatar", "banner", "sticker", "item"):
+                    continue
+                name = fields[6].strip("'")
+                counts[name] = counts.get(name, 0) + 1
+        return counts
+
+    seed = seed_collections()
+    # **كل** ظهور للقسم يجب أن يطابق البذرة (القائمة تُكتب مرّتين: في الفحص وفي
+    # التفاصيل — فأي خطأ في أحدهما يجب أن يُمسَك).
+    occurrences = re.findall(r"\('([^']+)', (\d+)\)", sql)
+    wrong_counts = [f"{c}: الفاحص {n} · البذرة {seed.get(c)}"
+                    for c, n in occurrences if seed.get(c) != int(n)]
+    missing_colls = [c for c in seed if c not in {c for c, _ in occurrences}]
+    rows.append((f"أعداد الأقسام في الفاحص = ملفات البذرة ({len(seed)} قسماً)",
+                 not wrong_counts and not missing_colls,
+                 " · ".join(wrong_counts[:5] + [f"منسي: {c}" for c in missing_colls[:3]])))
 
     # ٣ج) كل مقارنة نتيجة في الفاحص يجب أن تكون 'true'/'false' (نتائج الفحص
     #     مصبوبة نصّاً) — خطأ من نوع «= '1'» يجعل البند يفشل دائماً بلا سبب.

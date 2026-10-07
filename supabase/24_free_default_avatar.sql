@@ -5,7 +5,7 @@
 --          أي الصورة الافتراضية المجانية.»
 --
 --  ما يفعله هذا الملف (آمن لإعادة التنفيذ):
---      1) يجعل الافتراضي لعمود profiles.avatar_url = 'profiles/onefree.png'.
+--      1) يجعل الافتراضي لعمود profiles.avatar_url = 'profiles/profiles/onefree.png'.
 --      2) يعبّئ كل حساب **بلا صورة** (فارغ أو null) بنفس الصورة — فلا يبقى
 --         حساب بلا أفاتار.
 --      3) يثبّت الصورة صراحةً داخل دالة handle_new_user() ⇒ كل حساب **جديد**
@@ -16,21 +16,22 @@
 --  والصورة مسجّلة في site_assets بـ required_plan = 'free' ⇒ مباحة للجميع
 --  (هي الصورة الوحيدة غير المقفولة في تبويب الأفاتار).
 --
---  ⚠️ إن لم تظهر الصورة داخل التطبيق فالملف غير موجود في المخزن — ارفعه:
---       site-assets/profiles/onefree.png
---     (التطبيق يجرب المسارين profiles/profiles/onefree.png و
---      profiles/onefree.png تلقائياً، ثم أيقونة محلية أخيرة).
+--  ⚠️ المسار المعتمد هو ما هو موجود فعلاً في المخزن:
+--       site-assets/profiles/profiles/onefree.png
+--     (التطبيق يجرب المسارين — profiles/profiles/onefree.png ثم
+--      profiles/onefree.png — ثم أيقونة محلية أخيرة، فلا تعطل الصورة أبداً.
+--      وملف 32_onefree_canonical_path يوحّد كل شيء على المسار الموجود.)
 --
 --  يُنفَّذ مرة واحدة في Supabase → SQL Editor.
 -- ============================================================================
 
 -- ١) الافتراضي على مستوى العمود
 alter table public.profiles
-  alter column avatar_url set default 'profiles/onefree.png';
+  alter column avatar_url set default 'profiles/profiles/onefree.png';
 
 -- ٢) تعبئة الحسابات القائمة التي بلا صورة
 update public.profiles
-   set avatar_url = 'profiles/onefree.png',
+   set avatar_url = 'profiles/profiles/onefree.png',
        updated_at = now()
  where avatar_url is null
     or btrim(avatar_url) = ''
@@ -60,7 +61,7 @@ begin
 
   -- الصورة الافتراضية المجانية onefree لكل حساب جديد
   insert into public.profiles (id, username, display_name, avatar_url)
-  values (new.id, v_username, v_username, 'profiles/onefree.png')
+  values (new.id, v_username, v_username, 'profiles/profiles/onefree.png')
   on conflict (id) do nothing;
 
   insert into public.ac_wallets (user_id, balance, total_earned)

@@ -662,7 +662,16 @@ begin
   -- السماح بإعادة التعيين للقيمة الافتراضية
   if p_value is null or p_value = '' or p_value = 'none' then
     if p_kind = 'avatar' then
-      update public.profiles set avatar_url = 'profiles/onefree.png' where id = v_uid;
+      -- المسار من صف الأفاتار المجاني المفعّل نفسه (لا مسار مكتوب يدوياً):
+      -- فلا يتعطّل شيء إن تغيّر مسار الصورة في المخزن (راجع 32).
+      update public.profiles
+         set avatar_url = coalesce(
+               (select a.file_url from public.site_assets a
+                 where a.asset_type = 'avatar' and a.required_plan = 'free' and a.enabled
+                 order by a.sort_order, a.id limit 1),
+               'profiles/profiles/onefree.png'),
+             updated_at = now()
+       where id = v_uid;
     elsif p_kind = 'banner' then
       update public.profiles set banner_url = null where id = v_uid;
     else

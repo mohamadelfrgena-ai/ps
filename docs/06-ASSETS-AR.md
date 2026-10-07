@@ -245,9 +245,13 @@ update public.site_assets set enabled = true where file_url = 'profiles/profiles
 ```
 
 **الصورة نفسها:** محفوظة في المستودع
-`supabase/site-assets/profiles/onefree.png` (640×640) — ارفعها إلى مخزن
-`site-assets` تحت المسار `profiles/onefree.png` (استبدال الملف القديم بنفس
-الاسم).
+`supabase/site-assets/profiles/onefree.png` (640×640) — والمسار المعتمد في
+المخزن هو **`profiles/profiles/onefree.png`** (هكذا رُفع فعلاً، ومعه 25 صورة
+أخرى في قسم «Profiles»)، و`32_onefree_canonical_path.sql` يوحّد كل شيء عليه:
+صف المكتبة · افتراضي `avatar_url` · دالة إنشاء الحساب · وكل الحسابات.
+
+> التطبيق يجرب المسارين تلقائياً (`profiles/profiles/onefree.png` ثم
+> `profiles/onefree.png`) ثم أيقونة محلية — فلا تظهر صورة مكسورة في أي حال.
 
 **البذرة:** `supabase/15_assets_v2.sql` يعطّل المجاني القديم بعد الإدخال، فأي
 تثبيت جديد من الصفر يطابق النتيجة بلا خطوة إضافية.

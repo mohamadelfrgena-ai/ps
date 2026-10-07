@@ -19,9 +19,10 @@
 --
 --  آمن لإعادة التنفيذ (idempotent).
 --
---  ⚠️ الملف نفسه يجب أن يكون مرفوعاً في المخزن:
---        site-assets/profiles/onefree.png
---     (نسخة محفوظة في المستودع: supabase/site-assets/profiles/onefree.png)
+--  ⚠️ الملف نفسه مرفوع في المخزن على المسار:
+--        site-assets/profiles/profiles/onefree.png   ← المسار المعتمد
+--     (نسخة محفوظة في المستودع: supabase/site-assets/profiles/onefree.png
+--      — ارفعها على المسار أعلاه إن احتجت، و32 يوحّد كل شيء عليه)
 --
 --  يُنفَّذ مرة واحدة في Supabase → SQL Editor.
 -- ============================================================================
@@ -53,19 +54,20 @@ update public.site_assets
    and required_plan = 'free'
    and lower(file_url) not like '%onefree%';
 
--- النسخة المزدوجة المسار (profiles/profiles/onefree.png) تُعطَّل هي الأخرى:
--- الصورة نفسها، ولا داعي لظهورها مرّتين في تبويب الأفاتار.
+-- المسار المعتمد **واحد فقط**: profiles/profiles/onefree.png — وهو المسار
+-- الذي رُفعت إليه الصورة فعلاً في المخزن (تحقّق منه فاحص 99). أي صف onefree
+-- آخر (مثل profiles/onefree.png) يُعطَّل، ولا يظهر مرّتين في تبويب الأفاتار.
 update public.site_assets
    set enabled = false
  where asset_type = 'avatar'
    and lower(file_url) like '%onefree%'
-   and file_url <> 'profiles/onefree.png';
+   and file_url <> 'profiles/profiles/onefree.png';
 
 -- ---------------------------------------------------------------------------
--- ٢) تثبيت الأصل المجاني الوحيد: profiles/onefree.png (اسمه onefree · مفعّل)
+-- ٢) تثبيت الأصل المجاني الوحيد: profiles/profiles/onefree.png (موجود في المخزن)
 -- ---------------------------------------------------------------------------
 insert into public.site_assets (asset_type, name, file_url, required_plan, animated, sort_order, enabled)
-values ('avatar', 'Onefree', 'profiles/onefree.png', 'free', false, 1, true)
+values ('avatar', 'Onefree', 'profiles/profiles/onefree.png', 'free', false, 1, true)
 on conflict (file_url) do update
    set asset_type    = excluded.asset_type,
        name          = excluded.name,

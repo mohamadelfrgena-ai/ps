@@ -88,15 +88,15 @@ add("01_schema", "عمودا التقسيم في site_assets (collection · coll
       "where table_schema = 'public' and table_name = 'site_assets' "
       "and column_name in ('collection', 'collection_order')"))
 
-add("01_schema", "أعمدة ملف المستخدم الأساسية (avatar_url · role · plan · equipped_item_id …)",
+add("01_schema", "أعمدة ملف المستخدم الأساسية (avatar_url · banner_url · role · plan · equipped_item_id …)",
     q_ok("select (count(*) = 8)::text from information_schema.columns "
          "where table_schema = 'public' and table_name = 'profiles' and column_name in "
          "('avatar_url', 'role', 'plan', 'plan_expires_at', 'equipped_item_id', 'username', "
-         "'display_name', 'cover_url')", "true"),
+         "'display_name', 'banner_url')", "true"),
     q("select count(*)::text || '/8' from information_schema.columns "
       "where table_schema = 'public' and table_name = 'profiles' and column_name in "
       "('avatar_url', 'role', 'plan', 'plan_expires_at', 'equipped_item_id', 'username', "
-      "'display_name', 'cover_url')"))
+      "'display_name', 'banner_url')"))
 
 add("01_schema", "دوال ومشغّلات الملف الشخصي (ترتيب الخطط · اللمس · الحماية)",
     "(select count(*) from unnest(array['plan_rank', 'role_rank', 'touch_updated_at', "
@@ -319,40 +319,96 @@ missing_list("14_redeem_codes", "سياسات أكواد الشحن",
 # ═══════════════════════════════════════════════════════════════════════════
 #  15_assets_v2 (+16_fix_asset_paths) + 21_banners + 27_admin_only_assets
 # ═══════════════════════════════════════════════════════════════════════════
-add("15_assets_v2 · 21_banners", "مجموع الأصول = 532 (492 من 15 + 40 بانر من 21)",
-    q_ok("select (count(*) = 532)::text from public.site_assets", "true"),
-    qdet("select count(*)::text || '/532' from public.site_assets"))
+COLLECTIONS = [("PFP", 14), ("Profiles", 26), ("Pack One", 19), ("Best Cartoon", 7),
+               ("Cartoon Meme", 11), ("Cool Cartoon", 6), ("Call Of Duty", 10), ("Sad", 10),
+               ("Ahh", 8), ("Moumen", 4), ("Animated", 8), ("Memes", 47),
+               ("Minecraft Memes 1", 21), ("Minecraft Memes 2", 87), ("Minecraft Memes 3", 20),
+               ("Minecraft Movie", 6), ("Top", 12), ("Minecraft Items", 103), ("Games", 41),
+               ("PlayStation", 10), ("Random Things", 22), ("Nature 🌿", 13), ("Random 🎲", 27)]
+COLLECTION_VALUES = ",\n              ".join(
+    f"('{c}', {n})" for c, n in COLLECTIONS)
+TOTAL_ASSETS = sum(n for _, n in COLLECTIONS)
+TYPE_MIN = {"avatar": 123, "item": 176, "sticker": 193, "banner": 40}
 
-add("15_assets_v2", "توزيع الأصول (123 أفاتار · 176 أداة · 193 ملصقاً · 40 بانر)",
-    q_ok("select ((count(*) filter (where asset_type = 'avatar') = 123) "
-         "and (count(*) filter (where asset_type = 'item') = 176) "
-         "and (count(*) filter (where asset_type = 'sticker') = 193) "
-         "and (count(*) filter (where asset_type = 'banner') = 40))::text "
-         "from public.site_assets", "true"),
-    qdet("select 'avatar ' || count(*) filter (where asset_type = 'avatar')::text || ' · item ' "
-      "|| count(*) filter (where asset_type = 'item')::text || ' · sticker ' "
-      "|| count(*) filter (where asset_type = 'sticker')::text || ' · banner ' "
-         "|| count(*) filter (where asset_type = 'banner')::text from public.site_assets"))
+# نُقارن بعدد **لا ينقص** عن دفعاتنا: أي زيادة = أصول أضفتها أنت من لوحة الإدارة
+# (مثل بانرين إضافيين) — وهذا لا يُعدّ نقصاً، بل يُذكر في التفاصيل.
+TYPE_CHECKS = " and ".join(
+    f"(count(*) filter (where asset_type = '{t}') >= {n})"
+    for t, n in TYPE_MIN.items())
 
-add("15_assets_v2 · 21_banners", "الأقسام (collection) مضبوطة — 23 قسماً",
-    q_ok("select (count(distinct collection) >= 23)::text from public.site_assets "
-         "where collection is not null", "true"),
-    qdet("select count(distinct collection)::text || ' قسماً' from public.site_assets "
-         "where collection is not null"))
+add("15_assets_v2 · 21_banners", f"مجموع الأصول >= {TOTAL_ASSETS} (492 من 15 + 40 بانر من 21)",
+    q_ok(f"select (count(*) >= {TOTAL_ASSETS})::text from public.site_assets", "true"),
+    qdet(f"select count(*)::text || '/{TOTAL_ASSETS} مصدر' "
+         "|| ' · إضافاتك: ' || greatest(count(*) - " + str(TOTAL_ASSETS) + ", 0)::text "
+         "from public.site_assets"))
 
-add("16_fix_asset_paths", "لا مسارات مكرّرة (profiles/profiles/ …) في الأصول",
-    q_ok("select (count(*) = 0)::text from public.site_assets "
-         "where file_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'",
-         "true"),
-    qdet("select count(*)::text || ' مساراً مكرّراً' from public.site_assets "
-         "where file_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'"))
+add("15_assets_v2", "توزيع الأصول كاملًا (123 أفاتاراً · 176 أداة · 193 ملصقاً · 40 بانراً)",
+    q_ok(f"select ({TYPE_CHECKS})::text from public.site_assets", "true"),
+    qdet("select 'avatar ' || count(*) filter (where asset_type = 'avatar')::text "
+         "|| ' · item ' || count(*) filter (where asset_type = 'item')::text "
+         "|| ' · sticker ' || count(*) filter (where asset_type = 'sticker')::text "
+         "|| ' · banner ' || count(*) filter (where asset_type = 'banner')::text "
+         "from public.site_assets"))
 
-add("16_fix_asset_paths", "لا مسارات مكرّرة في صور الحسابات",
-    q_ok("select (count(*) = 0)::text from public.profiles "
-         "where avatar_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'",
-         "true"),
-    qdet("select count(*)::text || ' حساباً' from public.profiles "
-         "where avatar_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'"))
+# قسمٌ قسمٌ: لا نقص في أي قسم من أقسام دفعاتنا (الزيادة مقبولة = إضافاتك)
+add("15_assets_v2 · 21_banners", f"لا نقص في أي قسم من أقسام الدفعات ({len(COLLECTIONS)} قسماً)",
+    q_ok(f"""(select (count(*) = 0)::text
+            from (values
+              {COLLECTION_VALUES}) as e(collection, want)
+            left join (select collection, count(*) as have
+                         from public.site_assets
+                        where collection is not null
+                        group by collection) a on a.collection = e.collection
+           where coalesce(a.have, 0) < e.want)""", "true"),
+    qdet(f"""select string_agg(e.collection || ': ' || coalesce(a.have, 0) || '/' || e.want, ' · ')
+              from (values
+                {COLLECTION_VALUES}) as e(collection, want)
+              left join (select collection, count(*) as have
+                           from public.site_assets
+                          where collection is not null
+                          group by collection) a on a.collection = e.collection
+             where coalesce(a.have, 0) < e.want""", "لا نقص في أي قسم"))
+
+# المصدر المرجعي: الملفات المرفوعة في المخزن. المسار المكرّر (profiles/profiles/…)
+# ليس خطأً — هكذا رُفعت الملفات فعلاً؛ لذلك نُقارن **بعد تطبيع البادئة المكرّرة**
+# من الطرفين، فالسؤال الصحيح: «هل كل صورة معروضة لها ملف في المخزن؟»
+NORM = "regexp_replace(%s, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/')"
+
+add("15_assets_v2 · 21_banners", "كل أصل مفعّل ملفه موجود في المخزن (لا صورة مكسورة)",
+    q_ok("select (count(*) = 0)::text from public.site_assets a "
+         "where a.enabled and not exists (select 1 from storage.objects o "
+         "where o.bucket_id = 'site-assets' and "
+         + NORM % "o.name" + " = " + NORM % "a.file_url" + ")", "true"),
+    qdet("select 'أول المفقود: ' || string_agg(a.file_url, ' · ') from ("
+         "select a.file_url from public.site_assets a "
+         "where a.enabled and not exists (select 1 from storage.objects o "
+         "where o.bucket_id = 'site-assets' and "
+         + NORM % "o.name" + " = " + NORM % "a.file_url" + ") limit 6) a",
+         "كل الملفات موجودة"))
+
+add("15_assets_v2", "كل أفاتار مفعّل ملفه موجود في المخزن",
+    q_ok("select (count(*) = 0)::text from public.site_assets a "
+         "where a.enabled and a.asset_type = 'avatar' and not exists ("
+         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and "
+         + NORM % "o.name" + " = " + NORM % "a.file_url" + ")", "true"),
+    qdet("select string_agg(a.file_url, ' · ') from ("
+         "select a.file_url from public.site_assets a "
+         "where a.enabled and a.asset_type = 'avatar' and not exists ("
+         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and "
+         + NORM % "o.name" + " = " + NORM % "a.file_url" + ") limit 6) a",
+         "كل الأفاتارات موجودة"))
+
+add("24_free_default_avatar · 32", "صور الحسابات موجودة في المخزن (لا حساب بصورة مكسورة)",
+    q_ok("select (count(*) = 0)::text from public.profiles p "
+         "where p.avatar_url is not null and btrim(p.avatar_url) <> '' "
+         "and lower(btrim(p.avatar_url)) <> 'none' and not exists ("
+         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and "
+         + NORM % "o.name" + " = " + NORM % "p.avatar_url" + ")", "true"),
+    qdet("select count(*)::text || ' حساباً' from public.profiles p "
+         "where p.avatar_url is not null and btrim(p.avatar_url) <> '' "
+         "and lower(btrim(p.avatar_url)) <> 'none' and not exists ("
+         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and "
+         + NORM % "o.name" + " = " + NORM % "p.avatar_url" + ")", "كل صور الحسابات موجودة"))
 
 add("21_banners", "بانرات إضافية مسجّلة (40)",
     q_ok("select (count(*) >= 40)::text from public.site_assets where asset_type = 'banner'", "true"),
@@ -408,11 +464,12 @@ add("23_payment_order_usd", "عمود amount_usd ودالة الطلب ترجع�
       "where table_schema = 'public' and table_name = 'payment_orders' "
       "and column_name = 'amount_usd')::text)"))
 
-add("24_free_default_avatar", "avatar_url افتراضيه onefree + زناد الحساب الجديد",
-    q_ok("select ((select column_default like '%onefree%' from information_schema.columns "
-         "where table_schema = 'public' and table_name = 'profiles' "
-         "and column_name = 'avatar_url') and (select count(*) from pg_trigger "
-         "where tgname = 'on_auth_user_created' and not tgisinternal) = 1)::text", "true"),
+add("24_free_default_avatar · 32", "افتراضي avatar_url = المسار المعتمد + زناد الحساب الجديد",
+    q_ok("select ((select column_default like '%profiles/profiles/onefree.png%' "
+         "from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'profiles' and column_name = 'avatar_url') "
+         "and (select count(*) from pg_trigger where tgname = 'on_auth_user_created' "
+         "and not tgisinternal) = 1)::text", "true"),
     q("select 'الافتراضي: ' || coalesce((select column_default from information_schema.columns "
       "where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url'), 'مفقود')"))
 
@@ -459,11 +516,36 @@ add("30_chat_members_only", "الشات للمسجّلين فقط (3 سياسا�
       "and policyname in ('messages_read', 'reactions_read', 'channels_read') "
       "and qual ilike '%auth.uid()%'"))
 
-add("31_single_free_avatar", "أفاتار مجاني مفعّل واحد فقط (onefree)",
-    qbool("select (count(*) = 1)::text from public.site_assets where asset_type = 'avatar' "
-          "and required_plan = 'free' and enabled"),
-    qdet("select count(*)::text || ' مفعّل' from public.site_assets where asset_type = 'avatar' "
-         "and required_plan = 'free' and enabled"))
+add("31_single_free_avatar · 32", "أفاتار مجاني مفعّل واحد فقط (onefree) وملفه موجود في المخزن",
+    qbool("select (count(*) = 1)::text from public.site_assets a "
+          "where a.asset_type = 'avatar' and a.required_plan = 'free' and a.enabled "
+          "and exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' "
+          "and regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/') "
+          "  = regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/'))"),
+    qdet("select count(*)::text || ' مفعّل · ملفه: ' || coalesce((select string_agg(a.file_url, ' · ') "
+         "from public.site_assets a where a.asset_type = 'avatar' "
+         "and a.required_plan = 'free' and a.enabled and not exists ("
+         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and "
+         "regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/') = "
+         "regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/'))), 'موجود ✅') "
+         "from public.site_assets where asset_type = 'avatar' and required_plan = 'free' and enabled"))
+
+add("32_onefree_canonical_path", "المسار المعتمد موحّد (الأصل المفعّل · الافتراضي · كل الحسابات)",
+    q_ok("select ((select count(*) from public.site_assets where asset_type = 'avatar' "
+         "and required_plan = 'free' and enabled "
+         "and file_url = 'profiles/profiles/onefree.png') = 1 "
+         "and (select column_default like '%profiles/profiles/onefree.png%' from "
+         "information_schema.columns where table_schema = 'public' "
+         "and table_name = 'profiles' and column_name = 'avatar_url') "
+         "and (select count(*) from public.profiles "
+         "where avatar_url = 'profiles/onefree.png') = 0)::text", "true"),
+    qdet("select 'المفعّل: ' || coalesce((select string_agg(file_url, ' · ') "
+         "from public.site_assets where asset_type = 'avatar' and required_plan = 'free' "
+         "and enabled), '—') || ' · الافتراضي: ' || coalesce((select column_default "
+         "from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'profiles' and column_name = 'avatar_url'), '—') "
+         "|| ' · حسابات على مسار قديم: ' || (select count(*) from public.profiles "
+         "where avatar_url = 'profiles/onefree.png')::text"))
 
 add("31_single_free_avatar", "كل الحسابات صورتها onefree (ولا حساب بلا صورة)",
     qbool("select (count(*) = 0)::text from public.profiles where avatar_url is null "
@@ -494,6 +576,17 @@ add("31_single_free_avatar", "ملف الصورة موجود فعلاً في ا�
 add("07_seed_assets · 12_avatars", "دفعات الأصول القديمة (مُستبدَلة بـ15 — لا يلزم تنفيذها)",
     "true",
     "'لا شيء مطلوب: 15_assets_v2 و21_banners هما المرجع (532 أصلاً)'")
+
+add("16_fix_asset_paths", "توحيد المسارات المكرّرة (نسخة آمنة — لا تلزمك الآن)",
+    "true",
+    qdet("select 'مسارات مكرّرة: ' || count(*) filter (where file_url ~ "
+         "'^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/')::text "
+         "|| ' · منها ملفه على المسار النظيف: ' || count(*) filter (where file_url ~ "
+         "'^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/' and exists ("
+         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and o.name = "
+         "regexp_replace(file_url, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/')))::text "
+         "|| ' (المكرّر مقصود: هكذا رُفعت الملفات)' from public.site_assets",
+         "لا شيء مطلوب"))
 
 add("28_chat_cleanup", "حالة الشات (28 ملف تنظيف أقسامه اختيارية)",
     "true",

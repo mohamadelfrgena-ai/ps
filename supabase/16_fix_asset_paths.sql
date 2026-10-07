@@ -1,44 +1,82 @@
--- -------------------------------------------------------------------
--- 16) إصلاح مسارات الأصول المكرّرة المجلد
--- -------------------------------------------------------------------
--- المشكلة: سكربت التعبئة أضاف اسم المجلد مرّتين، فصارت المسارات هكذا
---   profiles/profiles/onefree.png
---   profiles/profiles/default-profile.jpg
---   profiles/profiles/minecraft-rose-painting.jpg
--- بدل
---   profiles/onefree.png
--- النتيجة: رابط الصورة يفشل (404) ⇒ تبقى خانة الصورة فارغة حتى ينتهي وقت
--- الطلب، فيبدو للمستخدم أن «تحميل صورة البروفايل والبانر والأدوات بطيء» أو ثقيل.
+-- ============================================================================
+--  AddonStation Mobile — 16) توحيد مسارات الأصول (نسخة **آمنة**)
+-- ============================================================================
 --
--- هذا السكربت ينظّف المسارات في قاعدة البيانات. (التطبيق أيضاً يطبّع المسار
--- عند بناء الرابط كشبكة أمان، فلو لم تُشغّل هذا السكربت بقي التطبيق يعمل.)
+--  ⚠️ اقرأ هذا قبل التنفيذ (مهم):
 --
--- آمن للتكرار: لا يمسّ المسارات الصحيحة، ولا يغيّر أي جدول أو دالة.
+--  في مخزنك، ملفات قسم «Profiles» الـ26 مرفوعة فعلاً على مسار **مكرّر**:
+--        site-assets/profiles/profiles/onefree.png   ✅ موجود
+--        site-assets/profiles/onefree.png            ❌ غير موجود
+--  وهذا ما تؤكّده السجلات (`assets-manifest.json`) وفاحص القاعدة (99).
+--
+--  ⇒ لذلك **لا يجوز** تحويل `profiles/profiles/x.jpg` إلى `profiles/x.jpg`
+--    تحويلاً أعمى: الصور الـ26 ستبقى بلا ملف وتظهر الصورة الافتراضية بدلها.
+--
+--  هذه النسخة تُصحّح المسار **فقط** إذا كان الملف موجوداً فعلاً في المخزن
+--  على المسار النظيف، ولا تلمس غيره ⇒ **آمنة تماماً** (لا تغيّر شيئاً في
+--  حالتك الحالية، لأن الملفات على المسار المكرّر).
+--
+--  ⚠️ لا تُشغّل هذه النسخة القديمة إن وُجدت في مكان آخر — هذه هي المعتمدة.
+--
+--  آمن لإعادة التنفيذ · يُنفَّذ مرة واحدة (اختياري — لا شيء مطلوب منك الآن).
+-- ============================================================================
 
--- 1) أصول الموقع
-update public.site_assets
-   set file_url = regexp_replace(file_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/')
- where file_url ~ '^(profiles/profiles/|banners/banners/|items/items/|stickers/stickers/)';
+-- ---------------------------------------------------------------------------
+-- ١) أصول المكتبة: صُحّح المسار المكرّر إن كان الملف موجوداً على المسار النظيف
+-- ---------------------------------------------------------------------------
+update public.site_assets a
+   set file_url = regexp_replace(a.file_url,
+                                 '^(profiles|banners|items|stickers)/(\1)/', '\1/')
+ where a.file_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'
+   -- الملف موجود فعلاً على المسار النظيف في المخزن
+   and exists (
+        select 1 from storage.objects o
+         where o.bucket_id = 'site-assets'
+           and o.name = regexp_replace(a.file_url,
+                                       '^(profiles|banners|items|stickers)/(\1)/', '\1/'))
+   -- ولا يوجد صف آخر بنفس المسار النظيف (حتى لا نكسر الفهرس الفريد)
+   and not exists (
+        select 1 from public.site_assets b
+         where b.id <> a.id
+           and b.file_url = regexp_replace(a.file_url,
+                                           '^(profiles|banners|items|stickers)/(\1)/', '\1/'));
 
--- 2) صورة البروفايل والبانر المختاران لكل مستخدم
-update public.profiles
-   set avatar_url = regexp_replace(avatar_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/')
- where avatar_url is not null
-   and avatar_url ~ '^(profiles/profiles/|banners/banners/|items/items/|stickers/stickers/)';
+-- ---------------------------------------------------------------------------
+-- ٢) صور الحسابات: نفس القاعدة
+-- ---------------------------------------------------------------------------
+update public.profiles p
+   set avatar_url = regexp_replace(p.avatar_url,
+                                   '^(profiles|banners|items|stickers)/(\1)/', '\1/'),
+       updated_at = now()
+ where p.avatar_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'
+   and exists (
+        select 1 from storage.objects o
+         where o.bucket_id = 'site-assets'
+           and o.name = regexp_replace(p.avatar_url,
+                                       '^(profiles|banners|items|stickers)/(\1)/', '\1/'));
 
-update public.profiles
-   set banner_url = regexp_replace(banner_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/')
- where banner_url is not null
-   and banner_url ~ '^(profiles/profiles/|banners/banners/|items/items/|stickers/stickers/)';
+update public.profiles p
+   set banner_url = regexp_replace(p.banner_url,
+                                   '^(profiles|banners|items|stickers)/(\1)/', '\1/'),
+       updated_at = now()
+ where p.banner_url is not null
+   and p.banner_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'
+   and exists (
+        select 1 from storage.objects o
+         where o.bucket_id = 'site-assets'
+           and o.name = regexp_replace(p.banner_url,
+                                       '^(profiles|banners|items|stickers)/(\1)/', '\1/'));
 
--- 3) التحقّق: يجب أن يخرج صفر صفوف
-select count(*) as remaining_broken_paths
-  from public.site_assets
- where file_url ~ '^(profiles/profiles/|banners/banners/|items/items/|stickers/stickers/)';
-
-select asset_type, count(*) as total,
-       count(*) filter (where file_url like '%/%/%' ) as in_subfolder
-  from public.site_assets
- where enabled = true
- group by asset_type
- order by asset_type;
+-- ---------------------------------------------------------------------------
+-- ٣) تحقّق: كم مساراً مكرّراً بقي؟ (الطبيعي في حالتك: يبقى كما هو لأن الملفات
+--    على المسار المكرّر — وهذا **صحيح** ومقصود)
+-- ---------------------------------------------------------------------------
+select count(*) filter (where file_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/')
+         as "مسارات مكرّرة في الأصول",
+       count(*) filter (where file_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'
+                          and exists (select 1 from storage.objects o
+                                       where o.bucket_id = 'site-assets'
+                                         and o.name = regexp_replace(file_url,
+                                             '^(profiles|banners|items|stickers)/(\1)/', '\1/')))
+         as "منها ملفه موجود على المسار النظيف"
+  from public.site_assets;

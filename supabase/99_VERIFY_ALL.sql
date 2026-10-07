@@ -66,9 +66,9 @@ with checks(n, file_, item, ok, detail) as (
          public.diag_text($q$select (count(*) = 2)::text from information_schema.columns where table_schema = 'public' and table_name = 'site_assets' and column_name in ('collection', 'collection_order')$q$) = 'true',
          public.diag_text($q$select coalesce(string_agg(column_name, ' · '), 'مفقود') from information_schema.columns where table_schema = 'public' and table_name = 'site_assets' and column_name in ('collection', 'collection_order')$q$)
   union all
-  select 3, '01_schema', 'أعمدة ملف المستخدم الأساسية (avatar_url · role · plan · equipped_item_id …)',
-         public.diag_text($q$select (count(*) = 8)::text from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name in ('avatar_url', 'role', 'plan', 'plan_expires_at', 'equipped_item_id', 'username', 'display_name', 'cover_url')$q$) = 'true',
-         public.diag_text($q$select count(*)::text || '/8' from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name in ('avatar_url', 'role', 'plan', 'plan_expires_at', 'equipped_item_id', 'username', 'display_name', 'cover_url')$q$)
+  select 3, '01_schema', 'أعمدة ملف المستخدم الأساسية (avatar_url · banner_url · role · plan · equipped_item_id …)',
+         public.diag_text($q$select (count(*) = 8)::text from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name in ('avatar_url', 'role', 'plan', 'plan_expires_at', 'equipped_item_id', 'username', 'display_name', 'banner_url')$q$) = 'true',
+         public.diag_text($q$select count(*)::text || '/8' from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name in ('avatar_url', 'role', 'plan', 'plan_expires_at', 'equipped_item_id', 'username', 'display_name', 'banner_url')$q$)
   union all
   select 4, '01_schema', 'دوال ومشغّلات الملف الشخصي (ترتيب الخطط · اللمس · الحماية)',
          (select count(*) from unnest(array['plan_rank', 'role_rank', 'touch_updated_at', 'guard_profile_update', 'handle_new_user']) t where not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = t)) = 0 and (select count(*) from pg_trigger where not tgisinternal and tgname in ('trg_guard_profile_update', 'on_auth_user_created', 'trg_touch_profiles', 'trg_touch_subscription_plans', 'trg_touch_payment_orders', 'trg_touch_content_items', 'trg_touch_app_settings', 'trg_touch_user_friends')) = 8,
@@ -154,95 +154,107 @@ with checks(n, file_, item, ok, detail) as (
          (select count(*) from unnest(array['ac_redeem_codes_admin:ac_redeem_codes', 'ac_redeem_uses_self:ac_redeem_uses']) t where not exists (select 1 from pg_policies pol where pol.schemaname = 'public' and pol.tablename = split_part(t, ':', 2) and pol.policyname = split_part(t, ':', 1))) = 0,
          coalesce((select 'المفقود: ' || string_agg(t, ' · ') from unnest(array['ac_redeem_codes_admin:ac_redeem_codes', 'ac_redeem_uses_self:ac_redeem_uses']) t where not exists (select 1 from pg_policies pol where pol.schemaname = 'public' and pol.tablename = split_part(t, ':', 2) and pol.policyname = split_part(t, ':', 1))), '2/2 موجودة')
   union all
-  select 25, '15_assets_v2 · 21_banners', 'مجموع الأصول = 532 (492 من 15 + 40 بانر من 21)',
-         public.diag_text($q$select (count(*) = 532)::text from public.site_assets$q$) = 'true',
-         coalesce(public.diag_text($q$select count(*)::text || '/532' from public.site_assets$q$), 'مفقود')
+  select 25, '15_assets_v2 · 21_banners', 'مجموع الأصول >= 532 (492 من 15 + 40 بانر من 21)',
+         public.diag_text($q$select (count(*) >= 532)::text from public.site_assets$q$) = 'true',
+         coalesce(public.diag_text($q$select count(*)::text || '/532 مصدر' || ' · إضافاتك: ' || greatest(count(*) - 532, 0)::text from public.site_assets$q$), 'مفقود')
   union all
-  select 26, '15_assets_v2', 'توزيع الأصول (123 أفاتار · 176 أداة · 193 ملصقاً · 40 بانر)',
-         public.diag_text($q$select ((count(*) filter (where asset_type = 'avatar') = 123) and (count(*) filter (where asset_type = 'item') = 176) and (count(*) filter (where asset_type = 'sticker') = 193) and (count(*) filter (where asset_type = 'banner') = 40))::text from public.site_assets$q$) = 'true',
+  select 26, '15_assets_v2', 'توزيع الأصول كاملًا (123 أفاتاراً · 176 أداة · 193 ملصقاً · 40 بانراً)',
+         public.diag_text($q$select ((count(*) filter (where asset_type = 'avatar') >= 123) and (count(*) filter (where asset_type = 'item') >= 176) and (count(*) filter (where asset_type = 'sticker') >= 193) and (count(*) filter (where asset_type = 'banner') >= 40))::text from public.site_assets$q$) = 'true',
          coalesce(public.diag_text($q$select 'avatar ' || count(*) filter (where asset_type = 'avatar')::text || ' · item ' || count(*) filter (where asset_type = 'item')::text || ' · sticker ' || count(*) filter (where asset_type = 'sticker')::text || ' · banner ' || count(*) filter (where asset_type = 'banner')::text from public.site_assets$q$), 'مفقود')
   union all
-  select 27, '15_assets_v2 · 21_banners', 'الأقسام (collection) مضبوطة — 23 قسماً',
-         public.diag_text($q$select (count(distinct collection) >= 23)::text from public.site_assets where collection is not null$q$) = 'true',
-         coalesce(public.diag_text($q$select count(distinct collection)::text || ' قسماً' from public.site_assets where collection is not null$q$), 'مفقود')
+  select 27, '15_assets_v2 · 21_banners', 'لا نقص في أي قسم من أقسام الدفعات (23 قسماً)',
+         public.diag_text($q$(select (count(*) = 0)::text from (values ('PFP', 14), ('Profiles', 26), ('Pack One', 19), ('Best Cartoon', 7), ('Cartoon Meme', 11), ('Cool Cartoon', 6), ('Call Of Duty', 10), ('Sad', 10), ('Ahh', 8), ('Moumen', 4), ('Animated', 8), ('Memes', 47), ('Minecraft Memes 1', 21), ('Minecraft Memes 2', 87), ('Minecraft Memes 3', 20), ('Minecraft Movie', 6), ('Top', 12), ('Minecraft Items', 103), ('Games', 41), ('PlayStation', 10), ('Random Things', 22), ('Nature 🌿', 13), ('Random 🎲', 27)) as e(collection, want) left join (select collection, count(*) as have from public.site_assets where collection is not null group by collection) a on a.collection = e.collection where coalesce(a.have, 0) < e.want)$q$) = 'true',
+         coalesce(public.diag_text($q$select string_agg(e.collection || ': ' || coalesce(a.have, 0) || '/' || e.want, ' · ') from (values ('PFP', 14), ('Profiles', 26), ('Pack One', 19), ('Best Cartoon', 7), ('Cartoon Meme', 11), ('Cool Cartoon', 6), ('Call Of Duty', 10), ('Sad', 10), ('Ahh', 8), ('Moumen', 4), ('Animated', 8), ('Memes', 47), ('Minecraft Memes 1', 21), ('Minecraft Memes 2', 87), ('Minecraft Memes 3', 20), ('Minecraft Movie', 6), ('Top', 12), ('Minecraft Items', 103), ('Games', 41), ('PlayStation', 10), ('Random Things', 22), ('Nature 🌿', 13), ('Random 🎲', 27)) as e(collection, want) left join (select collection, count(*) as have from public.site_assets where collection is not null group by collection) a on a.collection = e.collection where coalesce(a.have, 0) < e.want$q$), 'لا نقص في أي قسم')
   union all
-  select 28, '16_fix_asset_paths', 'لا مسارات مكرّرة (profiles/profiles/ …) في الأصول',
-         public.diag_text($q$select (count(*) = 0)::text from public.site_assets where file_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'$q$) = 'true',
-         coalesce(public.diag_text($q$select count(*)::text || ' مساراً مكرّراً' from public.site_assets where file_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'$q$), 'مفقود')
+  select 28, '15_assets_v2 · 21_banners', 'كل أصل مفعّل ملفه موجود في المخزن (لا صورة مكسورة)',
+         public.diag_text($q$select (count(*) = 0)::text from public.site_assets a where a.enabled and not exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' and regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\1)/', '\1/') = regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/'))$q$) = 'true',
+         coalesce(public.diag_text($q$select 'أول المفقود: ' || string_agg(a.file_url, ' · ') from (select a.file_url from public.site_assets a where a.enabled and not exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' and regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\1)/', '\1/') = regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/')) limit 6) a$q$), 'كل الملفات موجودة')
   union all
-  select 29, '16_fix_asset_paths', 'لا مسارات مكرّرة في صور الحسابات',
-         public.diag_text($q$select (count(*) = 0)::text from public.profiles where avatar_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'$q$) = 'true',
-         coalesce(public.diag_text($q$select count(*)::text || ' حساباً' from public.profiles where avatar_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/'$q$), 'مفقود')
+  select 29, '15_assets_v2', 'كل أفاتار مفعّل ملفه موجود في المخزن',
+         public.diag_text($q$select (count(*) = 0)::text from public.site_assets a where a.enabled and a.asset_type = 'avatar' and not exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' and regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\1)/', '\1/') = regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/'))$q$) = 'true',
+         coalesce(public.diag_text($q$select string_agg(a.file_url, ' · ') from (select a.file_url from public.site_assets a where a.enabled and a.asset_type = 'avatar' and not exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' and regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\1)/', '\1/') = regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/')) limit 6) a$q$), 'كل الأفاتارات موجودة')
   union all
-  select 30, '21_banners', 'بانرات إضافية مسجّلة (40)',
+  select 30, '24_free_default_avatar · 32', 'صور الحسابات موجودة في المخزن (لا حساب بصورة مكسورة)',
+         public.diag_text($q$select (count(*) = 0)::text from public.profiles p where p.avatar_url is not null and btrim(p.avatar_url) <> '' and lower(btrim(p.avatar_url)) <> 'none' and not exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' and regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\1)/', '\1/') = regexp_replace(p.avatar_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/'))$q$) = 'true',
+         coalesce(public.diag_text($q$select count(*)::text || ' حساباً' from public.profiles p where p.avatar_url is not null and btrim(p.avatar_url) <> '' and lower(btrim(p.avatar_url)) <> 'none' and not exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' and regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\1)/', '\1/') = regexp_replace(p.avatar_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/'))$q$), 'كل صور الحسابات موجودة')
+  union all
+  select 31, '21_banners', 'بانرات إضافية مسجّلة (40)',
          public.diag_text($q$select (count(*) >= 40)::text from public.site_assets where asset_type = 'banner'$q$) = 'true',
          coalesce(public.diag_text($q$select count(*)::text || ' بانر' from public.site_assets where asset_type = 'banner'$q$), 'مفقود')
   union all
-  select 31, '27_admin_only_assets', 'أصول حصرية للإدارة (required_plan = admin)',
+  select 32, '27_admin_only_assets', 'أصول حصرية للإدارة (required_plan = admin)',
          public.diag_text($q$select (count(*) >= 1)::text from public.site_assets where required_plan = 'admin'$q$) = 'true',
          coalesce(public.diag_text($q$select count(*)::text || ' أصلاً' from public.site_assets where required_plan = 'admin'$q$), 'مفقود')
   union all
-  select 32, '17_message_delete_window', 'نافذة حذف الرسالة = 180 ثانية (٣ دقائق)',
+  select 33, '17_message_delete_window', 'نافذة حذف الرسالة = 180 ثانية (٣ دقائق)',
          public.diag_text($q$select (public.chat_delete_window_seconds() = 180)::text$q$) = 'true',
          public.diag_text($q$select public.chat_delete_window_seconds()::text || ' ثانية'$q$)
   union all
-  select 33, '18_media_admin_only', 'الوسائط (فيديو/صوت) للإدارة فقط — الحارس والزناد',
+  select 34, '18_media_admin_only', 'الوسائط (فيديو/صوت) للإدارة فقط — الحارس والزناد',
          public.diag_text($q$select ((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'chat_media_admin_only_guard') = 1 and (select count(*) from pg_trigger where tgname = 'trg_chat_media_admin_only' and not tgisinternal) = 1)::text$q$) = 'true',
          public.diag_text($q$select 'دالة الحارس: ' || ((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'chat_media_admin_only_guard')::text) || ' · الزناد: ' || ((select count(*) from pg_trigger where tgname = 'trg_chat_media_admin_only' and not tgisinternal)::text)$q$)
   union all
-  select 34, '19_admin_panel_guard', 'دالة حماية لوحة الإدارة + سياساتها',
+  select 35, '19_admin_panel_guard', 'دالة حماية لوحة الإدارة + سياساتها',
          public.diag_text($q$select ((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'admin_panel_access') = 1 and (select count(*) from pg_policies where schemaname = 'public' and policyname in ('settings_admin', 'audit_admin_read', 'ac_redeem_codes_admin', 'orders_admin_all')) = 4)::text$q$) = 'true',
          public.diag_text($q$select 'الدالة: ' || ((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'admin_panel_access')::text) || ' · السياسات: ' || ((select count(*) from pg_policies where schemaname = 'public' and policyname in ('settings_admin', 'audit_admin_read', 'ac_redeem_codes_admin', 'orders_admin_all'))::text) || '/4'$q$)
   union all
-  select 35, '20_sticker_with_text', 'send_chat_message تقبل الملصق مع النص',
+  select 36, '20_sticker_with_text', 'send_chat_message تقبل الملصق مع النص',
          public.diag_text($q$select (count(*) >= 1)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'send_chat_message' and pg_get_function_arguments(p.oid) like '%p_sticker_url%'$q$) = 'true',
          public.diag_text($q$select count(*)::text || ' نسخة' from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'send_chat_message' and pg_get_function_arguments(p.oid) like '%p_sticker_url%'$q$)
   union all
-  select 36, '23_payment_order_usd', 'عمود amount_usd ودالة الطلب ترجعه',
+  select 37, '23_payment_order_usd', 'عمود amount_usd ودالة الطلب ترجعه',
          public.diag_text($q$select ((select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'payment_orders' and column_name = 'amount_usd') = 1)::text$q$) = 'true',
          public.diag_text($q$select 'amount_usd: ' || ((select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'payment_orders' and column_name = 'amount_usd')::text)$q$)
   union all
-  select 37, '24_free_default_avatar', 'avatar_url افتراضيه onefree + زناد الحساب الجديد',
-         public.diag_text($q$select ((select column_default like '%onefree%' from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url') and (select count(*) from pg_trigger where tgname = 'on_auth_user_created' and not tgisinternal) = 1)::text$q$) = 'true',
+  select 38, '24_free_default_avatar · 32', 'افتراضي avatar_url = المسار المعتمد + زناد الحساب الجديد',
+         public.diag_text($q$select ((select column_default like '%profiles/profiles/onefree.png%' from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url') and (select count(*) from pg_trigger where tgname = 'on_auth_user_created' and not tgisinternal) = 1)::text$q$) = 'true',
          public.diag_text($q$select 'الافتراضي: ' || coalesce((select column_default from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url'), 'مفقود')$q$)
   union all
-  select 38, '25_fix_send_chat_message_unnest', 'send_chat_message بلا خطأ unnest (الإصلاح مطبَّق)',
+  select 39, '25_fix_send_chat_message_unnest', 'send_chat_message بلا خطأ unnest (الإصلاح مطبَّق)',
          public.diag_text($q$select (count(*) = 0)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'send_chat_message' and pg_get_functiondef(p.oid) ilike '%where unnest is not null%'$q$) = 'true',
          public.diag_text($q$select count(*)::text || ' نسخة فيها الخلل' from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'send_chat_message' and pg_get_functiondef(p.oid) ilike '%where unnest is not null%'$q$)
   union all
-  select 39, '26_fix_site_assets_sequence', 'تسلسل الأصول يعمل (authenticated يستطيع الإدراج)',
+  select 40, '26_fix_site_assets_sequence', 'تسلسل الأصول يعمل (authenticated يستطيع الإدراج)',
          coalesce(public.diag_text($q$select (has_sequence_privilege('authenticated', 'public.site_assets_id_seq', 'usage') and (select count(*) from pg_sequences where schemaname = 'public' and sequencename = 'site_assets_id_seq') = 1)::text$q$), 'false') = 'true',
          coalesce(public.diag_text($q$select 'التسلسل: ' || coalesce((select sequencename from pg_sequences where schemaname = 'public' and sequencename = 'site_assets_id_seq'), 'مفقود') || ' · أعلى معرّف: ' || coalesce((select max(id)::text from public.site_assets), '—')$q$), 'مفقود')
   union all
-  select 40, '29_chat_moderation_rooms', 'غرف المشرفين + دوالها + سياساتها',
+  select 41, '29_chat_moderation_rooms', 'غرف المشرفين + دوالها + سياساتها',
          public.diag_text($q$select ((select count(*) from information_schema.tables where table_schema = 'public' and table_name = 'chat_moderator_rooms') = 1 and (select count(*) from pg_policies where schemaname = 'public' and policyname in ('mod_rooms_admin_all', 'mod_rooms_self_read')) = 2 and (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('chat_can_moderate_channel', 'chat_my_moderation_scope', 'chat_delete_message_staff', 'chat_moderator_list', 'chat_set_moderator_rooms')) = 5)::text$q$) = 'true',
          public.diag_text($q$select 'الجدول: ' || ((select count(*) from information_schema.tables where table_schema = 'public' and table_name = 'chat_moderator_rooms')::text) || ' · السياسات: ' || ((select count(*) from pg_policies where schemaname = 'public' and policyname in ('mod_rooms_admin_all', 'mod_rooms_self_read'))::text) || '/2' || ' · الدوال: ' || ((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('chat_can_moderate_channel', 'chat_my_moderation_scope', 'chat_delete_message_staff', 'chat_moderator_list', 'chat_set_moderator_rooms'))::text) || '/5'$q$)
   union all
-  select 41, '30_chat_members_only', 'الشات للمسجّلين فقط (3 سياسات بـ auth.uid())',
+  select 42, '30_chat_members_only', 'الشات للمسجّلين فقط (3 سياسات بـ auth.uid())',
          public.diag_text($q$select (count(*) = 3)::text from pg_policies where schemaname = 'public' and policyname in ('messages_read', 'reactions_read', 'channels_read') and qual ilike '%auth.uid()%'$q$) = 'true',
          public.diag_text($q$select count(*)::text || '/3' from pg_policies where schemaname = 'public' and policyname in ('messages_read', 'reactions_read', 'channels_read') and qual ilike '%auth.uid()%'$q$)
   union all
-  select 42, '31_single_free_avatar', 'أفاتار مجاني مفعّل واحد فقط (onefree)',
-         coalesce(public.diag_text($q$select (count(*) = 1)::text from public.site_assets where asset_type = 'avatar' and required_plan = 'free' and enabled$q$), 'false') = 'true',
-         coalesce(public.diag_text($q$select count(*)::text || ' مفعّل' from public.site_assets where asset_type = 'avatar' and required_plan = 'free' and enabled$q$), 'مفقود')
+  select 43, '31_single_free_avatar · 32', 'أفاتار مجاني مفعّل واحد فقط (onefree) وملفه موجود في المخزن',
+         coalesce(public.diag_text($q$select (count(*) = 1)::text from public.site_assets a where a.asset_type = 'avatar' and a.required_plan = 'free' and a.enabled and exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' and regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\1)/', '\1/') = regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/'))$q$), 'false') = 'true',
+         coalesce(public.diag_text($q$select count(*)::text || ' مفعّل · ملفه: ' || coalesce((select string_agg(a.file_url, ' · ') from public.site_assets a where a.asset_type = 'avatar' and a.required_plan = 'free' and a.enabled and not exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' and regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\1)/', '\1/') = regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/'))), 'موجود ✅') from public.site_assets where asset_type = 'avatar' and required_plan = 'free' and enabled$q$), 'مفقود')
   union all
-  select 43, '31_single_free_avatar', 'كل الحسابات صورتها onefree (ولا حساب بلا صورة)',
+  select 44, '32_onefree_canonical_path', 'المسار المعتمد موحّد (الأصل المفعّل · الافتراضي · كل الحسابات)',
+         public.diag_text($q$select ((select count(*) from public.site_assets where asset_type = 'avatar' and required_plan = 'free' and enabled and file_url = 'profiles/profiles/onefree.png') = 1 and (select column_default like '%profiles/profiles/onefree.png%' from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url') and (select count(*) from public.profiles where avatar_url = 'profiles/onefree.png') = 0)::text$q$) = 'true',
+         coalesce(public.diag_text($q$select 'المفعّل: ' || coalesce((select string_agg(file_url, ' · ') from public.site_assets where asset_type = 'avatar' and required_plan = 'free' and enabled), '—') || ' · الافتراضي: ' || coalesce((select column_default from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url'), '—') || ' · حسابات على مسار قديم: ' || (select count(*) from public.profiles where avatar_url = 'profiles/onefree.png')::text$q$), 'مفقود')
+  union all
+  select 45, '31_single_free_avatar', 'كل الحسابات صورتها onefree (ولا حساب بلا صورة)',
          coalesce(public.diag_text($q$select (count(*) = 0)::text from public.profiles where avatar_url is null or btrim(avatar_url) = ''$q$), 'false') = 'true',
          coalesce(public.diag_text($q$select count(*)::text || ' بلا صورة' from public.profiles where avatar_url is null or btrim(avatar_url) = ''$q$), 'مفقود')
   union all
-  select 44, '31_single_free_avatar', 'لا حساب يستعمل صورة مجانية قديمة (معطَّلة)',
+  select 46, '31_single_free_avatar', 'لا حساب يستعمل صورة مجانية قديمة (معطَّلة)',
          coalesce(public.diag_text($q$select (count(*) = 0)::text from public.profiles p where exists (select 1 from public.site_assets a where a.asset_type = 'avatar' and a.required_plan = 'free' and not a.enabled and lower(a.file_url) not like '%onefree%' and (p.avatar_url = a.file_url or p.avatar_url = 'profiles/' || a.file_url or a.file_url = 'profiles/' || p.avatar_url))$q$), 'false') = 'true',
          coalesce(public.diag_text($q$select count(*)::text || ' حساباً' from public.profiles p where exists (select 1 from public.site_assets a where a.asset_type = 'avatar' and a.required_plan = 'free' and not a.enabled and lower(a.file_url) not like '%onefree%' and (p.avatar_url = a.file_url or p.avatar_url = 'profiles/' || a.file_url or a.file_url = 'profiles/' || p.avatar_url))$q$), 'مفقود')
   union all
-  select 45, '31_single_free_avatar', 'ملف الصورة موجود فعلاً في المخزن (site-assets/profiles/onefree.png)',
+  select 47, '31_single_free_avatar', 'ملف الصورة موجود فعلاً في المخزن (site-assets/profiles/onefree.png)',
          public.diag_text($q$select (count(*) >= 1)::text from storage.objects where bucket_id = 'site-assets' and name in ('profiles/onefree.png', 'profiles/profiles/onefree.png')$q$) = 'true',
          coalesce(public.diag_text($q$select string_agg(name, ' · ') from storage.objects where bucket_id = 'site-assets' and name in ('profiles/onefree.png', 'profiles/profiles/onefree.png')$q$), 'غير مرفوع بعد')
   union all
-  select 46, '07_seed_assets · 12_avatars', 'دفعات الأصول القديمة (مُستبدَلة بـ15 — لا يلزم تنفيذها)',
+  select 48, '07_seed_assets · 12_avatars', 'دفعات الأصول القديمة (مُستبدَلة بـ15 — لا يلزم تنفيذها)',
          true,
          'لا شيء مطلوب: 15_assets_v2 و21_banners هما المرجع (532 أصلاً)'
   union all
-  select 47, '28_chat_cleanup', 'حالة الشات (28 ملف تنظيف أقسامه اختيارية)',
+  select 49, '16_fix_asset_paths', 'توحيد المسارات المكرّرة (نسخة آمنة — لا تلزمك الآن)',
+         true,
+         coalesce(public.diag_text($q$select 'مسارات مكرّرة: ' || count(*) filter (where file_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/')::text || ' · منها ملفه على المسار النظيف: ' || count(*) filter (where file_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/' and exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' and o.name = regexp_replace(file_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/')))::text || ' (المكرّر مقصود: هكذا رُفعت الملفات)' from public.site_assets$q$), 'لا شيء مطلوب')
+  union all
+  select 50, '28_chat_cleanup', 'حالة الشات (28 ملف تنظيف أقسامه اختيارية)',
          true,
          coalesce(public.diag_text($q$select 'الظاهرة: ' || count(*) filter (where status <> 'deleted')::text || ' · المحذوفة: ' || count(*) filter (where status = 'deleted')::text || ' · المخفية: ' || count(*) filter (where status = 'hidden')::text from public.chat_messages$q$), 'مفقود')
 
