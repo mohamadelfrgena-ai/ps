@@ -49,8 +49,8 @@ on:
       - '.push-live-request'
 
 permissions:
-  contents: read
-  statuses: write
+  contents: write      # لكتابة أسباب الفشل في تعليق الالتزام
+  statuses: write      # لكتابة حصيلة التنفيذ في حالة الالتزام
 
 jobs:
   doctor:
