@@ -288,7 +288,7 @@ jobs:
                       time.sleep(6)
           PY
 
-      - name: (اختياري) تحقّق حيّ: نداء دالة الإرسال وقراءة ردّها
+      - name: "(اختياري) تحقّق حيّ — نداء دالة الإرسال وقراءة ردّها"
         if: ${{ always() && steps.flags.outputs.enable == 'true' }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
