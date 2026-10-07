@@ -194,6 +194,7 @@ def main() -> int:
         "creators": "data/repo/CreatorRepository.kt",
         "admin": "data/repo/AdminRepository.kt",
         "assets": "data/repo/AssetsRepository.kt",
+        "push": "data/repo/PushRepository.kt",
         "supabase": "data/SupabaseClient.kt",
         "state": "data/AppState.kt",
         "prefs": "data/UserPrefs.kt",

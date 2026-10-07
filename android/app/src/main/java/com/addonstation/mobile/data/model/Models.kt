@@ -260,6 +260,28 @@ data class ChatNotification(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+/**
+ * تفضيلات الإشعارات (صف واحد لكل مستخدم من `push_prefs`):
+ * مفتاح رئيسي + خمسة أقسام + ساعات الهدوء + مدّة الغياب قبل التذكير.
+ */
+@Serializable
+data class PushPrefs(
+    val master: Boolean = true,
+    val chat: Boolean = true,
+    val content: Boolean = true,
+    val social: Boolean = true,
+    val account: Boolean = true,
+    val reminders: Boolean = true,
+    @SerialName("quiet_enabled") val quietEnabled: Boolean = true,
+    @SerialName("quiet_from") val quietFrom: Int = 23,
+    @SerialName("quiet_to") val quietTo: Int = 8,
+    @SerialName("reengage_days") val reengageDays: Int = 7,
+)
+
+/** نتيجة «جرّب الإشعار الآن» (دالة push_test_me). */
+@Serializable
+data class PushTestResult(val ok: Boolean = false, val message: String? = null)
+
 /** صف من جدول الحظر: من حظرتُه أنا (يُقرأ مرة لفلترة الرسائل فوراً في الواجهة). */
 @Serializable
 data class BlockedUser(

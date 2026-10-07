@@ -51,6 +51,7 @@ ORDER = [
     "31_single_free_avatar.sql",
     "32_onefree_canonical_path.sql",
     "33_user_block.sql",
+    "34_push_notifications.sql",
 ]
 
 HEADER = """-- ============================================================================

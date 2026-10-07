@@ -126,6 +126,8 @@ fun openSupportEmail(context: Context, subject: String, body: String): Boolean {
 fun SettingsScreen(
     onLogin: () -> Unit,
     onNotifications: () -> Unit,
+    /** الإشعارات: الأقسام الخمسة وساعات الهدوء وتذكير الغياب (34_push_notifications). */
+    onNotificationSettings: () -> Unit = {},
     onOpenProfile: () -> Unit,
     onOpenWallet: () -> Unit,
     onSignedOut: () -> Unit,
@@ -310,6 +312,12 @@ fun SettingsScreen(
                     iconRes = R.drawable.ic_set_notifications,
                     title = stringResource(R.string.set_notifications),
                     onClick = onNotifications,
+                )
+                RowItem(
+                    iconRes = R.drawable.ic_set_notifications,
+                    title = stringResource(R.string.notif_settings),
+                    subtitle = stringResource(R.string.notif_settings_subtitle),
+                    onClick = onNotificationSettings,
                 )
                 Column {
                     RowItem(

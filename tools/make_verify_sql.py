@@ -3,7 +3,7 @@
 """
 يولّد **`supabase/99_VERIFY_ALL.sql`** — فاحص القاعدة الكامل (قراءة فقط).
 
-ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 33) نُفِّذت
+ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 34) نُفِّذت
 كما نريد، ويطبع جدولاً: ✅/❌ + التفاصيل (وما هو المفقود بالاسم). يلصقه المالك
 في Supabase → SQL Editor مرة واحدة.
 
@@ -614,6 +614,38 @@ add("28_chat_cleanup", "حالة الشات (28 ملف تنظيف أقسامه �
       "|| ' · المحذوفة: ' || count(*) filter (where status = 'deleted')::text "
       "|| ' · المخفية: ' || count(*) filter (where status = 'hidden')::text "
          "from public.chat_messages"))
+
+add("34_push_notifications", "الإشعارات الفورية: 3 جداول + 17 دالة + زنادان + إعدادات المستخدم",
+    q_ok("select ((select count(*) from information_schema.tables where table_schema = 'public' "
+         "and table_name in ('push_devices', 'push_prefs', 'push_queue')) = 3 "
+         "and (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname in ('push_prefs_for', 'push_allowed', "
+         "'push_local_now', 'push_schedule_at', 'push_enqueue', 'push_broadcast', "
+         "'push_reengage_scan', 'push_cleanup', 'push_targets', 'push_heartbeat', "
+         "'push_register_device', 'push_unregister_device', 'my_push_prefs', "
+         "'push_set_prefs', 'push_test_me', 'push_on_notification', 'push_on_content')) = 17 "
+         "and (select count(*) from pg_trigger where not tgisinternal and tgname in "
+         "('trg_push_on_notification', 'trg_push_on_content')) = 2 "
+         "and (select count(*) from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'push_prefs' and column_name in ('master', 'chat', 'content', "
+         "'social', 'account', 'reminders', 'quiet_enabled', 'quiet_from', 'quiet_to', "
+         "'reengage_days')) = 10 "
+         "and (select count(*) from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'push_devices' and column_name in ('token', 'user_id', 'platform', "
+         "'locale', 'tz_offset', 'enabled')) = 6 "
+         "and (select count(*) from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'push_queue' and column_name in ('title_key', 'body_key', 'route', "
+         "'collapse_key', 'priority', 'scheduled_at', 'status', 'args')) = 8)::text", "true"),
+    qdet("select 'الجداول: ' || (select count(*) from information_schema.tables "
+         "where table_schema = 'public' and table_name in ('push_devices', 'push_prefs', "
+         "'push_queue'))::text || '/3 ' "
+         "|| '· الدوال: ' || (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and (p.proname like 'push\_%' or p.proname = 'my_push_prefs'))::text "
+         "|| '/17 ' || '· الزنادات: ' || (select count(*) from pg_trigger where not tgisinternal "
+         "and tgname in ('trg_push_on_notification', 'trg_push_on_content'))::text || '/2 ' "
+         "|| '· الأجهزة المسجّلة: ' || (select count(*) from public.push_devices)::text "
+         "|| ' · في الطابور: ' || (select count(*) from public.push_queue "
+         "where status = 'pending')::text"))
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  كتابة الملف

@@ -27,6 +27,22 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AddonStation">
 
+        <!-- إشعارات FCM: الخدمة تستقبل الرسائل وتبني الإشعار بنفسها (نص بلغة
+             الجهاز + القناة المناسبة + الفتح على الشاشة المطلوبة). -->
+        <service
+            android:name=".push.PushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="as_chat" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_push_notification" />
+
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|locale|layoutDirection"

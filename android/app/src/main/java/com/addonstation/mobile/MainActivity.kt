@@ -27,9 +27,21 @@ class MainActivity : ComponentActivity() {
 
     private val recoveryLink: MutableState<String?> = mutableStateOf(null)
 
+    /**
+     * الوجهة التي طلبها إشعار FCM (مثل `chat:العربية` أو `item:<id>`).
+     * حالة قابلة للملاحظة مثل رابط الاستعادة: قد يصل الإشعار والتطبيق مفتوح
+     * فيأتي عبر onNewIntent لا onCreate.
+     */
+    private val pushRoute: MutableState<String?> = mutableStateOf(null)
+
     /** أي رابط addonstation:// يصلنا (استعادة كلمة المرور وغيرها). */
     private fun linkOf(intent: android.content.Intent?): String? =
         intent?.data?.toString()?.takeIf { it.startsWith("addonstation://") }
+
+    /** الوجهة المطلوبة من إشعار (يضعها PendingIntent في الملحق). */
+    private fun routeOf(intent: android.content.Intent?): String? =
+        intent?.getStringExtra(com.addonstation.mobile.push.PushNotifications.EXTRA_ROUTE)
+            ?.takeIf { it.isNotBlank() }
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleManager.wrap(newBase))
@@ -39,12 +51,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         recoveryLink.value = linkOf(intent)
+        pushRoute.value = routeOf(intent)
 
         setContent {
             Surface(modifier = Modifier.fillMaxSize()) {
                 AppRoot(
                     recoveryLink = recoveryLink.value,
                     onRecoveryConsumed = { recoveryLink.value = null },
+                    pushRoute = pushRoute.value,
+                    onPushConsumed = { pushRoute.value = null },
                 )
             }
         }
@@ -55,5 +70,6 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         // التطبيق كان مفتوحاً ⇒ نحدّث الحالة فتلتقطها الواجهة فوراً
         recoveryLink.value = linkOf(intent)
+        pushRoute.value = routeOf(intent)
     }
 }

@@ -8,6 +8,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    // الإشعارات الفورية (FCM): الإضافة مسجّلة هنا لكن **لا تُطبَّق** إلا عند وجود
+    // google-services.json — فبناء الـAPK يعمل عادياً قبل إنشاء مشروع Firebase.
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 // قراءة قيم Supabase من gradle.properties (أو من ملف local.properties) لتمريرها كـ BuildConfig.
@@ -126,5 +129,24 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
 
+    // الإشعارات الفورية — مكتبة FCM (تعمل فور إضافة google-services.json)
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
+}
+
+// ---------------------------------------------------------------------------
+//  إشعارات FCM: يُطبَّق الإضافة فقط عند وجود ملف الإعداد من Firebase.
+//  قبل إنشائه: البناء ينجح والتطبيق يعمل، والإشعارات تُسجَّل بلا عمل (بلا أخطاء).
+// ---------------------------------------------------------------------------
+val googleServicesFile = file("google-services.json")
+if (googleServicesFile.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    logger.lifecycle("🔔 google-services.json موجود ⇒ الإشعارات الفورية (FCM) مفعّلة في هذا البناء.")
+} else {
+    logger.lifecycle(
+        "ℹ️ google-services.json غير موجود ⇒ بناء عادي بلا إشعارات فورية.\n" +
+        "   لتشغيلها: أنشئ مشروع Firebase وضع الملف في android/app/ (انظر docs/11-PUSH-AR.md)."
+    )
 }

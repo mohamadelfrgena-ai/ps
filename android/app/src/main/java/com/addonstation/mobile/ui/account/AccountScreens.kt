@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.OutlinedTextField
@@ -347,6 +349,8 @@ fun NotificationsScreen(
     onBack: () -> Unit,
     onOpenChannel: (String, Long?) -> Unit,
     onOpenProfile: (String) -> Unit,
+    /** فتح إعدادات الإشعارات (الأقسام وساعات الهدوء) — زر الترس في الرأس. */
+    onOpenSettings: () -> Unit = {},
 ) {
     val container = rememberContainer()
     val scope = rememberCoroutineScope()
@@ -377,12 +381,27 @@ fun NotificationsScreen(
         }
     }
 
+    // نرفع النصوص خارج اللامبدا (قاعدة الفاحص: stringResource في لامبدا تُرفع إلى val)
+    val notifTitle = stringResource(R.string.notif_title)
+    val settingsLabel = stringResource(R.string.notif_settings)
+
     Column(Modifier.fillMaxSize()) {
         PixelTopBar(
-            title = stringResource(R.string.notif_title),
+            title = notifTitle,
             onLogoClick = onBack,
             showWallet = false,
             icon = Icons.Filled.Notifications,
+            actions = {
+                // ترس التخصيص: مكانه الطبيعي داخل شاشة الإشعارات نفسها
+                Icon(
+                    Icons.Filled.Settings,
+                    contentDescription = settingsLabel,
+                    tint = AppColors.Muted,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable { onOpenSettings() },
+                )
+            },
         )
         if (loading) {
             LoadingBox(text = stringResource(R.string.common_loading))

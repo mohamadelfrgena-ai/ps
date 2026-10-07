@@ -34,6 +34,10 @@ class AddonStationApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // الإشعارات: نُسجّل الحاوية (تحتاجها خدمة FCM) وننشئ القنوات الخمس
+        // (رسائل · محتوى · اجتماعي · حساب · تذكير) فتظهر بأسماء بلغة المستخدم.
+        com.addonstation.mobile.push.AppContainerHolder.set(this, container)
+        com.addonstation.mobile.push.PushNotifications.ensureChannels(this)
     }
 
     override fun attachBaseContext(base: Context) {

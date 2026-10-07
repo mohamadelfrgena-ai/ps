@@ -11,6 +11,7 @@ import com.addonstation.mobile.data.repo.CreatorRepository
 import com.addonstation.mobile.data.repo.NotificationsRepository
 import com.addonstation.mobile.data.repo.PlansRepository
 import com.addonstation.mobile.data.repo.ProfileRepository
+import com.addonstation.mobile.data.repo.PushRepository
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -39,6 +40,9 @@ class AppContainer(context: Context) {
     val ac = AcRepository(supabase, state)
     val chat = ChatRepository(supabase, state, profile)
     val notifications = NotificationsRepository(supabase)
+
+    /** الإشعارات الفورية: تسجيل الجهاز · التفضيلات · إشعار تجريبي · نبضة الحضور. */
+    val push = PushRepository(supabase)
     val creators = CreatorRepository(supabase)
     val admin = AdminRepository(supabase)
     val assets = AssetsRepository(supabase, state)

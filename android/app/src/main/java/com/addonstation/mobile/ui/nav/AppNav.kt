@@ -71,6 +71,8 @@ object Routes {
     fun chat(id: String) = "chat/$id"
     const val WALLET = "wallet"
     const val NOTIFICATIONS = "notifications"
+    /** إعدادات الإشعارات (الأقسام وساعات الهدوء ووتيرة التذكير). */
+    const val NOTIF_SETTINGS = "notification-settings"
     const val FRIENDS = "friends"
     const val PLANS = "plans"
     const val CHECKOUT = "checkout/{planId}"
@@ -100,6 +102,9 @@ object Routes {
 fun AppRoot(
     recoveryLink: String? = null,
     onRecoveryConsumed: () -> Unit = {},
+    /** وجهة طلبها إشعار FCM (chat:<id> · item:<id> · notifications · plans · orders · store). */
+    pushRoute: String? = null,
+    onPushConsumed: () -> Unit = {},
 ) {
     val container = rememberContainer()
     val dark by container.prefs.darkTheme.collectAsState(initial = true)
@@ -287,6 +292,70 @@ private fun MainNavigation(startAtReset: Boolean) {
         navController.navigate(route) { launchSingleTop = true }
     }
 
+    /**
+     * فتح الوجهة التي طلبها الإشعار — بترتيب آمن:
+     *   • غير مسجّل دخول ⇒ نحفظ الوجهة ونُنقله للدخول (وتُفتح بعد الدخول).
+     *   • شاشة تحتاج تسجيلاً (الشات) ⇒ نفس المعالجة.
+     *   • غير ذلك ⇒ تنقّل مباشر (singleTop حتى لا تتكدّس نسخ).
+     */
+    fun openPushTarget(raw: String) {
+        when {
+            raw.startsWith("chat:") -> {
+                val id = raw.removePrefix("chat:")
+                if (id.isBlank()) go(Routes.NOTIFICATIONS) else go(Routes.chat(id))
+            }
+            raw.startsWith("item:") -> {
+                val id = raw.removePrefix("item:")
+                if (id.isBlank()) goTab(MainTab.Store) else go(Routes.item(id))
+            }
+            raw == "notifications" -> go(Routes.NOTIFICATIONS)
+            raw == "plans" -> go(Routes.PLANS)
+            raw == "orders" -> go(Routes.ORDERS)
+            raw == "creators" -> go(Routes.CREATORS)
+            raw == "wallet" -> go(Routes.WALLET)
+            raw == "store" -> goTab(MainTab.Store)
+            raw == "community" -> goTab(MainTab.Community)
+            else -> go(Routes.NOTIFICATIONS)
+        }
+    }
+
+    // الوجهة القادمة من إشعار: أثر مستقل (قد تصل والتطبيق مفتوح ⇒ onNewIntent).
+    // غير مسجّل؟ نحفظها ونُنقله للدخول، ثم تُفتح تلقائياً بعد نجاح الدخول
+    // (وإلا ضاع الإشعار: المستخدم يفتحه فيرى شاشة الدخول فقط).
+    var pendingPush by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(pushRoute) {
+        val target = pushRoute ?: return@LaunchedEffect
+        if (!signedIn) {
+            pendingPush = target
+            requireSignIn(target)
+        } else {
+            openPushTarget(target)
+        }
+        onPushConsumed()
+    }
+    LaunchedEffect(signedIn, pendingPush) {
+        val target = pendingPush ?: return@LaunchedEffect
+        if (!signedIn) return@LaunchedEffect
+        pendingPush = null
+        // مهلة قصيرة حتى تكتمل تهيئة الشاشة الأولى (الملف الشخصي والتنقّل)
+        kotlinx.coroutines.delay(350)
+        openPushTarget(target)
+    }
+
+    /**
+     * عند كل فتح للتطبيق والمستخدم مسجّل:
+     *   • نبضة حضور (تُحدّث «آخر ظهور») ⇒ بها يعرف الخادم من غاب فترة فيُذكّره.
+     *   • تسجيل توكن الجهاز (أول مرة وبعد إعادة التثبيت) مع لغته ومنطقته الزمنية.
+     */
+    LaunchedEffect(signedIn) {
+        if (!signedIn) return@LaunchedEffect
+        val ctx = container.appContext
+        withContext(Dispatchers.IO) {
+            com.addonstation.mobile.push.PushRegistrar.heartbeat(container)
+            com.addonstation.mobile.push.PushRegistrar.register(ctx)
+        }
+    }
+
     fun goTab(target: MainTab) {
         if (target == MainTab.Community && !signedIn) {
             requireSignIn(target.route)
@@ -384,6 +453,7 @@ private fun MainNavigation(startAtReset: Boolean) {
                     SettingsScreen(
                         onLogin = { go(Routes.LOGIN) },
                         onNotifications = { go(Routes.NOTIFICATIONS) },
+                        onNotificationSettings = { go(Routes.NOTIF_SETTINGS) },
                         onOpenProfile = { goTab(MainTab.Profile) },
                         onOpenWallet = { go(Routes.WALLET) },
                         onSignedOut = { goTab(MainTab.Home) },
@@ -533,6 +603,13 @@ private fun MainNavigation(startAtReset: Boolean) {
                         onBack = { back() },
                         onOpenChannel = { channelId, _ -> go(Routes.chat(channelId)) },
                         onOpenProfile = { id -> go(Routes.userProfile(id)) },
+                        // ترس التخصيص داخل شاشة الإشعارات نفسها (أقرب مكان للمستخدم)
+                        onOpenSettings = { go(Routes.NOTIF_SETTINGS) },
+                    )
+                }
+                composable(Routes.NOTIF_SETTINGS) {
+                    com.addonstation.mobile.ui.settings.NotificationSettingsScreen(
+                        onBack = { back() },
                     )
                 }
                 composable(Routes.FRIENDS) {
