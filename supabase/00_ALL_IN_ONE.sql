@@ -7966,8 +7966,19 @@ create table if not exists public.push_queue (
   status         text not null default 'pending' check (status in ('pending','sent','failed','skipped')),
   error          text,
   created_at     timestamptz not null default now(),
-  sent_at        timestamptz
+  sent_at        timestamptz,
+  image_url      text,                                   -- صورة الإشعار (مسار أو رابط كامل)
+  image_kind     text                                    -- cover = صورة كبيرة · avatar = أيكونة
 );
+-- نوع الصورة: cover تُعرض كبيرة (غلاف إضافة/عالم) · avatar تُعرض أيكونة (صورة المرسل)
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'push_queue_image_kind_chk') then
+    alter table public.push_queue
+      add constraint push_queue_image_kind_chk
+      check (image_kind is null or image_kind in ('cover', 'avatar'));
+  end if;
+end $$;
+
 create index if not exists push_queue_pending_idx on public.push_queue(status, scheduled_at)
   where status = 'pending';
 create index if not exists push_queue_user_recent_idx on public.push_queue(user_id, category, created_at desc);
@@ -8080,7 +8091,10 @@ create or replace function public.push_enqueue(
   p_route      text   default null,
   p_collapse   text   default null,
   p_priority   text   default 'normal',
-  p_cooldown_minutes int default 0
+  p_cooldown_minutes int default 0,
+  -- صورة الإشعار: غلاف الإضافة/العالم (كبيرة) أو صورة المرسل (أيكونة)
+  p_image      text   default null,
+  p_image_kind text   default null
 )
 returns bigint
 language plpgsql security definer set search_path = public
@@ -8108,7 +8122,10 @@ begin
        set args = p_args,
            title_key = p_title_key,
            body_key = p_body_key,
-           route = coalesce(p_route, route)
+           route = coalesce(p_route, route),
+           -- صورة أحدث رسالة/إضافة في المجموعة (وإن لم تصل صورة نُبقي السابقة)
+           image_url = coalesce(p_image, image_url),
+           image_kind = coalesce(p_image_kind, image_kind)
      where id = v_existing;
     return v_existing;
   end if;
@@ -8128,9 +8145,9 @@ begin
   v_scheduled := public.push_schedule_at(p_user, p_priority);
 
   insert into public.push_queue(user_id, category, title_key, body_key, args, route,
-                                collapse_key, priority, scheduled_at)
+                                collapse_key, priority, scheduled_at, image_url, image_kind)
   values (p_user, p_category, p_title_key, p_body_key, coalesce(p_args, '{}'::jsonb),
-          p_route, p_collapse, p_priority, v_scheduled)
+          p_route, p_collapse, p_priority, v_scheduled, p_image, p_image_kind)
   returning id into v_id;
 
   return v_id;
@@ -8145,7 +8162,9 @@ create or replace function public.push_broadcast(
   p_title_key text,
   p_body_key  text,
   p_args      jsonb default '{}'::jsonb,
-  p_route     text  default null
+  p_route     text  default null,
+  p_image      text default null,
+  p_image_kind text default null
 )
 returns bigint
 language plpgsql security definer set search_path = public
@@ -8163,15 +8182,18 @@ begin
   if v_existing is not null then
     update public.push_queue
        set args = p_args, title_key = p_title_key, body_key = p_body_key,
-           scheduled_at = least(scheduled_at, now() + interval '5 minutes')
+           scheduled_at = least(scheduled_at, now() + interval '5 minutes'),
+           -- ملخّص اليوم يحمل صورة **أحدث** إضافة نزلت
+           image_url = coalesce(p_image, image_url),
+           image_kind = coalesce(p_image_kind, image_kind)
      where id = v_existing;
     return v_existing;
   end if;
 
   insert into public.push_queue(user_id, category, title_key, body_key, args, route,
-                                priority, scheduled_at)
+                                priority, scheduled_at, image_url, image_kind)
   values (null, p_category, p_title_key, p_body_key, coalesce(p_args, '{}'::jsonb),
-          p_route, 'normal', now())
+          p_route, 'normal', now(), p_image, p_image_kind)
   returning id into v_id;
   return v_id;
 end $$;
@@ -8195,14 +8217,19 @@ declare
   v_collapse text;
   v_cooldown int := 0;
   v_actor_name text;
+  v_actor_avatar text;
 begin
   -- لا إشعار لصاحب الفعل نفسه
   if new.actor_id is not null and new.actor_id = new.recipient_id then
     return new;
   end if;
 
-  v_actor_name := coalesce((select coalesce(nullif(username, ''), full_name, '—')
-                              from public.profiles where id = new.actor_id), '—');
+  -- اسم المرسل وصورته: الصورة تظهر كأيكونة بجانب الإشعار (شات/صداقة)
+  select coalesce(nullif(username, ''), full_name, '—'),
+         nullif(btrim(coalesce(avatar_url, '')), '')
+    into v_actor_name, v_actor_avatar
+    from public.profiles where id = new.actor_id;
+  v_actor_name := coalesce(v_actor_name, '—');
 
   case new.type
     when 'mention' then
@@ -8256,7 +8283,10 @@ begin
 
   perform public.push_enqueue(
     new.recipient_id, v_category, v_title, v_body, v_args, v_route,
-    v_collapse, v_priority, v_cooldown
+    v_collapse, v_priority, v_cooldown,
+    -- صورة المرسل أيكونة صغيرة (لا صورة كبيرة) — إلا المحتوى فصورته غلاف كبير
+    case when v_category = 'content' then null else v_actor_avatar end,
+    case when v_actor_avatar is not null and v_category <> 'content' then 'avatar' end
   );
   return new;
 end $$;
@@ -8283,10 +8313,14 @@ begin
     from public.content_items
    where is_published and created_at > now() - interval '1 day';
 
+  -- الإشعار يحمل **صورة الإضافة/العالم** نفسها (غلافها) فتُعرض كبيرة على الهاتف.
+  -- الصورة قد تكون مساراً داخل مخزن site-assets (والتطبيق يبنيه رابطاً كاملاً)
+  -- أو رابطاً كاملاً — الحالتان مدعومتان على الجهاز.
   perform public.push_broadcast(
     'content', 'push_content_title', 'push_content_body',
     jsonb_build_object('n', greatest(v_count, 1), 'name', coalesce(new.title, '')),
-    'item:' || coalesce(new.id::text, '')
+    'item:' || coalesce(new.id::text, ''),
+    nullif(btrim(coalesce(new.cover_url, '')), ''), 'cover'
   );
   return new;
 end $$;
@@ -8512,8 +8546,8 @@ end $$;
 revoke all on function public.push_prefs_for(uuid) from public;
 revoke all on function public.push_allowed(uuid, text) from public;
 revoke all on function public.push_schedule_at(uuid, text) from public;
-revoke all on function public.push_enqueue(uuid, text, text, text, jsonb, text, text, text, int) from public;
-revoke all on function public.push_broadcast(text, text, text, jsonb, text) from public;
+revoke all on function public.push_enqueue(uuid, text, text, text, jsonb, text, text, text, int, text, text) from public;
+revoke all on function public.push_broadcast(text, text, text, jsonb, text, text, text) from public;
 revoke all on function public.push_reengage_scan(int) from public;
 revoke all on function public.push_cleanup(int) from public;
 
@@ -8556,6 +8590,6 @@ union all select 'إشعارات في الطابور',
 
 do $$
 begin
-  raise notice '٣٤) الإشعارات جاهزة: 5 أقسام · ساعات هدوء · تجميع · تذكير غياب كل 14 يوماً.';
+  raise notice '٣٤) الإشعارات جاهزة: 5 أقسام · ساعات هدوء · تجميع · تذكير غياب كل 14 يوماً · إشعارات بصور الأغلفة وصور المرسلين.';
   raise notice 'الخطوة التالية: انشر دالة send-push على Supabase وضع مفاتيح FCM (docs/11-PUSH-AR.md).';
 end $$;

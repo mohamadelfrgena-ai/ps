@@ -2,7 +2,8 @@
 //  AddonStation — دالة إرسال الإشعارات (Supabase Edge Function · Deno)
 //
 //  ماذا تفعل؟
-//    تقرأ الطابور (push_queue) وترسل كل صف إلى أجهزة أصحابه عبر FCM v1،
+//    تقرأ الطابور (push_queue) وتُرسل كل صف إلى أجهزة أصحابه عبر FCM v1،
+//    ومعها صورة الإشعار إن وُجدت (غلاف إضافة/عالم أو صورة المرسل)،
 //    بلغة كل جهاز نفسه، وعلى قناة الإشعارات المناسبة له (chat/content/...).
 //
 //  لماذا دالة على الخادم لا من التطبيق؟
@@ -312,7 +313,9 @@ async function sendToTokens(
   sa: ServiceAccount, token: string,
   devices: { token: string; locale: string }[],
   payload: { titleKey: string; bodyKey: string; args: Record<string, unknown>; route: string | null;
-             category: string; collapse: string | null; priority: string; queueId: number },
+             category: string; collapse: string | null; priority: string; queueId: number;
+             // صورة الإشعار: غلاف إضافة/عالم (cover) أو صورة المرسل (avatar)
+             image: string | null; imageKind: string | null },
 ): Promise<{ ok: number; bad: string[] }> {
   let ok = 0;
   const bad: string[] = [];
@@ -331,6 +334,11 @@ async function sendToTokens(
           category: payload.category,
           route: payload.route ?? "",
           queue: String(payload.queueId),
+          // الصورة تُمرَّر كرابط/مسار والتطبيق هو الذي يُنزّلها ويعرضها
+          // (cover ⇒ صورة كبيرة · avatar ⇒ أيكونة بجانب الإشعار).
+          ...(payload.image
+            ? { image: payload.image, image_kind: payload.imageKind ?? "cover" }
+            : {}),
         },
         android: {
           priority: payload.priority === "high" ? "HIGH" : "NORMAL",
@@ -419,6 +427,8 @@ async function dispatch(sa: ServiceAccount, limit: number): Promise<Record<strin
       collapse: (row.collapse_key as string | null) ?? null,
       priority: String(row.priority ?? "normal"),
       queueId: id,
+      image: (row.image_url as string | null) ?? null,
+      imageKind: (row.image_kind as string | null) ?? null,
     });
 
     deadTokens.push(...res.bad);

@@ -615,7 +615,7 @@ add("28_chat_cleanup", "حالة الشات (28 ملف تنظيف أقسامه �
       "|| ' · المخفية: ' || count(*) filter (where status = 'hidden')::text "
          "from public.chat_messages"))
 
-add("34_push_notifications", "الإشعارات الفورية: 3 جداول + 17 دالة + زنادان + إعدادات المستخدم",
+add("34_push_notifications", "الإشعارات الفورية: 3 جداول + 17 دالة + زنادان + إعدادات المستخدم + إشعارات بصور",
     q_ok("select ((select count(*) from information_schema.tables where table_schema = 'public' "
          "and table_name in ('push_devices', 'push_prefs', 'push_queue')) = 3 "
          "and (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
@@ -635,7 +635,8 @@ add("34_push_notifications", "الإشعارات الفورية: 3 جداول + 
          "'locale', 'tz_offset', 'enabled')) = 6 "
          "and (select count(*) from information_schema.columns where table_schema = 'public' "
          "and table_name = 'push_queue' and column_name in ('title_key', 'body_key', 'route', "
-         "'collapse_key', 'priority', 'scheduled_at', 'status', 'args')) = 8)::text", "true"),
+         "'collapse_key', 'priority', 'scheduled_at', 'status', 'args', 'image_url', "
+         "'image_kind')) = 10)::text", "true"),
     qdet("select 'الجداول: ' || (select count(*) from information_schema.tables "
          "where table_schema = 'public' and table_name in ('push_devices', 'push_prefs', "
          "'push_queue'))::text || '/3 ' "
@@ -645,7 +646,9 @@ add("34_push_notifications", "الإشعارات الفورية: 3 جداول + 
          "and tgname in ('trg_push_on_notification', 'trg_push_on_content'))::text || '/2 ' "
          "|| '· الأجهزة المسجّلة: ' || (select count(*) from public.push_devices)::text "
          "|| ' · في الطابور: ' || (select count(*) from public.push_queue "
-         "where status = 'pending')::text"))
+         "where status = 'pending')::text "
+         "|| ' · إشعارات بصور: ' || (select count(*) from public.push_queue "
+         "where image_url is not null)::text"))
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  كتابة الملف
