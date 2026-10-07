@@ -640,4 +640,8 @@
     <string name="auth_confirm_hint">Нет письма? Проверьте также папку «Спам».</string>
     <string name="profile_guest_title">Вы просматриваете как гость</string>
     <string name="profile_guest_text">Войдите или создайте аккаунт, чтобы приложение сохраняло избранное, ваш контент и баланс AC.</string>
+    <string name="notif_prompt_title">Включить уведомления</string>
+    <string name="notif_prompt_text">Получайте сообщения чата, упоминания и новые аддоны даже при закрытом приложении. Каждую категорию можно настроить позже.</string>
+    <string name="notif_prompt_allow">Включить сейчас</string>
+    <string name="notif_prompt_later">Позже</string>
 </resources>

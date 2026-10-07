@@ -640,4 +640,8 @@
     <string name="auth_confirm_hint">Não encontrou? Verifique também a pasta de spam.</string>
     <string name="profile_guest_title">Está a navegar como convidado</string>
     <string name="profile_guest_text">Entre ou crie uma conta para o app guardar os seus favoritos, o seu conteúdo e o saldo AC.</string>
+    <string name="notif_prompt_title">Ativar notificações</string>
+    <string name="notif_prompt_text">Receba mensagens do chat, menções e novos addons mesmo com o app fechado. Pode ajustar cada categoria depois nas Configurações.</string>
+    <string name="notif_prompt_allow">Ativar agora</string>
+    <string name="notif_prompt_later">Mais tarde</string>
 </resources>

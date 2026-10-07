@@ -10,6 +10,7 @@ object AppPrefs {
     private const val FILE = "addonstation_boot"
     private const val KEY_LOCALE = "locale"
     private const val KEY_DARK = "dark_theme"
+    private const val KEY_NOTIF_ASKED = "notif_asked"
 
     private fun sp(context: Context) =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -22,6 +23,18 @@ object AppPrefs {
     }
 
     fun readDark(context: Context): Boolean = sp(context).getBoolean(KEY_DARK, true)
+
+    /**
+     * هل سألنا المستخدم عن إذن الإشعارات مرة واحدة من قبل؟
+     * نسأل **مرة واحدة فقط** عند أول دخول على أندرويد 13+ ثم لا نُزعج أبداً،
+     * ويبقى زر «اسمح بالإشعارات» حاضراً في الإعدادات لمن أراد لاحقاً.
+     */
+    fun notificationAsked(context: Context): Boolean =
+        sp(context).getBoolean(KEY_NOTIF_ASKED, false)
+
+    fun markNotificationAsked(context: Context) {
+        sp(context).edit().putBoolean(KEY_NOTIF_ASKED, true).apply()
+    }
 
     fun writeDark(context: Context, dark: Boolean) {
         sp(context).edit().putBoolean(KEY_DARK, dark).apply()

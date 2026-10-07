@@ -52,6 +52,7 @@ ORDER = [
     "32_onefree_canonical_path.sql",
     "33_user_block.sql",
     "34_push_notifications.sql",
+    "35_push_live.sql",
 ]
 
 HEADER = """-- ============================================================================

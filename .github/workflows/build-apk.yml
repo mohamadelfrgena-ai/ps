@@ -116,6 +116,24 @@ jobs:
           echo "ADDONSTATION_SUPABASE_URL=${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}" >> local.properties
           echo "ADDONSTATION_SUPABASE_ANON_KEY=${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}" >> local.properties
 
+      # إشعارات حقيقية: ملف Firebase يُدمج في التطبيق وقت البناء. لا يوجد في
+      # المودع (وهو ليس سرّاً)، فإن وُضع نصّه في الأسرار كُتب هنا تلقائياً ⇒ يكفي
+      # من الجوال: Settings → Secrets → New secret باسم ADDONSTATION_GOOGLE_SERVICES_JSON.
+      # وإن كان الملف موجوداً في المودع أصلاً فلا حاجة للسرّ إطلاقاً.
+      - name: تجهيز google-services.json (الإشعارات الحقيقية)
+        env:
+          FCM_JSON: ${{ secrets.ADDONSTATION_GOOGLE_SERVICES_JSON }}
+        run: |
+          cd android/app
+          if [ -f google-services.json ]; then
+            echo "✓ google-services.json موجود في المودع ⇒ الإشعارات الفورية (FCM) مفعّلة في هذا البناء."
+          elif [ -n "$FCM_JSON" ]; then
+            printf '%s' "$FCM_JSON" > google-services.json
+            python3 -c "import json,sys; d=json.load(open('google-services.json')); print('✓ كُتب من الأسرار · project_id =', d['project_info']['project_id'], '· الحزم:', [c['client_info']['android_client_info']['package_name'] for c in d['client']])"
+          else
+            echo "::warning title=الإشعارات لن تعمل في هذه النسخة::لا يوجد google-services.json ولا سرّ ADDONSTATION_GOOGLE_SERVICES_JSON ⇒ يُبنى التطبيق بلا Firebase، ولن تستقبل النسخة أي إشعار (ولا حتى التجريبي). انظر docs/15-PUSH-LIVE-AR.md"
+          fi
+
       - name: فحص الموارد res/ قبل البناء
         run: |
           python3 tools/check_resources.py || {
@@ -146,6 +164,9 @@ jobs:
 
       - name: حارس وزن الصور قبل البناء (لا عودة للأصول الثقيلة والتقطيع)
         run: python3 tools/check_media_optimize.py
+
+      - name: حارس الإشعارات الحقيقية قبل البناء (لا عودة لإشعارات تجريبية)
+        run: python3 tools/check_push_live.py
 
       - name: Build debug APK
         working-directory: android

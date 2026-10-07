@@ -44,6 +44,7 @@ tools/           أدوات تحقق: اللغات الثمانية + مراجع
 | نظام المظهر: لوحتا ألوان كاملتان (داكن/فاتح) + زر تبديل محفوظ على الجهاز + أيقونات شريط الحالة تتبع الوضع | ✅ يعمل |
 | دليل بناء APK خطوة بخطوة | ✅ [`docs/05-BUILD-APK-AR.md`](docs/05-BUILD-APK-AR.md) |
 | وزن صور الأصول: شبكات تعرض لقطات ثابتة + مُحسِّن خادمي يشغَّل من Actions | ✅ جاهز |
+| إشعارات حقيقية: تشغيل الطابور تلقائياً (كل دقيقة + فوري للمنشن) + طبيب تشخيص | ✅ جاهز (يحتاج مشروع Firebase + بناءً جديداً) |
 | بناء/تثبيت فعلي (يحتاج JDK 17 + Android SDK) | ⏸️ موقوف بطلبك حتى تطلب APK |
 
 ## تشغيل التحقق من اللغات
@@ -56,6 +57,8 @@ python3 tools/check_symbols.py     # ✓ لا مراجع إلى أصناف/دو�
 python3 tools/check_jank_guard.py  # 🟢 لا عودة لأسباب اللاق/التقطيع (انظر docs/12-PERFORMANCE-AR.md)
 python3 tools/check_auth_state.py  # 🟢 لا عودة لأسباب «التطبيق لا يعرف أني سجّلت» (انظر docs/13-AUTH-STATE-AR.md)
 python3 tools/check_media_optimize.py  # 🟢 الأصول خفيفة: لقطات ثابتة في الشبكات + مُحسِّن خادمي (انظر docs/14-MEDIA-OPTIMIZE-AR.md)
+python3 tools/check_push_live.py  # 🟢 إشعارات حقيقية: إذن + توكن + طابور يُفرَّغ كل دقيقة (انظر docs/15-PUSH-LIVE-AR.md)
+python3 tools/push_doctor.py --offline  # 🔔 طبيب الإشعارات: لماذا لا تصل؟ (بلا شبكة يفحص نسخة APK)
 python3 tools/build_all_in_one_sql.py    # يبني supabase/00_ALL_IN_ONE.sql
 python3 tools/upload_seed_assets.py --url ... --key sb_secret_...   # رفع 311 أصلاً
 ```

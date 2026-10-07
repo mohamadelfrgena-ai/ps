@@ -640,4 +640,8 @@
     <string name="auth_confirm_hint">没收到？也请检查垃圾邮件文件夹。</string>
     <string name="profile_guest_title">你正在以访客身份浏览</string>
     <string name="profile_guest_text">登录或创建账号，应用才能保存你的收藏、内容和 AC 余额。</string>
+    <string name="notif_prompt_title">开启通知</string>
+    <string name="notif_prompt_text">即使应用关闭，也能收到聊天消息、提及和新增内容。之后可在设置中分别调整。</string>
+    <string name="notif_prompt_allow">立即开启</string>
+    <string name="notif_prompt_later">稍后</string>
 </resources>

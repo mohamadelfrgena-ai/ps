@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -21,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavHostController
@@ -44,10 +48,15 @@ import com.addonstation.mobile.ui.store.ContentDetailScreen
 import com.addonstation.mobile.ui.settings.SettingsScreen
 import com.addonstation.mobile.ui.profile.ProfileScreen
 import com.addonstation.mobile.ui.common.SetupScreen
+import com.addonstation.mobile.ui.theme.AppColors
+import com.addonstation.mobile.ui.theme.AppText
+import com.addonstation.mobile.util.AppPrefs
 import android.app.Activity
+import android.os.Build
 import android.content.ContextWrapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -424,6 +433,9 @@ private fun MainNavigation(
         }
         return true
     }
+
+    // إذن الإشعارات: مرة واحدة بعد أول دخول (انظر الدالة أدناه)
+    NotificationPermissionPrompt(signedIn)
 
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f)) {
@@ -830,5 +842,77 @@ private fun SignInGate(
         contentAlignment = androidx.compose.ui.Alignment.Center,
     ) {
         com.addonstation.mobile.ui.components.LoadingBox()
+    }
+}
+
+
+/**
+ * طلب إذن الإشعارات مرة واحدة بعد أول دخول (أندرويد 13+).
+ *
+ * لماذا هنا؟ لأن النظام لا يسأل من نفسه، وبلا هذا الإذن لا يظهر أي إشعار
+ * حقيقي مهما كانت المنظومة الخلفية سليمة — يسقط الإشعار عند المتصفّح الأخير
+ * ولا يشعر المستخدم بشيء. لذلك:
+ *   • نسأل **مرة واحدة**، بعد ثانية ونصف من الدخول (لا في وجهه أول لحظة).
+ *   • نقول الفائدة بصراحة (رسائل الشات والإضافات الجديدة والتطبيق مغلق).
+ *   • ولا نُكرّر أبداً: من رفض يجد زر «اسمح بالإشعارات» في إعدادات الإشعارات.
+ *   • وعند الموافقة نُسجّل الجهاز فوراً فلا ينتظر أول تشغيل قادم.
+ *
+ * على أندرويد 12 وأقدم لا يوجد إذن وقت تشغيل ⇒ الدالة لا تفعل شيئاً.
+ */
+@Composable
+private fun NotificationPermissionPrompt(signedIn: Boolean) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var visible by remember { mutableStateOf(false) }
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        visible = false
+        if (granted) {
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    com.addonstation.mobile.push.PushRegistrar
+                        .register(context.applicationContext)
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(signedIn) {
+        if (!signedIn) return@LaunchedEffect
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect
+        if (com.addonstation.mobile.push.PushNotifications.permissionGranted(context)) return@LaunchedEffect
+        if (AppPrefs.notificationAsked(context)) return@LaunchedEffect
+        delay(1500)
+        if (com.addonstation.mobile.push.PushNotifications.permissionGranted(context)) return@LaunchedEffect
+        AppPrefs.markNotificationAsked(context)   // مرة واحدة مهما كان الجواب
+        visible = true
+    }
+
+    if (visible) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { visible = false },
+            containerColor = AppColors.Surface,
+            title = {
+                Text(stringResource(R.string.notif_prompt_title), style = AppText.sectionTitle, color = AppColors.Text)
+            },
+            text = {
+                Text(stringResource(R.string.notif_prompt_text), style = AppText.bodySmall, color = AppColors.Muted)
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    visible = false
+                    runCatching { launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS) }
+                }) {
+                    Text(stringResource(R.string.notif_prompt_allow), color = AppColors.Green)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { visible = false }) {
+                    Text(stringResource(R.string.notif_prompt_later), color = AppColors.Muted)
+                }
+            },
+        )
     }
 }

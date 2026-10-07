@@ -640,4 +640,8 @@
     <string name="auth_confirm_hint">لم تجد الرسالة؟ تحقّق من مجلّد «الرسائل غير المرغوبة» أيضاً.</string>
     <string name="profile_guest_title">أنت تتصفّح كضيف</string>
     <string name="profile_guest_text">سجّل الدخول أو أنشئ حساباً ليحفظ التطبيق مفضّلتك ومحتواك ورصيد AC الخاص بك.</string>
+    <string name="notif_prompt_title">فعّل الإشعارات</string>
+    <string name="notif_prompt_text">تصلك رسائل الشات والإشارات والإضافات الجديدة حتى والتطبيق مغلق. وتقدر تتحكّم بكل قسم لاحقاً من الإعدادات.</string>
+    <string name="notif_prompt_allow">فعّلها الآن</string>
+    <string name="notif_prompt_later">لاحقاً</string>
 </resources>

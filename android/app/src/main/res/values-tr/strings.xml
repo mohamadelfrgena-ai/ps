@@ -640,4 +640,8 @@
     <string name="auth_confirm_hint">Mesaj gelmedi mi? Spam klasörüne de bak.</string>
     <string name="profile_guest_title">Konuk olarak geziyorsun</string>
     <string name="profile_guest_text">Giriş yap veya hesap oluştur; uygulama favorilerini, içeriğini ve AC bakiyeni saklasın.</string>
+    <string name="notif_prompt_title">Bildirimleri aç</string>
+    <string name="notif_prompt_text">Uygulama kapalıyken bile sohbet mesajlarını, bahsetmeleri ve yeni eklentileri al. Her bölümü sonradan Ayarlar\'dan değiştirebilirsin.</string>
+    <string name="notif_prompt_allow">Şimdi aç</string>
+    <string name="notif_prompt_later">Sonra</string>
 </resources>
