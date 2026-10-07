@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""معاينة شاشة البداية بعد جعل صورة القرية (الغروب) خلفيةً.
+"""معاينة شاشة الترحيب بخلفيتها الجديدة (لقطة من إعلان Minecraft الرسمي).
 
-يرسم نفس تركيب SplashScreen: صورة مقصوصة من الأعلى + تعتيم متدرّج + الشعار +
-القاعدة الرفيعة + الكلمات الثلاث + العلامة التجارية. النصوص من ملفات الموارد الفعلية.
+يرسم نفس تركيب SplashScreen: الخلفية (نسخة xxhdpi من drawable-xxhdpi/splash_bg.jpg)
++ تعتيم متدرّج + الشعار + القاعدة الرفيعة + الكلمات الثلاث + العلامة التجارية.
+النصوص من ملفات الموارد الفعلية. يُنتج `splash_background_preview.png` في الجذر.
 """
 import io
 import os
@@ -15,7 +16,8 @@ from bidi.algorithm import get_display
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RES = os.path.join(ROOT, "android", "app", "src", "main", "res")
-BG = os.path.join(RES, "drawable-nodpi", "splash_bg.jpg")
+# نسخة xxhdpi (1080×2340) — نفس ما يراه هاتف بكثافة عالية
+BG = os.path.join(RES, "drawable-xxhdpi", "splash_bg.jpg")
 LOGO = os.path.join(RES, "drawable-nodpi", "splash_logo.png")
 OUT = os.path.join(ROOT, "splash_background_preview.png")
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -124,7 +126,7 @@ def main() -> int:
     bw, bh = Image.open(BG).size
     bkb = os.path.getsize(BG) / 1024
     note = [
-        "الصورة: drawable-nodpi/splash_bg.jpg (%d×%d · %d KB) — مقصوصة من المنتصف (Center) ليبقى الأفق والشمس والقرية في أي مقاس شاشة."
+        "الخلفية: drawable-xxhdpi/splash_bg.jpg (%d×%d · %d KB) — الصورة كاملة (16:9) أعلى الشاشة وتحتاج بقيتها ممتلئة بنفس الصورة مغبَّشة."
         % (bw, bh, round(bkb)),
         "تعت림 متدرّج (شفافية 27%–55%) فوقها ليقرأ الشعار الأبيض والكلمات بوضوح، مع بقاء حركات التلاشي والتكبير وخطوط المسح والجسيمات كما هي.",
     ]
