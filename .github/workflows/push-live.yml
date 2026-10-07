@@ -1,28 +1,31 @@
-# 🔔 طبيب الإشعارات + التشغيل الكامل — يدوي فقط (لا يبني شيئاً ولا يلمس .build-request)
+# 🔔 طبيب الإشعارات + ضبط الخادم كاملاً — **لا يبني أي APK**
 #
-# يجيب على سؤال «لماذا لا تصل إشعاراتي؟» من هاتفك بلا حاسوب، ويفحص السلسلة
-# كاملة: نسخة التطبيق المبنية (هل تحمل Firebase؟) · القاعدة (هل نُفِّذ
-# 35_push_live.sql؟) · دالة الإرسال (منشورة؟) · الأجهزة المسجّلة · الطابور
-# (يتحرّك أم واقف؟) · آخر ردّ من الدالة (200 · 401 · أسرار ناقصة · مفتاح FCM).
+# يجيب على سؤال «لماذا لا تصل إشعاراتي؟» ويفحص السلسلة كاملة: نسخة التطبيق
+# المبنية (هل تحمل Firebase؟) · القاعدة (هل نُفِّذ 35_push_live.sql؟) · دالة
+# الإرسال (منشورة؟) · أسرارها · الأجهزة المسجّلة · الطابور (يتحرّك أم واقف؟) ·
+# آخر ردّ من الدالة (200 · 401 · أسرار ناقصة · مفتاح FCM غير سليم).
 #
-# التشغيل: Actions → «Push doctor» → Run workflow
-#   enable = false ⇒ فحص وتقرير فقط (ابدأ به — آمن تماماً).
-#   enable = true  ⇒ مع الفحص: ينفّذ 35_push_live.sql ويشغّل الطابور تلقائياً
-#                     (push_live_enable) بمفتاح ADDONSTATION_PUSH_CRON_SECRET،
-#                     وإن لم يكن موجوداً يُولَّد سرّ ويُطبع في الملخّص لتضعه في
-#                     أسرار دالة الإرسال باسم PUSH_CRON_SECRET.
-#   deploy_function = true ⇒ ينشر دالة الإرسال send-push من هذا المودع ويرفع
-#                     مفتاح FCM إلى أسرارها (يحتاج SUPABASE_ACCESS_TOKEN).
+# طريقتان للتشغيل:
+#  ١) من تبويب Actions → «Push doctor» → Run workflow (بعد دمج الفرع في main).
+#  ٢) **بدفعة واحدة** (تعمل على الفرع بلا انتظار الدمج): عدّل الملف
+#     `.push-live-request` واكتب فيه `enable: true` و/أو `deploy: true`
+#     ثم احفظ الالتزام ⇒ يعمل هذا السير فوراً.
+#
+# المعنى:
+#   enable = true  ⇒ ينفّذ 35_push_live.sql ويشغّل الطابور (كل دقيقة + الفوري).
+#   deploy = true  ⇒ ينشر دالة الإرسال send-push من المودع.
+#   (أسرار الدالة FCM_SERVICE_ACCOUNT و PUSH_CRON_SECRET تُزامَن تلقائياً
+#    كلما توفّر SUPABASE_ACCESS_TOKEN — فلا يبقى خطأ 401 بسبب سرّ مختلف.)
 #
 # الأسرار (Settings → Secrets and variables → Actions):
 #   ADDONSTATION_SUPABASE_URL          = https://xxxx.supabase.co
 #   ADDONSTATION_SUPABASE_SECRET_KEY   = sb_secret_…            (مفتاح الخادم)
 #   ADDONSTATION_GOOGLE_SERVICES_JSON  = نصّ google-services.json (للإشعارات الحقيقية)
 #   ADDONSTATION_FCM_SERVICE_ACCOUNT   = نصّ JSON لحساب خدمة Firebase
-#   SUPABASE_ACCESS_TOKEN              = رمز supabase.com/dashboard/account/tokens (للنشر)
-#   ADDONSTATION_PUSH_CRON_SECRET      = (اختياري) سرّ النداء الثابت بين القاعدة والدالة
+#   SUPABASE_ACCESS_TOKEN              = رمز supabase.com/dashboard/account/tokens
+#   ADDONSTATION_PUSH_CRON_SECRET      = (اختياري) سرّ النداء — إن غاب يُولَّد ويُثبَّت
 #
-# ⚠️ لا يبني أي APK: البناء يبقى مربوطاً بملف .build-request وحده.
+# ⚠️ البناء يبقى مربوطاً بملف .build-request وحده. هذا السير لا يبني شيئاً.
 
 name: Push doctor
 
@@ -30,15 +33,20 @@ on:
   workflow_dispatch:
     inputs:
       enable:
-        description: "true = نفّذ 35_push_live.sql وشغّل الطابور تلقائياً بعد الفحص"
+        description: "true = نفّذ 35_push_live.sql وشغّل الطابور تلقائياً"
         required: true
         default: false
         type: boolean
       deploy_function:
-        description: "true = انشر دالة الإرسال send-push وارفع مفتاح FCM إلى أسرارها"
+        description: "true = انشر دالة الإرسال send-push من المودع"
         required: false
         default: false
         type: boolean
+  # الدفعة الواحدة: عدّل .push-live-request ثم احفظ الالتزام (مثل .build-request)
+  push:
+    branches: [main, arena/75fb0e28-ps]
+    paths:
+      - '.push-live-request'
 
 permissions:
   contents: read
@@ -53,6 +61,22 @@ jobs:
       - name: تنصيب Python
         run: python3 -V
 
+      - name: قراءة الطلب (من المدخلات أو من ملف الطلب)
+        id: flags
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            ENABLE="$(grep -iE '^[[:space:]]*enable[[:space:]]*:' .push-live-request 2>/dev/null | head -1 | awk -F: '{print $2}' | tr -d ' [:space:]')"
+            DEPLOY="$(grep -iE '^[[:space:]]*deploy[[:space:]]*:' .push-live-request 2>/dev/null | head -1 | awk -F: '{print $2}' | tr -d ' [:space:]')"
+          else
+            ENABLE="${{ inputs.enable }}"
+            DEPLOY="${{ inputs.deploy_function }}"
+          fi
+          [ "$ENABLE" = "true" ] || ENABLE="false"
+          [ "$DEPLOY" = "true" ] || DEPLOY="false"
+          echo "enable=$ENABLE" >> "$GITHUB_OUTPUT"
+          echo "deploy=$DEPLOY" >> "$GITHUB_OUTPUT"
+          echo "الطريقة: ${GITHUB_EVENT_NAME} · تنفيذ SQL وتشغيل الطابور: $ENABLE · نشر الدالة: $DEPLOY"
+
       - name: التحقق من السرّين الأساسيين
         env:
           URL_OK: ${{ secrets.ADDONSTATION_SUPABASE_URL != '' }}
@@ -64,8 +88,7 @@ jobs:
           fi
           echo "✓ السرّان الأساسيان موجودان."
 
-      # مصدر واحد للسرّ: سرّ المودع إن وُجد، وإلا يُولَّد الآن (لا تضارب ⇒ لا 401)
-      - name: تجهيز سرّ التشغيل ومفتاح المشروع
+      - name: تجهيز مفتاح المشروع وسرّ التشغيل
         env:
           PROVIDED: ${{ secrets.ADDONSTATION_PUSH_CRON_SECRET }}
           PROJECT_REF_VAR: ${{ vars.ADDONSTATION_PROJECT_REF }}
@@ -79,58 +102,80 @@ jobs:
           if [ -z "$SECRET" ]; then
             SECRET="$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 32)"
             echo "::notice title=سرّ تشغيل جديد::PUSH_CRON_SECRET=$SECRET"
-            {
-              echo "### سرّ التشغيل (اتركه كما هو أو انسخه)"
-              echo ""
-              echo '```'
-              echo "ADDONSTATION_PUSH_CRON_SECRET = $SECRET"
-              echo '```'
-              echo "يُضبط تلقائياً في القاعدة. وإن نشرتَ الدالة يدوياً فضع في أسرارها"
-              echo "PUSH_CRON_SECRET بنفس هذه القيمة، وإلا رفضت النداءات (401)."
-            } >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "PROJECT_REF=$REF" >> "$GITHUB_ENV"
           echo "PUSH_SECRET=$SECRET" >> "$GITHUB_ENV"
-          echo "✓ المشروع: $REF · سرّ التشغيل: $( [ -n "$PROVIDED" ] && echo 'من أسرار المودع' || echo 'مولَّد الآن' )"
+          {
+            echo "### سرّ التشغيل (ثابت لهذه التشغيلات)"
+            echo ""
+            echo '```'
+            echo "ADDONSTATION_PUSH_CRON_SECRET = $SECRET"
+            echo '```'
+            echo "أضفه كسرّ للمودع ليصير ثابتاً في كل تشغيل قادم"
+            echo "(وإلا يُولَّد جديد في كل مرة وتُزامَن القاعدة معه تلقائياً)."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "✓ المشروع: $REF · سرّ التشغيل: $( [ -n "$PROVIDED" ] && echo 'من أسرار المودع' || echo 'مولَّد الآن ومُزامَن' )"
 
-      - name: (اختياري) نشر دالة الإرسال ورفع مفتاح FCM إلى أسرارها
-        if: ${{ inputs.deploy_function }}
+      - name: مزامنة أسرار دالة الإرسال (FCM + سرّ التشغيل) عبر واجهة الإدارة
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           FCM_SA: ${{ secrets.ADDONSTATION_FCM_SERVICE_ACCOUNT }}
-          GOOGLE_JSON: ${{ secrets.ADDONSTATION_GOOGLE_SERVICES_JSON }}
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
-            echo "::warning title=نشر الدالة يحتاج رمزاً واحداً::أضف SUPABASE_ACCESS_TOKEN من supabase.com/dashboard/account/tokens (New token) ثم أعد التشغيل بخيار deploy_function."
+            echo "::warning::بلا SUPABASE_ACCESS_TOKEN: لا أستطيع مزامنة أسرار الدالة — إن ظهر 401 من الطبيب فانظر دليل docs/16."
             exit 0
           fi
           if [ -z "$FCM_SA" ]; then
-            echo "::warning title=مفتاح FCM ناقص::أضف ADDONSTATION_FCM_SERVICE_ACCOUNT (نصّ ملف حساب الخدمة من Firebase → Service accounts → Generate new private key)."
-            exit 0
-          fi
-          curl -sS -L https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar xz
-          ./supabase functions deploy send-push --project-ref "$PROJECT_REF" --no-verify-jwt
-          ./supabase secrets set --project-ref "$PROJECT_REF" \
-            FCM_SERVICE_ACCOUNT="$FCM_SA" PUSH_CRON_SECRET="$PUSH_SECRET"
-          echo "✓ الدالة منشورة والأسرار مرفوعة (FCM_SERVICE_ACCOUNT + PUSH_CRON_SECRET)."
-          if [ -n "$GOOGLE_JSON" ]; then
-            echo "✓ google-services.json محفوظ في الأسرار ⇒ سيُدمج في أي بناء APK قادم."
-          else
-            echo "::warning title=نسخة التطبيق بلا Firebase::لا يوجد ADDONSTATION_GOOGLE_SERVICES_JSON ⇒ أي APK يُبنى لن يستقبل إشعارات. أضفه (نصّ الملف) ثم اطلب البناء."
-          fi
-
-      - name: (اختياري) تنفيذ 35_push_live.sql عبر واجهة الإدارة
-        if: ${{ inputs.enable }}
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
-            echo "::warning::بلا SUPABASE_ACCESS_TOKEN: نفّذ supabase/35_push_live.sql من SQL Editor (انسخ الملف والصقه واضغط Run)."
+            echo "::warning title=مفتاح FCM ناقص::أضف ADDONSTATION_FCM_SERVICE_ACCOUNT (نصّ حساب الخدمة من Firebase → Service accounts → Generate new private key)."
             exit 0
           fi
           python3 - <<'PY'
           import json, os, urllib.request
-          ref, token = os.environ["PROJECT_REF"], os.environ["SUPABASE_ACCESS_TOKEN"]
+          ref = os.environ["PROJECT_REF"]
+          token = os.environ["SUPABASE_ACCESS_TOKEN"]
+          payload = [
+              {"name": "FCM_SERVICE_ACCOUNT", "value": os.environ["FCM_SA"]},
+              {"name": "PUSH_CRON_SECRET", "value": os.environ["PUSH_SECRET"]},
+          ]
+          req = urllib.request.Request(
+              f"https://api.supabase.com/v1/projects/{ref}/secrets",
+              data=json.dumps(payload).encode(), method="POST")
+          req.add_header("Authorization", "Bearer " + token)
+          req.add_header("Content-Type", "application/json")
+          try:
+              with urllib.request.urlopen(req, timeout=60) as res:
+                  print("✓ زُوِّمت أسرار الدالة (FCM_SERVICE_ACCOUNT + PUSH_CRON_SECRET) ·", res.status)
+          except Exception as exc:
+              body = getattr(exc, "read", lambda: b"")()
+              print("::warning::تعذّرت المزامنة (" + str(exc)[:100] + ") " + body.decode("utf-8", "replace")[:160])
+          PY
+
+      - name: (اختياري) نشر دالة الإرسال send-push
+        if: ${{ steps.flags.outputs.deploy == 'true' }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::warning title=نشر الدالة يحتاج رمزاً واحداً::أضف SUPABASE_ACCESS_TOKEN من supabase.com/dashboard/account/tokens (New token) ثم أعد التشغيل."
+            exit 0
+          fi
+          curl -sS -L https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar xz
+          ./supabase functions deploy send-push --project-ref "$PROJECT_REF" --no-verify-jwt
+          echo "✓ الدالة منشورة."
+
+      - name: (اختياري) تنفيذ 35_push_live.sql عبر واجهة الإدارة
+        if: ${{ steps.flags.outputs.enable == 'true' }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::warning::بلا SUPABASE_ACCESS_TOKEN: انسخ supabase/35_push_live.sql في SQL Editor واضغط Run."
+            exit 0
+          fi
+          python3 - <<'PY'
+          import json, os, urllib.request
+          ref = os.environ["PROJECT_REF"]
+          token = os.environ["SUPABASE_ACCESS_TOKEN"]
           sql = open("supabase/35_push_live.sql", encoding="utf-8").read()
           req = urllib.request.Request(
               f"https://api.supabase.com/v1/projects/{ref}/database/query",
@@ -138,14 +183,14 @@ jobs:
           req.add_header("Authorization", "Bearer " + token)
           req.add_header("Content-Type", "application/json")
           try:
-              with urllib.request.urlopen(req, timeout=120) as res:
+              with urllib.request.urlopen(req, timeout=180) as res:
                   print("✓ نُفِّذ 35_push_live.sql:", res.read().decode()[:200])
           except Exception as exc:
               print("::warning::تعذّر التنفيذ التلقائي (" + str(exc)[:140] + ") — انسخ الملف في SQL Editor واضغط Run.")
           PY
 
       - name: (اختياري) تشغيل الطابور تلقائياً (push_live_enable)
-        if: ${{ inputs.enable }}
+        if: ${{ steps.flags.outputs.enable == 'true' }}
         env:
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY }}
         run: |
@@ -183,6 +228,14 @@ jobs:
             cat doctor.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: رفع تقرير الطبيب
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: push-doctor-report
+          path: doctor.txt
+          retention-days: 14
 
       - name: حارس الإشعارات الحقيقية
         run: python3 tools/check_push_live.py
