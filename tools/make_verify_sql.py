@@ -3,7 +3,7 @@
 """
 يولّد **`supabase/99_VERIFY_ALL.sql`** — فاحص القاعدة الكامل (قراءة فقط).
 
-ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 32) نُفِّذت
+ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 33) نُفِّذت
 كما نريد، ويطبع جدولاً: ✅/❌ + التفاصيل (وما هو المفقود بالاسم). يلصقه المالك
 في Supabase → SQL Editor مرة واحدة.
 
@@ -547,6 +547,26 @@ add("32_onefree_canonical_path", "المسار المعتمد موحّد (الأ
          "|| ' · حسابات على مسار قديم: ' || (select count(*) from public.profiles "
          "where avatar_url = 'profiles/onefree.png')::text"))
 
+add("33_user_block", "الحظر بين المستخدمين (سياسة جوجل UGC): الجدول + الدوال + إخفاء الرسائل",
+    q_ok("select ((select count(*) from information_schema.tables where table_schema = 'public' "
+         "and table_name = 'user_blocks') = 1 "
+         "and (select count(*) from pg_proc where proname in "
+         "('user_block', 'user_unblock', 'is_blocked_pair', 'my_blocked_users', "
+         "'i_blocked_user')) = 5 "
+         "and (select count(*) from pg_policies where schemaname = 'public' "
+         "and tablename = 'chat_messages' and policyname = 'messages_read' "
+         "and qual like '%is_blocked_pair%') = 1 "
+         "and (select count(*) from pg_policies where schemaname = 'public' "
+         "and tablename = 'user_blocks' and policyname = 'user_blocks_read') = 1)::text", "true"),
+    qdet("select 'الجدول: ' || (select case when count(*) = 1 then 'موجود' else 'مفقود' end "
+         "from information_schema.tables where table_schema = 'public' and table_name = 'user_blocks') "
+         "|| ' · الدوال: ' || (select count(*) from pg_proc where proname in "
+         "('user_block', 'user_unblock', 'is_blocked_pair', 'my_blocked_users', "
+         "'i_blocked_user'))::text || '/5 ' "
+         "|| '· إخفاء الرسائل: ' || (select case when count(*) = 1 then 'مفعّل' else 'غير مفعّل' end "
+         "from pg_policies where schemaname = 'public' and tablename = 'chat_messages' "
+         "and policyname = 'messages_read' and qual like '%is_blocked_pair%') "
+         "|| ' · حظرات مسجّلة: ' || (select count(*) from public.user_blocks)::text"))
 add("31_single_free_avatar", "كل الحسابات صورتها onefree (ولا حساب بلا صورة)",
     qbool("select (count(*) = 0)::text from public.profiles where avatar_url is null "
           "or btrim(avatar_url) = ''"),
@@ -602,7 +622,7 @@ HEAD = r'''-- ==================================================================
 --  AddonStation Mobile — ٩٩) فاحص القاعدة: «هل نُفِّذ كل SQL كما نريد؟»
 -- ============================================================================
 --
---  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 32) بنداً بنداً، ويطبع
+--  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 33) بنداً بنداً، ويطبع
 --  جدولاً واحداً: كل صف = بند · العمود «الحالة» ✅ أو ❌ · والعمود «التفاصيل»
 --  يقول لك ما هو الناقص بالاسم بالضبط.
 --
@@ -683,7 +703,7 @@ select 999999,
 
 -- ---------------------------------------------------------------------------
 --  ماذا بعد؟
---   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 32).
+--   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 33).
 --   • الصف الأخير (المجموع) يسرد أسماء الملفات التي فيها بند ❌ — لا يعني أن
 --     الملفات نفسها ناقصة، بل أن بنداً واحداً فيها لم يتحقّق: راجع عموده.
 --   • ظهر ❌ في ملف معيّن ⇒ نفّذ ذلك الملف من `supabase/` في SQL Editor

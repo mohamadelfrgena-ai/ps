@@ -1037,6 +1037,12 @@ fun UserProfileScreen(
      * المستخدم ملفه هو (لا معنى لأن يراسل نفسه أو يضيفها صديقاً).
      */
     onEditProfile: () -> Unit = {},
+    /**
+     * الحظر (سياسة Google Play للمحتوى): يُعرض على ملفات الآخرين فقط.
+     * الحظر متقابل ويُخفى كل كلامه فوراً، والإلغاء من هنا نفسه.
+     */
+    onBlock: (Profile) -> Unit = {},
+    onUnblock: (Profile) -> Unit = {},
 ) {
     val container = rememberContainer()
     // هل هذا ملفي أنا؟ (نفس مقارنة بطاقة الشات: معرّف الجلسة = معرّف الملف)
@@ -1045,6 +1051,8 @@ fun UserProfileScreen(
     var items by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var card by remember { mutableStateOf<com.addonstation.mobile.data.model.CreatorCard?>(null) }
     var friendEntry by remember { mutableStateOf<com.addonstation.mobile.data.model.FriendEntry?>(null) }
+    // هل أنا حاظر صاحب هذا الملف؟ (يُقرأ من القاعدة: جدول user_blocks)
+    var blocked by remember(userId) { mutableStateOf(false) }
     val friendState = friendEntry?.status ?: "none"
 
     LaunchedEffect(userId) {
@@ -1052,6 +1060,7 @@ fun UserProfileScreen(
         items = container.content.byCreator(userId, 20)
         card = container.creators.creatorStats(userId)
         friendEntry = container.profile.friendshipState(userId)
+        blocked = container.chat.blockedIds().contains(userId)
     }
 
     ContentColumn(
@@ -1148,6 +1157,24 @@ fun UserProfileScreen(
                     borderColor = AppColors.Blue.copy(alpha = 0.5f),
                 )
             }
+            // الحظر: صفّ مستقل أسفل الأزرار — لا يزاحم «مراسلة» و«إضافة صديق»،
+            // وواضح النص (سياسة جوجل تطلب وسيلة حظر ظاهرة لا مخفية في الإعدادات).
+            Spacer(Modifier.height(10.dp))
+            GhostButton(
+                text = if (blocked) stringResource(R.string.block_user_undo)
+                else stringResource(R.string.block_user),
+                onClick = {
+                    if (blocked) {
+                        onUnblock(me)
+                        blocked = false
+                    } else {
+                        onBlock(me)
+                        blocked = true
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                borderColor = AppColors.Red.copy(alpha = 0.5f),
+            )
         }
 
         Spacer(Modifier.height(12.dp))

@@ -409,12 +409,21 @@ fun MessageActionsSheet(
     onModerate: () -> Unit,
     onPin: () -> Unit,
     onMute: (Int) -> Unit,
+    /** هل أنا حاظر صاحب هذه الرسالة؟ (يقلب الخيار بين «حظر» و«إلغاء الحظر») */
+    isBlocked: Boolean = false,
+    /**
+     * حظر المستخدم — سياسة Google Play للمحتوى تشترط وسيلة حظر داخل التطبيق.
+     * الحظر متقابل: لا يرى أيٌّ منكما رسائل الآخر (والفلترة في القاعدة).
+     */
+    onBlockUser: () -> Unit = {},
+    onUnblockUser: () -> Unit = {},
     onOpenProfile: () -> Unit,
     onReact: (String) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showReport by remember { mutableStateOf(false) }
     var showMute by remember { mutableStateOf(false) }
+    var showBlock by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -447,6 +456,14 @@ fun MessageActionsSheet(
             ActionRow(Icons.Filled.Reply, stringResource(R.string.chat_reply), onReply)
             ActionRow(Icons.Filled.ContentCopy, stringResource(R.string.chat_copy_text), onCopy)
             ActionRow(Icons.Filled.Flag, stringResource(R.string.chat_report), onClick = { showReport = true })
+            // الحظر: لا يظهر لرسالتي أنا (لا معنى لحظر النفس)
+            if (ui.message.userId != myId) {
+                if (isBlocked) {
+                    ActionRow(Icons.Filled.Block, stringResource(R.string.block_user_undo), onUnblockUser)
+                } else {
+                    ActionRow(Icons.Filled.Block, stringResource(R.string.block_user), onClick = { showBlock = true }, tint = AppColors.Red)
+                }
+            }
             // خيار الحذف: للرسالة التي أرسلها المستخدم نفسه **وفي أول ٣ دقائق فقط**.
             // بعد انتهاء المدة يختفي الخيار تماماً (والقاعدة ترفضه من جهة الخادم أيضاً).
             if (ui.message.userId == myId && ui.message.status != "deleted") {
@@ -505,6 +522,17 @@ fun MessageActionsSheet(
             },
         )
     }
+    if (showBlock) {
+        BlockConfirmDialog(
+            name = ui.author?.username?.takeIf { it.isNotBlank() }
+                ?: stringResource(R.string.chat_view_profile),
+            onDismiss = { showBlock = false },
+            onConfirm = {
+                showBlock = false
+                onBlockUser()
+            },
+        )
+    }
     if (showMute) {
         MuteDialog(
             onDismiss = { showMute = false },
@@ -549,6 +577,46 @@ private fun ReportDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
         confirmButton = {
             androidx.compose.material3.TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.common_cancel), color = AppColors.Muted)
+            }
+        },
+    )
+}
+
+/**
+ * تأكيد الحظر — خطوة واحدة لازمة لأن أثره متقابل وفوري (يختفي كل كلامه)،
+ * ونوضّح فيه صراحةً أن الإلغاء متاح دائماً من ملفه الشخصي (لا رجعة عنه).
+ */
+@Composable
+private fun BlockConfirmDialog(
+    name: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = AppColors.Surface,
+        title = {
+            Text(
+                stringResource(R.string.block_confirm_title),
+                style = AppText.sectionTitle,
+                color = AppColors.Text,
+            )
+        },
+        text = {
+            Text(
+                stringResource(R.string.block_confirm_body, name),
+                style = AppText.bodySmall,
+                color = AppColors.Muted,
+            )
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel), color = AppColors.Muted)
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.block_user), color = AppColors.Red)
             }
         },
     )

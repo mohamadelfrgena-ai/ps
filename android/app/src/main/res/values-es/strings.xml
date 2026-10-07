@@ -257,6 +257,13 @@
     <string name="chat_reason_inappropriate">Contenido inapropiado</string>
     <string name="chat_reason_other">Otro</string>
     <string name="chat_report_sent">Reporte enviado ✅</string>
+    <string name="block_user">Bloquear usuario</string>
+    <string name="block_user_undo">Desbloquear</string>
+    <string name="block_confirm_title">¿Bloquear a este usuario?</string>
+    <string name="block_confirm_body">Ya no verás los mensajes de %1$s y él no verá los tuyos, y no podrá enviarte una solicitud de amistad. Puedes desbloquearlo en cualquier momento desde su perfil.</string>
+    <string name="block_done">Usuario bloqueado: sus mensajes ya están ocultos.</string>
+    <string name="block_failed">No se pudo bloquear — inténtalo de nuevo.</string>
+    <string name="unblock_done">Usuario desbloqueado.</string>
     <string name="chat_delete_mine">Eliminar mi mensaje</string>
     <string name="chat_delete_staff">🗑 Eliminar mensaje (moderación)</string>
     <string name="chat_delete_staff_note">Cualquier mensaje, por antiguo que sea — el límite de 3 minutos es solo para su autor.</string>

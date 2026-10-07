@@ -267,6 +267,13 @@
     <string name="chat_reason_inappropriate">Inappropriate content</string>
     <string name="chat_reason_other">Other</string>
     <string name="chat_report_sent">Report sent ✅</string>
+    <string name="block_user">Block user</string>
+    <string name="block_user_undo">Unblock</string>
+    <string name="block_confirm_title">Block this user?</string>
+    <string name="block_confirm_body">You will no longer see %1$s\'s messages and they will not see yours, and they cannot send you a friend request. You can unblock at any time from their profile.</string>
+    <string name="block_done">User blocked — their messages are now hidden.</string>
+    <string name="block_failed">Couldn\'t block — please try again.</string>
+    <string name="unblock_done">User unblocked.</string>
     <string name="chat_delete_mine">Delete my message</string>
     <string name="chat_delete_staff">🗑 Delete message (moderation)</string>
     <string name="chat_delete_staff_note">Any message, however old — the 3-minute limit applies to the author only.</string>

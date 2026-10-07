@@ -257,6 +257,13 @@
     <string name="chat_reason_inappropriate">不当内容</string>
     <string name="chat_reason_other">其他</string>
     <string name="chat_report_sent">举报已发送 ✅</string>
+    <string name="block_user">屏蔽用户</string>
+    <string name="block_user_undo">取消屏蔽</string>
+    <string name="block_confirm_title">要屏蔽该用户吗？</string>
+    <string name="block_confirm_body">你将不再看到 %1$s 的消息，对方也看不到你的消息，并且无法向你发送好友请求。你可以随时在其个人资料中取消屏蔽。</string>
+    <string name="block_done">已屏蔽该用户 — 其消息将不再显示。</string>
+    <string name="block_failed">无法屏蔽 — 请重试。</string>
+    <string name="unblock_done">已取消屏蔽。</string>
     <string name="chat_delete_mine">删除我的消息</string>
     <string name="chat_delete_staff">🗑 删除消息（管理）</string>
     <string name="chat_delete_staff_note">任何消息，无论发送多久——3 分钟限制只针对作者本人。</string>

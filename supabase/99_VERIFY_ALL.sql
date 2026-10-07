@@ -2,7 +2,7 @@
 --  AddonStation Mobile — ٩٩) فاحص القاعدة: «هل نُفِّذ كل SQL كما نريد؟»
 -- ============================================================================
 --
---  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 32) بنداً بنداً، ويطبع
+--  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 33) بنداً بنداً، ويطبع
 --  جدولاً واحداً: كل صف = بند · العمود «الحالة» ✅ أو ❌ · والعمود «التفاصيل»
 --  يقول لك ما هو الناقص بالاسم بالضبط.
 --
@@ -234,27 +234,31 @@ with checks(n, file_, item, ok, detail) as (
          public.diag_text($q$select ((select count(*) from public.site_assets where asset_type = 'avatar' and required_plan = 'free' and enabled and file_url = 'profiles/profiles/onefree.png') = 1 and (select column_default like '%profiles/profiles/onefree.png%' from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url') and (select count(*) from public.profiles where avatar_url = 'profiles/onefree.png') = 0)::text$q$) = 'true',
          coalesce(public.diag_text($q$select 'المفعّل: ' || coalesce((select string_agg(file_url, ' · ') from public.site_assets where asset_type = 'avatar' and required_plan = 'free' and enabled), '—') || ' · الافتراضي: ' || coalesce((select column_default from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url'), '—') || ' · حسابات على مسار قديم: ' || (select count(*) from public.profiles where avatar_url = 'profiles/onefree.png')::text$q$), 'مفقود')
   union all
-  select 45, '31_single_free_avatar', 'كل الحسابات صورتها onefree (ولا حساب بلا صورة)',
+  select 45, '33_user_block', 'الحظر بين المستخدمين (سياسة جوجل UGC): الجدول + الدوال + إخفاء الرسائل',
+         public.diag_text($q$select ((select count(*) from information_schema.tables where table_schema = 'public' and table_name = 'user_blocks') = 1 and (select count(*) from pg_proc where proname in ('user_block', 'user_unblock', 'is_blocked_pair', 'my_blocked_users', 'i_blocked_user')) = 5 and (select count(*) from pg_policies where schemaname = 'public' and tablename = 'chat_messages' and policyname = 'messages_read' and qual like '%is_blocked_pair%') = 1 and (select count(*) from pg_policies where schemaname = 'public' and tablename = 'user_blocks' and policyname = 'user_blocks_read') = 1)::text$q$) = 'true',
+         coalesce(public.diag_text($q$select 'الجدول: ' || (select case when count(*) = 1 then 'موجود' else 'مفقود' end from information_schema.tables where table_schema = 'public' and table_name = 'user_blocks') || ' · الدوال: ' || (select count(*) from pg_proc where proname in ('user_block', 'user_unblock', 'is_blocked_pair', 'my_blocked_users', 'i_blocked_user'))::text || '/5 ' || '· إخفاء الرسائل: ' || (select case when count(*) = 1 then 'مفعّل' else 'غير مفعّل' end from pg_policies where schemaname = 'public' and tablename = 'chat_messages' and policyname = 'messages_read' and qual like '%is_blocked_pair%') || ' · حظرات مسجّلة: ' || (select count(*) from public.user_blocks)::text$q$), 'مفقود')
+  union all
+  select 46, '31_single_free_avatar', 'كل الحسابات صورتها onefree (ولا حساب بلا صورة)',
          coalesce(public.diag_text($q$select (count(*) = 0)::text from public.profiles where avatar_url is null or btrim(avatar_url) = ''$q$), 'false') = 'true',
          coalesce(public.diag_text($q$select count(*)::text || ' بلا صورة' from public.profiles where avatar_url is null or btrim(avatar_url) = ''$q$), 'مفقود')
   union all
-  select 46, '31_single_free_avatar', 'لا حساب يستعمل صورة مجانية قديمة (معطَّلة)',
+  select 47, '31_single_free_avatar', 'لا حساب يستعمل صورة مجانية قديمة (معطَّلة)',
          coalesce(public.diag_text($q$select (count(*) = 0)::text from public.profiles p where exists (select 1 from public.site_assets a where a.asset_type = 'avatar' and a.required_plan = 'free' and not a.enabled and lower(a.file_url) not like '%onefree%' and (p.avatar_url = a.file_url or p.avatar_url = 'profiles/' || a.file_url or a.file_url = 'profiles/' || p.avatar_url))$q$), 'false') = 'true',
          coalesce(public.diag_text($q$select count(*)::text || ' حساباً' from public.profiles p where exists (select 1 from public.site_assets a where a.asset_type = 'avatar' and a.required_plan = 'free' and not a.enabled and lower(a.file_url) not like '%onefree%' and (p.avatar_url = a.file_url or p.avatar_url = 'profiles/' || a.file_url or a.file_url = 'profiles/' || p.avatar_url))$q$), 'مفقود')
   union all
-  select 47, '31_single_free_avatar', 'ملف الصورة موجود فعلاً في المخزن (site-assets/profiles/onefree.png)',
+  select 48, '31_single_free_avatar', 'ملف الصورة موجود فعلاً في المخزن (site-assets/profiles/onefree.png)',
          public.diag_text($q$select (count(*) >= 1)::text from storage.objects where bucket_id = 'site-assets' and name in ('profiles/onefree.png', 'profiles/profiles/onefree.png')$q$) = 'true',
          coalesce(public.diag_text($q$select string_agg(name, ' · ') from storage.objects where bucket_id = 'site-assets' and name in ('profiles/onefree.png', 'profiles/profiles/onefree.png')$q$), 'غير مرفوع بعد')
   union all
-  select 48, '07_seed_assets · 12_avatars', 'دفعات الأصول القديمة (مُستبدَلة بـ15 — لا يلزم تنفيذها)',
+  select 49, '07_seed_assets · 12_avatars', 'دفعات الأصول القديمة (مُستبدَلة بـ15 — لا يلزم تنفيذها)',
          true,
          'لا شيء مطلوب: 15_assets_v2 و21_banners هما المرجع (532 أصلاً)'
   union all
-  select 49, '16_fix_asset_paths', 'توحيد المسارات المكرّرة (نسخة آمنة — لا تلزمك الآن)',
+  select 50, '16_fix_asset_paths', 'توحيد المسارات المكرّرة (نسخة آمنة — لا تلزمك الآن)',
          true,
          coalesce(public.diag_text($q$select 'مسارات مكرّرة: ' || count(*) filter (where file_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/')::text || ' · منها ملفه على المسار النظيف: ' || count(*) filter (where file_url ~ '^(profiles|banners|items|stickers)/(profiles|banners|items|stickers)/' and exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' and o.name = regexp_replace(file_url, '^(profiles|banners|items|stickers)/(\1)/', '\1/')))::text || ' (المكرّر مقصود: هكذا رُفعت الملفات)' from public.site_assets$q$), 'لا شيء مطلوب')
   union all
-  select 50, '28_chat_cleanup', 'حالة الشات (28 ملف تنظيف أقسامه اختيارية)',
+  select 51, '28_chat_cleanup', 'حالة الشات (28 ملف تنظيف أقسامه اختيارية)',
          true,
          coalesce(public.diag_text($q$select 'الظاهرة: ' || count(*) filter (where status <> 'deleted')::text || ' · المحذوفة: ' || count(*) filter (where status = 'deleted')::text || ' · المخفية: ' || count(*) filter (where status = 'hidden')::text from public.chat_messages$q$), 'مفقود')
 
@@ -281,7 +285,7 @@ select 999999,
 
 -- ---------------------------------------------------------------------------
 --  ماذا بعد؟
---   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 32).
+--   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 33).
 --   • الصف الأخير (المجموع) يسرد أسماء الملفات التي فيها بند ❌ — لا يعني أن
 --     الملفات نفسها ناقصة، بل أن بنداً واحداً فيها لم يتحقّق: راجع عموده.
 --   • ظهر ❌ في ملف معيّن ⇒ نفّذ ذلك الملف من `supabase/` في SQL Editor

@@ -50,6 +50,7 @@ ORDER = [
     "30_chat_members_only.sql",
     "31_single_free_avatar.sql",
     "32_onefree_canonical_path.sql",
+    "33_user_block.sql",
 ]
 
 HEADER = """-- ============================================================================

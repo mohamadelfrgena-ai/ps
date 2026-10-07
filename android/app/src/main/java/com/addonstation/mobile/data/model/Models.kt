@@ -260,6 +260,13 @@ data class ChatNotification(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+/** صف من جدول الحظر: من حظرتُه أنا (يُقرأ مرة لفلترة الرسائل فوراً في الواجهة). */
+@Serializable
+data class BlockedUser(
+    @SerialName("blocked_id") val blockedId: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
 @Serializable
 data class FriendEntry(
     val id: Long,

@@ -257,6 +257,13 @@
     <string name="chat_reason_inappropriate">Uygunsuz içerik</string>
     <string name="chat_reason_other">Diğer</string>
     <string name="chat_report_sent">Bildirim gönderildi ✅</string>
+    <string name="block_user">Kullanıcıyı engelle</string>
+    <string name="block_user_undo">Engeli kaldır</string>
+    <string name="block_confirm_title">Bu kullanıcı engellensin mi?</string>
+    <string name="block_confirm_body">Artık %1$s kullanıcısının mesajlarını görmeyeceksin, o da seninkileri görmeyecek ve sana arkadaşlık isteği gönderemeyecek. Profilinden istediğin zaman engeli kaldırabilirsin.</string>
+    <string name="block_done">Kullanıcı engellendi — mesajları artık gizli.</string>
+    <string name="block_failed">Engellenemedi — tekrar dene.</string>
+    <string name="unblock_done">Engel kaldırıldı.</string>
     <string name="chat_delete_mine">Mesajımı sil</string>
     <string name="chat_delete_staff">🗑 Mesajı sil (moderasyon)</string>
     <string name="chat_delete_staff_note">Herhangi bir mesaj, ne kadar eski olursa olsun — 3 dakika sınırı sadece sahibi için.</string>

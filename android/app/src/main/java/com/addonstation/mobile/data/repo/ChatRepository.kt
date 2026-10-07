@@ -657,6 +657,43 @@ class ChatRepository(
         }
     }
 
+    // --------------------------------------------------- الحظر بين المستخدمين
+    // سياسة Google Play للمحتوى تشترط على كل تطبيق فيه شات **وسيلة حظر**،
+    // وهذه الثلاث وظائف تقودها. الفلترة نفسها في القاعدة (سياسة messages_read
+    // في 33_user_block.sql) فلا حاجة لتعديل أي استعلام قراءة في التطبيق.
+
+    /** يحظر مستخدماً: لا يرى أيٌّ منكما رسائل الآخر، وتُحذف صداقتهما. */
+    suspend fun blockUser(userId: String, reason: String? = null): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                supabase.rpc(
+                    "user_block",
+                    mapOf(
+                        "p_user_id" to JsonPrimitive(userId),
+                        "p_reason" to reason?.let { JsonPrimitive(it) },
+                    ),
+                ).asOutcome().requireOk()
+                Unit
+            }
+        }
+
+    suspend fun unblockUser(userId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc("user_unblock", mapOf("p_user_id" to JsonPrimitive(userId)))
+                .asOutcome().requireOk()
+            Unit
+        }
+    }
+
+    /** معرّفات المحظورين عندي — تُقرأ عند فتح الشات فتُفلتَر الرسائل فوراً أيضًا في الواجهة. */
+    suspend fun blockedIds(): Set<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.decodeList<BlockedUser>(
+                supabase.select("user_blocks", "select=blocked_id&order=created_at.desc"),
+            ).mapNotNull { it.blockedId }.filter { it.isNotBlank() }.toSet()
+        }.getOrElse { emptySet() }
+    }
+
     suspend fun banUser(userId: String, reason: String? = null): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             supabase.rpc(

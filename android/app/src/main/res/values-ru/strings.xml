@@ -257,6 +257,13 @@
     <string name="chat_reason_inappropriate">Неприемлемый контент</string>
     <string name="chat_reason_other">Другое</string>
     <string name="chat_report_sent">Жалоба отправлена ✅</string>
+    <string name="block_user">Заблокировать пользователя</string>
+    <string name="block_user_undo">Разблокировать</string>
+    <string name="block_confirm_title">Заблокировать этого пользователя?</string>
+    <string name="block_confirm_body">Вы больше не будете видеть сообщения %1$s, он не будет видеть ваши и не сможет отправить заявку в друзья. Разблокировать можно в любой момент из его профиля.</string>
+    <string name="block_done">Пользователь заблокирован — его сообщения скрыты.</string>
+    <string name="block_failed">Не удалось заблокировать — попробуйте ещё раз.</string>
+    <string name="unblock_done">Пользователь разблокирован.</string>
     <string name="chat_delete_mine">Удалить моё сообщение</string>
     <string name="chat_delete_staff">🗑 Удалить сообщение (модерация)</string>
     <string name="chat_delete_staff_note">Любое сообщение, независимо от давности — лимит 3 минуты только для автора.</string>

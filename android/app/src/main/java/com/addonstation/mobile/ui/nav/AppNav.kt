@@ -616,6 +616,10 @@ private fun MainNavigation(startAtReset: Boolean) {
                             scope.launch { container.profile.sendFriendRequest(profile.id) }
                         },
                         onOpenItem = { item -> go(Routes.item(item.id)) },
+                        // الحظر (سياسة UGC): يُنفَّذ على الخادم، والواجهة تُحدّث
+                        // حالتها في الشاشة نفسها (blocked) بلا إعادة تنقّل.
+                        onBlock = { profile -> scope.launch { container.chat.blockUser(profile.id) } },
+                        onUnblock = { profile -> scope.launch { container.chat.unblockUser(profile.id) } },
                         // ملفي أنا: الزرّ الوحيد هو «تعديل الملف الشخصي»
                         onEditProfile = { go(Routes.EDIT_PROFILE) },
                     )

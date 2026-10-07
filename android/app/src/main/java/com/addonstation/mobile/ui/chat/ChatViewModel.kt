@@ -75,6 +75,14 @@ class ChatViewModel(private val container: AppContainer) {
     private val _typing = MutableStateFlow<List<String>>(emptyList())
     val typing: StateFlow<List<String>> = _typing.asStateFlow()
 
+    /**
+     * من حظرتُهم (من قاعدة البيانات). الفلترة الأصلية في الخادم (RLS)، وهذه
+     * نسخة محلية للفلترة الفورية: يُخفى المحظور من اللحظة نفسها بلا انتظار
+     * جلب، ويُمنع تسرّب رسالة وصلت من Realtime/الاستقصاء قبل تحديث الجلسة.
+     */
+    private val _blockedIds = MutableStateFlow<Set<String>>(emptySet())
+    val blockedIds: StateFlow<Set<String>> = _blockedIds.asStateFlow()
+
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
@@ -93,6 +101,7 @@ class ChatViewModel(private val container: AppContainer) {
             _loading.value = true
             // فشل أول جلب لا يجوز أن يُبقي الشات على «جارٍ التحميل» للأبد:
             // الاستطلاع (كل ثانيتين) يجلب الرسائل بعده في أي حال.
+            runCatching { _blockedIds.value = container.chat.blockedIds() }
             runCatching { loadInitial(channel.id) }
             _loading.value = false
             startRealtime(channel.id)
@@ -190,6 +199,7 @@ class ChatViewModel(private val container: AppContainer) {
             container.supabase.json.decodeFromJsonElement(ChatMessage.serializer(), record)
         }.getOrNull() ?: return
         if (_messages.value.any { it.message.id == message.id }) return
+        if (message.userId in _blockedIds.value) return          // محظور: لا يظهر
         _messages.value = _messages.value + toUi(message)
         if (message.userId != container.supabase.session()?.userId &&
             !_newMessagesBelow.value
@@ -224,7 +234,9 @@ class ChatViewModel(private val container: AppContainer) {
                                 it
                             }
                         }
-                    } else if (list.none { it.message.id == message.id }) {
+                    } else if (message.userId !in _blockedIds.value &&
+                        list.none { it.message.id == message.id }
+                    ) {
                         mapped += toUi(message)
                     }
                 }
@@ -533,6 +545,36 @@ class ChatViewModel(private val container: AppContainer) {
 
     fun mute(userId: String, minutes: Int) {
         scope.launch { container.chat.muteUser(userId, minutes) }
+    }
+
+    /**
+     * حظر مستخدم (سياسة Google Play UGC): يُبلَّغ الخادم أولاً، ثم تُخفى
+     * رسائله من القائمة المعروضة فوراً بلا إعادة تحميل — تجربة فورية، والقاعدة
+     * تضمن الاختفاء الدائم بعدها (الاستقصاء والبثّ والبحث كلها تمرّ بـ RLS).
+     */
+    fun block(userId: String, onResult: (Boolean) -> Unit = {}) {
+        scope.launch {
+            container.chat.blockUser(userId)
+                .onSuccess {
+                    _blockedIds.value = _blockedIds.value + userId
+                    _messages.value = _messages.value.filterNot { it.message.userId == userId }
+                    _authors.value = _authors.value - userId
+                    onResult(true)
+                }
+                .onFailure { onResult(false) }
+        }
+    }
+
+    fun unblock(userId: String, onResult: (Boolean) -> Unit = {}) {
+        scope.launch {
+            container.chat.unblockUser(userId)
+                .onSuccess {
+                    _blockedIds.value = _blockedIds.value - userId
+                    runCatching { reload() }
+                    onResult(true)
+                }
+                .onFailure { onResult(false) }
+        }
     }
 
     fun report(messageId: Long, reason: String, note: String?) {

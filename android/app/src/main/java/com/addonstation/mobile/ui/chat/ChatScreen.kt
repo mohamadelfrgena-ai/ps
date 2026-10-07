@@ -138,6 +138,8 @@ fun ChatScreen(
     val authors by vm.authors.collectAsState()
     val loading by vm.loading.collectAsState()
     val newBelow by vm.newMessagesBelow.collectAsState()
+    /** من حظرتُهم — يُقرأ من القاعدة ويُحدَّث فوراً عند الحظر/الإلغاء في هذه الشاشة. */
+    val blockedIds by vm.blockedIds.collectAsState()
     val scrollTick by vm.scrollTick.collectAsState()
     val typing by vm.typing.collectAsState()
     val stickers by vm.stickers.collectAsState()
@@ -215,6 +217,9 @@ fun ChatScreen(
     val isAdmin = profile?.role == "admin"
     val pinMsg = stringResource(R.string.chat_pin)
     val unpinMsg = stringResource(R.string.chat_unpin)
+    val blockedMsg = stringResource(R.string.block_done)
+    val unblockedMsg = stringResource(R.string.unblock_done)
+    val blockFailedMsg = stringResource(R.string.block_failed)
     val imageFormatsMsg = stringResource(R.string.chat_image_formats)
     val imageMaxMsg = stringResource(R.string.chat_image_max)
     val mediaMaxMsg = stringResource(R.string.chat_media_max)
@@ -843,6 +848,15 @@ fun ChatScreen(
             },
             onMute = { minutes ->
                 vm.mute(ui.message.userId, minutes)
+                actionsFor = null
+            },
+            isBlocked = ui.message.userId in blockedIds,
+            onBlockUser = {
+                vm.block(ui.message.userId) { ok -> statusMessage = if (ok) blockedMsg else blockFailedMsg }
+                actionsFor = null
+            },
+            onUnblockUser = {
+                vm.unblock(ui.message.userId) { ok -> statusMessage = if (ok) unblockedMsg else null }
                 actionsFor = null
             },
             onOpenProfile = {
