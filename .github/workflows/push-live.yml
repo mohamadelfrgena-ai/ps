@@ -220,25 +220,47 @@ jobs:
             exit 0
           fi
           python3 - <<'PY'
-          import json, os, urllib.request
+          import json, os, time, urllib.error, urllib.request
 
-          def run_sql(path: str) -> bool:
-              ref = os.environ["PROJECT_REF"]
-              token = os.environ["SUPABASE_ACCESS_TOKEN"]
-              sql = open(path, encoding="utf-8").read()
+          REF = os.environ["PROJECT_REF"]
+          TOKEN = os.environ["SUPABASE_ACCESS_TOKEN"]
+
+
+          def sql_api(query: str):
+              """ينفّذ استعلاماً عبر واجهة الإدارة. يرفع HTTPError عند الفشل."""
               req = urllib.request.Request(
-                  f"https://api.supabase.com/v1/projects/{ref}/database/query",
-                  data=json.dumps({"query": sql}).encode(), method="POST")
-              req.add_header("Authorization", "Bearer " + token)
+                  f"https://api.supabase.com/v1/projects/{REF}/database/query",
+                  data=json.dumps({"query": query}).encode(), method="POST")
+              req.add_header("Authorization", "Bearer " + TOKEN)
               req.add_header("Content-Type", "application/json")
-              try:
-                  with urllib.request.urlopen(req, timeout=180) as res:
-                      print("✓ نُفِّذ " + path + ":", res.read().decode()[:200])
+              with urllib.request.urlopen(req, timeout=180) as res:
+                  return res.read().decode()
+
+
+          def run_sql(path: str, tries: int = 3) -> bool:
+              """ينفّذ ملف SQL — مع إعادة محاولة (الشبكة للخارج قد تسقط لحظة)،
+              ويطبع سبب الفشل الحقيقي (نصّ ردّ Supabase) حتى نعرف بالضبط."""
+              sql = open(path, encoding="utf-8").read()
+              last = ""
+              for attempt in range(1, tries + 1):
+                  try:
+                      sql_api(sql)
+                      print("::notice title=نُفِّذ " + path + "::كل عباراته نجحت (محاولة " + str(attempt) + ")")
                       return True
-              except Exception as exc:
-                  print("::warning::تعذّر تنفيذ " + path + " (" + str(exc)[:140]
-                        + ") — انسخ الملف في SQL Editor واضغط Run.")
-                  return False
+                  except urllib.error.HTTPError as exc:
+                      body = ""
+                      try:
+                          body = exc.read().decode()[:400]
+                      except Exception:
+                          pass
+                      last = "HTTP " + str(exc.code) + ": " + body
+                  except Exception as exc:
+                      last = type(exc).__name__ + ": " + str(exc)[:300]
+                  if attempt < tries:
+                      time.sleep(5)
+              print("::error title=فشل تنفيذ " + path + "::" + last.replace("\n", " ")[:400])
+              return False
+
 
           # 35 يشغّل الإشعارات الحقيقية · 36 إحصاءات الملف الشخصي (أرقام الأصدقاء/
           # التنزيلات/المفضّلة/المستوى) · 37 الإبلاغ عن عضو من ملفّه ·
@@ -247,6 +269,31 @@ jobs:
           run_sql("supabase/36_profile_stats.sql")
           run_sql("supabase/37_profile_reports.sql")
           run_sql("supabase/38_user_mute.sql")
+
+          # تحقّق صريح: هل وصلت الدوال/الأعمدة إلى القاعدة فعلاً؟ (يظهر كتنبيه
+          # في صفحة التشغيل مباشرةً فلا نبقى نخمّن)
+          check = (
+              "select 'profile_stats=' || (select count(*) from pg_proc p "
+              "join pg_namespace n on n.oid = p.pronamespace "
+              "where n.nspname = 'public' and p.proname = 'profile_stats')::text"
+              " || ' chat_report_user=' || (select count(*) from pg_proc p "
+              "join pg_namespace n on n.oid = p.pronamespace "
+              "where n.nspname = 'public' and p.proname = 'chat_report_user')::text"
+              " || ' user_mute=' || (select count(*) from pg_proc p "
+              "join pg_namespace n on n.oid = p.pronamespace "
+              "where n.nspname = 'public' and p.proname = 'user_mute')::text"
+              " || ' user_mutes=' || (select count(*) from information_schema.tables "
+              "where table_schema = 'public' and table_name = 'user_mutes')::text"
+              " || ' muted_users=' || (select count(*) from information_schema.columns "
+              "where table_schema = 'public' and table_name = 'push_prefs' "
+              "and column_name = 'muted_users')::text as report"
+          )
+          try:
+              raw = sql_api(check).strip()
+              print("::notice title=تحقّق الخادم::" + raw[:300])
+          except Exception as exc:
+              print("::warning::تعذّر التحقّق: " + str(exc)[:140])
+
           if not ok:
               raise SystemExit(0)
 
