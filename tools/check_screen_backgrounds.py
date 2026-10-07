@@ -29,10 +29,6 @@ import re
 import sys
 from pathlib import Path
 
-try:
-    from PIL import Image
-except ImportError:  # pillow غير مثبّت ⇒ نتجاوز فحص الأبعاد
-    Image = None
 
 ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / "android/app/src/main/res"
@@ -67,8 +63,39 @@ def func_body(src: str, signature: str) -> str:
     return src[start:]
 
 
-def size_of(path: Path):
-    return Image.open(path).size if Image is not None and path.exists() else None
+def jpeg_size(path: Path):
+    """
+    أبعاد صورة JPEG بلا أي مكتبة خارجية: نتتبّع علامات JPEG حتى SOF.
+
+    لماذا لا Pillow؟ لأن الفاحص يجب أن يعمل في أي بيئة (سير GitHub مثلاً)
+    بلا تثبيت شيء — والاعتماد على مكتبة غير مثبّتة يجعل الفحص يفشل بلا سبب.
+    """
+    if not path.exists():
+        return None
+    data = path.read_bytes()
+    if data[:2] != b"\xff\xd8":
+        return None
+    i, n = 2, len(data)
+    while i + 9 < n:
+        if data[i] != 0xFF:
+            i += 1
+            continue
+        marker = data[i + 1]
+        if marker in (0xD8, 0x01) or 0xD0 <= marker <= 0xD7:
+            i += 2
+            continue
+        seg_len = int.from_bytes(data[i + 2:i + 4], "big")
+        # SOF0..SOF15 عدا DHT (C4) وJPG (C8) وDAC (CC)
+        if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+            height = int.from_bytes(data[i + 5:i + 7], "big")
+            width = int.from_bytes(data[i + 7:i + 9], "big")
+            return (width, height)
+        i += 2 + seg_len
+    return None
+
+
+# توافق: بعض الفحوص كانت تنادي size_of
+size_of = jpeg_size
 
 
 def main() -> int:
@@ -131,12 +158,11 @@ def main() -> int:
     legacy = size_of(SPLASH_LEGACY)
     rows.append((f"الصورة القديمة محفوظة كما هي ({legacy[0]}×{legacy[1]})" if legacy
                  else "الصورة القديمة محفوظة كما هي", bool(legacy)))
-    if legacy and Image is not None:
-        old = Image.open(SPLASH_LEGACY).convert("RGB")
-        orig = Image.open(SPLASH_OLD_MASTER).convert("RGB") if SPLASH_OLD_MASTER.exists() else None
-        rows.append(("نسخة legacy مطابقة للأصل القديم",
-                     orig is not None and old.tobytes() == orig.tobytes()))
-        # النقطية القديمة كانت طولية 852×1356 — نتحقّق أن المحفوظ هو هي لا صورة جديدة
+    if legacy:
+        # مطابقة بايتاً ببايت بلا أي مكتبة صور
+        same = (SPLASH_OLD_MASTER.exists()
+                and SPLASH_LEGACY.read_bytes() == SPLASH_OLD_MASTER.read_bytes())
+        rows.append(("نسخة legacy مطابقة للأصل القديم (بايتاً بايت)", same))
         rows.append(("المحفوظ هو الصورة القديمة الطولية (852×1356)",
                      legacy == (852, 1356)))
     rows.append(("الإرجاع موثّق في الكود (splash_bg_legacy)",

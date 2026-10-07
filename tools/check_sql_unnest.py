@@ -36,6 +36,33 @@ BAD = re.compile(
 DEMO = re.compile(r"^\s*perform\s+array\(\s*select\s+distinct\s+unnest\(", re.IGNORECASE)
 
 
+def strip_strings(line: str) -> str:
+    """
+    يحذف النصوص المُقتبسة من السطر قبل الفحص.
+
+    لماذا؟ لأن ملف `99_VERIFY_ALL.sql` يبحث عن النمط المكسور **كنصّ** داخل
+    `ilike '%where unnest is not null%'` — وهو استعمال سليم (فحص إصلاح)،
+    فلا يجوز أن يُفشل الفاحص.
+    """
+    out, i, n = [], 0, len(line)
+    while i < n:
+        if line[i] == "'":
+            i += 1
+            while i < n:
+                if line[i] == "'":
+                    if i + 1 < n and line[i + 1] == "'":
+                        i += 2
+                        continue
+                    i += 1
+                    break
+                i += 1
+            out.append("''")
+            continue
+        out.append(line[i])
+        i += 1
+    return "".join(out)
+
+
 def main() -> int:
     bad: list[str] = []
     files = sorted([*SQL_DIR.glob("*.sql"), *SQL_DIR.glob("functions/**/*.ts")])
@@ -52,7 +79,7 @@ def main() -> int:
                 continue
             if DEMO.match(line):
                 continue
-            if BAD.search(line):
+            if BAD.search(strip_strings(line)):
                 bad.append(f"{f.relative_to(ROOT)}:{i}: {line.strip()}")
 
     if bad:
