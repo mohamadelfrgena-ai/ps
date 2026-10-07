@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.imePadding
@@ -30,11 +31,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -64,6 +69,7 @@ import com.addonstation.mobile.R
 import com.addonstation.mobile.data.ProfileLoadStatus
 import com.addonstation.mobile.data.model.ContentItem
 import com.addonstation.mobile.data.model.Profile
+import com.addonstation.mobile.data.model.ProfileStats
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.theme.adaptiveColumns
 import com.addonstation.mobile.ui.theme.appScreenWidthDp
@@ -88,12 +94,31 @@ import com.addonstation.mobile.ui.components.ProfileRow
 import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.components.RowItem
 import com.addonstation.mobile.ui.components.SectionHeader
+import com.addonstation.mobile.ui.components.SpecAboutCard
+import com.addonstation.mobile.ui.components.SpecDangerButton
+import com.addonstation.mobile.ui.components.SpecFillButton
+import com.addonstation.mobile.ui.components.SpecActionRow
+import com.addonstation.mobile.ui.components.SpecBannerIconButton
+import com.addonstation.mobile.ui.components.SpecCard
+import com.addonstation.mobile.ui.components.SpecGridTile
+import com.addonstation.mobile.ui.components.SpecHiddenWalletCard
+import com.addonstation.mobile.ui.components.SpecOutlineButton
+import com.addonstation.mobile.ui.components.SpecSmallCaps
+import com.addonstation.mobile.ui.components.SpecIdentityCard
+import com.addonstation.mobile.ui.components.SpecLevelCard
+import com.addonstation.mobile.ui.components.SpecProfileAvatar
+import com.addonstation.mobile.ui.components.SpecProfileBanner
+import com.addonstation.mobile.ui.components.SpecStatsStrip
+import com.addonstation.mobile.ui.components.SpecWalletCard
+import com.addonstation.mobile.ui.components.specMemberSince
+import com.addonstation.mobile.ui.components.specStatusOf
 import com.addonstation.mobile.ui.components.SubScreenHeader
 import com.addonstation.mobile.ui.components.ThinProgress
 import com.addonstation.mobile.ui.common.metaOf
 import com.addonstation.mobile.ui.common.planLabelOf
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
+import com.addonstation.mobile.ui.theme.Spec
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.util.TimeFormat
 import kotlinx.coroutines.CancellationException
@@ -171,24 +196,33 @@ private fun GuestProfileScreen(
     }
 }
 
+/**
+ * الشاشة A — «ملفي» (تبويب الملف الشخصي) — على وثيقة `SPEC_PROFILES.md` §3 حرفياً:
+ *   ١ البانر (زرّ الرجوع وحده) ٢ صفّ الأفاتار + «تعديل الملف» محاذى لأسفله
+ *   ٣ بطاقة الهوية ٤ بطاقة المحفظة (تحت الهوية مباشرة) ٥ شريط الإحصاءات
+ *   ٦ بطاقة المستوى ٧ بطاقة النبذة ٨ شبكة 2×2 ٩ «تسجيل الخروج».
+ * الإعدادات شاشة مستقلة (تبويب الإعدادات) — لا تُعرض هنا.
+ *
+ * الأرقام (أصدقاء · تنزيلات · مفضّلة · المستوى · سلسلة الأيام · مكافأة اليوم)
+ * تأتي من دالة الخادم `profile_stats` ⇒ صحيحة لحسابي، وبلا استعلامات محجوبة.
+ */
 @Composable
 fun ProfileScreen(
     onLogin: () -> Unit,
     /** إنشاء حساب من شاشة الضيف (كانت تُحوّل إلى الدخول فقط). */
     onOpenSignup: () -> Unit = onLogin,
-    /**
-     * بعد تسجيل الخروج: نعود إلى الرئيسية كضيف (مع بطاقة دعوة للدخول) بدل
-     * إظهار شاشة الدخول فوراً — كانت تُفتح بلا طلب من المستخدم فيبدو الأمر
-     * كأنّه «طُرد» من التطبيق.
-     */
     onSignedOut: () -> Unit = onLogin,
-    onOpenSettings: () -> Unit,
-    onOpenPlans: () -> Unit,
+    onBack: () -> Unit,
     onOpenEdit: () -> Unit,
+    /** مدخل لوحة الإدارة — يظهر للأدمن/المشرف وحدهما (بند إضافي غير مخالف). */
     onOpenAdmin: () -> Unit,
-    onOpenStudio: () -> Unit,
-    onOpenItem: (ContentItem) -> Unit,
     onOpenWallet: () -> Unit,
+    onOpenFavorites: () -> Unit,
+    onOpenDownloads: () -> Unit,
+    onOpenOrders: () -> Unit,
+    onOpenMyContent: () -> Unit,
+    /** شاشة C: «عرض كما يراني الآخرون». */
+    onViewAsOthers: () -> Unit,
 ) {
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
@@ -198,13 +232,10 @@ fun ProfileScreen(
     val scope = rememberCoroutineScope()
 
     var profileRetryTick by remember { mutableStateOf(0) }
-    var tab by remember { mutableStateOf(0) }
-    var myContent by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
-    var favourites by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
-    var downloads by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var failed by remember { mutableStateOf(false) }
-    var reloadTick by remember { mutableStateOf(0) }
+    var statsTick by remember { mutableStateOf(0) }
+    var stats by remember { mutableStateOf<ProfileStats?>(null) }
+    var claiming by remember { mutableStateOf(false) }
+    var claimNote by remember { mutableStateOf<String?>(null) }
 
     // الجلسة قد تكون صالحة بينما الملف الشخصي لم يكتمل تحميله بعد؛ لا نحوّل
     // هذه الحالة المؤقتة إلى شاشة تسجيل دخول، بل نجلب الملف ونتيح إعادة المحاولة.
@@ -220,35 +251,15 @@ fun ProfileScreen(
         }
     }
 
-    // القوائم الثلاث تُجلب **مرة واحدة وبالتوازي**: بطاقات الإحصائيات الثلاث
-    // (التنزيلات · محتواي · المفضلة) تقرأها كلّها من اللحظة الأولى، فلا أصفار
-    // مؤقتة ولا طلبات متسلسلة عند كل لمسة تبويب.
-    LaunchedEffect(profile?.id, reloadTick) {
-        val me = profile ?: return@LaunchedEffect
-        loading = true
-        failed = false
-        try {
-            coroutineScope {
-                val mine = async(Dispatchers.IO) { container.content.byCreator(me.id) }
-                val favs = async(Dispatchers.IO) { container.content.favorites() }
-                val downs = async(Dispatchers.IO) { container.content.downloads() }
-                myContent = mine.await()
-                favourites = favs.await()
-                downloads = downs.await()
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Throwable) {
-            failed = true
-        } finally {
-            loading = false
-        }
+    // الإحصاءات + المحفظة معاً (تُعاد كلّها بعد استلام المكافأة)
+    LaunchedEffect(profile?.id, statsTick) {
+        val id = profile?.id ?: return@LaunchedEffect
+        container.profile.refreshWallet()
+        stats = container.profile.stats(id)
     }
 
     if (!signedIn) {
-        // **لا نُخرِج المستخدم من التبويب قسراً** (كان `LaunchedEffect { onLogin() }`
-        // ينقله إلى شاشة الدخول بمجرّد فتح «ملف شخصي» — وهو ما جعل صاحب التطبيق
-        // يظنّ أن التطبيق «لا يعرف» أنه مسجّل). الآن: شاشة ضيف واضحة بزرّين،
+        // **لا نُخرِج المستخدم من التبويب قسراً** — شاشة ضيف واضحة بزرّين،
         // والتنقّل يبقى بيد المستخدم.
         GuestProfileScreen(onLogin = onLogin, onOpenSignup = onOpenSignup)
         return
@@ -271,168 +282,167 @@ fun ProfileScreen(
     }
 
     val me = profile!!
-    val level = me.userLevel
-    val xpProgress = level.coerceAtMost(50) / 50f
-    val xpPercent = (xpProgress * 100).toInt()
+    val status = specStatusOf(me, isMe = true)
+    val level = stats?.level ?: me.userLevel
+    val xpInLevel = stats?.xpInLevel ?: 0
+    val balance = wallet?.balance ?: 0
+    val streak = stats?.streak ?: 0
+    val dailyClaimed = stats?.dailyClaimed ?: false
+
+    fun claimDaily() {
+        if (claiming) return
+        scope.launch {
+            claiming = true
+            claimNote = null
+            val daily = runCatching {
+                container.ac.tasks()
+                    .firstOrNull { it.frequency == "daily" || it.frequency == "streak" }
+                    ?.id
+            }.getOrNull() ?: "daily_login"
+            container.ac.claimTask(daily)
+                .onSuccess { reward -> claimNote = "+$reward AC" }
+                .onFailure { claimNote = null }
+            // الحالة الحقيقية («هل استُلمت اليوم؟») تُقرأ من الخادم لا من الزرّ
+            statsTick += 1
+            claiming = false
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
-        PixelTopBar(
-            title = stringResource(R.string.nav_profile),
-            // الرصيد معروض على البانر كما في التصميم ⇒ لا نكرّره في الشريط
-            showWallet = false,
-            icon = Icons.Filled.Settings,
-        )
         Column(
             Modifier
                 .fillMaxSize()
                 .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp),
+                .verticalScroll(rememberScrollState()),
         ) {
-            Spacer(Modifier.height(12.dp))
+            // ١) البانر — زرّ الرجوع وحده (بلا «المزيد» في هذه الشاشة)
+            SpecProfileBanner(
+                bannerUrl = assetUrl(container, me.bannerUrl),
+                onBack = onBack,
+            )
 
-            // البانر + الصورة: نصف الصورة على الحافة السفلية للبانر (كما في التصميم)
-            val bannerHeight = 132.dp
-            val avatarSize = 88.dp
-            Box(Modifier.fillMaxWidth().height(bannerHeight + avatarSize / 2 + 12.dp)) {
-                ProfileBanner(height = bannerHeight) {
-                    assetUrl(container, me.bannerUrl)?.let { banner ->
-                        CoverImage(url = banner, radius = 20.dp, animate = true, modifier = Modifier.fillMaxSize())
-                    }
-                    // رصيد AC أعلى يمين البانر
-                    Row(
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(12.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(AppColors.Bg.copy(alpha = 0.45f))
-                            .clickable { onOpenWallet() }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        CoinIcon(size = 14.dp)
-                        Text(
-                            "${wallet?.balance ?: 0} AC",
-                            style = AppText.small,
-                            color = AppColors.Gold,
-                            fontWeight = FontWeight.Bold,
+            // ٢) صفّ الأفاتار: يركب على البانر 46dp، و«تعديل الملف» محاذى لأسفل الأفاتار
+            Box(Modifier.fillMaxWidth().height(Spec.avatarLg - Spec.avatarOverlap)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = Spec.screenPad),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    Box(Modifier.offset(y = -Spec.avatarOverlap)) {
+                        SpecProfileAvatar(
+                            avatarUrl = assetUrl(container, me.avatarUrl),
+                            status = status,
                         )
                     }
-                }
-                Box(Modifier.align(Alignment.BottomStart).padding(start = 4.dp)) {
-                    ProfileAvatar(level = level, size = avatarSize) {
-                        AvatarImage(url = assetUrl(container, me.avatarUrl), size = avatarSize - 8.dp)
-                    }
+                    Spacer(Modifier.weight(1f))
+                    SpecFillButton(
+                        text = stringResource(R.string.profile_edit),
+                        onClick = onOpenEdit,
+                    )
                 }
             }
 
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    me.displayName ?: me.username ?: "",
-                    style = AppText.welcomeName,
-                    color = AppColors.Text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                RankBadge(role = me.role, plan = me.effectivePlan)
-            }
-            Text(
-                "@${me.username ?: ""} · " + stringResource(
-                    R.string.profile_member_since,
-                    TimeFormat.dateOnly(me.createdAt, Locale.getDefault()),
-                ),
-                style = AppText.tiny,
-                color = AppColors.Muted,
-            )
-            me.customStatus?.takeIf { it.isNotBlank() }?.let {
-                Text(it, style = AppText.bodySmall, color = AppColors.Blue, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
+            Column(Modifier.padding(horizontal = Spec.screenPad)) {
+                // ٣) بطاقة الهوية
+                Spacer(Modifier.height(12.dp))
+                SpecIdentityCard(profile = me, status = status, level = level)
 
-            Spacer(Modifier.height(12.dp))
-            GradientButton(
-                text = stringResource(R.string.profile_edit),
-                onClick = onOpenEdit,
-                icon = Icons.Filled.Edit,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            // أزرار الأدوار تبقى في المتناول تحت «تعديل الملف» (ترقية · لوحة إدارة · استوديو)
-            if (me.effectivePlan == "free" || me.role == "admin" || me.role == "creator") {
+                // مدخل الشاشة C («عرض كما يراني الآخرون») — بند الوثيقة §5
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (me.effectivePlan == "free") {
-                        GhostButton(
-                            text = stringResource(R.string.profile_upgrade),
-                            onClick = onOpenPlans,
-                            icon = Icons.Filled.WorkspacePremium,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    if (me.role == "admin") {
-                        GhostButton(
-                            text = stringResource(R.string.profile_dashboard),
-                            onClick = onOpenAdmin,
-                            icon = Icons.Filled.AdminPanelSettings,
-                            modifier = Modifier.weight(1f),
-                        )
-                    } else if (me.role == "creator") {
-                        GhostButton(
-                            text = stringResource(R.string.home_creator_open),
-                            onClick = onOpenStudio,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onViewAsOthers),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.Visibility,
+                        contentDescription = null,
+                        tint = Spec.blueLink,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        stringResource(R.string.profile_view_as_others),
+                        style = Spec.link,
+                        color = Spec.blueLink,
+                    )
                 }
-            }
 
-            Spacer(Modifier.height(12.dp))
-            ProfileXpBar(
-                progress = xpProgress,
-                label = stringResource(R.string.profile_xp_progress, level.toString(), xpPercent),
-            )
-
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ProfileStatCard(
-                    value = downloads.size.toString(),
-                    label = stringResource(R.string.profile_stats_downloads),
-                    modifier = Modifier.weight(1f),
-                )
-                ProfileStatCard(
-                    value = myContent.size.toString(),
-                    label = stringResource(R.string.profile_stats_content),
-                    modifier = Modifier.weight(1f),
-                )
-                ProfileStatCard(
-                    value = favourites.size.toString(),
-                    label = stringResource(R.string.profile_stats_favorites),
-                    modifier = Modifier.weight(1f),
-                )
-            }
-
-            Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val tabs = listOf(
-                    stringResource(R.string.profile_tab_about),
-                    stringResource(R.string.profile_tab_content),
-                    stringResource(R.string.profile_tab_favorites),
-                    stringResource(R.string.profile_tab_plan),
-                )
-                tabs.forEachIndexed { index, label ->
-                    FilterChip(label = label, selected = tab == index, onClick = { tab = index })
+                // ٤) بطاقة المحفظة — تحت بطاقة الهوية مباشرة (ولمسها يفتح شاشة المحفظة)
+                Spacer(Modifier.height(12.dp))
+                Box(Modifier.clickable(onClick = onOpenWallet)) {
+                    SpecWalletCard(
+                        balance = balance,
+                        streak = streak,
+                        dailyReward = stats?.dailyReward ?: 0,
+                        dailyClaimed = dailyClaimed,
+                        claiming = claiming,
+                        onClaim = { claimDaily() },
+                    )
                 }
-            }
+                claimNote?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(it, style = Spec.secondary, color = Spec.gold)
+                }
 
-            Spacer(Modifier.height(12.dp))
-            when (tab) {
-                0 -> MyAccountTab(
-                    me = me,
-                    onOpenPlans = onOpenPlans,
-                    onOpenEdit = onOpenEdit,
-                    onOpenSettings = onOpenSettings,
-                    onSignOut = {
+                // ٥) شريط الإحصاءات
+                Spacer(Modifier.height(12.dp))
+                SpecStatsStrip(
+                    friends = stats?.friends ?: 0,
+                    downloads = stats?.downloads ?: 0,
+                    favorites = stats?.favorites ?: 0,
+                )
+
+                // ٦) بطاقة المستوى
+                Spacer(Modifier.height(12.dp))
+                SpecLevelCard(level = level, xpInLevel = xpInLevel)
+
+                // ٧) بطاقة النبذة («عضو منذ» داخلها)
+                Spacer(Modifier.height(12.dp))
+                SpecAboutCard(bio = me.bio, memberSince = specMemberSince(me.createdAt))
+
+                // ٨) شبكة 2×2 (فراغ 10 · هامش علوي 12)
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SpecGridTile(
+                        stringResource(R.string.profile_tab_favorites),
+                        onClick = onOpenFavorites,
+                        modifier = Modifier.weight(1f),
+                    )
+                    SpecGridTile(
+                        stringResource(R.string.profile_stats_downloads),
+                        onClick = onOpenDownloads,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SpecGridTile(
+                        stringResource(R.string.profile_orders),
+                        onClick = onOpenOrders,
+                        modifier = Modifier.weight(1f),
+                    )
+                    SpecGridTile(
+                        stringResource(R.string.profile_stats_content),
+                        onClick = onOpenMyContent,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                // لوحة الإدارة: مدخل لا بديل عنه للأدمن/المشرف (الوثيقة لا تذكره،
+                // وإخفاؤه يقطع الطريق الوحيد إلى اللوحة — لذا يظهر لهما وحدهما).
+                if (me.isStaff) {
+                    Spacer(Modifier.height(10.dp))
+                    SpecGridTile(
+                        stringResource(R.string.profile_dashboard),
+                        onClick = onOpenAdmin,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                // ٩) تسجيل الخروج
+                Spacer(Modifier.height(16.dp))
+                SpecDangerButton(
+                    text = stringResource(R.string.profile_logout),
+                    onClick = {
                         scope.launch {
                             container.auth.signOut()
                             container.state.setSignedIn(false)
@@ -443,25 +453,8 @@ fun ProfileScreen(
                         }
                     },
                 )
-                1 -> ContentGrid(
-                    items = myContent,
-                    loading = loading,
-                    failed = failed,
-                    onRetry = { reloadTick += 1 },
-                    emptyText = stringResource(R.string.profile_my_content_empty),
-                    onClick = onOpenItem,
-                )
-                2 -> ContentGrid(
-                    items = favourites,
-                    loading = loading,
-                    failed = failed,
-                    onRetry = { reloadTick += 1 },
-                    emptyText = stringResource(R.string.profile_favorites_empty),
-                    onClick = onOpenItem,
-                )
-                else -> PlanTab(me = me, onOpenPlans = onOpenPlans)
+                Spacer(Modifier.height(96.dp))
             }
-            Spacer(Modifier.height(96.dp))
         }
     }
 }
@@ -1196,212 +1189,546 @@ private fun OutlinedTextFieldBidi(
 // تباعد ورقة الأصول؛ عدد الأعمدة وارتفاع الخلية يُحسبان من عرض شاشة الهاتف (Sizing.kt).
 private const val GRID_SPACING = 6
 
-/** ملف مستخدم عام (يُفتح من الشات أو من بطاقة المبدع). */
+/**
+ * الشاشة B — «ملف عضو» (تُفتح من اسم في الشات) على وثيقة `SPEC_PROFILES.md` §4:
+ *   البانر (رجوع يسار + «المزيد» يمين) · الأفاتار بلا زرّ · الهوية · صفّ الأزرار
+ *   · الإحصاءات · المستوى · النبذة · بطاقة السلامة · وبطاقة الإشراف للإدارة فقط.
+ * لا محفظة ولا طلبات ولا مفضّلة ولا إعدادات هنا (نصّ الوثيقة §4).
+ *
+ * قرار المالك: زرّ «مراسلة [الاسم]» **مخفيّ مؤقتاً** — لا محادثات خاصة في
+ * الخادم بعد؛ يُعاد بإضافة جدول الرسائل الخاصة وحدها (لا شيء آخر يتغيّر).
+ *
+ * الأرقام تأتي من دالة الخادم `profile_stats` (أصدقاء · تنزيلات · مفضّلة ·
+ * مستوى · سلسلة أيام) لأن جداولها محميّة بسياسات «لصاحبها فقط».
+ */
 @Composable
 fun UserProfileScreen(
     userId: String,
     onBack: () -> Unit,
-    onMessage: (Profile) -> Unit,
-    onAddFriend: (Profile) -> Unit,
-    onOpenItem: (ContentItem) -> Unit,
-    /**
-     * فتح **تعديل الملف الشخصي** — يظهر بدل «مراسلة» و«إضافة صديق» حين يفتح
-     * المستخدم ملفه هو (لا معنى لأن يراسل نفسه أو يضيفها صديقاً).
-     */
+    /** فتح تعديل الملف — يظهر حين يفتح المستخدم ملفه هو. */
     onEditProfile: () -> Unit = {},
-    /**
-     * الحظر (سياسة Google Play للمحتوى): يُعرض على ملفات الآخرين فقط.
-     * الحظر متقابل ويُخفى كل كلامه فوراً، والإلغاء من هنا نفسه.
-     */
     onBlock: (Profile) -> Unit = {},
     onUnblock: (Profile) -> Unit = {},
+    /** أدوات الإشراف (الأدمن/المشرف): تُفتح شاشة إشراف الشات حيث الحذف والكتم. */
+    onOpenAdminTools: () -> Unit = {},
 ) {
     val container = rememberContainer()
-    // هل هذا ملفي أنا؟ (نفس مقارنة بطاقة الشات: معرّف الجلسة = معرّف الملف)
     val isMyProfile = container.supabase.session()?.userId == userId
-    var profile by remember { mutableStateOf<Profile?>(null) }
-    var items by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
-    var card by remember { mutableStateOf<com.addonstation.mobile.data.model.CreatorCard?>(null) }
-    var friendEntry by remember { mutableStateOf<com.addonstation.mobile.data.model.FriendEntry?>(null) }
-    // هل أنا حاظر صاحب هذا الملف؟ (يُقرأ من القاعدة: جدول user_blocks)
-    var blocked by remember(userId) { mutableStateOf(false) }
-    val friendState = friendEntry?.status ?: "none"
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(userId) {
+    var profile by remember { mutableStateOf<Profile?>(null) }
+    var stats by remember { mutableStateOf<ProfileStats?>(null) }
+    var friendEntry by remember { mutableStateOf<com.addonstation.mobile.data.model.FriendEntry?>(null) }
+    // الحظر: أنا حاظره (فأُظهر «إلغاء الحظر») · أو بيننا حظر بأي اتجاه (فأُعطّل الأزرار)
+    var blockedByMe by remember(userId) { mutableStateOf(false) }
+    var blockedPair by remember(userId) { mutableStateOf(false) }
+    var muted by remember(userId) { mutableStateOf(false) }
+    var working by remember { mutableStateOf(false) }
+    var note by remember { mutableStateOf<String?>(null) }
+    var showBlockConfirm by remember { mutableStateOf(false) }
+    var showReport by remember { mutableStateOf(false) }
+    var showMore by remember { mutableStateOf(false) }
+    var showUnfriendConfirm by remember { mutableStateOf(false) }
+    // إعادة القراءة بعد كل فعل (صداقة · كتم · حظر) بلا إعادة تنقّل
+    var tick by remember { mutableStateOf(0) }
+
+    val doneMsg = stringResource(R.string.profile_action_done)
+    val failedMsg = stringResource(R.string.profile_action_failed)
+    val muteDoneMsg = stringResource(R.string.profile_mute_done)
+    val unmuteDoneMsg = stringResource(R.string.profile_unmute_done)
+    val blockDoneMsg = stringResource(R.string.block_done)
+    val reportSentMsg = stringResource(R.string.chat_report_sent)
+
+    LaunchedEffect(userId, tick) {
         profile = container.profile.loadProfile(userId)
-        items = container.content.byCreator(userId, 20)
-        card = container.creators.creatorStats(userId)
+        stats = container.profile.stats(userId)
         friendEntry = container.profile.friendshipState(userId)
-        blocked = container.chat.blockedIds().contains(userId)
+        blockedByMe = container.chat.iBlockedUser(userId)
+        blockedPair = container.chat.blockedPair(userId)
+        muted = runCatching { container.prefs.readMutedUsers() }
+            .getOrDefault(emptySet()).contains(userId)
     }
 
-    ContentColumn(
+    fun toggleMute() {
+        scope.launch {
+            val current = runCatching { container.prefs.readMutedUsers() }.getOrDefault(emptySet())
+            val next = if (muted) current - userId else current + userId
+            container.prefs.setMutedUsers(next)
+            note = if (muted) unmuteDoneMsg else muteDoneMsg
+            tick += 1
+        }
+    }
+
+    fun doBlock() {
+        val me = profile ?: return
+        scope.launch {
+            onBlock(me)
+            note = blockDoneMsg
+            tick += 1
+        }
+    }
+
+    fun doUnblock() {
+        val me = profile ?: return
+        scope.launch {
+            onUnblock(me)
+            note = doneMsg
+            tick += 1
+        }
+    }
+
+    Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
         val me = profile ?: run {
-            LoadingBox(text = stringResource(R.string.common_loading))
-            return@ContentColumn
+            com.addonstation.mobile.ui.components.LoadingBox(text = stringResource(R.string.common_loading))
+            return@Column
+        }
+        val status = specStatusOf(me, isMe = isMyProfile)
+        val level = stats?.level ?: me.userLevel
+
+        // ١) البانر: رجوع يسارًا · «المزيد» يمينًا (نفس أدوات بطاقة السلامة)
+        SpecProfileBanner(
+            bannerUrl = assetUrl(container, me.bannerUrl),
+            onBack = onBack,
+            more = {
+                Box {
+                    SpecBannerIconButton(
+                        icon = Icons.Filled.MoreVert,
+                        description = stringResource(R.string.common_more),
+                        onClick = { showMore = true },
+                    )
+                    DropdownMenu(
+                        expanded = showMore,
+                        onDismissRequest = { showMore = false },
+                        containerColor = AppColors.Surface,
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(if (muted) R.string.chat_unmute_user else R.string.chat_mute_user), color = Spec.text) },
+                            onClick = { showMore = false; toggleMute() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(if (blockedByMe) R.string.block_user_undo else R.string.block_user), color = Spec.danger) },
+                            onClick = {
+                                showMore = false
+                                if (blockedByMe) doUnblock() else showBlockConfirm = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.chat_report), color = Spec.danger) },
+                            onClick = { showMore = false; showReport = true },
+                        )
+                    }
+                }
+            },
+        )
+
+        // ٢) الأفاتار — بلا زرّ بجانبه (زرّ التعديل لملفي أنا وحدي)
+        Box(Modifier.fillMaxWidth().height(Spec.avatarLg - Spec.avatarOverlap)) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Spec.screenPad),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Box(Modifier.offset(y = -Spec.avatarOverlap)) {
+                    SpecProfileAvatar(avatarUrl = assetUrl(container, me.avatarUrl), status = status)
+                }
+                if (isMyProfile) {
+                    Spacer(Modifier.weight(1f))
+                    SpecFillButton(
+                        text = stringResource(R.string.profile_edit),
+                        onClick = onEditProfile,
+                    )
+                }
+            }
         }
 
-        Spacer(Modifier.height(12.dp))
-        // البانر + الصورة الراكبة على حافته السفلية، وزرّ الرجوع فوقه
-        val bannerHeight = 150.dp
-        val avatarSize = 92.dp
-        Box(Modifier.fillMaxWidth().height(bannerHeight + avatarSize / 2 + 12.dp)) {
-            ProfileBanner(height = bannerHeight) {
-                assetUrl(container, me.bannerUrl)?.let { banner ->
-                    CoverImage(url = banner, radius = 20.dp, animate = true, modifier = Modifier.fillMaxSize())
-                }
-                // زرّ الرجوع: رجوعٌ واحد نظيف عبر back() في التنقّل
+        Column(Modifier.padding(horizontal = Spec.screenPad)) {
+            // ٣) الهوية
+            Spacer(Modifier.height(12.dp))
+            SpecIdentityCard(profile = me, status = status, level = level)
+
+            // ٤) صفّ الأزرار — والحظر يُبدَّل بحالة واحدة معطَّلة («إلغاء الحظر»)
+            Spacer(Modifier.height(12.dp))
+            if (blockedPair) {
+                val iBlockedThem = blockedByMe
                 Box(
                     Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(AppColors.Bg.copy(alpha = 0.45f))
-                        .clickable(onClick = onBack),
+                        .fillMaxWidth()
+                        .height(Spec.actionBtnH)
+                        .clip(RoundedCornerShape(Spec.buttonRadius))
+                        .background(Spec.surfaceHigh)
+                        .then(
+                            if (iBlockedThem) {
+                                Modifier.clickable(enabled = !working) { doUnblock() }
+                            } else {
+                                Modifier
+                            }
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.common_back),
-                        tint = AppColors.Text,
-                        modifier = Modifier.size(19.dp),
+                    Text(
+                        stringResource(
+                            if (iBlockedThem) R.string.block_user_undo else R.string.profile_blocked_state
+                        ),
+                        style = Spec.button,
+                        color = if (iBlockedThem) Spec.blueLink else Spec.textMuted,
                     )
                 }
-            }
-            Box(Modifier.align(Alignment.BottomStart).padding(start = 4.dp)) {
-                ProfileAvatar(level = me.userLevel, size = avatarSize) {
-                    AvatarImage(url = assetUrl(container, me.avatarUrl), size = avatarSize - 8.dp)
-                }
-            }
-        }
-
-        Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                me.displayName ?: me.username ?: "",
-                style = AppText.welcomeName,
-                color = AppColors.Text,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            RankBadge(role = me.role, plan = me.effectivePlan)
-        }
-        Text(
-            "@${me.username ?: ""} · " + if (me.showOnlineStatus) stringResource(R.string.profile_online)
-            else stringResource(R.string.profile_offline),
-            style = AppText.tiny,
-            color = AppColors.Muted,
-        )
-
-        Spacer(Modifier.height(12.dp))
-        if (isMyProfile) {
-            // ملفي أنا: زرّ واحد يعرض الشاشة كاملة بدل مراسلة النفس
-            GradientButton(
-                text = stringResource(R.string.profile_edit_mine),
-                onClick = onEditProfile,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GradientButton(
-                    text = stringResource(R.string.profile_message),
-                    onClick = { onMessage(me) },
-                    modifier = Modifier.weight(1f),
+            } else if (isMyProfile) {
+                SpecFillButton(
+                    text = stringResource(R.string.profile_edit),
+                    onClick = onEditProfile,
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                val friendLabel = when (friendState) {
-                    "friends" -> stringResource(R.string.profile_friends)
-                    "sent" -> stringResource(R.string.profile_friend_sent)
-                    else -> stringResource(R.string.profile_add_friend)
-                }
-                GhostButton(
-                    text = friendLabel,
-                    onClick = {
-                        if (friendState == "none") onAddFriend(me)
+            } else {
+                // «مراسلة [الاسم]»: مخفيّ مؤقتاً بقرار المالك (لا محادثات خاصة في الخادم بعد)
+                FriendActionButtons(
+                    friendState = friendEntry,
+                    name = me.displayName ?: me.username ?: "",
+                    working = working,
+                    onSend = {
+                        scope.launch {
+                            working = true
+                            val ok = container.profile.sendFriendRequest(userId).isSuccess
+                            note = if (ok) doneMsg else failedMsg
+                            working = false
+                            tick += 1
+                        }
                     },
-                    enabled = friendState == "none",
-                    modifier = Modifier.weight(1f),
-                    borderColor = AppColors.Blue.copy(alpha = 0.5f),
+                    onRespond = { accept ->
+                        scope.launch {
+                            working = true
+                            val entry = friendEntry
+                            val ok = entry != null &&
+                                container.profile.respondFriendRequest(entry.id, accept).isSuccess
+                            note = if (ok) doneMsg else failedMsg
+                            working = false
+                            tick += 1
+                        }
+                    },
+                    onUnfriend = { showUnfriendConfirm = true },
                 )
             }
-            // الحظر: صفّ مستقل أسفل الأزرار — لا يزاحم «مراسلة» و«إضافة صديق»،
-            // وواضح النص (سياسة جوجل تطلب وسيلة حظر ظاهرة لا مخفية في الإعدادات).
-            Spacer(Modifier.height(10.dp))
-            GhostButton(
-                text = if (blocked) stringResource(R.string.block_user_undo)
-                else stringResource(R.string.block_user),
-                onClick = {
-                    if (blocked) {
-                        onUnblock(me)
-                        blocked = false
-                    } else {
-                        onBlock(me)
-                        blocked = true
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                borderColor = AppColors.Red.copy(alpha = 0.5f),
-            )
-        }
 
-        Spacer(Modifier.height(12.dp))
-        SectionHeader(title = stringResource(R.string.profile_about_me), leadingEmoji = "📝")
-        GlassCard {
-            Text(
-                me.bio?.takeIf { it.isNotBlank() } ?: stringResource(R.string.profile_about_default),
-                style = AppText.bodySmall,
-                color = AppColors.Muted,
+            // ٥) الإحصاءات
+            Spacer(Modifier.height(12.dp))
+            SpecStatsStrip(
+                friends = stats?.friends ?: 0,
+                downloads = stats?.downloads ?: 0,
+                favorites = stats?.favorites ?: 0,
             )
-        }
 
-        SectionHeader(title = stringResource(R.string.profile_level_reputation), leadingEmoji = "🏆")
-        ProfileXpBar(
-            progress = me.userLevel.coerceAtMost(50) / 50f,
-            label = stringResource(R.string.profile_level_active, me.userLevel),
-        )
+            // بطاقة المستوى والسمعة
+            Spacer(Modifier.height(12.dp))
+            SpecLevelCard(level = level, xpInLevel = stats?.xpInLevel ?: 0)
 
-        SectionHeader(title = stringResource(R.string.profile_statistics), leadingEmoji = "📊")
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ProfileStatCard(
-                value = (card?.downloads ?: 0).toString(),
-                label = stringResource(R.string.profile_stats_downloads),
-                modifier = Modifier.weight(1f),
-            )
-            ProfileStatCard(
-                value = (card?.worlds ?: 0).toString(),
-                label = stringResource(R.string.profile_stat_worlds),
-                modifier = Modifier.weight(1f),
-            )
-            ProfileStatCard(
-                value = (card?.published ?: 0).toString(),
-                label = stringResource(R.string.profile_stat_published),
-                modifier = Modifier.weight(1f),
-            )
-        }
+            // النبذة + «عضو منذ»
+            Spacer(Modifier.height(12.dp))
+            SpecAboutCard(bio = me.bio, memberSince = specMemberSince(me.createdAt))
 
-        SectionHeader(title = stringResource(R.string.profile_content_section), leadingEmoji = "📦")
-        if (items.isEmpty()) {
-            EmptyState(stringResource(R.string.profile_no_content_published))
-        } else {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(items, key = { it.id }) { item ->
-                    ContentCard(
-                        title = item.title,
-                        coverUrl = assetUrl(container, item.coverUrl),
-                        planLabel = planLabelOf(item.plan),
-                        metaLine = metaOf(item),
-                        onClick = { onOpenItem(item) },
-                        large = true,
+            // ٦) بطاقة السلامة (صفوف 52 · فواصل 1dp)
+            Spacer(Modifier.height(12.dp))
+            SpecCard(padding = 0.dp) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+                    SpecActionRow(
+                        text = stringResource(if (muted) R.string.chat_unmute_user else R.string.chat_mute_user),
+                        color = Spec.text,
+                        onClick = { toggleMute() },
+                    )
+                    SpecActionRow(
+                        text = stringResource(if (blockedByMe) R.string.block_user_undo else R.string.block_user),
+                        color = Spec.danger,
+                        onClick = { if (blockedByMe) doUnblock() else showBlockConfirm = true },
+                        showDivider = true,
+                    )
+                    SpecActionRow(
+                        text = stringResource(R.string.chat_report),
+                        color = Spec.danger,
+                        onClick = { showReport = true },
+                        showDivider = true,
                     )
                 }
             }
+
+            // ٧) بطاقة الإشراف — للأدمن/المشرف وحدهما
+            if (me.isStaff) {
+                Spacer(Modifier.height(12.dp))
+                SpecCard(padding = 0.dp) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+                        Spacer(Modifier.height(12.dp))
+                        SpecSmallCaps(stringResource(R.string.profile_moderation))
+                        SpecActionRow(
+                            text = stringResource(R.string.chat_mute_user),
+                            color = Spec.text,
+                            onClick = {
+                                scope.launch {
+                                    working = true
+                                    val ok = container.chat.muteUser(userId, 24 * 60).isSuccess
+                                    note = if (ok) doneMsg else failedMsg
+                                    working = false
+                                }
+                            },
+                        )
+                        SpecActionRow(
+                            text = stringResource(R.string.profile_ban_user),
+                            color = Spec.danger,
+                            onClick = {
+                                scope.launch {
+                                    working = true
+                                    val ok = container.chat.banUser(userId).isSuccess
+                                    note = if (ok) doneMsg else failedMsg
+                                    working = false
+                                }
+                            },
+                            showDivider = true,
+                        )
+                        SpecActionRow(
+                            text = stringResource(R.string.profile_delete_message),
+                            color = Spec.blueLink,
+                            onClick = onOpenAdminTools,
+                            showDivider = true,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            }
+
+            note?.let {
+                Spacer(Modifier.height(10.dp))
+                Text(it, style = Spec.secondary, color = Spec.chipLabel)
+            }
+            Spacer(Modifier.height(96.dp))
         }
-        Spacer(Modifier.height(96.dp))
+    }
+
+    // تأكيد الحظر (سياسة UGC) — واحد لأنّه متقابل وفوري
+    if (showBlockConfirm) {
+        val name = profile?.displayName ?: profile?.username ?: ""
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showBlockConfirm = false },
+            containerColor = AppColors.Surface,
+            title = { Text(stringResource(R.string.block_confirm_title), style = AppText.sectionTitle, color = AppColors.Text) },
+            text = { Text(stringResource(R.string.block_confirm_body, name), style = AppText.bodySmall, color = AppColors.Muted) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { showBlockConfirm = false; doBlock() }) {
+                    Text(stringResource(R.string.block_user), color = Spec.danger)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showBlockConfirm = false }) {
+                    Text(stringResource(R.string.common_cancel), color = AppColors.Muted)
+                }
+            },
+        )
+    }
+
+    // اختيار سبب الإبلاغ — نفس أسباب الإبلاغ في الشات (الخادم يتحقّق منها)
+    if (showReport) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showReport = false },
+            containerColor = AppColors.Surface,
+            title = { Text(stringResource(R.string.chat_report), style = AppText.sectionTitle, color = AppColors.Text) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        "spam" to R.string.chat_reason_spam,
+                        "insult" to R.string.chat_reason_insult,
+                        "inappropriate" to R.string.chat_reason_inappropriate,
+                        "other" to R.string.chat_reason_other,
+                    ).forEach { (code, label) ->
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    showReport = false
+                                    scope.launch {
+                                        val ok = container.chat.reportUser(userId, code).isSuccess
+                                        note = if (ok) reportSentMsg else failedMsg
+                                    }
+                                }
+                                .padding(horizontal = 10.dp, vertical = 11.dp),
+                        ) {
+                            Text(stringResource(label), style = AppText.body, color = AppColors.Text)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { showReport = false }) {
+                    Text(stringResource(R.string.common_cancel), color = AppColors.Muted)
+                }
+            },
+        )
+    }
+
+    // إلغاء الصداقة — باللمس على «أصدقاء ✓» كما تنصّ الوثيقة
+    if (showUnfriendConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showUnfriendConfirm = false },
+            containerColor = AppColors.Surface,
+            title = { Text(stringResource(R.string.profile_friends_state), style = AppText.sectionTitle, color = AppColors.Text) },
+            text = { Text(stringResource(R.string.profile_unfriend_confirm), style = AppText.bodySmall, color = AppColors.Muted) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    showUnfriendConfirm = false
+                    scope.launch {
+                        working = true
+                        val ok = container.profile.removeFriend(userId).isSuccess
+                        note = if (ok) doneMsg else failedMsg
+                        working = false
+                        tick += 1
+                    }
+                }) {
+                    Text(stringResource(R.string.profile_unfriend), color = Spec.danger)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showUnfriendConfirm = false }) {
+                    Text(stringResource(R.string.common_cancel), color = AppColors.Muted)
+                }
+            },
+        )
+    }
+}
+
+/**
+ * صفّ أزرار الصداقة في ملف العضو — بحالات الوثيقة §4:
+ * «طلب صداقة» ⇒ «أُرسل الطلب» (معطَّل) ⇒ «أصدقاء ✓» (لمسها يعرض إلغاء الصداقة)،
+ * وإن أرسل هو الطلب: «قبول» / «رفض».
+ *
+ * أمّا «مراسلة [الاسم]» فمخفيّ **بقرار المالك** حتى تُضاف المحادثات الخاصة
+ * إلى الخادم — لا نُظهر زرّاً لا يعمل.
+ */
+@Composable
+private fun FriendActionButtons(
+    friendState: com.addonstation.mobile.data.model.FriendEntry?,
+    name: String,
+    working: Boolean,
+    onSend: () -> Unit,
+    onRespond: (Boolean) -> Unit,
+    onUnfriend: () -> Unit,
+) {
+    val myId = rememberContainer().supabase.session()?.userId
+    val status = friendState?.status
+    val incoming = status == "pending" && friendState?.requesterId != myId
+    when {
+        // طلب وارد لي: قبول أو رفض
+        incoming -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SpecFillButton(
+                text = stringResource(R.string.profile_accept),
+                onClick = { onRespond(true) },
+                enabled = !working,
+                modifier = Modifier.weight(1f),
+            )
+            SpecOutlineButton(
+                text = stringResource(R.string.profile_reject),
+                onClick = { onRespond(false) },
+                enabled = !working,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        // أصدقاء: اللمس يعرض إلغاء الصداقة
+        status == "accepted" -> SpecOutlineButton(
+            text = stringResource(R.string.profile_friends_state),
+            onClick = onUnfriend,
+            enabled = !working,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        // أرسلتُ أنا: معطَّل حتى يردّ
+        status == "pending" -> SpecOutlineButton(
+            text = stringResource(R.string.profile_request_sent),
+            onClick = {},
+            enabled = false,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        else -> SpecOutlineButton(
+            text = stringResource(R.string.profile_friend_request),
+            onClick = onSend,
+            enabled = !working,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * الشاشة C — «ملفي كما يراه الآخرون» (وثيقة `SPEC_PROFILES.md` §5):
+ * نفس ترتيب A لكن بمنظور الزائر: أفاتار + «تعديل الملف» · الهوية · الإحصاءات
+ * · المستوى · النبذة · وبطاقة محفظة **بحدّ متقطّع** بدل المحفظة الحقيقية.
+ * بلا صفّ أزرار · بلا بطاقة سلامة · بلا «تسجيل الخروج».
+ */
+@Composable
+fun ProfileAsOthersScreen(
+    onBack: () -> Unit,
+    onOpenEdit: () -> Unit,
+) {
+    val container = rememberContainer()
+    val profile by container.state.profile.collectAsState()
+    var stats by remember { mutableStateOf<ProfileStats?>(null) }
+
+    LaunchedEffect(profile?.id) {
+        profile?.id?.let { stats = container.profile.stats(it) }
+    }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        val me = profile ?: run {
+            com.addonstation.mobile.ui.components.LoadingBox(text = stringResource(R.string.common_loading))
+            return@Column
+        }
+        // ما يراه الزائر: الحالة تُعرض كما أظهرها لغيري (show_online_status)
+        val status = specStatusOf(me, isMe = false)
+
+        SpecProfileBanner(
+            bannerUrl = assetUrl(container, me.bannerUrl),
+            onBack = onBack,
+        )
+
+        Box(Modifier.fillMaxWidth().height(Spec.avatarLg - Spec.avatarOverlap)) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Spec.screenPad),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Box(Modifier.offset(y = -Spec.avatarOverlap)) {
+                    SpecProfileAvatar(avatarUrl = assetUrl(container, me.avatarUrl), status = status)
+                }
+                Spacer(Modifier.weight(1f))
+                SpecFillButton(
+                    text = stringResource(R.string.profile_edit),
+                    onClick = onOpenEdit,
+                )
+            }
+        }
+
+        Column(Modifier.padding(horizontal = Spec.screenPad)) {
+            Spacer(Modifier.height(12.dp))
+            // الشارة الظاهرة للزائر: بلا «المستوى» الشخصي؟ لا — الوثيقة تُظهر الهوية كما يراها الزائر (تشمل المستوى)
+            SpecIdentityCard(profile = me, status = status, level = stats?.level ?: me.userLevel)
+
+            Spacer(Modifier.height(12.dp))
+            SpecStatsStrip(
+                friends = stats?.friends ?: 0,
+                downloads = stats?.downloads ?: 0,
+                favorites = stats?.favorites ?: 0,
+            )
+
+            Spacer(Modifier.height(12.dp))
+            SpecLevelCard(level = stats?.level ?: me.userLevel, xpInLevel = stats?.xpInLevel ?: 0)
+
+            Spacer(Modifier.height(12.dp))
+            SpecAboutCard(bio = me.bio, memberSince = specMemberSince(me.createdAt))
+
+            // بطاقة المحفظة المخفيّة (حدّ متقطّع) بدل المحفظة الحقيقية
+            Spacer(Modifier.height(12.dp))
+            SpecHiddenWalletCard()
+
+            Spacer(Modifier.height(96.dp))
+        }
     }
 }
 

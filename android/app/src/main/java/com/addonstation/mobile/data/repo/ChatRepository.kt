@@ -686,6 +686,27 @@ class ChatRepository(
         }
     }
 
+    /**
+     * الإبلاغ عن **عضو** (لا رسالة) من ملفّه الشخصي — بند السلامة في وثيقة
+     * شاشات الملف (37_profile_reports.sql). السبب واحد من أربعة: spam · insult ·
+     * inappropriate · other، والخادم يمنع الإبلاغ عن النفس ويردّ `reported`
+     * أو `already_reported` (مرة كل ٢٤ ساعة لنفس العضو).
+     */
+    suspend fun reportUser(userId: String, reason: String, note: String? = null): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val outcome = supabase.rpc(
+                    "chat_report_user",
+                    mapOf(
+                        "p_user_id" to JsonPrimitive(userId),
+                        "p_reason" to JsonPrimitive(reason),
+                        "p_note" to note?.let { JsonPrimitive(it) },
+                    ),
+                ).asOutcome().requireOk()
+                Unit
+            }
+        }
+
     /** معرّفات المحظورين عندي — تُقرأ عند فتح الشات فتُفلتَر الرسائل فوراً أيضًا في الواجهة. */
     suspend fun blockedIds(): Set<String> = withContext(Dispatchers.IO) {
         runCatching {
@@ -693,6 +714,29 @@ class ChatRepository(
                 supabase.select("user_blocks", "select=blocked_id&order=created_at.desc"),
             ).mapNotNull { it.blockedId }.filter { it.isNotBlank() }.toSet()
         }.getOrElse { emptySet() }
+    }
+
+    /** هل حظرتُ هذا العضو؟ (شاشة ملفه تُظهر «إلغاء الحظر» بدل «حظر»). */
+    suspend fun iBlockedUser(userId: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc("i_blocked_user", mapOf("p_user_id" to JsonPrimitive(userId))).asBool() ?: false
+        }.getOrElse { false }
+    }
+
+    /**
+     * هل بيني وبينه حظر **بأي اتجاه**؟ (is_blocked_pair من 33_user_block.sql)
+     * الحظر متقابل في الشات، فإن حظرني أحدهم كان الأليق ألّا أرى أزرار
+     * «مراسلة/صداقة» في ملفه — بل حالة واحدة معطَّلة كما تنصّ الوثيقة §4.
+     */
+    suspend fun blockedPair(otherUserId: String): Boolean = withContext(Dispatchers.IO) {
+        val me = supabase.session()?.userId
+        if (me.isNullOrBlank()) return@withContext false
+        runCatching {
+            supabase.rpc(
+                "is_blocked_pair",
+                mapOf("p_a" to JsonPrimitive(me), "p_b" to JsonPrimitive(otherUserId)),
+            ).asBool() ?: false
+        }.getOrElse { false }
     }
 
     suspend fun banUser(userId: String, reason: String? = null): Result<Unit> = withContext(Dispatchers.IO) {

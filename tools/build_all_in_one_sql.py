@@ -53,6 +53,8 @@ ORDER = [
     "33_user_block.sql",
     "34_push_notifications.sql",
     "35_push_live.sql",
+    "36_profile_stats.sql",
+    "37_profile_reports.sql",
 ]
 
 HEADER = """-- ============================================================================

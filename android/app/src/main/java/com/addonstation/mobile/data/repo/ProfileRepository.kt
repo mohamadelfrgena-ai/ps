@@ -11,6 +11,7 @@ import com.addonstation.mobile.data.SupabaseClient
 import com.addonstation.mobile.data.model.AcWallet
 import com.addonstation.mobile.data.model.FriendEntry
 import com.addonstation.mobile.data.model.Profile
+import com.addonstation.mobile.data.model.ProfileStats
 import com.addonstation.mobile.data.model.SiteAsset
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -80,6 +81,25 @@ class ProfileRepository(
             )
         }
         list.associateBy { it.id }
+    }
+
+    /**
+     * إحصاءات أي عضو — أرقام فقط: أصدقاء · تنزيلات · مفضّلة · المستوى ·
+     * سلسلة الأيام · مكافأة اليوم.
+     *
+     * لماذا دالة خادم ولا استعلامات مباشرة؟ لأن المفضّلة والتنزيلات والمحفظة
+     * محميّة بسياسات «لصاحبها فقط»، فملف عضو آخر لا يستطيع قراءتها. الدالة
+     * `profile_stats` (36_profile_stats.sql) تعمل بـ security definer وتُرجع
+     * **أعداداً لا بيانات**. وإن لم تكن مُنفَّذة على الخادم بعد (404) تُرجع
+     * `null` فتُخفي الواجهة الأرقام بلا كسر الشاشة.
+     *
+     * قاعدة المستوى: كل 100 AC مكتسَبة = مستوى (والأعلى بينها وبين تعديل الإدارة).
+     */
+    suspend fun stats(userId: String? = null): ProfileStats? = withContext(Dispatchers.IO) {
+        runCatching {
+            val body = supabase.rpc("profile_stats", params("p_user_id" to p(userId)))
+            body?.let { supabase.decodeOne<ProfileStats>(it) }
+        }.getOrNull()
     }
 
     suspend fun searchUsers(query: String, limit: Int = 30): List<Profile> {

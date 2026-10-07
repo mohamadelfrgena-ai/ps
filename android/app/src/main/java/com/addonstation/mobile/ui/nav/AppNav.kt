@@ -95,6 +95,10 @@ object Routes {
     const val CREATOR_APPLY = "creator-apply"
     const val CREATOR_STUDIO = "creator-studio"
     const val EDIT_PROFILE = "edit-profile"
+    /** «محتواي» — كل ما نشرتُه (وثيقة شاشات الملف §3: بلاطة الشبكة 2×2). */
+    const val MY_CONTENT = "my-content"
+    /** «ملفي كما يراه الآخرون» — الشاشة C من وثيقة شاشات الملف. */
+    const val PROFILE_AS_OTHERS = "profile-as-others"
     const val USER_PROFILE = "user/{userId}"
     fun userProfile(id: String) = "user/$id"
     const val ADMIN = "admin"
@@ -502,17 +506,22 @@ private fun MainNavigation(
                 }
 
                 composable(Routes.PROFILE) {
+                    // الشاشة A من وثيقة شاشات الملف (AddonStation_profiles):
+                    // بانر · أفاتار+تعديل · هوية · محفظة · إحصاءات · مستوى · نبذة
+                    // · شبكة 2×2 · خروج. (الإعدادات تبويب مستقل — لا تُعرض هنا.)
                     ProfileScreen(
                         onLogin = { go(Routes.LOGIN) },
                         onOpenSignup = { go(Routes.SIGNUP) },
                         onSignedOut = { goTab(MainTab.Home) },
-                        onOpenSettings = { goTab(MainTab.Settings) },
-                        onOpenPlans = { go(Routes.PLANS) },
+                        onBack = { back() },
                         onOpenEdit = { go(Routes.EDIT_PROFILE) },
                         onOpenAdmin = { go(Routes.ADMIN) },
-                        onOpenStudio = { go(Routes.CREATOR_STUDIO) },
-                        onOpenItem = { item -> go(Routes.item(item.id)) },
                         onOpenWallet = { go(Routes.WALLET) },
+                        onOpenFavorites = { go(Routes.FAVORITES) },
+                        onOpenDownloads = { go(Routes.DOWNLOADS) },
+                        onOpenOrders = { go(Routes.ORDERS) },
+                        onOpenMyContent = { go(Routes.MY_CONTENT) },
+                        onViewAsOthers = { go(Routes.PROFILE_AS_OTHERS) },
                     )
                 }
 
@@ -724,24 +733,49 @@ private fun MainNavigation(
                         onSaved = { back() },
                     )
                 }
+                // الشاشة C: ملفي كما يراه الآخرون (بلا محفظة حقيقية · بلا أزرار)
+                composable(Routes.PROFILE_AS_OTHERS) {
+                    com.addonstation.mobile.ui.profile.ProfileAsOthersScreen(
+                        onBack = { back() },
+                        onOpenEdit = { go(Routes.EDIT_PROFILE) },
+                    )
+                }
+                // «محتواي»: بلاطة الشبكة 2×2 في ملفي — كل ما نشرتُه
+                composable(Routes.MY_CONTENT) {
+                    com.addonstation.mobile.ui.common.ContentListScreen(
+                        title = androidx.compose.ui.res.stringResource(
+                            com.addonstation.mobile.R.string.profile_stats_content
+                        ),
+                        emptyText = androidx.compose.ui.res.stringResource(
+                            com.addonstation.mobile.R.string.profile_my_content_empty
+                        ),
+                        loader = {
+                            container.content.byCreator(
+                                container.supabase.session()?.userId.orEmpty()
+                            )
+                        },
+                        onBack = { back() },
+                        onOpen = { item -> go(Routes.item(item.id)) },
+                    )
+                }
                 composable(
                     route = Routes.USER_PROFILE,
                     arguments = listOf(navArgument("userId") { type = NavType.StringType }),
                 ) { entry ->
+                    // الشاشة B من وثيقة شاشات الملف: هوية · صداقة · إحصاءات ·
+                    // مستوى · نبذة · سلامة (كتم/حظر/إبلاغ) · إشراف للأدمن.
+                    // بلا محفظة ولا طلبات ولا إعدادات (نصّ الوثيقة §4).
                     com.addonstation.mobile.ui.profile.UserProfileScreen(
                         userId = entry.arguments?.getString("userId").orEmpty(),
                         onBack = { back() },
-                        onMessage = { goTab(MainTab.Community) },
-                        onAddFriend = { profile ->
-                            scope.launch { container.profile.sendFriendRequest(profile.id) }
-                        },
-                        onOpenItem = { item -> go(Routes.item(item.id)) },
-                        // الحظر (سياسة UGC): يُنفَّذ على الخادم، والواجهة تُحدّث
-                        // حالتها في الشاشة نفسها (blocked) بلا إعادة تنقّل.
-                        onBlock = { profile -> scope.launch { container.chat.blockUser(profile.id) } },
-                        onUnblock = { profile -> scope.launch { container.chat.unblockUser(profile.id) } },
                         // ملفي أنا: الزرّ الوحيد هو «تعديل الملف الشخصي»
                         onEditProfile = { go(Routes.EDIT_PROFILE) },
+                        // الحظر (سياسة UGC): يُنفَّذ على الخادم، والواجهة تُعيد
+                        // قراءة حالتها في الشاشة نفسها بلا إعادة تنقّل.
+                        onBlock = { profile -> scope.launch { container.chat.blockUser(profile.id) } },
+                        onUnblock = { profile -> scope.launch { container.chat.unblockUser(profile.id) } },
+                        // «حذف رسالة» في بطاقة الإشراف تُفتح في شاشة إشراف الشات
+                        onOpenAdminTools = { go(Routes.ADMIN_CHAT) },
                     )
                 }
 

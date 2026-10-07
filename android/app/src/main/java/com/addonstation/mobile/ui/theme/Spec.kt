@@ -45,6 +45,17 @@ object Spec {
     // ألوان أسماء الأعضاء الدورية (وثيقة الشات)
     val nameColors = listOf(Color(0xFF9B6BFF), Color(0xFF7FD99A), Color(0xFF6FA8FF), Color(0xFFEAF0FA))
 
+    // ── رموز وثيقة الملف الشخصي (SPEC_PROFILES.md §1) ─────────────────────────
+    val danger = Color(0xFFFF8791)         // نصّ الخطر: حظر · إبلاغ · تسجيل الخروج
+    val dangerBorder = Color(0xFFB3414B)   // إطار زرّ الخطر
+    val onlineFill = Color(0xFF3FBF6A)     // أخضر نقطة الحالة
+    val onlineText = Color(0xFF7FD99A)     // نصّ «متصّل الآن» (قيمة الوثيقة)
+    val awayAmber = Color(0xFFF0C25E)      // «بعيد/خامل»: الوثيقة قالت amber بلا قيمة ⇒ كهرمان اللوحة
+    val offlineGrey = Color(0xFF6B7A94)    // «غير متصل» — بلا توهّج
+    val dashedBorder = Color(0xFF2E3C58)   // إطار متقطّع (بطاقة المحفظة المخفيّة في شاشة C)
+    val dotStart = Color(0xFF8CF2AD)       // تدرّج النقطة: الفاتح (من أعلى اليسار)
+    val dotEnd = Color(0xFF2FB35C)         // تدرّج النقطة: الغامق
+
     // ── المقاسات ──────────────────────────────────────────────────────────────
     val screenPad = 16.dp
     val chatListPad = 12.dp
@@ -61,6 +72,18 @@ object Spec {
     val avatar64 = 64.dp
     val avatar40 = 40.dp
     val composerField = 44.dp
+
+    // مقاسات الملف الشخصي (SPEC_PROFILES.md §2)
+    val bannerH = 150.dp           // ارتفاع البانر
+    val avatarLg = 96.dp           // أفاتار الملف
+    val avatarOverlap = 46.dp      // مقدار تجاوز الأفاتار للبانر
+    val dotSize = 30.dp            // نقطة الحالة
+    val profileCardRadius = 16.dp  // بطاقات الملف
+    val badgeRadius = 8.dp         // شرائح الشارات
+    val actionBtnH = 48.dp         // «مراسلة» · «طلب صداقة» · «تسجيل الخروج»
+    val gridBtnH = 56.dp           // أزرار الشبكة 2×2
+    val safetyRowH = 52.dp         // صفوف بطاقة السلامة
+    val statBarH = 8.dp            // شريط تقدّم المستوى
 
     // ── الخطوط ────────────────────────────────────────────────────────────────
     /** أرقام الرصيد والعدّادات (النص الرقمي من الحقيبة). */
@@ -105,4 +128,20 @@ object Spec {
     val ownBubbleMax = 260.dp
     val incomingImageW = 230.dp
     val incomingImageH = 130.dp
+
+    // ── خطوط الملف الشخصي (SPEC_PROFILES.md §2) ───────────────────────────────
+    /** تسمية قسم صغيرة بالأحرف الكبيرة (بكسل · 11 · ذهبي · تباعد 1). */
+    val smallCaps = TextStyle(fontFamily = PixelFont, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+
+    val profileName = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)   // اسم العرض
+    val profileHandle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold)      // @username
+    val badgeChip = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)     // شرائح الشارات
+    val statusBox = TextStyle(fontSize = 13.sp)                                        // الحالة المخصّصة
+    val statNumber = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)    // رقم الإحصاء
+    val statLabel = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold)          // تسمية الإحصاء
+    val bioText = TextStyle(fontSize = 14.sp, lineHeight = 19.6.sp)                    // النبذة (1.4)
+    val balanceBig = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)    // رصيد AC
+    val levelText = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)     // «المستوى N · x/100»
+    val gridButton = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)    // أزرار الشبكة
+    val walletCaption = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold)      // «محفظة AC · الرصيد الحالي» · «N يوم متتالٍ»
 }

@@ -94,6 +94,15 @@ class ChatViewModel(private val container: AppContainer) {
     private val _blockedIds = MutableStateFlow<Set<String>>(emptySet())
     val blockedIds: StateFlow<Set<String>> = _blockedIds.asStateFlow()
 
+    /**
+     * مكتومون عندي (كتم **محلي** من ملف العضو: «Mute this user»). أثره مثل
+     * الحظر في العرض — تُخفى رسائلهم — لكنه قرار شخصيّ على هذا الجهاز وحده،
+     * ولا يُبلَّغ به أحد. يُقرأ من إعدادات الجهاز ويُتابَع حيّاً، فبمجرّد
+     * الكتم من ملف العضو تختفي رسائله في الشات المفتوح بلا إعادة فتح.
+     */
+    private val _mutedIds = MutableStateFlow<Set<String>>(emptySet())
+    val mutedIds: StateFlow<Set<String>> = _mutedIds.asStateFlow()
+
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
@@ -113,6 +122,10 @@ class ChatViewModel(private val container: AppContainer) {
             // فشل أول جلب لا يجوز أن يُبقي الشات على «جارٍ التحميل» للأبد:
             // الاستطلاع (كل ثانيتين) يجلب الرسائل بعده في أي حال.
             runCatching { _blockedIds.value = container.chat.blockedIds() }
+            // الكتم المحلي: متابعة مستمرّة (تتحدّث لحظة الكتم من ملف العضو)
+            scope.launch {
+                container.prefs.mutedUsers.collect { ids -> _mutedIds.value = ids }
+            }
             runCatching { loadInitial(channel.id) }
             _loading.value = false
             startRealtime(channel.id)
@@ -215,6 +228,7 @@ class ChatViewModel(private val container: AppContainer) {
         }.getOrNull() ?: return
         if (_messages.value.any { it.message.id == message.id }) return
         if (message.userId in _blockedIds.value) return          // محظور: لا يظهر
+        if (message.userId in _mutedIds.value) return            // مكتوم عندي: لا يظهر
         _messages.value = _messages.value + toUi(message)
         if (message.userId != container.supabase.session()?.userId &&
             !_newMessagesBelow.value
@@ -250,6 +264,7 @@ class ChatViewModel(private val container: AppContainer) {
                             }
                         }
                     } else if (message.userId !in _blockedIds.value &&
+                        message.userId !in _mutedIds.value &&
                         list.none { it.message.id == message.id }
                     ) {
                         mapped += toUi(message)

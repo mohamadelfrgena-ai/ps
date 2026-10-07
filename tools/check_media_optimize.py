@@ -81,9 +81,12 @@ if not re.search(r"animate\s*=\s*true", strip_comments(store)):
     problems.append("ui/store/StoreScreens.kt: صفحة العنصر لم تعد تعرض الصورة بحركتها (animate = true)")
 
 profile = read(os.path.join(SRC, "ui", "profile", "ProfileScreens.kt"))
-if not re.search(r"CoverImage\(url = banner, radius = 20\.dp, animate = true",
-                 strip_comments(profile)):
-    problems.append("ui/profile/ProfileScreens.kt: بانر الملف الشخصي لم يعد متحرّكاً (animate = true)")
+# بانر الملف الشخصي في وثيقة AddonStation_profiles صار في مكوّن مشترك
+# (ui/components/ProfileSpecUi.kt) — والقاعدة نفسها: يبقى متحرّكاً (animate = true)
+spec_profile = read(os.path.join(SRC, "ui", "components", "ProfileSpecUi.kt"))
+if not re.search(r"CoverImage\(\s*\n?\s*url = bannerUrl,\s*\n?\s*radius = 0\.dp,\s*\n?\s*animate = true",
+                 strip_comments(spec_profile)):
+    problems.append("ui/components/ProfileSpecUi.kt: بانر الملف الشخصي لم يعد متحرّكاً (animate = true)")
 if not re.search(r"BannerThumb\(\s*\n\s*url = assetUrl\(container, asset\.fileUrl\),\s*\n\s*animate = false",
                  strip_comments(profile)):
     problems.append("ui/profile/ProfileScreens.kt: شبكة الأغلفة تُشغّل الحركة لكل خلية (يجب animate = false)")
