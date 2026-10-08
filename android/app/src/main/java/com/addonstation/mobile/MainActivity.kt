@@ -15,6 +15,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -102,6 +103,9 @@ class MainActivity : ComponentActivity() {
             }
 
             CompositionLocalProvider(
+                // createConfigurationContext يبدّل LocalContext إلى Context غير Activity؛
+                // نمرّر مالك ActivityResult صراحةً كي تعمل rememberLauncherForActivityResult.
+                LocalActivityResultRegistryOwner provides this@MainActivity,
                 LocalContext provides localizedContext,
                 LocalConfiguration provides localizedConfiguration,
                 LocalLayoutDirection provides layoutDirection,

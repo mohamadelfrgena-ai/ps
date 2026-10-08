@@ -965,6 +965,9 @@ private fun SignInGate(
  */
 @Composable
 private fun NotificationPermissionPrompt(signedIn: Boolean) {
+    // Android 12 وما قبله لا يملك إذن الإشعارات وقت التشغيل، فلا ننشئ launcher أصلاً.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var visible by remember { mutableStateOf(false) }
@@ -985,7 +988,6 @@ private fun NotificationPermissionPrompt(signedIn: Boolean) {
 
     LaunchedEffect(signedIn) {
         if (!signedIn) return@LaunchedEffect
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect
         if (com.addonstation.mobile.push.PushNotifications.permissionGranted(context)) return@LaunchedEffect
         if (AppPrefs.notificationAsked(context)) return@LaunchedEffect
         delay(1500)
