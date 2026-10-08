@@ -589,6 +589,7 @@ fun AvatarImage(
  *
  * @param model نموذج بديل (ملف أو Uri محلي) يُحمّل **قبل** رابط الخادم —
  *              يستعمله الشات لمعاينة الصورة/إطار الفيديو لحظة اختياره.
+ * @param backgroundColor لون الطبقة خلف الصورة؛ يمكن جعله شفافاً للأيقونات بلا بطاقة.
  */
 @Composable
 fun CoverImage(
@@ -608,6 +609,7 @@ fun CoverImage(
      * بلا محاولات فاشلة متكرّرة (انظر [missingThumbUrls]).
      */
     animate: Boolean = false,
+    backgroundColor: Color = AppColors.Elevated2,
 ) {
     val thumbCandidate = remember(url, animate) {
         if (url?.contains(".gif", ignoreCase = true) == true) "$url.thumb.jpg" else null
@@ -628,7 +630,7 @@ fun CoverImage(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(radius))
-            .background(AppColors.Elevated2),
+            .background(backgroundColor),
     ) {
         if (base != null) {
             if (failed) {

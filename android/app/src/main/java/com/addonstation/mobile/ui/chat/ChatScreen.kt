@@ -1511,6 +1511,7 @@ private fun MessageBlock(
             .combinedClickable(onClick = onReply, onLongClick = onLongPress)
             .alpha(if (ui.pending) 0.55f else 1f)      // قيد الإرسال — تظهر فوراً
             .padding(horizontal = 8.dp, vertical = 2.dp),
+        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
     ) messageBody@{
         if (message.isAnnouncement) {
             Text(
@@ -1520,7 +1521,7 @@ private fun MessageBlock(
             )
         }
 
-        if (!grouped) {
+        if (!grouped && !isMine) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 com.addonstation.mobile.ui.components.AvatarImage(
                     url = assetUrl(container, author?.avatarUrl),
@@ -1568,6 +1569,7 @@ private fun MessageBlock(
                             url = itemImg,
                             radius = 8.dp,
                             modifier = Modifier.size(32.dp),
+                            backgroundColor = Color.Transparent,
                         )
                     } else {
                         Text("🎖", style = AppText.body.copy(fontSize = 24.sp))
@@ -1812,7 +1814,7 @@ private fun MessageBlock(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = if (grouped) 2.dp else 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
                         verticalAlignment = Alignment.Bottom,
                     ) {
                         MessageStatus(
@@ -1876,7 +1878,7 @@ private fun MessageBlock(
         // الصفّ زر «إضافة تفاعل» (＋) الذي يفتح لوحة الرموز.
         if (ui.reactions.isNotEmpty()) {
             Row(
-                modifier = Modifier.padding(start = 48.dp, top = 4.dp),
+                modifier = Modifier.padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
