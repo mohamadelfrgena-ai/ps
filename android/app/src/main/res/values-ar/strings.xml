@@ -732,4 +732,29 @@
     <string name="crash_report_copy">نسخ تقرير التعطل</string>
     <string name="crash_report_copied">نُسخ التقرير. الصقه في هذه المحادثة.</string>
     <string name="crash_report_continue">جرّب فتح التطبيق</string>
+
+    <!-- Edit profile detail screen -->
+    <string name="profile_edit_plain">تعديل الملف</string>
+    <string name="edit_profile_preview">معاينة</string>
+    <string name="edit_profile_counter">%1$d/%2$d</string>
+    <string name="edit_profile_discard_title">تجاهل التغييرات؟</string>
+    <string name="edit_profile_discard_body">ستفقد تعديلاتك.</string>
+    <string name="edit_profile_discard">تجاهل</string>
+    <string name="edit_profile_keep_editing">متابعة التعديل</string>
+    <string name="edit_profile_saved">تم حفظ الملف الشخصي</string>
+    <string name="edit_profile_status_hint">بماذا تفكر؟</string>
+    <string name="edit_profile_avatar_label">الأفاتار</string>
+    <string name="edit_profile_epic_item">أداة Epic</string>
+    <string name="edit_profile_golden_item">أداة ذهبية</string>
+    <string name="edit_profile_no_items">لا توجد أدوات متاحة في هذا القسم حالياً.</string>
+    <string name="edit_profile_no_results">لا توجد صور مطابقة.</string>
+    <string name="cd_avatar_selected">%1$s، محدد</string>
+    <string name="cd_avatar_locked">%1$s، مقفل. يتطلب %2$s</string>
+    <string name="plan_locked_avatars_plain">الأفاتارات المقفلة تفتح مع Epic أو Legendary.</string>
+    <string name="plan_locked_items_plain">الأدوات المقفلة في الشات تحتاج إلى الخطة المناسبة.</string>
+    <string name="plan_locked_online_plain">حالة الاتصال متاحة لمشتركي Legendary.</string>
+    <string name="plan_locked_banner_note_plain">الأغلفة كلها مقفولة — لا تُفتح إلا باشتراك Epic أو Legendary.</string>
+    <string name="profile_banner_none_plain">ما في غلاف — اختر واحداً من الفقرات تحت</string>
+    <string name="profile_about_plain">النبذة</string>
+    <string name="msg_username_taken">اسم المستخدم مستخدم بالفعل.</string>
 </resources>

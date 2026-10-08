@@ -727,4 +727,29 @@
     <string name="settings_account_actions">账号操作</string>
     <string name="settings_footer">© 2026 AddonStation — 保留所有权利</string>
     <string name="auth_username_placeholder">用户名</string>
+
+    <!-- Edit profile detail screen -->
+    <string name="profile_edit_plain">编辑个人资料</string>
+    <string name="edit_profile_preview">预览</string>
+    <string name="edit_profile_counter">%1$d/%2$d</string>
+    <string name="edit_profile_discard_title">放弃更改？</string>
+    <string name="edit_profile_discard_body">未保存的修改将会丢失。</string>
+    <string name="edit_profile_discard">放弃</string>
+    <string name="edit_profile_keep_editing">继续编辑</string>
+    <string name="edit_profile_saved">个人资料已保存</string>
+    <string name="edit_profile_status_hint">此刻在想什么？</string>
+    <string name="edit_profile_avatar_label">头像</string>
+    <string name="edit_profile_epic_item">Epic 饰品</string>
+    <string name="edit_profile_golden_item">金色饰品</string>
+    <string name="edit_profile_no_items">此分类暂时没有可用饰品。</string>
+    <string name="edit_profile_no_results">没有找到匹配的图片。</string>
+    <string name="cd_avatar_selected">%1$s，已选择</string>
+    <string name="cd_avatar_locked">%1$s，已锁定。需要 %2$s</string>
+    <string name="plan_locked_avatars_plain">升级至 Epic 或 Legendary 即可解锁这些头像。</string>
+    <string name="plan_locked_items_plain">解锁聊天饰品需要相应的订阅方案。</string>
+    <string name="plan_locked_online_plain">在线状态仅对 Legendary 订阅用户开放。</string>
+    <string name="plan_locked_banner_note_plain">所有横幅均已锁定 — 订阅 Epic 或 Legendary 即可解锁。</string>
+    <string name="profile_banner_none_plain">还没有横幅 — 从下方分类中选择一个</string>
+    <string name="profile_about_plain">个人简介</string>
+    <string name="msg_username_taken">该用户名已被使用。</string>
 </resources>

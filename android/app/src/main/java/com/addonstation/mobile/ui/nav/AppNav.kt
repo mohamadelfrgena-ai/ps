@@ -264,6 +264,8 @@ private fun MainNavigation(
 ) {
     val container = rememberContainer()
     val scope = rememberCoroutineScope()
+    val mainSnackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    val profileSavedMessage = stringResource(R.string.edit_profile_saved)
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
@@ -798,7 +800,11 @@ private fun MainNavigation(
                 composable(Routes.EDIT_PROFILE) {
                     com.addonstation.mobile.ui.profile.EditProfileScreen(
                         onBack = { back() },
-                        onSaved = { back() },
+                        onSaved = {
+                            back()
+                            scope.launch { mainSnackbarHostState.showSnackbar(profileSavedMessage) }
+                        },
+                        onOpenPlans = { go(Routes.PLANS) },
                     )
                 }
                 // الشاشة C: ملفي كما يراه الآخرون (بلا محفظة حقيقية · بلا أزرار)
@@ -913,6 +919,12 @@ private fun MainNavigation(
                     }
                 }
             }
+            androidx.compose.material3.SnackbarHost(
+                hostState = mainSnackbarHostState,
+                modifier = Modifier
+                    .align(androidx.compose.ui.Alignment.BottomCenter)
+                    .fillMaxWidth(),
+            )
         }
 
         // تبويب Settings الرئيسي ضمن الشريط؛ الإعدادات الفرعية ومسارات التفاصيل لا تطابق تبويباً.

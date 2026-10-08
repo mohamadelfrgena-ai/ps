@@ -727,4 +727,29 @@ YARAT.</string>
     <string name="settings_account_actions">Hesap işlemleri</string>
     <string name="settings_footer">© 2026 AddonStation — Tüm hakları saklıdır</string>
     <string name="auth_username_placeholder">kullanici_adi</string>
+
+    <!-- Edit profile detail screen -->
+    <string name="profile_edit_plain">Profili düzenle</string>
+    <string name="edit_profile_preview">Önizleme</string>
+    <string name="edit_profile_counter">%1$d/%2$d</string>
+    <string name="edit_profile_discard_title">Değişiklikler silinsin mi?</string>
+    <string name="edit_profile_discard_body">Değişiklikleriniz kaybolacak.</string>
+    <string name="edit_profile_discard">Vazgeç</string>
+    <string name="edit_profile_keep_editing">Düzenlemeye devam et</string>
+    <string name="edit_profile_saved">Profil kaydedildi</string>
+    <string name="edit_profile_status_hint">Aklınızdan ne geçiyor?</string>
+    <string name="edit_profile_avatar_label">Avatar</string>
+    <string name="edit_profile_epic_item">Epic eşyası</string>
+    <string name="edit_profile_golden_item">Altın eşya</string>
+    <string name="edit_profile_no_items">Bu bölümde henüz kullanılabilir eşya yok.</string>
+    <string name="edit_profile_no_results">Eşleşen görsel bulunamadı.</string>
+    <string name="cd_avatar_selected">%1$s, seçildi</string>
+    <string name="cd_avatar_locked">%1$s, kilitli. Gerekli plan: %2$s</string>
+    <string name="plan_locked_avatars_plain">Kilitli avatarların kilidi Epic veya Legendary ile açılır.</string>
+    <string name="plan_locked_items_plain">Kilitli sohbet eşyaları için uygun plan gerekir.</string>
+    <string name="plan_locked_online_plain">Çevrimiçi durumu yalnızca Legendary abonelerine açıktır.</string>
+    <string name="plan_locked_banner_note_plain">Tüm kapaklar kilitli — Epic veya Legendary aboneliğiyle açabilirsiniz.</string>
+    <string name="profile_banner_none_plain">Henüz bir kapak yok — aşağıdaki bölümlerden birini seçin</string>
+    <string name="profile_about_plain">Hakkımda</string>
+    <string name="msg_username_taken">Bu kullanıcı adı zaten kullanılıyor.</string>
 </resources>

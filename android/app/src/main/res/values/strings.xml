@@ -748,4 +748,29 @@ CREATE IT.</string>
     <string name="crash_report_copy">Copy crash report</string>
     <string name="crash_report_copied">Report copied. Paste it into this chat.</string>
     <string name="crash_report_continue">Try opening the app</string>
+
+    <!-- Edit profile detail screen -->
+    <string name="profile_edit_plain">Edit profile</string>
+    <string name="edit_profile_preview">Preview</string>
+    <string name="edit_profile_counter">%1$d/%2$d</string>
+    <string name="edit_profile_discard_title">Discard changes?</string>
+    <string name="edit_profile_discard_body">Your edits will be lost.</string>
+    <string name="edit_profile_discard">Discard</string>
+    <string name="edit_profile_keep_editing">Keep editing</string>
+    <string name="edit_profile_saved">Profile saved</string>
+    <string name="edit_profile_status_hint">What\'s on your mind?</string>
+    <string name="edit_profile_avatar_label">Avatar</string>
+    <string name="edit_profile_epic_item">Epic item</string>
+    <string name="edit_profile_golden_item">Golden item</string>
+    <string name="edit_profile_no_items">No items are available in this section yet.</string>
+    <string name="edit_profile_no_results">No matching pictures.</string>
+    <string name="cd_avatar_selected">%1$s, selected</string>
+    <string name="cd_avatar_locked">%1$s, locked. Requires %2$s</string>
+    <string name="plan_locked_avatars_plain">Locked avatars unlock with Epic or Legendary.</string>
+    <string name="plan_locked_items_plain">Locked chat items require the right plan.</string>
+    <string name="plan_locked_online_plain">Online status is available to Legendary subscribers.</string>
+    <string name="plan_locked_banner_note_plain">All banners are locked — unlock with an Epic or Legendary subscription.</string>
+    <string name="profile_banner_none_plain">No banner yet — pick one from the sections below</string>
+    <string name="profile_about_plain">Bio</string>
+    <string name="msg_username_taken">That username is already in use.</string>
 </resources>

@@ -727,4 +727,29 @@ CRIE.</string>
     <string name="settings_account_actions">Ações da conta</string>
     <string name="settings_footer">© 2026 AddonStation — Todos os direitos reservados</string>
     <string name="auth_username_placeholder">seu_usuario</string>
+
+    <!-- Edit profile detail screen -->
+    <string name="profile_edit_plain">Editar perfil</string>
+    <string name="edit_profile_preview">Pré-visualização</string>
+    <string name="edit_profile_counter">%1$d/%2$d</string>
+    <string name="edit_profile_discard_title">Descartar alterações?</string>
+    <string name="edit_profile_discard_body">As suas alterações serão perdidas.</string>
+    <string name="edit_profile_discard">Descartar</string>
+    <string name="edit_profile_keep_editing">Continuar a editar</string>
+    <string name="edit_profile_saved">Perfil guardado</string>
+    <string name="edit_profile_status_hint">O que está a pensar?</string>
+    <string name="edit_profile_avatar_label">Avatar</string>
+    <string name="edit_profile_epic_item">Item Epic</string>
+    <string name="edit_profile_golden_item">Item dourado</string>
+    <string name="edit_profile_no_items">Ainda não há itens disponíveis nesta secção.</string>
+    <string name="edit_profile_no_results">Não há imagens correspondentes.</string>
+    <string name="cd_avatar_selected">%1$s, selecionado</string>
+    <string name="cd_avatar_locked">%1$s, bloqueado. Requer %2$s</string>
+    <string name="plan_locked_avatars_plain">Os avatares bloqueados são desbloqueados com Epic ou Legendary.</string>
+    <string name="plan_locked_items_plain">Os itens de chat bloqueados requerem o plano adequado.</string>
+    <string name="plan_locked_online_plain">O estado online está disponível para subscritores Legendary.</string>
+    <string name="plan_locked_banner_note_plain">Todas as capas estão bloqueadas — desbloqueie-as com uma subscrição Epic ou Legendary.</string>
+    <string name="profile_banner_none_plain">Ainda não há capa — escolha uma das secções abaixo</string>
+    <string name="profile_about_plain">Biografia</string>
+    <string name="msg_username_taken">Este nome de utilizador já está em uso.</string>
 </resources>
