@@ -366,7 +366,7 @@ fun ProfileScreen(
                     Modifier.fillMaxWidth().padding(horizontal = Spec.screenPad),
                     verticalAlignment = Alignment.Bottom,
                 ) {
-                    Box(Modifier.offset(y = -Spec.avatarOverlap)) {
+                    Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
                         SpecProfileAvatar(
                             avatarUrl = assetUrl(container, me.avatarUrl),
                             status = status,
@@ -376,6 +376,8 @@ fun ProfileScreen(
                     SpecFillButton(
                         text = stringResource(R.string.profile_edit),
                         onClick = onOpenEdit,
+                        buttonHeight = 44.dp,
+                        horizontalPadding = 20.dp,
                     )
                 }
             }
@@ -1413,7 +1415,7 @@ fun UserProfileScreen(
                 Modifier.fillMaxWidth().padding(horizontal = Spec.screenPad),
                 verticalAlignment = Alignment.Bottom,
             ) {
-                Box(Modifier.offset(y = -Spec.avatarOverlap)) {
+                Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
                     SpecProfileAvatar(avatarUrl = assetUrl(container, me.avatarUrl), status = status)
                 }
                 if (isMyProfile) {
@@ -1421,6 +1423,8 @@ fun UserProfileScreen(
                     SpecFillButton(
                         text = stringResource(R.string.profile_edit),
                         onClick = onEditProfile,
+                        buttonHeight = 44.dp,
+                        horizontalPadding = 20.dp,
                     )
                 }
             }
@@ -1462,6 +1466,8 @@ fun UserProfileScreen(
                 SpecFillButton(
                     text = stringResource(R.string.profile_edit),
                     onClick = onEditProfile,
+                    buttonHeight = 44.dp,
+                    horizontalPadding = 20.dp,
                     modifier = Modifier.fillMaxWidth(),
                 )
             } else {
@@ -1781,13 +1787,15 @@ fun ProfileAsOthersScreen(
                 Modifier.fillMaxWidth().padding(horizontal = Spec.screenPad),
                 verticalAlignment = Alignment.Bottom,
             ) {
-                Box(Modifier.offset(y = -Spec.avatarOverlap)) {
+                Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
                     SpecProfileAvatar(avatarUrl = assetUrl(container, me.avatarUrl), status = status)
                 }
                 Spacer(Modifier.weight(1f))
                 SpecFillButton(
                     text = stringResource(R.string.profile_edit),
                     onClick = onOpenEdit,
+                    buttonHeight = 44.dp,
+                    horizontalPadding = 20.dp,
                 )
             }
         }

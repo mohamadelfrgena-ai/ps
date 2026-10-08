@@ -397,18 +397,6 @@ fun WalletCompactCard(
             .clickable(onClick = onOpenWallet)
             .padding(16.dp),
     ) {
-        Box(
-            Modifier
-                .align(Alignment.TopEnd)
-                .offset(x = 40.dp, y = (-40).dp)
-                .size(120.dp)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(AppColors.AuthGold.copy(alpha = 0.25f), Color.Transparent),
-                    ),
-                    CircleShape,
-                ),
-        )
         Column(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 WalletCoinImage(56.dp)

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -255,7 +256,8 @@ fun SpecProfileAvatar(
     size: Dp = Spec.avatarLg,
     borderWidth: Dp = 5.dp,
 ) {
-    Box(modifier = modifier.size(size)) {
+    // لا تدع ارتفاع صفّ التداخل (50dp) يسحق صورة 96dp إلى شكل بيضاوي.
+    Box(modifier = modifier.requiredSize(size)) {
         val context = LocalContext.current
         Box(
             Modifier
@@ -547,17 +549,19 @@ fun SpecHiddenWalletCard(modifier: Modifier = Modifier) {
 
 // ───────────────────────────────────────────── أزرار الشاشات A · B · C
 
-/** زر ممتلئ أزرق (48h · نصف قطر 12 · نصّ أبيض 14/800). */
+/** زرّ ممتلئ أزرق (48h افتراضياً · نصف قطر 12 · نصّ أبيض 14/800). */
 @Composable
 fun SpecFillButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    buttonHeight: Dp = Spec.actionBtnH,
+    horizontalPadding: Dp = 0.dp,
 ) {
     Box(
         modifier = modifier
-            .height(Spec.actionBtnH)
+            .height(buttonHeight)
             .clip(RoundedCornerShape(Spec.buttonRadius))
             .background(if (enabled) Spec.blue else Spec.surfaceHigh)
             .clickable(enabled = enabled, onClick = onClick),
@@ -565,6 +569,7 @@ fun SpecFillButton(
     ) {
         Text(
             text,
+            modifier = Modifier.padding(horizontal = horizontalPadding),
             style = Spec.button,
             color = if (enabled) Color.White else Spec.textMuted,
             maxLines = 1,

@@ -124,9 +124,16 @@ check("٢٫١ البانر الافتراضي من الحقيبة (profile_banne
 check("٢٫١ الزرّ الدائري فوق البانر 44×44 · خلفية 60% · أيقونة 22",
       re.search(r"\.size\(Spec\.touch\)[\s\S]{0,120}?Spec\.bg\.copy\(alpha = 0\.60f\)", comp) is not None
       and "Modifier.size(22.dp)" in comp)
-check("٢٫٢ الأفاتار 96 بحدّ 5dp بلون الخلفية",
+check("٢٫٢ الأفاتار 96 بحدّ 5dp بلون الخلفية ولا يُسحقه صفّ التداخل",
       re.search(r"size: Dp = Spec\.avatarLg,[\s\S]{0,200}?borderWidth: Dp = 5\.dp", comp) is not None
+      and "requiredSize(size)" in comp
       and "border(borderWidth, Spec.bg, CircleShape)" in comp)
+check("٢٫٢ تداخل الأفاتار 46dp مع تعويض قصّ الصف في الشاشات الثلاث",
+      screens.count("Box(Modifier.offset(y = -(Spec.avatarOverlap / 2)))") >= 3)
+check("أزرار تعديل الملف: ارتفاع 44dp وحشو أفقي 20dp",
+      screens.count("buttonHeight = 44.dp") >= 4
+      and screens.count("horizontalPadding = 20.dp") >= 4
+      and "padding(horizontal = horizontalPadding)" in body(comp, "SpecFillButton"))
 check("٢٫٢ نقطة الحالة: توهّج 14dp@65% + حلقة 2dp@35% + حدّ داخلي بلون الخلفية",
       "alpha = 0.65f" in comp and "alpha = 0.35f" in comp and "r - 2.5.dp.toPx()" in comp)
 check("٢٫٢ «غير متصل» رمادي بلا توهّج · «مخفيّ الحالة» بلا نقطة",
@@ -156,6 +163,9 @@ check("٢٫٧ محفظة الملف: عملة 56 · رصيد متحرك · مك�
       and "WalletStreakChip" in compact_wallet and "onOpenWallet" in compact_wallet
       and "animateIntAsState" in compact_wallet and "tween(durationMillis = 700)" in compact_wallet
       and "R.string.profile_daily_reward" in compact_wallet and "R.string.ac_claimed" in compact_wallet)
+check("محفظة الملف بلا بقعة الضوء الزخرفية بجانب السهم",
+      "Brush.radialGradient(" not in compact_wallet
+      and "AuthGold.copy(alpha = 0.25f)" not in compact_wallet)
 check("إطار متقطّع 1dp (§5) بـ dashPathEffect",
       "PathEffect.dashPathEffect" in comp and "specDashedBorder" in comp)
 
