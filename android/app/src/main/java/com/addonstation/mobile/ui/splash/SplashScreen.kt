@@ -117,6 +117,9 @@ fun SplashScreen(
     var compactMode by remember(isFirstLaunch, reduceMotion) {
         mutableStateOf(!isFirstLaunch)
     }
+    var introComplete by remember(isFirstLaunch, reduceMotion) {
+        mutableStateOf(!isFirstLaunch || reduceMotion)
+    }
     var skipRequested by remember { mutableStateOf(false) }
 
     // المقدمة الكاملة طولها 6.6 ثوانٍ؛ النقر يسرّع إلى إطارها الأخير.
@@ -129,6 +132,7 @@ fun SplashScreen(
                     easing = LinearEasing,
                 ),
             )
+            introComplete = true
             compactMode = true
         }
     }
@@ -146,9 +150,10 @@ fun SplashScreen(
         }
     }
 
-    // الحد الأدنى 1.5 ثانية؛ بعده لا ننتظر الأنيميشن إذا أصبحت بيانات الإقلاع جاهزة.
-    LaunchedEffect(startupReady) {
-        if (!startupReady) return@LaunchedEffect
+    // المقدمة الأولى تكتمل كاملةً (6.6 ثوانٍ) قبل الخروج؛ في التشغيلات
+    // اللاحقة تبقى الحركة قصيرة (1.5 ثانية). وفي الحالتين ننتظر جاهزية الإقلاع.
+    LaunchedEffect(startupReady, introComplete) {
+        if (!startupReady || !introComplete) return@LaunchedEffect
         val elapsed = SystemClock.elapsedRealtime() - startedAt
         val remaining = (MIN_SPLASH_MS - elapsed).coerceAtLeast(0L)
         if (remaining > 0L) delay(remaining)
