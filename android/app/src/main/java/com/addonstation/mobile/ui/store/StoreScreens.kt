@@ -87,7 +87,12 @@ fun StoreScreen(
     onOpenItem: (ContentItem) -> Unit,
     onOpenWallet: () -> Unit,
     initialQuery: String = "",
+    scrollToTopRequest: Int = 0,
 ) {
+    val scrollState = rememberScrollState()
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) scrollState.animateScrollTo(0)
+    }
     val container = rememberContainer()
     val wallet by container.state.wallet.collectAsState()
     val scope = rememberCoroutineScope()
@@ -141,7 +146,7 @@ fun StoreScreen(
             Modifier
                 .fillMaxSize()
                 .imePadding()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = 14.dp),
         ) {
             Spacer(Modifier.height(10.dp))
@@ -371,7 +376,7 @@ fun ContentDetailScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 when {
                     !signedIn -> GradientButton(
-                        text = stringResource(R.string.item_download),
+                        text = stringResource(R.string.item_download_plain),
                         onClick = onLogin,
                         modifier = Modifier.weight(1f),
                         icon = Icons.Filled.FileDownload,
@@ -393,7 +398,7 @@ fun ContentDetailScreen(
                     else -> GradientButton(
                         text = if (current.acPrice > 0 && !unlocked)
                             stringResource(R.string.item_unlock_ac, current.acPrice)
-                        else stringResource(R.string.item_download),
+                        else stringResource(R.string.item_download_plain),
                         leading = if (current.acPrice > 0 && !unlocked) ({ CoinIcon(size = 18.dp) }) else null,
                         onClick = {
                             scope.launch {

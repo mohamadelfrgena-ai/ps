@@ -714,4 +714,19 @@
     <string name="profile_unfriend_confirm">将该成员从好友中移除？</string>
     <string name="mute_member_locked">Legendary</string>
     <string name="mute_member_needs_plan">静音成员是 Legendary 订阅功能——正在打开订阅页。</string>
+
+    <!-- AddonStation auth/settings redesign -->
+    <string name="auth_email_placeholder">name@example.com</string>
+    <string name="auth_password_placeholder">••••••••</string>
+    <string name="settings_my_plan">我的方案</string>
+    <string name="settings_your_plan">当前方案：%1$s</string>
+    <string name="settings_expires_on">到期日期：%1$s</string>
+    <string name="settings_upgrade">升级</string>
+    <string name="settings_sections_five">5 个分类</string>
+    <string name="settings_admin_tools">管理工具</string>
+    <string name="settings_admin_visible">仅管理员账号可见</string>
+    <string name="settings_open_dashboard">打开管理面板</string>
+    <string name="settings_account_actions">账号操作</string>
+    <string name="settings_footer">© 2026 AddonStation — 保留所有权利</string>
+    <string name="auth_username_placeholder">用户名</string>
 </resources>

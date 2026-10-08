@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -80,6 +81,7 @@ fun CommunityGate(
     onOpenWallet: () -> Unit,
     onLogin: () -> Unit,
     onDeclineToHome: () -> Unit,
+    scrollToTopRequest: Int = 0,
 ) {
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
@@ -116,6 +118,7 @@ fun CommunityGate(
         onOpenEditProfile = onOpenEditProfile,
         onOpenWallet = onOpenWallet,
         onLogin = onLogin,
+        scrollToTopRequest = scrollToTopRequest,
     )
 }
 
@@ -194,7 +197,12 @@ fun RoomListScreen(
     onOpenEditProfile: () -> Unit,
     onOpenWallet: () -> Unit,
     onLogin: () -> Unit,
+    scrollToTopRequest: Int = 0,
 ) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) listState.animateScrollToItem(0)
+    }
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
     val signedIn by container.state.signedIn.collectAsState()
@@ -289,6 +297,7 @@ fun RoomListScreen(
             com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.weight(1f),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
                     start = Spec.chatListPad,
@@ -393,7 +402,7 @@ fun RoomListScreen(
                 ) {
                     Icon(
                         Icons.Filled.Settings,
-                        contentDescription = stringResource(R.string.profile_edit),
+                        contentDescription = stringResource(R.string.profile_edit_plain),
                         tint = Spec.text,
                         modifier = Modifier.size(20.dp),
                     )

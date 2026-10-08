@@ -687,7 +687,10 @@ fun PinnedSheet(pinned: List<ChatMessage>, onDismiss: () -> Unit) {
         containerColor = AppColors.Surface,
     ) {
         Column(Modifier.padding(horizontal = 14.dp)) {
-            Text(stringResource(R.string.chat_pinned), style = AppText.sectionTitle, color = AppColors.Text)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Filled.PushPin, contentDescription = null, tint = AppColors.Blue, modifier = Modifier.size(18.dp))
+                Text(stringResource(R.string.chat_pinned_plain), style = AppText.sectionTitle, color = AppColors.Text)
+            }
             if (pinned.isEmpty()) {
                 Text(
                     stringResource(R.string.chat_no_pinned),

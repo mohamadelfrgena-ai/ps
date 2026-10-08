@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
@@ -25,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavHostController
@@ -56,6 +58,8 @@ import android.os.Build
 import android.content.ContextWrapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -81,6 +85,7 @@ object Routes {
     const val CHAT = "chat/{channelId}"
     fun chat(id: String) = "chat/$id"
     const val WALLET = "wallet"
+    const val AC_HISTORY = "wallet/history"
     const val NOTIFICATIONS = "notifications"
     /** إعدادات الإشعارات (الأقسام وساعات الهدوء ووتيرة التذكير). */
     const val NOTIF_SETTINGS = "notification-settings"
@@ -126,6 +131,7 @@ fun AppRoot(
 
     var splashDone by remember { mutableStateOf(false) }
     var configured by remember { mutableStateOf(container.isConfigured) }
+    var launchReady by remember { mutableStateOf(false) }
 
     // أيقونات شريط الحالة تتبع وضع التطبيق نفسه (لا وضع الجهاز):
     // في الوضع الفاتح تصير الأيقونات داكنة فوق الخلفية الفاتحة.
@@ -164,25 +170,42 @@ fun AppRoot(
     // استعادة الجلسة عند الإقلاع
     LaunchedEffect(Unit) {
         // كل عمل الإقلاع (شبكة + فك ترميز JSON) على خيط الإدخال/الإخراج،
-        // حتى لا يتجمّد الخيط الرئيسي أثناء شاشة الترحيب (كان سبب «اللاق»).
-        runCatching {
-            withContext(Dispatchers.IO) {
-                if (container.auth.isSignedIn()) {
-                    container.auth.ensureFreshSession()
-                    container.state.refreshAll()
-                    container.assets.all()
-                    // غرفة «خدمات النقدية» (قراءة فقط للأدمن): نضمن وجودها
-                    // **عند فتح التطبيق** لا عند فتح شاشة الغرف فقط، فتظهر
-                    // لكل المستخدمين من أول تشغيل. الخادم يرفض الطلب لغير الأدمن.
-                    container.chat.ensureCashServicesRoom(
-                        container.state.profile.value?.role == "admin",
-                    )  // الخادم يمنعها لغير الأدمن، فنستدعيها دائماً
+        // بالتوازي مع حركة البداية. تخرج شاشة الترحيب بعد الحد الأدنى عندما
+        // يصبح هذا العمل جاهزاً، لا بعد انتظار مدة الحركة كاملة.
+        try {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val signedIn = container.auth.isSignedIn()
+                    if (signedIn) container.auth.ensureFreshSession()
+                    coroutineScope {
+                        if (signedIn) {
+                            // جلسة المستخدم والأصول تُحمّلان معاً؛ غرفة الخدمات
+                            // تنتظر الملف الشخصي فقط، والخطط/الطرق تُحمّل ضمن refreshAll.
+                            val refresh = async { container.state.refreshAll() }
+                            val assets = async { container.assets.all() }
+                            refresh.await()
+                            val cashRoom = async {
+                                // الخادم يمنع الإنشاء لغير الأدمن، ونستدعيها دائماً.
+                                container.chat.ensureCashServicesRoom(
+                                    container.state.profile.value?.role == "admin",
+                                )
+                            }
+                            assets.await()
+                            cashRoom.await()
+                        } else {
+                            // بيانات المتجر العامة مستقلة؛ لا نجعل الطريقتين متتابعتين.
+                            val plans = async { container.plans.loadPlans() }
+                            val paymentMethods = async { container.plans.loadPaymentMethods() }
+                            plans.await()
+                            paymentMethods.await()
+                        }
+                    }
                 }
-                container.plans.loadPlans()
-                container.plans.loadPaymentMethods()
             }
+        } finally {
+            configured = container.isConfigured
+            launchReady = true
         }
-        configured = container.isConfigured
     }
 
     com.addonstation.mobile.ui.theme.AddonStationTheme(darkTheme = dark) {
@@ -219,7 +242,10 @@ fun AppRoot(
                     }
                     if (!splashDone) {
                         // الشاشة نفسها فوق كل شيء، وتخرج بتلاشٍ يكشف ما تحتها
-                        SplashScreen(onFinished = { splashDone = true })
+                        SplashScreen(
+                            startupReady = launchReady,
+                            onFinished = { splashDone = true },
+                        )
                     }
                 }
             }
@@ -244,7 +270,20 @@ private fun MainNavigation(
     val tab = MainTab.entries.firstOrNull { it.route == route }
     val profile by container.state.profile.collectAsState()
     val signedIn by container.state.signedIn.collectAsState()
-    val wallet by container.state.wallet.collectAsState()
+    val unread by container.state.unread.collectAsState()
+    var pendingFriendRequests by remember { mutableStateOf(0) }
+    var scrollToTopRequest by remember { mutableStateOf(0) }
+
+    val chatUnreadCount = unread.values.sumOf { maxOf(it.unread, it.mentions) }
+
+    LaunchedEffect(signedIn, route) {
+        if (!signedIn) {
+            pendingFriendRequests = 0
+        } else if (tab != null || route == Routes.NOTIFICATIONS || route == Routes.FRIENDS) {
+            runCatching { container.notifications.incomingFriendRequests().size }
+                .onSuccess { pendingFriendRequests = it }
+        }
+    }
 
     LaunchedEffect(startAtReset) {
         if (startAtReset) navController.navigate(Routes.RESET)
@@ -357,6 +396,14 @@ private fun MainNavigation(
         }
     }
 
+    fun selectTab(target: MainTab) {
+        if (tab == target) {
+            scrollToTopRequest += 1
+        } else {
+            goTab(target)
+        }
+    }
+
     /**
      * فتح الوجهة التي طلبها الإشعار — بترتيب آمن:
      *   • غير مسجّل دخول ⇒ نحفظ الوجهة ونُنقله للدخول (وتُفتح بعد الدخول).
@@ -438,6 +485,9 @@ private fun MainNavigation(
         return true
     }
 
+    val density = LocalDensity.current
+    val keyboardOpen = WindowInsets.ime.getBottom(density) > 0
+
     // إذن الإشعارات: مرة واحدة بعد أول دخول (انظر الدالة أدناه)
     NotificationPermissionPrompt(signedIn)
 
@@ -447,6 +497,7 @@ private fun MainNavigation(
 
                 composable(Routes.HOME) {
                     HomeScreen(
+                        scrollToTopRequest = scrollToTopRequest,
                         actions = HomeActions(
                             openStore = { goTab(MainTab.Store) },
                             openFavorites = { go(Routes.FAVORITES) },
@@ -470,6 +521,7 @@ private fun MainNavigation(
 
                 composable(Routes.STORE) {
                     StoreScreen(
+                        scrollToTopRequest = scrollToTopRequest,
                         onOpenItem = { item -> go(Routes.item(item.id)) },
                         onOpenWallet = { go(Routes.WALLET) },
                     )
@@ -484,6 +536,7 @@ private fun MainNavigation(
                         onRequireSignIn = { intended -> requireSignIn(intended) },
                     ) {
                         com.addonstation.mobile.ui.community.CommunityGate(
+                            scrollToTopRequest = scrollToTopRequest,
                             onOpenRoom = { channel: ChatChannel -> go(Routes.chat(channel.id)) },
                             // ترس لوحة المستخدم في الشات → تعديل الملف الشخصي
                             onOpenEditProfile = { go(Routes.EDIT_PROFILE) },
@@ -496,12 +549,16 @@ private fun MainNavigation(
 
                 composable(Routes.SETTINGS) {
                     SettingsScreen(
+                        scrollToTopRequest = scrollToTopRequest,
                         onLogin = { go(Routes.LOGIN) },
                         onNotifications = { go(Routes.NOTIFICATIONS) },
                         onNotificationSettings = { go(Routes.NOTIF_SETTINGS) },
                         onOpenProfile = { goTab(MainTab.Profile) },
                         onOpenWallet = { go(Routes.WALLET) },
                         onSignedOut = { goTab(MainTab.Home) },
+                        onOpenPlans = { go(Routes.PLANS) },
+                        onOpenAdmin = { go(Routes.ADMIN) },
+                        onBack = { back() },
                     )
                 }
 
@@ -510,6 +567,7 @@ private fun MainNavigation(
                     // بانر · أفاتار+تعديل · هوية · محفظة · إحصاءات · مستوى · نبذة
                     // · شبكة 2×2 · خروج. (الإعدادات تبويب مستقل — لا تُعرض هنا.)
                     ProfileScreen(
+                        scrollToTopRequest = scrollToTopRequest,
                         onLogin = { go(Routes.LOGIN) },
                         onOpenSignup = { go(Routes.SIGNUP) },
                         onSignedOut = { goTab(MainTab.Home) },
@@ -647,8 +705,11 @@ private fun MainNavigation(
                 composable(Routes.WALLET) {
                     com.addonstation.mobile.ui.account.AcWalletScreen(
                         onBack = { back() },
-                        onOpenItem = { id -> go(Routes.item(id)) },
+                        onOpenHistory = { go(Routes.AC_HISTORY) },
                     )
+                }
+                composable(Routes.AC_HISTORY) {
+                    com.addonstation.mobile.ui.account.AcTransactionHistoryScreen(onBack = { back() })
                 }
                 composable(Routes.NOTIFICATIONS) {
                     com.addonstation.mobile.ui.account.NotificationsScreen(
@@ -847,8 +908,14 @@ private fun MainNavigation(
             }
         }
 
-        if (tab != null) {
-            BottomNavBar(current = tab, onSelect = { target -> goTab(target) })
+        // تبويب Settings الرئيسي ضمن الشريط؛ الإعدادات الفرعية ومسارات التفاصيل لا تطابق تبويباً.
+        if (tab != null && !keyboardOpen) {
+            BottomNavBar(
+                current = tab,
+                onSelect = { target -> selectTab(target) },
+                chatUnreadCount = chatUnreadCount,
+                hasPendingFriendRequests = pendingFriendRequests > 0,
+            )
         }
     }
 }

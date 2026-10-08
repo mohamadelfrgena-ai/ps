@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-فاحص: **حقول كلمة المرور** في شاشات الحساب (طلب المالك):
+"""حارس حقول كلمة المرور بعد توحيدها في AuthSettingsField.
 
-    • عين 👁 **داخل** كل حقل كلمة مرور تُظهرها وتُخفيها؛
-    • شاشة «إنشاء الحساب» فيها **حقل تأكيد** ثانٍ؛
-    • إنشاء الحساب **يُرفض** إن اختلف الحقلان (مع رسالة واضحة)؛
-    • لا يبقى أي حقل كلمة مرور «أعمى» (بلا عين) في شاشات الحساب؛
-    • نصّا «إظهار/إخفاء كلمة المرور» موجودان بكل اللغات.
-
-يفشل الفاحص إن عاد أيٌّ من ذلك.
+يتأكد من وجود عين الإظهار/الإخفاء داخل المكوّن، ومن توصيله بكل الحقول
+(الدخول 1 · التسجيل 2 · إعادة التعيين 2)، ومن منع التسجيل إن لم تتطابق
+كلمتا المرور، ومن وجود نصوص العين بجميع اللغات.
 """
 import re
 import sys
@@ -18,61 +13,57 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "android/app/src/main/java"
 AUTH = SRC / "com/addonstation/mobile/ui/auth/AuthScreens.kt"
+FIELDS = SRC / "com/addonstation/mobile/ui/components/AuthSettingsUi.kt"
 RES = ROOT / "android/app/src/main/res"
 
 
 def main() -> int:
     problems: list[str] = []
-    if not AUTH.exists():
-        print(f"✗ الملف مفقود: {AUTH}")
+    if not AUTH.exists() or not FIELDS.exists():
+        print("✗ ملف شاشة المصادقة أو مكوّنات الحقول مفقود")
         return 1
-    s = AUTH.read_text(encoding="utf-8")
+    auth = AUTH.read_text(encoding="utf-8")
+    fields = FIELDS.read_text(encoding="utf-8")
 
-    # ١) الحقل الموحّد موجود وفيه عين التبديل
-    if "private fun PasswordField(" not in s:
-        problems.append("لا يوجد حقل PasswordField موحّد")
-    else:
-        body = s[s.index("private fun PasswordField("):]
-        body = body[: body.index("\n}\n") + 3]
-        for needle, label in (
-            ("Icons.Filled.Visibility", "أيقونة العين (إظهار)"),
-            ("Icons.Filled.VisibilityOff", "أيقونة العين (إخفاء)"),
-            ("VisualTransformation.None", "إظهار النص عند الفتح"),
-            ("PasswordVisualTransformation()", "إخفاء النص افتراضاً"),
-            ("trailingIcon", "العين داخل الحقل (trailingIcon)"),
-        ):
-            if needle not in body:
-                problems.append(f"PasswordField بلا {label}")
+    # الحقل المشترك يحتوي على عين 44dp، وتحويل إظهار/إخفاء.
+    if "fun AuthSettingsField(" not in fields:
+        problems.append("لا يوجد AuthSettingsField موحّد")
+    for needle, label in (
+        ("Icons.Filled.Visibility", "عين الإظهار"),
+        ("Icons.Filled.VisibilityOff", "عين الإخفاء"),
+        ("VisualTransformation.None", "إظهار النص"),
+        ("PasswordVisualTransformation()", "إخفاء افتراضي"),
+        ("IconButton(", "زرّ عين تفاعلي"),
+        ("Modifier.size(44.dp)", "هدف لمس 44dp"),
+    ):
+        if needle not in fields:
+            problems.append(f"AuthSettingsField بلا {label}")
 
-    # ٢) لا حقل كلمة مرور «أعمى» (بلا عين) في **أي** شاشة في التطبيق
-    blind = s.count("PasswordVisualTransformation()")
-    if blind > 1:  # واحد فقط داخل PasswordField نفسه
-        problems.append(f"يوجد {blind - 1} حقل/حقول كلمة مرور بلا عين في شاشات الحساب")
-    for f in sorted(SRC.rglob("*.kt")):
-        if f == AUTH:
-            continue
-        t = f.read_text(encoding="utf-8")
-        if "PasswordVisualTransformation()" not in t:
-            continue
-        # الحقل مقبول فقط إن كان بجانبه تبديل إظهار/إخفاء (عين)
-        if "Icons.Filled.Visibility" not in t or "VisualTransformation.None" not in t:
-            problems.append(
-                f"حقل كلمة مرور بلا عين · {f.relative_to(ROOT)}"
-            )
+    # لا توجد تحولات كلمة مرور منفصلة/عمياء في الشاشات الأخرى.
+    occurrences = []
+    for path in sorted(SRC.rglob("*.kt")):
+        text = path.read_text(encoding="utf-8")
+        if "PasswordVisualTransformation()" in text:
+            occurrences.append(path)
+    admin_gate = SRC / "com/addonstation/mobile/ui/admin/AdminGate.kt"
+    allowed = {FIELDS, admin_gate}
+    if set(occurrences) != allowed:
+        problems.append("تحويل كلمة مرور في ملف غير معتمد: " + " · ".join(str(p.relative_to(ROOT)) for p in occurrences))
+    if admin_gate.exists():
+        admin = admin_gate.read_text(encoding="utf-8")
+        if not all(mark in admin for mark in ("Icons.Filled.Visibility", "Icons.Filled.VisibilityOff", "VisualTransformation.None")):
+            problems.append("حقل كلمة مرور لوحة الإدارة بلا عين إظهار/إخفاء")
 
-    # ٣) حقل التأكيد في إنشاء الحساب + التحقق من التطابق
-    signup = s[s.index("fun SignUpScreen("):]
+    signup = auth[auth.index("fun SignUpScreen("):]
     if "R.string.auth_confirm_password" not in signup:
-        problems.append("شاشة إنشاء الحساب بلا حقل «تأكيد كلمة المرور»")
+        problems.append("شاشة إنشاء الحساب بلا حقل تأكيد كلمة المرور")
     if not re.search(r"password\s*!=\s*confirm", signup):
-        problems.append("لا تحقّق من تطابق الحقلين قبل إنشاء الحساب")
+        problems.append("لا يوجد تحقق من تطابق كلمتي المرور")
 
-    # ٤) عدد الحقول المستخدمة (دخول ١ · إنشاء حساب ٢ · كلمة المرور الجديدة ٢)
-    used = s.count("PasswordField(\n") + len(re.findall(r"^\s+PasswordField\(", s, re.M))
-    if used < 5:
-        problems.append(f"عدد حقول كلمة المرور قليل: {used} (المتوقّع ٥)")
+    uses = len(re.findall(r"password\s*=\s*true", auth))
+    if uses != 5:
+        problems.append(f"عدد حقول كلمة المرور الموصولة بالعين {uses} (المتوقع 5)")
 
-    # ٥) النصوص موجودة بكل اللغات
     missing = []
     for path in sorted(RES.glob("values*/strings.xml")):
         text = path.read_text(encoding="utf-8")
@@ -82,17 +73,15 @@ def main() -> int:
     if missing:
         problems.append("نصوص ناقصة: " + " · ".join(missing))
 
-    print("الفحص | النتيجة")
+    print("فحص حقول كلمة المرور")
     print("----------------------------------------------")
     if problems:
-        for p in problems:
-            print(f"❌ {p}")
+        for problem in problems:
+            print(f"❌ {problem}")
         print(f"\n✗ عدد المشاكل: {len(problems)}")
         return 1
-
-    print("✅ عين الإظهار في **كل** حقول كلمة المرور في التطبيق + حقل تأكيد في إنشاء الحساب")
-    print("\n🟢 كل حقل كلمة مرور في التطبيق يملك عين 👁 داخله (الحساب ولوحة "
-          "الإدارة)، وإنشاء الحساب يرفض الحقلين غير المتطابقين، والنصوص بكل اللغات.")
+    print("✅ العين الموحّدة داخل الحقول الخمسة · التأكيد والتحقق محفوظان")
+    print("🟢 كل الحقول لها عين إظهار/إخفاء والنصوص كاملة باللغات الثماني.")
     return 0
 
 

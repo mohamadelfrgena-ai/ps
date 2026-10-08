@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ac_unlock_with_ac">Desbloquear com AC</string>
+    <string name="admin_chat_plain">Chat</string>
+    <string name="cd_download_item">Baixar %1$s</string>
+    <string name="cd_hide_password">Ocultar senha</string>
+    <string name="cd_more_options">Mais opções</string>
+    <string name="cd_new_activity">Nova atividade</string>
+    <string name="cd_open_wallet">Abrir carteira AC</string>
+    <string name="cd_show_password">Mostrar senha</string>
+    <string name="chat_pinned_plain">Mensagens fixadas</string>
+    <string name="home_latest_plain">Addons recentes</string>
+    <string name="item_download_plain">Baixar</string>
+    <string name="nav_chat">Chat</string>
+    <string name="profile_edit_plain">Editar perfil</string>
+    <string name="plan_buy_plain">Comprar assinatura</string>
+    <string name="auth_login_subtitle_plain">Entre para continuar sua aventura</string>
+    <plurals name="ac_streak_days">
+        <item quantity="one">Sequência de %d dia</item>
+        <item quantity="other">Sequência de %d dias</item>
+    </plurals>
+    <plurals name="cd_chat_unread">
+        <item quantity="one">%d mensagem não lida</item>
+        <item quantity="other">%d mensagens não lidas</item>
+    </plurals>
+</resources>

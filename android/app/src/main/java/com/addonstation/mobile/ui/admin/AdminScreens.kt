@@ -1024,7 +1024,7 @@ private fun MoreTab(onOpen: (String) -> Unit) {
             RowItem(Icons.Filled.Settings, stringResource(R.string.admin_plans_and_payment), onClick = { onOpen("settings") }, tint = AppColors.Gold)
             RowItem(Icons.Filled.MonetizationOn, stringResource(R.string.admin_ac_tools), onClick = { onOpen("ac") }, tint = AppColors.Green)
             RowItem(Icons.Filled.Receipt, stringResource(R.string.admin_tips_title), onClick = { onOpen("tips") }, tint = AppColors.Gold)
-            RowItem(Icons.Filled.Chat, stringResource(R.string.admin_chat), onClick = { onOpen("chat") }, tint = AppColors.Blue)
+            RowItem(Icons.Filled.Chat, stringResource(R.string.admin_chat_plain), onClick = { onOpen("chat") }, tint = AppColors.Blue)
             RowItem(Icons.Filled.History, stringResource(R.string.admin_audit_log), onClick = { onOpen("audit") }, tint = AppColors.Muted)
             RowItem(Icons.Filled.AdminPanelSettings, stringResource(R.string.admin_title), onClick = { onOpen("back") }, tint = AppColors.Red)
         }
@@ -2189,7 +2189,7 @@ fun AdminChatScreen(onBack: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.admin_chat), onBack = onBack)
+        SubScreenHeader(title = stringResource(R.string.admin_chat_plain), onBack = onBack)
         Column(
             Modifier
                 .fillMaxSize()

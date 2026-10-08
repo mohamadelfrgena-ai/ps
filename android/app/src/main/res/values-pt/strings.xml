@@ -714,4 +714,19 @@ CRIE.</string>
     <string name="profile_unfriend_confirm">Remover este membro dos seus amigos?</string>
     <string name="mute_member_locked">Legendary</string>
     <string name="mute_member_needs_plan">Silenciar membros é um recurso Legendary — abrindo a assinatura.</string>
+
+    <!-- AddonStation auth/settings redesign -->
+    <string name="auth_email_placeholder">name@example.com</string>
+    <string name="auth_password_placeholder">••••••••</string>
+    <string name="settings_my_plan">Meu plano</string>
+    <string name="settings_your_plan">Seu plano: %1$s</string>
+    <string name="settings_expires_on">Expira em %1$s</string>
+    <string name="settings_upgrade">Fazer upgrade</string>
+    <string name="settings_sections_five">5 SEÇÕES</string>
+    <string name="settings_admin_tools">Ferramentas de administração</string>
+    <string name="settings_admin_visible">Visível apenas para contas de administrador</string>
+    <string name="settings_open_dashboard">Abrir painel</string>
+    <string name="settings_account_actions">Ações da conta</string>
+    <string name="settings_footer">© 2026 AddonStation — Todos os direitos reservados</string>
+    <string name="auth_username_placeholder">seu_usuario</string>
 </resources>

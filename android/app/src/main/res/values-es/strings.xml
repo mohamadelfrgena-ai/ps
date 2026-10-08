@@ -714,4 +714,19 @@ CRÉALO.</string>
     <string name="profile_unfriend_confirm">¿Eliminar a este miembro de tus amigos?</string>
     <string name="mute_member_locked">Legendary</string>
     <string name="mute_member_needs_plan">Silenciar miembros es una función Legendary — abriendo la suscripción.</string>
+
+    <!-- AddonStation auth/settings redesign -->
+    <string name="auth_email_placeholder">name@example.com</string>
+    <string name="auth_password_placeholder">••••••••</string>
+    <string name="settings_my_plan">Mi plan</string>
+    <string name="settings_your_plan">Tu plan: %1$s</string>
+    <string name="settings_expires_on">Caduca el %1$s</string>
+    <string name="settings_upgrade">Mejorar plan</string>
+    <string name="settings_sections_five">5 SECCIONES</string>
+    <string name="settings_admin_tools">Herramientas de administración</string>
+    <string name="settings_admin_visible">Visible solo para cuentas de administrador</string>
+    <string name="settings_open_dashboard">Abrir panel</string>
+    <string name="settings_account_actions">Acciones de la cuenta</string>
+    <string name="settings_footer">© 2026 AddonStation — Todos los derechos reservados</string>
+    <string name="auth_username_placeholder">tu_usuario</string>
 </resources>

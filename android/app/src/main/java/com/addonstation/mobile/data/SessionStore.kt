@@ -89,10 +89,8 @@ class SessionStore(context: Context) {
             email = prefs.getString(K_EMAIL, null),
             expiresAtEpochSeconds = prefs.getLong(K_EXPIRES, 0L),
         )
-    } catch (t: Throwable) {
-        // فشل فكّ التشفير (Keystore تغيّر أو تُبطِل بعد تحديث النظام/قفل جديد):
-        // نُنظّف المخزن ونرتدي «بلا جلسة» بدل الانهيار أو حالة غامضة.
-        runCatching { prefs.edit().clear().commit() }
+    } catch (_: Throwable) {
+        // لا نحذف بيانات الجلسة عند فشل قراءة عابر؛ الخروج/المسح الصريح وحده يفرّغ المخزن.
         null
     }
 

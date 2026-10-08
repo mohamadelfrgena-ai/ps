@@ -497,61 +497,28 @@ fun SpecAboutCard(bio: String?, memberSince: String?, modifier: Modifier = Modif
     }
 }
 
-// ────────────────────────────────────────────────────── 2.7 بطاقة المحفظة
+// ─────────────────────────────────────────────────── البطاقة المختصرة للمحفظة
 
-/**
- * بطاقة المحفظة (ملفي أنا فقط): عملة 44 · عمود [«محفظة AC · الرصيد الحالي»
- * 12/700 مصمت؛ الرصيد 22/800 ذهبي؛ «N يوم متتالٍ» 12 مصمت] · زرّ «مكافأة اليوم»
- * (44h · نصف قطر 12 · ذهبي · نصّ goldDark 13/800 · حشو 16) ويُعطَّل بعد الاستلام.
- */
+/** بطاقة الملف الشخصي المختصرة المطابقة لقسم 3 من مواصفة Wallet + Bottom Bar. */
 @Composable
 fun SpecWalletCard(
     balance: Int,
     streak: Int,
-    dailyReward: Int,
     dailyClaimed: Boolean,
     claiming: Boolean,
+    onOpenWallet: () -> Unit,
     onClaim: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SpecCard(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CoinIcon(size = 44.dp)
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.profile_wallet_title) + " · " + stringResource(R.string.ac_balance),
-                    style = Spec.walletCaption,
-                    color = Spec.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text("$balance", style = Spec.balanceBig, color = Spec.gold, maxLines = 1)
-                Text(
-                    stringResource(R.string.profile_day_streak, streak),
-                    style = Spec.walletCaption,
-                    color = Spec.textMuted,
-                    maxLines = 1,
-                )
-            }
-            Box(
-                Modifier
-                    .height(Spec.touch)
-                    .clip(RoundedCornerShape(Spec.buttonRadius))
-                    .background(if (dailyClaimed || claiming) Spec.gold.copy(alpha = 0.45f) else Spec.gold)
-                    .clickable(enabled = !dailyClaimed && !claiming, onClick = onClaim)
-                    .padding(horizontal = 16.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    if (dailyClaimed) stringResource(R.string.profile_daily_claimed)
-                    else stringResource(R.string.profile_daily_reward) + " +$dailyReward",
-                    style = Spec.buttonSmall,
-                    color = Spec.goldDeepBg,
-                    maxLines = 1,
-                )
-            }
-        }
-    }
+    WalletCompactCard(
+        balance = balance,
+        streak = streak,
+        dailyClaimed = dailyClaimed,
+        claiming = claiming,
+        onOpenWallet = onOpenWallet,
+        onClaim = onClaim,
+        modifier = modifier,
+    )
 }
 
 /** بطاقة بديلة في شاشة C: عملة 36 بشفافية 50% · «محفظة AC» · «مخفية عن المستخدمين». */

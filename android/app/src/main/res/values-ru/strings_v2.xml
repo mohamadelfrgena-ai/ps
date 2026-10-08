@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ac_unlock_with_ac">Открыть за AC</string>
+    <string name="admin_chat_plain">Чат</string>
+    <string name="cd_download_item">Скачать «%1$s»</string>
+    <string name="cd_hide_password">Скрыть пароль</string>
+    <string name="cd_more_options">Дополнительные параметры</string>
+    <string name="cd_new_activity">Новая активность</string>
+    <string name="cd_open_wallet">Открыть кошелёк AC</string>
+    <string name="cd_show_password">Показать пароль</string>
+    <string name="chat_pinned_plain">Закреплённые сообщения</string>
+    <string name="home_latest_plain">Новые дополнения</string>
+    <string name="item_download_plain">Скачать</string>
+    <string name="nav_chat">Чат</string>
+    <string name="profile_edit_plain">Редактировать профиль</string>
+    <string name="plan_buy_plain">Купить подписку</string>
+    <string name="auth_login_subtitle_plain">Войдите, чтобы продолжить приключение</string>
+    <plurals name="ac_streak_days">
+        <item quantity="one">%d день подряд</item>
+        <item quantity="few">%d дня подряд</item>
+        <item quantity="many">%d дней подряд</item>
+        <item quantity="other">%d дня подряд</item>
+    </plurals>
+    <plurals name="cd_chat_unread">
+        <item quantity="one">%d непрочитанное сообщение</item>
+        <item quantity="few">%d непрочитанных сообщения</item>
+        <item quantity="many">%d непрочитанных сообщений</item>
+        <item quantity="other">%d непрочитанного сообщения</item>
+    </plurals>
+</resources>

@@ -144,4 +144,26 @@ object Spec {
     val levelText = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)     // «المستوى N · x/100»
     val gridButton = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)    // أزرار الشبكة
     val walletCaption = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold)      // «محفظة AC · الرصيد الحالي» · «N يوم متتالٍ»
+
+    // ── مقاسات وخطوط وثيقة الدخول والإعدادات (SPEC_AUTH_SETTINGS §0) ────────
+    // مقاسات الوثيقة (§0 / §1 / §3)
+    val authHeaderH = 210.dp               // لوحة رأس الدخول
+    val fieldH = 52.dp                     // ارتفاع الحقل
+    val fieldRadius = 14.dp                // زاوية الحقل
+    val iconTile = 44.dp                   // قرص الأيقونة
+    val iconTileRadius = 12.dp
+    val groupRowMin = 68.dp                // أدنى ارتفاع صفّ الإعدادات
+    val footerText = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium)   // «© 2026 …»
+    val fieldLabel = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    val fieldHint = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium)
+    val authTitle = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)  // «Sign in»
+    val authSubtitle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    val rowTitle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)   // عنوان صفّ إعداد
+    val rowSub = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, lineHeight = 16.2.sp)
+    val rowValue = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    val pillText = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)   // «Edit»
+    val segText = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    val primaryBtn = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+    val planLabel = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold)       // «My plan»
+    val planName = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)   // «Your plan: Free»
 }

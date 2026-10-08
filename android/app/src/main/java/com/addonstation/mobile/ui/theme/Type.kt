@@ -7,6 +7,7 @@ import androidx.compose.ui.text.font.FontSynthesis
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
@@ -24,6 +25,27 @@ val PixelFont: FontFamily = FontFamily(
 )
 
 val BodyFont: FontFamily = FontFamily.Default
+
+/** أرقام المحفظة: أرقام روبوتو متوسطة واضحة على الخلفيات الداكنة. */
+val NumberFont: FontFamily = FontFamily(
+    Font(R.font.roboto_medium_numbers, FontWeight.Medium),
+)
+
+/** Body typeface for Home v2 in English (Nunito variable font, weights 400–800). */
+val NunitoFont: FontFamily = FontFamily(
+    Font(R.font.nunito_variable, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
+    Font(R.font.nunito_variable, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
+    Font(R.font.nunito_variable, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
+    Font(R.font.nunito_variable, FontWeight.ExtraBold, variationSettings = FontVariation.Settings(FontVariation.weight(800))),
+)
+
+/** Arabic typeface required by Home v2 (Tajawal 500/700/800). */
+val TajawalFont: FontFamily = FontFamily(
+    Font(R.font.tajawal_medium, FontWeight.Normal),
+    Font(R.font.tajawal_medium, FontWeight.Medium),
+    Font(R.font.tajawal_bold, FontWeight.Bold),
+    Font(R.font.tajawal_extrabold, FontWeight.ExtraBold),
+)
 
 /** أحجام الوثيقة: عنوان الصفحة 22، عنوان القسم 14 (بكسل، تباعد 0.5)، الجسم 11.5–13، الكيكر 9. */
 object AppText {

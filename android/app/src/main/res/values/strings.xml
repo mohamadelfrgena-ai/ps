@@ -730,4 +730,19 @@ CREATE IT.</string>
     <string name="profile_unfriend_confirm">Remove this member from your friends?</string>
     <string name="mute_member_locked">Legendary</string>
     <string name="mute_member_needs_plan">Muting members is a Legendary feature — opening the subscription.</string>
+
+    <!-- AddonStation auth/settings redesign -->
+    <string name="auth_email_placeholder">name@example.com</string>
+    <string name="auth_password_placeholder">••••••••</string>
+    <string name="settings_my_plan">My plan</string>
+    <string name="settings_your_plan">Your plan: %1$s</string>
+    <string name="settings_expires_on">Expires on %1$s</string>
+    <string name="settings_upgrade">Upgrade</string>
+    <string name="settings_sections_five">5 SECTIONS</string>
+    <string name="settings_admin_tools">Admin tools</string>
+    <string name="settings_admin_visible">Visible to admin accounts only</string>
+    <string name="settings_open_dashboard">Open Dashboard</string>
+    <string name="settings_account_actions">Account actions</string>
+    <string name="settings_footer">© 2026 AddonStation — All rights reserved</string>
+    <string name="auth_username_placeholder">your_username</string>
 </resources>

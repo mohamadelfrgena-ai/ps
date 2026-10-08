@@ -714,4 +714,19 @@ CRÉE-LE.</string>
     <string name="profile_unfriend_confirm">Retirer ce membre de vos amis ?</string>
     <string name="mute_member_locked">Legendary</string>
     <string name="mute_member_needs_plan">Le mode sourdine est réservé à l’abonnement Legendary — ouverture de l’abonnement.</string>
+
+    <!-- AddonStation auth/settings redesign -->
+    <string name="auth_email_placeholder">name@example.com</string>
+    <string name="auth_password_placeholder">••••••••</string>
+    <string name="settings_my_plan">Mon abonnement</string>
+    <string name="settings_your_plan">Votre offre : %1$s</string>
+    <string name="settings_expires_on">Expire le %1$s</string>
+    <string name="settings_upgrade">Passer à une offre supérieure</string>
+    <string name="settings_sections_five">5 SECTIONS</string>
+    <string name="settings_admin_tools">Outils d’administration</string>
+    <string name="settings_admin_visible">Visible uniquement pour les comptes administrateur</string>
+    <string name="settings_open_dashboard">Ouvrir le tableau de bord</string>
+    <string name="settings_account_actions">Actions du compte</string>
+    <string name="settings_footer">© 2026 AddonStation — Tous droits réservés</string>
+    <string name="auth_username_placeholder">votre_nom</string>
 </resources>

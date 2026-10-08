@@ -26,6 +26,7 @@ SUPABASE = os.path.join(ROOT, "supabase")
 
 SPEC = os.path.join(SRC, "ui", "theme", "Spec.kt")
 COMPONENTS = os.path.join(SRC, "ui", "components", "ProfileSpecUi.kt")
+WALLET_UI = os.path.join(SRC, "ui", "components", "WalletSpecUi.kt")
 SCREENS = os.path.join(SRC, "ui", "profile", "ProfileScreens.kt")
 NAV = os.path.join(SRC, "ui", "nav", "AppNav.kt")
 STATS_SQL = os.path.join(SUPABASE, "36_profile_stats.sql")
@@ -64,6 +65,7 @@ def body(text, name):
 
 spec = strip_comments(read(SPEC))
 comp = strip_comments(read(COMPONENTS))
+wallet_ui = strip_comments(read(WALLET_UI))
 screens = strip_comments(read(SCREENS))
 nav = read(NAV)
 stats_sql = read(STATS_SQL)
@@ -148,9 +150,12 @@ check("٢٫٥ شريط المستوى: 8 ارتفاع · تدرّج blue ← blu
       and "Brush.horizontalGradient(listOf(Spec.blue, Spec.blueLink))" in comp)
 check("٢٫٦ النبذة: الفاصل 1dp + «عضو منذ»",
       "SpecAboutCard" in comp and "R.string.profile_member_since_label" in comp)
-check("٢٫٧ المحفظة: عملة 44 · زرّ ذهبي 44h بنصّ goldDark",
-      "CoinIcon(size = 44.dp)" in comp and "background(if (dailyClaimed || claiming) Spec.gold.copy(alpha = 0.45f) else Spec.gold)" in comp
-      and "color = Spec.goldDeepBg" in comp)
+compact_wallet = body(wallet_ui, "WalletCompactCard")
+check("٢٫٧ محفظة الملف: عملة 56 · رصيد متحرك · مكافأة يومية 44h",
+      "WalletCoinImage(56.dp)" in compact_wallet and "height = 44.dp" in compact_wallet
+      and "WalletStreakChip" in compact_wallet and "onOpenWallet" in compact_wallet
+      and "animateIntAsState" in compact_wallet and "tween(durationMillis = 700)" in compact_wallet
+      and "R.string.profile_daily_reward" in compact_wallet and "R.string.ac_claimed" in compact_wallet)
 check("إطار متقطّع 1dp (§5) بـ dashPathEffect",
       "PathEffect.dashPathEffect" in comp and "specDashedBorder" in comp)
 

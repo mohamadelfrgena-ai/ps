@@ -21,8 +21,9 @@
   5) حساب نصّ فاصل التاريخ مرّتين لكل رسالة في كل إطار ⇒ يجب الاعتماد على
      `ChatMessageUi.dayKey` (يُحسب مرة واحدة) ومقارنته نصّياً.
 
-  6) شاشة بداية إلزامية طويلة تفصل عرض المحتوى ⇒ يجب أن يُبنى المحتوى خلفها،
-     وأن يبقى جدولها الزمني تحت ٣ ثوانٍ وقابلاً للتخطي بالنقر.
+  6) شاشة البداية الجديدة: مقدمة 6.6s لمرة واحدة، وحلقة مختصرة 1.5s
+     للتشغيلات اللاحقة. المحتوى يُبنى بالتوازي، والانتقال عند جاهزيته
+     (بحد أدنى 1.5s)، مع احترام تقليل الحركة والتخطي بالنقر.
 
 الاستخدام:
     python3 tools/check_jank_guard.py        # 0 = سليم · 1 = عاد أحد الأسباب
@@ -109,19 +110,26 @@ fmt = read("util/TimeFormat.kt")
 if "fun localDayKey(" not in fmt:
     problems.append("util/TimeFormat.kt: localDayKey مفقودة")
 
-# 6) البداية: قصيرة ومُخفيّة للمحتوى لا حاجبة
+# 6) البداية: مقدمة أولى 6.6s، ثم حلقة 1.5s؛ الجاهزية لا تنتظر الحركة
 splash = read("ui/splash/SplashScreen.kt")
-waits = [int(x) for x in re.findall(r"waitOrSkip\((\d+)", splash)]
-longest = max(waits) if waits else 0
-if longest > 2600:
-    problems.append(f"ui/splash/SplashScreen.kt: جدول البداية طويل ({longest}ms) — الحدّ ٢٦٠٠ms")
-if "waitOrSkip" not in splash or "skipped" not in splash:
-    problems.append("ui/splash/SplashScreen.kt: التخطي بالنقر مفقود")
+for token, description in (
+    ("FULL_TIMELINE_MS = 6_600", "مدة المقدمة الأولى 6.6s"),
+    ("COMPACT_LOOP_MS = 1_500", "حلقة التشغيلات التالية 1.5s"),
+    ("MIN_SPLASH_MS = 1_500L", "الحد الأدنى لعرض البداية 1.5s"),
+    ("if (!startupReady) return@LaunchedEffect", "الخروج مرتبط بجاهزية الإقلاع"),
+    ("skipRequested", "تخطي الحركة بالنقر"),
+    ("AppPrefs.splashCompleted(context)", "تذكّر اكتمال أول تشغيل"),
+):
+    if token not in splash:
+        problems.append(f"ui/splash/SplashScreen.kt: {description} غير موجود")
 nav = read("ui/nav/AppNav.kt")
 if "if (!splashDone)" not in nav:
     problems.append("ui/nav/AppNav.kt: شاشة البداية ليست طبقة فوق المحتوى (المحتوى يُبنى خلفها)")
-if re.search(r"!splashDone\s*->\s*SplashScreen", nav):
-    problems.append("ui/nav/AppNav.kt: عاد ربط عرض المحتوى بانتهاء شاشة البداية")
+if "startupReady = launchReady" not in nav or "launchReady = true" not in nav:
+    problems.append("ui/nav/AppNav.kt: إشارة جاهزية الإقلاع غير موصولة إلى شاشة البداية")
+for token in ("val refresh = async", "val assets = async", "val plans = async", "val paymentMethods = async"):
+    if token not in nav:
+        problems.append(f"ui/nav/AppNav.kt: تحميل الإقلاع المتوازي مفقود ({token})")
 
 print("حارس الأداء (Jank Guard)")
 print("-" * 52)
@@ -133,4 +141,5 @@ if problems:
     print(f"\n✗ عاد {len(problems)} سبباً من أسباب التقطيع/الثِقَل — أصلحها قبل البناء.")
     sys.exit(1)
 print("🟢 لا توليف فرعي في القوائم · الجلسة من الذاكرة · فهرس أدوات O(1) ·")
-print("   الرئيسية كسولة · فاصل التاريخ مرة واحدة · بداية قصيرة قابلة للتخطي تُبنى خلفها الشاشات.")
+print("   الرئيسية كسولة · فاصل التاريخ مرة واحدة · المقدمة 6.6s والحلقة 1.5s،")
+print("   البداية قابلة للتخطي، بحد أدنى 1.5s، والمحتوى يُبنى خلفها بالتوازي.")

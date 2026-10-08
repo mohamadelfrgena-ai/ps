@@ -16,11 +16,11 @@
      «Confirm email» مفعّلاً، فيبقى المستخدم خارج التطبيق. المعتمد الآن: بطاقة
      تأكيد صريحة + «أكّدت بريدي — سجّلني» + «أعِد إرسال الرابط».
 
-  3) **جلسة ميتة تُترك**: توكن تحديث مرفوض من الخادم (400/401) يجب أن يُنظَّف
-     فوراً كي لا يبقى المستخدم في «يظنّ نفسه مسجّلاً» وكل طلب يفشل.
+  3) **خروج تلقائي غير مرغوب**: رفض توكن التحديث لا يمسح الجلسة محلياً؛
+     لا يُسجَّل خروج صاحب الحساب إلا عند ضغطه على زر الخروج.
 
   4) **قراءة مشفّرة تُسقط الجلسة عند الفشل**: فشل فكّ تشفير المخزن (Keystore)
-     يجب أن يُعالَج بلا انهيار وبلا حالة غامضة.
+     يُعالَج بلا انهيار، ولا يحذف بيانات الجلسة تلقائياً.
 
   5) **الشاشات التي تعتمد على الحساب** يجب أن تُحدّث نفسها عند تغيّر حالة
      الدخول (`signedIn` ضمن مفاتيح التحميل)، وإلا عرضت بيانات ضيف بعد الدخول.
@@ -90,20 +90,37 @@ client = read("data/SupabaseClient.kt")
 if '"resend"' not in client:
     problems.append("data/SupabaseClient.kt: نقطة إعادة إرسال رابط التأكيد (resend) مفقودة")
 
-# 3) الجلسة الميتة تُنظَّف
-if "sessionStore.clear()" not in client:
-    problems.append("data/SupabaseClient.kt: لا تنظيف للجلسة عند رفض الخادم توكن التحديث")
-if not re.search(r"status == 400 \|\| err\.status == 401", client):
-    problems.append("data/SupabaseClient.kt: لا تمييز بين «توكن مرفوض» و«شبكة مقطوعة»")
+# 3) لا خروج تلقائياً: المسح محصور بدالة الخروج الصريح
+refresh_start = client.find("suspend fun refreshSession()")
+logout_start = client.find("suspend fun signOut()", refresh_start)
+refresh_body = client[refresh_start:logout_start] if refresh_start >= 0 and logout_start > refresh_start else ""
+logout_body = client[logout_start:client.find("suspend fun sendRecovery", logout_start)] if logout_start >= 0 else ""
+if "sessionStore.clear()" in refresh_body:
+    problems.append("data/SupabaseClient.kt: رفض التوكن يمسح الجلسة تلقائياً")
+if "sessionStore.clear()" not in logout_body:
+    problems.append("data/SupabaseClient.kt: الخروج الصريح لا يمسح الجلسة")
 
-# 4) قراءة المخزن المشفّر آمنة
+# 4) قراءة المخزن المشفّر آمنة وغير هدّامة
 store = read("data/SessionStore.kt")
 idx = store.find("private fun readFromDisk()")
-tail = store[idx: idx + 900] if idx >= 0 else ""
+end = store.find("\n    fun clear()", idx) if idx >= 0 else -1
+tail = store[idx:end] if idx >= 0 and end > idx else ""
 if idx < 0 or "catch" not in tail:
     problems.append("data/SessionStore.kt: قراءة المخزن بلا حماية من فشل فكّ التشفير")
+if "prefs.edit().clear()" in tail:
+    problems.append("data/SessionStore.kt: فشل فكّ التشفير يحذف بيانات الجلسة تلقائياً")
 
-# 5) الشاشات المرتبطة بالحساب تُحدّث نفسها عند تغيّر حالة الدخول
+# 5) تغيير اللغة لا يعيد إنشاء النشاط ولا يلمس جلسة الحساب
+settings = read("ui/settings/SettingsScreen.kt")
+main_activity = read("MainActivity.kt")
+if "applyAppLocale(language.code)" not in settings:
+    problems.append("ui/settings/SettingsScreen.kt: تغيير اللغة لا يحدّث Compose مباشرة")
+if "recreate()" in settings:
+    problems.append("ui/settings/SettingsScreen.kt: تغيير اللغة ما زال يعيد إنشاء النشاط")
+if "LocalConfiguration provides localizedConfiguration" not in main_activity:
+    problems.append("MainActivity.kt: سياق موارد اللغة غير متاح فوراً لـCompose")
+
+# 6) الشاشات المرتبطة بالحساب تُحدّث نفسها عند تغيّر حالة الدخول
 for rel, needle in (
     ("ui/store/StoreScreens.kt", "reloadTick, signedIn"),
     ("ui/account/AccountScreens.kt", "reloadTick, signedIn"),
@@ -127,12 +144,13 @@ for locale in ("values", "values-ar", "values-pt", "values-es", "values-ru", "va
 
 print("حارس حالة الدخول")
 print("-" * 52)
-print("فُحص: الملف الشخصي · الإعدادات · الإنشاء · الدخول · الجلسة · المتجر · الحساب · ٨ لغات")
+print("فُحص: الملف الشخصي · الإعدادات · الإنشاء · الدخول · الجلسة · تبديل اللغة · المتجر · ٨ لغات")
 print()
 if problems:
     for p in problems:
         print("✗", p)
     print(f"\n✗ عاد {len(problems)} سبباً من أسباب «التطبيق لا يعرف أني سجّلت».")
     sys.exit(1)
-print("🟢 لا طرد قسري إلى الدخول · تأكيد البريد له مخرَج واضح · الجلسة الميتة تُنظَّف ·")
-print("   الشاشات تُحدّث نفسها بعد الدخول · النصوص الثمانية مكتملة.")
+print("🟢 لا طرد قسري إلى الدخول · تغيير اللغة بلا إعادة إنشاء · لا خروج تلقائياً عند تعذّر التجديد ·")
+print("   مسح الجلسة محصور بالخروج الصريح ·")
+print("   الشاشات تُحدّث نفسها بعد الدخول · تأكيد البريد واضح · النصوص الثمانية مكتملة.")

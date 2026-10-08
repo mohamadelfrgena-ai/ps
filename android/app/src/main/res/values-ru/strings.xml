@@ -714,4 +714,19 @@
     <string name="profile_unfriend_confirm">Удалить этого участника из друзей?</string>
     <string name="mute_member_locked">Legendary</string>
     <string name="mute_member_needs_plan">Заглушение участников — функция Legendary. Открываем подписку.</string>
+
+    <!-- AddonStation auth/settings redesign -->
+    <string name="auth_email_placeholder">name@example.com</string>
+    <string name="auth_password_placeholder">••••••••</string>
+    <string name="settings_my_plan">Мой план</string>
+    <string name="settings_your_plan">Ваш план: %1$s</string>
+    <string name="settings_expires_on">Действует до %1$s</string>
+    <string name="settings_upgrade">Улучшить план</string>
+    <string name="settings_sections_five">5 РАЗДЕЛОВ</string>
+    <string name="settings_admin_tools">Инструменты администратора</string>
+    <string name="settings_admin_visible">Видно только администраторам</string>
+    <string name="settings_open_dashboard">Открыть панель</string>
+    <string name="settings_account_actions">Действия с аккаунтом</string>
+    <string name="settings_footer">© 2026 AddonStation — Все права защищены</string>
+    <string name="auth_username_placeholder">имя_пользователя</string>
 </resources>

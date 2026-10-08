@@ -7,10 +7,17 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import com.addonstation.mobile.ui.nav.AppRoot
+import com.addonstation.mobile.util.AppPrefs
 import com.addonstation.mobile.util.LocaleManager
 
 /**
@@ -26,6 +33,14 @@ import com.addonstation.mobile.util.LocaleManager
 class MainActivity : ComponentActivity() {
 
     private val recoveryLink: MutableState<String?> = mutableStateOf(null)
+    private val appLocaleCode: MutableState<String> = mutableStateOf("en")
+
+    /** تطبيق اللغة فوراً داخل Compose دون إعادة إنشاء النشاط أو إعادة تشغيل جلسة الحساب. */
+    fun applyAppLocale(languageCode: String) {
+        val code = LocaleManager.byCode(languageCode).code
+        AppPrefs.writeLocale(applicationContext, code)
+        appLocaleCode.value = code
+    }
 
     /**
      * الوجهة التي طلبها إشعار FCM (مثل `chat:العربية` أو `item:<id>`).
@@ -52,15 +67,36 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         recoveryLink.value = linkOf(intent)
         pushRoute.value = routeOf(intent)
+        appLocaleCode.value = LocaleManager.byCode(AppPrefs.readLocale(this)).code
 
         setContent {
-            Surface(modifier = Modifier.fillMaxSize()) {
-                AppRoot(
-                    recoveryLink = recoveryLink.value,
-                    onRecoveryConsumed = { recoveryLink.value = null },
-                    pushRoute = pushRoute.value,
-                    onPushConsumed = { pushRoute.value = null },
-                )
+            val languageCode = appLocaleCode.value
+            val baseConfiguration = LocalConfiguration.current
+            val localizedContext = remember(languageCode, baseConfiguration) {
+                LocaleManager.applyLocale(this@MainActivity, languageCode)
+            }
+            val localizedConfiguration = remember(languageCode, baseConfiguration) {
+                android.content.res.Configuration(localizedContext.resources.configuration)
+            }
+            val layoutDirection = if (LocaleManager.isRtl(languageCode)) {
+                LayoutDirection.Rtl
+            } else {
+                LayoutDirection.Ltr
+            }
+
+            CompositionLocalProvider(
+                LocalContext provides localizedContext,
+                LocalConfiguration provides localizedConfiguration,
+                LocalLayoutDirection provides layoutDirection,
+            ) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    AppRoot(
+                        recoveryLink = recoveryLink.value,
+                        onRecoveryConsumed = { recoveryLink.value = null },
+                        pushRoute = pushRoute.value,
+                        onPushConsumed = { pushRoute.value = null },
+                    )
+                }
             }
         }
     }

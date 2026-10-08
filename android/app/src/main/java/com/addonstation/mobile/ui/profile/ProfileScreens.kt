@@ -43,6 +43,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -128,6 +131,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.NumberFormat
 import java.util.Locale
 
 /** شاشة الملف الشخصي (تتطلب تسجيل الدخول — وإلا ينتقل المستخدم لتسجيل الدخول). */
@@ -143,7 +147,12 @@ import java.util.Locale
 private fun GuestProfileScreen(
     onLogin: () -> Unit,
     onOpenSignup: () -> Unit,
+    scrollToTopRequest: Int = 0,
 ) {
+    val scrollState = rememberScrollState()
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) scrollState.animateScrollTo(0)
+    }
     Column(Modifier.fillMaxSize()) {
         PixelTopBar(
             title = stringResource(R.string.nav_profile),
@@ -153,7 +162,7 @@ private fun GuestProfileScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -224,19 +233,28 @@ fun ProfileScreen(
     onOpenMyContent: () -> Unit,
     /** شاشة C: «عرض كما يراني الآخرون». */
     onViewAsOthers: () -> Unit,
+    scrollToTopRequest: Int = 0,
 ) {
+    val scrollState = rememberScrollState()
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) scrollState.animateScrollTo(0)
+    }
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
     val wallet by container.state.wallet.collectAsState()
     val signedIn by container.state.signedIn.collectAsState()
     val profileLoadStatus by container.state.profileLoadStatus.collectAsState()
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val dailySuccessTemplate = stringResource(R.string.ac_redeem_success, "%s")
+    val dailyAlreadyClaimed = stringResource(R.string.ac_claimed)
+    val dailySignInNeeded = stringResource(R.string.msg_sign_in_needed)
+    val dailyGenericError = stringResource(R.string.msg_generic_error)
 
     var profileRetryTick by remember { mutableStateOf(0) }
     var statsTick by remember { mutableStateOf(0) }
     var stats by remember { mutableStateOf<ProfileStats?>(null) }
     var claiming by remember { mutableStateOf(false) }
-    var claimNote by remember { mutableStateOf<String?>(null) }
 
     // الجلسة قد تكون صالحة بينما الملف الشخصي لم يكتمل تحميله بعد؛ لا نحوّل
     // هذه الحالة المؤقتة إلى شاشة تسجيل دخول، بل نجلب الملف ونتيح إعادة المحاولة.
@@ -262,7 +280,11 @@ fun ProfileScreen(
     if (!signedIn) {
         // **لا نُخرِج المستخدم من التبويب قسراً** — شاشة ضيف واضحة بزرّين،
         // والتنقّل يبقى بيد المستخدم.
-        GuestProfileScreen(onLogin = onLogin, onOpenSignup = onOpenSignup)
+        GuestProfileScreen(
+            onLogin = onLogin,
+            onOpenSignup = onOpenSignup,
+            scrollToTopRequest = scrollToTopRequest,
+        )
         return
     }
     if (profile == null) {
@@ -294,27 +316,43 @@ fun ProfileScreen(
         if (claiming) return
         scope.launch {
             claiming = true
-            claimNote = null
-            val daily = runCatching {
-                container.ac.tasks()
-                    .firstOrNull { it.frequency == "daily" || it.frequency == "streak" }
-                    ?.id
-            }.getOrNull() ?: "daily_login"
-            container.ac.claimTask(daily)
-                .onSuccess { reward -> claimNote = "+$reward AC" }
-                .onFailure { claimNote = null }
-            // الحالة الحقيقية («هل استُلمت اليوم؟») تُقرأ من الخادم لا من الزرّ
-            statsTick += 1
-            claiming = false
+            try {
+                val daily = runCatching {
+                    container.ac.tasks()
+                        .firstOrNull { it.frequency == "daily" || it.frequency == "streak" }
+                        ?.id
+                }.getOrNull() ?: "daily_login"
+                container.ac.claimTask(daily)
+                    .onSuccess { reward ->
+                        val amount = NumberFormat.getIntegerInstance(Locale.US).format(reward)
+                        snackbarHostState.showSnackbar(dailySuccessTemplate.format(amount))
+                    }
+                    .onFailure { error ->
+                        val raw = error.message.orEmpty()
+                        val normalized = raw.lowercase(Locale.ROOT)
+                        val message = when {
+                            normalized.contains("already_claimed") || normalized.contains("max_claims") -> dailyAlreadyClaimed
+                            normalized.contains("sign_in_required") -> dailySignInNeeded
+                            raw.isBlank() -> dailyGenericError
+                            else -> raw
+                        }
+                        snackbarHostState.showSnackbar(message)
+                    }
+                // الحالة الحقيقية («هل استُلمت اليوم؟») تُقرأ من الخادم لا من الزرّ
+                statsTick += 1
+            } finally {
+                claiming = false
+            }
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .imePadding()
-                .verticalScroll(rememberScrollState()),
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .imePadding()
+                    .verticalScroll(scrollState),
         ) {
             // ١) البانر — زرّ الرجوع وحده (بلا «المزيد» في هذه الشاشة)
             SpecProfileBanner(
@@ -369,21 +407,14 @@ fun ProfileScreen(
 
                 // ٤) بطاقة المحفظة — تحت بطاقة الهوية مباشرة (ولمسها يفتح شاشة المحفظة)
                 Spacer(Modifier.height(12.dp))
-                Box(Modifier.clickable(onClick = onOpenWallet)) {
-                    SpecWalletCard(
-                        balance = balance,
-                        streak = streak,
-                        dailyReward = stats?.dailyReward ?: 0,
-                        dailyClaimed = dailyClaimed,
-                        claiming = claiming,
-                        onClaim = { claimDaily() },
-                    )
-                }
-                claimNote?.let {
-                    Spacer(Modifier.height(6.dp))
-                    Text(it, style = Spec.secondary, color = Spec.gold)
-                }
-
+                SpecWalletCard(
+                    balance = balance,
+                    streak = streak,
+                    dailyClaimed = dailyClaimed,
+                    claiming = claiming,
+                    onOpenWallet = onOpenWallet,
+                    onClaim = { claimDaily() },
+                )
                 // ٥) شريط الإحصاءات
                 Spacer(Modifier.height(12.dp))
                 SpecStatsStrip(
@@ -457,7 +488,24 @@ fun ProfileScreen(
                 Spacer(Modifier.height(96.dp))
             }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .imePadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) { data ->
+            Snackbar(
+                containerColor = AppColors.AuthSurfaceHigh,
+                contentColor = AppColors.AuthText,
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Text(data.visuals.message, style = AppText.bodySmall, color = AppColors.AuthText)
+            }
+        }
     }
+}
 }
 
 /**
@@ -1325,7 +1373,7 @@ fun UserProfileScreen(
                 Box {
                     SpecBannerIconButton(
                         icon = Icons.Filled.MoreVert,
-                        description = stringResource(R.string.common_more),
+                        description = stringResource(R.string.cd_more_options),
                         onClick = { showMore = true },
                     )
                     DropdownMenu(

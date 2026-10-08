@@ -9,6 +9,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -74,13 +75,17 @@ fun AddonStationTheme(
     AppColors.apply(darkTheme)
     val scheme = if (darkTheme) darkScheme() else lightScheme()
 
-    ProvideAppSizing {
-        MaterialTheme(
-            colorScheme = scheme,
-            typography = AppTypography,
-            shapes = AppShapes,
-            content = content,
-        )
+    CompositionLocalProvider(
+        LocalHomePalette provides if (darkTheme) HomePalettes.Dark else HomePalettes.Light,
+    ) {
+        ProvideAppSizing {
+            MaterialTheme(
+                colorScheme = scheme,
+                typography = AppTypography,
+                shapes = AppShapes,
+                content = content,
+            )
+        }
     }
 }
 

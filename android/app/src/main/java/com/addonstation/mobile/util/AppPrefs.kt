@@ -11,6 +11,7 @@ object AppPrefs {
     private const val KEY_LOCALE = "locale"
     private const val KEY_DARK = "dark_theme"
     private const val KEY_NOTIF_ASKED = "notif_asked"
+    private const val KEY_SPLASH_COMPLETED = "splash_completed"
 
     private fun sp(context: Context) =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -38,5 +39,12 @@ object AppPrefs {
 
     fun writeDark(context: Context, dark: Boolean) {
         sp(context).edit().putBoolean(KEY_DARK, dark).apply()
+    }
+
+    fun splashCompleted(context: Context): Boolean =
+        sp(context).getBoolean(KEY_SPLASH_COMPLETED, false)
+
+    fun markSplashCompleted(context: Context) {
+        sp(context).edit().putBoolean(KEY_SPLASH_COMPLETED, true).apply()
     }
 }

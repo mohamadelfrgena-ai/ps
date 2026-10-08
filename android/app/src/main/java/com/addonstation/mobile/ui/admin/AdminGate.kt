@@ -221,7 +221,7 @@ fun AdminGate(onExit: () -> Unit, content: @Composable () -> Unit) {
                         Icon(
                             imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                             contentDescription = stringResource(
-                                if (visible) R.string.auth_hide_password else R.string.auth_show_password,
+                                if (visible) R.string.cd_hide_password else R.string.cd_show_password,
                             ),
                             tint = if (visible) AppColors.Green else AppColors.Muted,
                         )

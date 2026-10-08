@@ -23,6 +23,7 @@ DEFAULT_DIR = "values"
 LOCALES = ["ar", "pt", "es", "ru", "zh", "fr", "tr"]
 
 PLACEHOLDER = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
+FORMAT_PLACEHOLDER = re.compile(r"%(?:[0-9]+\$)?[sd]")
 
 
 def load(locale: str) -> dict[str, set[str]]:
@@ -46,6 +47,34 @@ def load(locale: str) -> dict[str, set[str]]:
             continue
         out[name] = set(PLACEHOLDER.findall("".join(el.itertext())))
     return out
+
+
+def load_v2(locale: str) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+    folder = DEFAULT_DIR if locale == "default" else f"values-{locale}"
+    path = RES / folder / "strings_v2.xml"
+    if not path.exists():
+        return {}, {}
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError as exc:
+        print(f"❌ خطأ في تحليل XML داخل {path}: {exc}")
+        sys.exit(1)
+    resources: dict[str, set[str]] = {}
+    plural_quantities: dict[str, set[str]] = {}
+    for element in root:
+        name = element.get("name")
+        if not name:
+            continue
+        if element.tag == "string":
+            samples = ["".join(element.itertext())]
+        elif element.tag == "plurals":
+            items = element.findall("item")
+            samples = ["".join(item.itertext()) for item in items]
+            plural_quantities[name] = {item.get("quantity", "") for item in items}
+        else:
+            continue
+        resources[name] = {token for sample in samples for token in FORMAT_PLACEHOLDER.findall(sample)}
+    return resources, plural_quantities
 
 
 def main() -> int:
@@ -84,6 +113,36 @@ def main() -> int:
         for key in mismatch:
             problems.append(f"{loc}: العناصر النائبة مختلفة في '{key}' "
                             f"(الافتراضي {sorted(base[key])} مقابل {sorted(data[key])})")
+
+    v2_base, v2_base_plurals = load_v2("default")
+    print(f"ℹ️  حزمة v2 (values): {len(v2_base)} مورداً")
+    if not v2_base:
+        problems.append("values/strings_v2.xml غير موجود أو فارغ")
+    for loc in LOCALES:
+        data, plural_quantities = load_v2(loc)
+        if not data:
+            problems.append(f"values-{loc}/strings_v2.xml غير موجود أو فارغ")
+            continue
+        missing = sorted(set(v2_base) - set(data))
+        extra = sorted(set(data) - set(v2_base))
+        mismatch = sorted(key for key in set(v2_base) & set(data) if v2_base[key] != data[key])
+        if missing or extra or mismatch:
+            problems.append(
+                f"{loc}: اختلاف موارد strings_v2.xml "
+                f"(ناقص {missing}, زائد {extra}, عناصر نائبة مختلفة {mismatch})"
+            )
+        for key in set(v2_base_plurals) & set(plural_quantities):
+            if not plural_quantities[key]:
+                problems.append(f"{loc}: صيغ الجمع فارغة في '{key}'")
+        if loc == "ar":
+            required_arabic_categories = {"zero", "one", "two", "few", "many", "other"}
+            for key in ("ac_streak_days", "cd_chat_unread"):
+                actual = plural_quantities.get(key, set())
+                if actual != required_arabic_categories:
+                    problems.append(
+                        f"ar: صيغ الجمع في '{key}' يجب أن تشمل "
+                        f"{sorted(required_arabic_categories)} لا {sorted(actual)}"
+                    )
 
     if problems:
         print("\n🔴 مشاكل:")

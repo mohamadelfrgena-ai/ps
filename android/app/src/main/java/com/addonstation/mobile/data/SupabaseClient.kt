@@ -110,11 +110,10 @@ class SupabaseClient(
     /**
      * تحديث الجلسة بالـ refresh token.
      *
-     * **تمييز مهم**: إن رفض **الخادم** التوكن (400/401 — منتهٍ أو مُبطَل بعد
-     * تغيير كلمة المرور أو خروج من جهاز آخر) فالجلسة **ميتة**: نُنظّفها فوراً
-     * كي لا يبقى المستخدم في حالة «التطبيق يظنّني مسجّلاً وكل طلب يفشل»،
-     * فيتحوّل تلقائياً إلى شاشة الدخول بشكل صريح.
-     * أمّا انقطاع الشبكة (بلا رمز HTTP) فلا يمسّ الجلسة إطلاقاً.
+     * **لا نُسجّل خروج المستخدم تلقائياً** إذا فشل التجديد، حتى لو رفض الخادم
+     * التوكن: لا يُمسح المخزن ولا تتغيّر حالة الحساب إلا بطلب خروج صريح من صاحبه.
+     * قد تفشل بعض الطلبات المحمية ما دام الخادم لا يقبل التوكن، لكن يبقى الحساب
+     * محفوظاً على الجهاز ويمكن إعادة المحاولة أو الخروج يدوياً.
      */
     suspend fun refreshSession(): Boolean = refreshMutex.withLock {
         val current = sessionStore.current() ?: return false
@@ -125,11 +124,8 @@ class SupabaseClient(
             val access = obj["access_token"]?.jsonPrimitive?.contentOrNull() ?: return false
             storeSession(obj, access, fallbackEmail = current.email)
             true
-        } catch (t: Throwable) {
-            val err = t.toApiError()
-            val rejected = err.status == 400 || err.status == 401
-            val refreshGone = err.raw?.lowercase()?.contains("refresh token") == true
-            if (rejected || refreshGone) sessionStore.clear()
+        } catch (_: Throwable) {
+            // لا نمسح جلسة الحساب ولا نُخرجه تلقائياً عند أي فشل في التجديد.
             false
         }
     }
