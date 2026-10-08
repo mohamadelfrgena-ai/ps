@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -275,7 +276,7 @@ private fun StreakDay(day: Int, completed: Boolean, today: Boolean) {
     }
 }
 
-private fun Modifier.dashedCircleBorder(color: Color): Modifier = androidx.compose.ui.draw.drawBehind {
+private fun Modifier.dashedCircleBorder(color: Color): Modifier = drawBehind {
     drawCircle(
         color = color,
         style = androidx.compose.ui.graphics.drawscope.Stroke(

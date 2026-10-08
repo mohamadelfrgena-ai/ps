@@ -744,7 +744,7 @@ class ChatRepository(
     suspend fun mutedMemberIds(): Set<String> = withContext(Dispatchers.IO) {
         runCatching {
             supabase.decodeList<MutedUser>(
-                supabase.rpc("my_muted_users", emptyMap(), signedOnly = true),
+                supabase.rpc("my_muted_users", emptyMap(), signedOnly = true) ?: JsonArray(emptyList()),
             ).mapNotNull { it.mutedId }.filter { it.isNotBlank() }.toSet()
         }.getOrElse { emptySet() }
     }

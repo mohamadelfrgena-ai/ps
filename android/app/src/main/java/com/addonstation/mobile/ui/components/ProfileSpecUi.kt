@@ -49,7 +49,7 @@ import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.parseIsoMillis
 import com.addonstation.mobile.ui.theme.Spec
-import com.addonstation.mobile.ui.theme.TimeFormat
+import com.addonstation.mobile.util.TimeFormat
 import java.util.Locale
 
 /**

@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.calculateBottomPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,7 +44,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.drawPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -363,6 +361,7 @@ private fun SplashSloganLine(
     lineHeight: androidx.compose.ui.unit.TextUnit,
 ) {
     val style = splashSloganStyle(text, arabic, fontSize, lineHeight)
+    val lineHeightDp = with(LocalDensity.current) { lineHeight.toDp() }
     Text(
         text = text,
         style = style.copy(color = color, textAlign = TextAlign.Center),
@@ -371,7 +370,7 @@ private fun SplashSloganLine(
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier
             .fillMaxWidth()
-            .height(lineHeight)
+            .height(lineHeightDp)
             .graphicsLayer {
                 val p = phase()
                 val enter = ramp(p, 0.1714f, 0.2357f)
@@ -392,11 +391,12 @@ private fun SplashSparkleLine(
 ) {
     val baseStyle = splashSloganStyle(text, arabic, fontSize, lineHeight)
     val density = LocalDensity.current
+    val lineHeightDp = with(density) { lineHeight.toDp() }
     val glowRadius = with(density) { 11.dp.toPx() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(lineHeight)
+            .height(lineHeightDp)
             .graphicsLayer {
                 val p = phase()
                 val scale = when {

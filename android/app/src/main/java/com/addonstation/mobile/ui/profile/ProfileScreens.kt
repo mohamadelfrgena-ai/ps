@@ -488,6 +488,7 @@ fun ProfileScreen(
                 Spacer(Modifier.height(96.dp))
             }
         }
+        }
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier

@@ -116,6 +116,10 @@ class ChatViewModel(private val container: AppContainer) {
         private set
 
     fun open(channel: ChatChannel) {
+        if (_channel.value?.id != channel.id) {
+            _pinned.value = emptyList()
+            _online.value = 0
+        }
         _channel.value = channel
         scope.launch {
             _loading.value = true
@@ -636,6 +640,15 @@ class ChatViewModel(private val container: AppContainer) {
         }
     }
 
+    fun loadPinned(channelId: String) {
+        scope.launch {
+            val pinned = container.chat.pinned(channelId)
+            if (_channel.value?.id == channelId && _pinned.value != pinned) {
+                _pinned.value = pinned
+            }
+        }
+    }
+
     private suspend fun loadStickers() {
         _packs.value = container.chat.stickerPacks()
         _stickers.value = container.chat.stickers()
@@ -649,7 +662,7 @@ class ChatViewModel(private val container: AppContainer) {
     fun close() {
         pollJob?.cancel()
         container.realtime.close()
-        resetPresence()
+        _online.value = 0
         scope.cancel()
     }
 }
