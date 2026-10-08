@@ -385,6 +385,15 @@ private fun MainNavigation(
     }
 
     fun goTab(target: MainTab) {
+        if (target == MainTab.Profile && !signedIn) {
+            // لا صفحة ضيف: افتح الدخول مباشرةً، واحذف الملف من الرصّة كي يعود
+            // زرّ الرجوع إلى الرئيسية بدلاً من الدخول في حلقة تحويل.
+            navController.navigate(Routes.LOGIN) {
+                popUpTo(Routes.HOME) { inclusive = false }
+                launchSingleTop = true
+            }
+            return
+        }
         if (target == MainTab.Community && !signedIn) {
             requireSignIn(target.route)
             return
@@ -397,7 +406,7 @@ private fun MainNavigation(
     }
 
     fun selectTab(target: MainTab) {
-        if (tab == target) {
+        if (tab == target && !(target == MainTab.Profile && !signedIn)) {
             scrollToTopRequest += 1
         } else {
             goTab(target)
@@ -568,8 +577,6 @@ private fun MainNavigation(
                     // · شبكة 2×2 · خروج. (الإعدادات تبويب مستقل — لا تُعرض هنا.)
                     ProfileScreen(
                         scrollToTopRequest = scrollToTopRequest,
-                        onLogin = { go(Routes.LOGIN) },
-                        onOpenSignup = { go(Routes.SIGNUP) },
                         onSignedOut = { goTab(MainTab.Home) },
                         onBack = { back() },
                         onOpenEdit = { go(Routes.EDIT_PROFILE) },

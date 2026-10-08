@@ -121,7 +121,7 @@
     <string name="common_none">None</string>
     <string name="common_yes">Yes</string>
     <string name="common_no">No</string>
-    <string name="common_guest">Guest</string>
+    <string name="common_guest">User</string>
     <string name="common_soon">Coming soon</string>
     <string name="common_log_out">Log out</string>
     <string name="common_sign_in">Sign in</string>
@@ -654,8 +654,6 @@
     <string name="auth_confirm_resend">Resend the confirmation link</string>
     <string name="auth_confirm_resent">Confirmation link sent again ✓</string>
     <string name="auth_confirm_hint">No message? Check the spam folder as well.</string>
-    <string name="profile_guest_title">You are browsing as a user</string>
-    <string name="profile_guest_text">Sign in or create an account so the app keeps your favourites, your content and your AC balance.</string>
     <string name="notif_prompt_title">Turn on notifications</string>
     <string name="notif_prompt_text">Get chat messages, mentions and new addons even when the app is closed. You can change every part later from Settings.</string>
     <string name="notif_prompt_allow">Turn on now</string>

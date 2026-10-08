@@ -115,7 +115,7 @@
     <string name="common_none">Yok</string>
     <string name="common_yes">Evet</string>
     <string name="common_no">Hayır</string>
-    <string name="common_guest">Misafir</string>
+    <string name="common_guest">Kullanıcı</string>
     <string name="common_soon">Yakında</string>
     <string name="common_log_out">Çıkış Yap</string>
     <string name="common_sign_in">Giriş yap</string>
@@ -638,8 +638,6 @@
     <string name="auth_confirm_resend">Doğrulama bağlantısını yeniden gönder</string>
     <string name="auth_confirm_resent">Doğrulama bağlantısı yeniden gönderildi ✓</string>
     <string name="auth_confirm_hint">Mesaj gelmedi mi? Spam klasörüne de bak.</string>
-    <string name="profile_guest_title">Kullanıcı olarak göz atıyorsunuz</string>
-    <string name="profile_guest_text">Giriş yap veya hesap oluştur; uygulama favorilerini, içeriğini ve AC bakiyeni saklasın.</string>
     <string name="notif_prompt_title">Bildirimleri aç</string>
     <string name="notif_prompt_text">Uygulama kapalıyken bile sohbet mesajlarını, bahsetmeleri ve yeni eklentileri al. Her bölümü sonradan Ayarlar\'dan değiştirebilirsin.</string>
     <string name="notif_prompt_allow">Şimdi aç</string>

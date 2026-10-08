@@ -115,7 +115,7 @@
     <string name="common_none">بدون</string>
     <string name="common_yes">نعم</string>
     <string name="common_no">لا</string>
-    <string name="common_guest">ضيف</string>
+    <string name="common_guest">مستخدم</string>
     <string name="common_soon">قريباً</string>
     <string name="common_log_out">تسجيل الخروج</string>
     <string name="common_sign_in">تسجيل الدخول</string>
@@ -638,8 +638,6 @@
     <string name="auth_confirm_resend">أعِد إرسال رابط التأكيد</string>
     <string name="auth_confirm_resent">تم إرسال رابط التأكيد مرة أخرى ✓</string>
     <string name="auth_confirm_hint">لم تجد الرسالة؟ تحقّق من مجلّد «الرسائل غير المرغوبة» أيضاً.</string>
-    <string name="profile_guest_title">أنت تتصفّح كمستخدم</string>
-    <string name="profile_guest_text">سجّل الدخول أو أنشئ حساباً ليحفظ التطبيق مفضّلتك ومحتواك ورصيد AC الخاص بك.</string>
     <string name="notif_prompt_title">فعّل الإشعارات</string>
     <string name="notif_prompt_text">تصلك رسائل الشات والإشارات والإضافات الجديدة حتى والتطبيق مغلق. وتقدر تتحكّم بكل قسم لاحقاً من الإعدادات.</string>
     <string name="notif_prompt_allow">فعّلها الآن</string>

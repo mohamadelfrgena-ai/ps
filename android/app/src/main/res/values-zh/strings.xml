@@ -115,7 +115,7 @@
     <string name="common_none">无</string>
     <string name="common_yes">是</string>
     <string name="common_no">否</string>
-    <string name="common_guest">访客</string>
+    <string name="common_guest">用户</string>
     <string name="common_soon">即将推出</string>
     <string name="common_log_out">退出登录</string>
     <string name="common_sign_in">登录</string>
@@ -638,8 +638,6 @@
     <string name="auth_confirm_resend">重新发送确认链接</string>
     <string name="auth_confirm_resent">确认链接已重新发送 ✓</string>
     <string name="auth_confirm_hint">没收到？也请检查垃圾邮件文件夹。</string>
-    <string name="profile_guest_title">你正在以用户身份浏览</string>
-    <string name="profile_guest_text">登录或创建账号，应用才能保存你的收藏、内容和 AC 余额。</string>
     <string name="notif_prompt_title">开启通知</string>
     <string name="notif_prompt_text">即使应用关闭，也能收到聊天消息、提及和新增内容。之后可在设置中分别调整。</string>
     <string name="notif_prompt_allow">立即开启</string>

@@ -115,7 +115,7 @@
     <string name="common_none">Aucun</string>
     <string name="common_yes">Oui</string>
     <string name="common_no">Non</string>
-    <string name="common_guest">Invité</string>
+    <string name="common_guest">Utilisateur</string>
     <string name="common_soon">Bientôt</string>
     <string name="common_log_out">Se déconnecter</string>
     <string name="common_sign_in">Se connecter</string>
@@ -638,8 +638,6 @@
     <string name="auth_confirm_resend">Renvoyer le lien de confirmation</string>
     <string name="auth_confirm_resent">Lien de confirmation renvoyé ✓</string>
     <string name="auth_confirm_hint">Rien reçu ? Vérifiez aussi le dossier spam.</string>
-    <string name="profile_guest_title">Vous naviguez en tant qu’utilisateur</string>
-    <string name="profile_guest_text">Connectez-vous ou créez un compte pour que l\'app garde vos favoris, votre contenu et votre solde AC.</string>
     <string name="notif_prompt_title">Activer les notifications</string>
     <string name="notif_prompt_text">Recevez les messages du chat, les mentions et les nouveaux addons même app fermée. Chaque catégorie reste réglable dans les Paramètres.</string>
     <string name="notif_prompt_allow">Activer maintenant</string>

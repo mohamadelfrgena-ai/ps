@@ -108,7 +108,7 @@
     <string name="common_none">بدون</string>
     <string name="common_yes">نعم</string>
     <string name="common_no">لا</string>
-    <string name="common_guest">ضيف</string>
+    <string name="common_guest">مستخدم</string>
     <string name="common_soon">قريباً</string>
     <string name="common_log_out">تسجيل الخروج</string>
     <string name="common_sign_in">تسجيل الدخول</string>

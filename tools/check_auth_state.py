@@ -8,9 +8,8 @@
 
 الأسباب التي عولجت (ولا يجوز أن تعود):
 
-  1) **طرد قسري إلى شاشة الدخول**: شاشة الملف الشخصي كانت تنفّذ
-     `LaunchedEffect(signedIn) { onLogin() }` بمجرّد أن تكون الحالة «بلا حساب»
-     ⇒ المستخدم يُقتلع من التبويب. المعتمد الآن: شاشة ضيف واضحة بزرّين.
+  1) **تبويب الملف بلا شاشة ضيف**: المستخدم غير المسجّل ينتقل مباشرةً إلى
+     شاشة الدخول؛ زرّ الرجوع يعيده للرئيسية ولا يكرّر التحويل.
 
   2) **إنشاء حساب بتأكيد بريد**: `supabase/signup` لا يُرجع جلسة حين يكون
      «Confirm email» مفعّلاً، فيبقى المستخدم خارج التطبيق. المعتمد الآن: بطاقة
@@ -48,24 +47,16 @@ def read(rel: str) -> str:
     return io.open(path, encoding="utf-8").read()
 
 
-# 1) لا طرد قسري إلى شاشة الدخول عند غياب الحساب
+# 1) لا صفحة ضيف للملف؛ والإعدادات لا تفرض الدخول على المستخدم
 for rel in ("ui/profile/ProfileScreens.kt", "ui/settings/SettingsScreen.kt"):
     text = read(rel)
     code = re.sub(r"(?m)^\s*(//|\*|/\*).*$", "", text)   # بلا تعليقات
-    if re.search(r"LaunchedEffect\([^)]*signedIn[^)]*\)\s*\{\s*onLogin\(\)", code):
-        problems.append(f"{rel}: عاد الطرد القسري إلى شاشة الدخول (LaunchedEffect + onLogin)")
-    if rel.endswith("ProfileScreens.kt"):
-        if "GuestProfileScreen" not in text:
-            problems.append("ui/profile/ProfileScreens.kt: شاشة الدخول/الإنشاء مفقودة")
-        if "profile_guest_title" not in text:
-            problems.append("ui/profile/ProfileScreens.kt: شاشة الدخول/الإنشاء بلا عنوان من الموارد")
-        start = text.find("private fun GuestProfileScreen(")
-        end = text.find("/**\n * الشاشة A", start)
-        guest_screen = text[start:end] if start >= 0 and end > start else ""
-        if not guest_screen:
-            problems.append("ui/profile/ProfileScreens.kt: تعذّر فحص شاشة الدخول/الإنشاء")
-        elif "AnonymousAvatarImage(" in guest_screen:
-            problems.append("ui/profile/ProfileScreens.kt: صورة المجهول ما زالت ظاهرة فوق أزرار الدخول/الإنشاء")
+    if rel.endswith("SettingsScreen.kt") and re.search(
+        r"LaunchedEffect\([^)]*signedIn[^)]*\)\s*\{\s*onLogin\(\)", code
+    ):
+        problems.append(f"{rel}: عاد الطرد القسري إلى شاشة الدخول")
+    if rel.endswith("ProfileScreens.kt") and "GuestProfileScreen" in text:
+        problems.append("ui/profile/ProfileScreens.kt: شاشة الزائر ما زالت موجودة")
 
 # 1ب) بعد تسجيل الخروج: لا شاشة دخول مفروضة
 prof = read("ui/profile/ProfileScreens.kt")
@@ -78,6 +69,26 @@ if signout and "onLogin()" in signout.group(0):
 nav = read("ui/nav/AppNav.kt")
 if "PushRegistrar.onSessionChanged" not in nav and "onSessionChanged(ctx, false)" not in nav:
     problems.append("ui/nav/AppNav.kt: لا إلغاء لتوكن الجهاز عند الخروج (onSessionChanged)")
+profile_start = nav.find("composable(Routes.PROFILE)")
+profile_end = nav.find("// المصادقة", profile_start)
+profile_route = nav[profile_start:profile_end] if profile_start >= 0 and profile_end > profile_start else ""
+tab_start = nav.find("fun goTab(target: MainTab)")
+tab_end = nav.find("fun selectTab", tab_start)
+tab_router = nav[tab_start:tab_end] if tab_start >= 0 and tab_end > tab_start else ""
+select_start = nav.find("fun selectTab(target: MainTab)")
+select_end = nav.find("/**", select_start)
+select_router = nav[select_start:select_end] if select_start >= 0 and select_end > select_start else ""
+if "tab == target && !(target == MainTab.Profile && !signedIn)" not in select_router:
+    problems.append("ui/nav/AppNav.kt: نقر تبويب الملف المحدد لا يفتح الدخول عند تسجيل الخروج")
+if not all(token in tab_router for token in (
+    "target == MainTab.Profile && !signedIn",
+    "navController.navigate(Routes.LOGIN)",
+    "popUpTo(Routes.HOME) { inclusive = false }",
+    "launchSingleTop = true",
+)):
+    problems.append("ui/nav/AppNav.kt: تبويب الملف لا يفتح الدخول مباشرةً مع رجوع آمن للرئيسية")
+if "onLogin =" in profile_route or "onOpenSignup =" in profile_route:
+    problems.append("ui/nav/AppNav.kt: صفحة الملف ما زالت تعتمد على شاشة الزائر")
 
 # 2) إنشاء حساب: معالجة تأكيد البريد
 signup = read("ui/auth/AuthScreens.kt")
@@ -140,17 +151,17 @@ for rel, needle in (
 KEYS = (
     "auth_confirm_title", "auth_confirm_text", "auth_confirm_retry",
     "auth_confirm_resend", "auth_confirm_resent", "auth_confirm_hint",
-    "profile_guest_title", "profile_guest_text", "splash_skip",
+    "common_guest", "splash_skip",
 )
-guest_user_titles = {
-    "values": "You are browsing as a user",
-    "values-ar": "أنت تتصفّح كمستخدم",
-    "values-pt": "Está a navegar como utilizador",
-    "values-es": "Estás navegando como usuario",
-    "values-ru": "Вы просматриваете как пользователь",
-    "values-zh": "你正在以用户身份浏览",
-    "values-fr": "Vous naviguez en tant qu’utilisateur",
-    "values-tr": "Kullanıcı olarak göz atıyorsunuz",
+user_labels = {
+    "values": "User",
+    "values-ar": "مستخدم",
+    "values-pt": "Utilizador",
+    "values-es": "Usuario",
+    "values-ru": "Пользователь",
+    "values-zh": "用户",
+    "values-fr": "Utilisateur",
+    "values-tr": "Kullanıcı",
 }
 for locale in ("values", "values-ar", "values-pt", "values-es", "values-ru", "values-zh", "values-fr", "values-tr"):
     path = os.path.join(RES, locale, "strings.xml")
@@ -158,9 +169,9 @@ for locale in ("values", "values-ar", "values-pt", "values-es", "values-ru", "va
     missing = [k for k in KEYS if f'name="{k}"' not in text]
     if missing:
         problems.append(f"{locale}: نصوص ناقصة → {', '.join(missing)}")
-    expected = guest_user_titles[locale]
-    if f'<string name="profile_guest_title">{expected}</string>' not in text:
-        problems.append(f"{locale}: عنوان غير المسجّل لا يستخدم كلمة user/مستخدم")
+    expected = user_labels[locale]
+    if f'<string name="common_guest">{expected}</string>' not in text:
+        problems.append(f"{locale}: تسمية المستخدم غير المسجّل لا تستخدم User/مستخدم")
 
 print("حارس حالة الدخول")
 print("-" * 52)
@@ -171,6 +182,6 @@ if problems:
         print("✗", p)
     print(f"\n✗ عاد {len(problems)} سبباً من أسباب «التطبيق لا يعرف أني سجّلت».")
     sys.exit(1)
-print("🟢 لا طرد قسري إلى الدخول · تغيير اللغة بلا إعادة إنشاء · لا خروج تلقائياً عند تعذّر التجديد ·")
-print("   مسح الجلسة محصور بالخروج الصريح ·")
+print("🟢 تبويب الملف يفتح الدخول مباشرةً لغير المسجّل · زرّ الرجوع للرئيسية · تغيير اللغة بلا إعادة إنشاء ·")
+print("   لا خروج تلقائياً عند تعذّر التجديد · مسح الجلسة محصور بالخروج الصريح ·")
 print("   الشاشات تُحدّث نفسها بعد الدخول · تأكيد البريد واضح · النصوص الثمانية مكتملة.")

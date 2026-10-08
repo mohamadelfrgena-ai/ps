@@ -115,7 +115,7 @@
     <string name="common_none">Нет</string>
     <string name="common_yes">Да</string>
     <string name="common_no">Нет</string>
-    <string name="common_guest">Гость</string>
+    <string name="common_guest">Пользователь</string>
     <string name="common_soon">Скоро</string>
     <string name="common_log_out">Выйти</string>
     <string name="common_sign_in">Войти</string>
@@ -638,8 +638,6 @@
     <string name="auth_confirm_resend">Отправить ссылку снова</string>
     <string name="auth_confirm_resent">Ссылка отправлена повторно ✓</string>
     <string name="auth_confirm_hint">Нет письма? Проверьте также папку «Спам».</string>
-    <string name="profile_guest_title">Вы просматриваете как пользователь</string>
-    <string name="profile_guest_text">Войдите или создайте аккаунт, чтобы приложение сохраняло избранное, ваш контент и баланс AC.</string>
     <string name="notif_prompt_title">Включить уведомления</string>
     <string name="notif_prompt_text">Получайте сообщения чата, упоминания и новые аддоны даже при закрытом приложении. Каждую категорию можно настроить позже.</string>
     <string name="notif_prompt_allow">Включить сейчас</string>
