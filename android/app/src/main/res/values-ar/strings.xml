@@ -729,4 +729,9 @@
     <string name="settings_account_actions">إجراءات الحساب</string>
     <string name="settings_footer">© 2026 AddonStation — جميع الحقوق محفوظة</string>
     <string name="auth_username_placeholder">اسم_المستخدم</string>
+    <string name="crash_report_title">تقرير تعطل التطبيق</string>
+    <string name="crash_report_body">توقف التطبيق بشكل غير متوقع في التشغيل السابق. انسخ هذا التقرير وأرسله هنا لنحدد السبب.</string>
+    <string name="crash_report_copy">نسخ تقرير التعطل</string>
+    <string name="crash_report_copied">نُسخ التقرير. الصقه في هذه المحادثة.</string>
+    <string name="crash_report_continue">جرّب فتح التطبيق</string>
 </resources>

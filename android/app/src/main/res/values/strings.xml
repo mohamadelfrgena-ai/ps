@@ -745,4 +745,9 @@ CREATE IT.</string>
     <string name="settings_account_actions">Account actions</string>
     <string name="settings_footer">© 2026 AddonStation — All rights reserved</string>
     <string name="auth_username_placeholder">your_username</string>
+    <string name="crash_report_title">App crash report</string>
+    <string name="crash_report_body">The app stopped unexpectedly on its previous launch. Copy this report and send it to support so we can identify the cause.</string>
+    <string name="crash_report_copy">Copy crash report</string>
+    <string name="crash_report_copied">Report copied. Paste it into this chat.</string>
+    <string name="crash_report_continue">Try opening the app</string>
 </resources>

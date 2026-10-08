@@ -1,7 +1,19 @@
 package com.addonstation.mobile
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
+import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,6 +30,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import com.addonstation.mobile.ui.nav.AppRoot
 import com.addonstation.mobile.util.AppPrefs
+import com.addonstation.mobile.util.CrashDiagnostics
 import com.addonstation.mobile.util.LocaleManager
 
 /**
@@ -64,6 +77,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashDiagnostics.read(this)?.let { report ->
+            showCrashReport(report)
+            return
+        }
         enableEdgeToEdge()
         recoveryLink.value = linkOf(intent)
         pushRoute.value = routeOf(intent)
@@ -99,6 +116,71 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** A minimal native view keeps the report accessible even if Compose startup crashed. */
+    private fun showCrashReport(report: String) {
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.TOP
+            layoutDirection = View.LAYOUT_DIRECTION_LOCALE
+            setPadding(dp(20), dp(24), dp(20), dp(20))
+            setBackgroundColor(Color.WHITE)
+        }
+        val title = TextView(this).apply {
+            text = getString(R.string.crash_report_title)
+            textSize = 22f
+            setTextColor(Color.rgb(25, 35, 48))
+        }
+        val explanation = TextView(this).apply {
+            text = getString(R.string.crash_report_body)
+            textSize = 15f
+            setTextColor(Color.rgb(70, 78, 90))
+            setPadding(0, dp(12), 0, dp(12))
+        }
+        val details = TextView(this).apply {
+            text = report
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            setTextColor(Color.rgb(45, 52, 62))
+            setTextIsSelectable(true)
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+        }
+        val scroll = ScrollView(this).apply {
+            addView(details, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+            ))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f,
+            )
+        }
+        val copy = Button(this).apply {
+            text = getString(R.string.crash_report_copy)
+            setOnClickListener {
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.crash_report_title), report))
+                Toast.makeText(this@MainActivity, R.string.crash_report_copied, Toast.LENGTH_LONG).show()
+            }
+        }
+        val retry = Button(this).apply {
+            text = getString(R.string.crash_report_continue)
+            setOnClickListener {
+                CrashDiagnostics.clear(this@MainActivity)
+                recreate()
+            }
+        }
+        root.addView(title)
+        root.addView(explanation)
+        root.addView(scroll)
+        root.addView(copy)
+        root.addView(retry)
+        setContentView(root)
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
