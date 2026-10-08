@@ -56,9 +56,16 @@ for rel in ("ui/profile/ProfileScreens.kt", "ui/settings/SettingsScreen.kt"):
         problems.append(f"{rel}: عاد الطرد القسري إلى شاشة الدخول (LaunchedEffect + onLogin)")
     if rel.endswith("ProfileScreens.kt"):
         if "GuestProfileScreen" not in text:
-            problems.append("ui/profile/ProfileScreens.kt: شاشة الضيف مفقودة")
+            problems.append("ui/profile/ProfileScreens.kt: شاشة الدخول/الإنشاء مفقودة")
         if "profile_guest_title" not in text:
-            problems.append("ui/profile/ProfileScreens.kt: شاشة الضيف بلا عنوان من الموارد")
+            problems.append("ui/profile/ProfileScreens.kt: شاشة الدخول/الإنشاء بلا عنوان من الموارد")
+        start = text.find("private fun GuestProfileScreen(")
+        end = text.find("/**\n * الشاشة A", start)
+        guest_screen = text[start:end] if start >= 0 and end > start else ""
+        if not guest_screen:
+            problems.append("ui/profile/ProfileScreens.kt: تعذّر فحص شاشة الدخول/الإنشاء")
+        elif "AnonymousAvatarImage(" in guest_screen:
+            problems.append("ui/profile/ProfileScreens.kt: صورة المجهول ما زالت ظاهرة فوق أزرار الدخول/الإنشاء")
 
 # 1ب) بعد تسجيل الخروج: لا شاشة دخول مفروضة
 prof = read("ui/profile/ProfileScreens.kt")
@@ -135,12 +142,25 @@ KEYS = (
     "auth_confirm_resend", "auth_confirm_resent", "auth_confirm_hint",
     "profile_guest_title", "profile_guest_text", "splash_skip",
 )
+guest_user_titles = {
+    "values": "You are browsing as a user",
+    "values-ar": "أنت تتصفّح كمستخدم",
+    "values-pt": "Está a navegar como utilizador",
+    "values-es": "Estás navegando como usuario",
+    "values-ru": "Вы просматриваете как пользователь",
+    "values-zh": "你正在以用户身份浏览",
+    "values-fr": "Vous naviguez en tant qu’utilisateur",
+    "values-tr": "Kullanıcı olarak göz atıyorsunuz",
+}
 for locale in ("values", "values-ar", "values-pt", "values-es", "values-ru", "values-zh", "values-fr", "values-tr"):
     path = os.path.join(RES, locale, "strings.xml")
     text = io.open(path, encoding="utf-8").read() if os.path.exists(path) else ""
     missing = [k for k in KEYS if f'name="{k}"' not in text]
     if missing:
         problems.append(f"{locale}: نصوص ناقصة → {', '.join(missing)}")
+    expected = guest_user_titles[locale]
+    if f'<string name="profile_guest_title">{expected}</string>' not in text:
+        problems.append(f"{locale}: عنوان غير المسجّل لا يستخدم كلمة user/مستخدم")
 
 print("حارس حالة الدخول")
 print("-" * 52)

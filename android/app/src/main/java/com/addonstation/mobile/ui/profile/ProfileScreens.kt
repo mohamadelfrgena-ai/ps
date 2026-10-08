@@ -167,12 +167,6 @@ private fun GuestProfileScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(26.dp))
-            // صورة المجهول (صورة المالك) — نفس صورة شاشة الدخول
-            com.addonstation.mobile.ui.components.AnonymousAvatarImage(
-                size = 104.dp,
-                borderColor = AppColors.Green,
-            )
-            Spacer(Modifier.height(14.dp))
             Text(
                 stringResource(R.string.profile_guest_title),
                 style = AppText.pageTitle,

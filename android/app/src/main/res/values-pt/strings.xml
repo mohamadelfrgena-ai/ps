@@ -638,7 +638,7 @@
     <string name="auth_confirm_resend">Reenviar o link de confirmação</string>
     <string name="auth_confirm_resent">Link de confirmação reenviado ✓</string>
     <string name="auth_confirm_hint">Não encontrou? Verifique também a pasta de spam.</string>
-    <string name="profile_guest_title">Está a navegar como convidado</string>
+    <string name="profile_guest_title">Está a navegar como utilizador</string>
     <string name="profile_guest_text">Entre ou crie uma conta para o app guardar os seus favoritos, o seu conteúdo e o saldo AC.</string>
     <string name="notif_prompt_title">Ativar notificações</string>
     <string name="notif_prompt_text">Receba mensagens do chat, menções e novos addons mesmo com o app fechado. Pode ajustar cada categoria depois nas Configurações.</string>

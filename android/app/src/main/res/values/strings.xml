@@ -654,7 +654,7 @@
     <string name="auth_confirm_resend">Resend the confirmation link</string>
     <string name="auth_confirm_resent">Confirmation link sent again ✓</string>
     <string name="auth_confirm_hint">No message? Check the spam folder as well.</string>
-    <string name="profile_guest_title">You are browsing as a guest</string>
+    <string name="profile_guest_title">You are browsing as a user</string>
     <string name="profile_guest_text">Sign in or create an account so the app keeps your favourites, your content and your AC balance.</string>
     <string name="notif_prompt_title">Turn on notifications</string>
     <string name="notif_prompt_text">Get chat messages, mentions and new addons even when the app is closed. You can change every part later from Settings.</string>
