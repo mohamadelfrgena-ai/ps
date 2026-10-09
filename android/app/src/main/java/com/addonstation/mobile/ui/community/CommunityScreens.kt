@@ -122,72 +122,10 @@ fun CommunityGate(
     )
 }
 
-/** شاشة ⚠️ قواعد المجتمع (النصوص تُقرأ من موارد اللغة، ويمكن للأدمن تعديلها من الخادم). */
+/** شاشة قواعد المجتمع المُعاد تصميمها؛ منطق القبول والتنقّل يبقى في CommunityGate. */
 @Composable
 fun RulesScreen(onAccepted: () -> Unit, onDecline: () -> Unit) {
-    val container = rememberContainer()
-    var serverRules by remember { mutableStateOf<List<String>>(emptyList()) }
-
-    LaunchedEffect(Unit) {
-        serverRules = runCatching { container.chat.rules(container.prefs.readLocale()) }
-            .getOrElse { emptyList() }
-    }
-
-    val fallback = listOf(
-        stringResource(R.string.chat_rule_1),
-        stringResource(R.string.chat_rule_2),
-        stringResource(R.string.chat_rule_3),
-        stringResource(R.string.chat_rule_4),
-        stringResource(R.string.chat_rule_5),
-        stringResource(R.string.chat_rule_6),
-        stringResource(R.string.chat_rule_7),
-        stringResource(R.string.chat_rule_8),
-    )
-    val rules = if (serverRules.isNotEmpty()) serverRules else fallback
-
-    // المقاسات تتبع الشاشة: العنوان فوق، وبطاقة القواعد تأخذ المساحة المتبقية
-    // وتتمرّر إن زادت عنها، والزرّان ثابتان في الأسفل ظاهران دائماً — فلا يخرج
-    // شيء عن حدود الشاشة على الهاتف الصغير ولا على الكبير.
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 18.dp, vertical = 14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.chat_rules_title),
-            style = AppText.pageTitle,
-            color = AppColors.Text,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(12.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = false)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            GlassCard(modifier = Modifier.fillMaxWidth(), padding = 12.dp) {
-                rules.forEach { rule ->
-                    Text("• $rule", style = AppText.bodySmall, color = AppColors.Muted)
-                }
-            }
-        }
-        Spacer(Modifier.height(14.dp))
-        GradientButton(
-            text = stringResource(R.string.chat_accept_enter),
-            onClick = onAccepted,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(10.dp))
-        GhostButton(
-            text = stringResource(R.string.chat_decline_home),
-            onClick = onDecline,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(6.dp))
-    }
+    CommunityRulesScreen(onAccepted = onAccepted, onDecline = onDecline)
 }
 
 /** قائمة الغرف: تصنيفان قابلان للطي + مؤشرات غير المقروء والمنشن + لوحة المستخدم أسفل الشاشة. */

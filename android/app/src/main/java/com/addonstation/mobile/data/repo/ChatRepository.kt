@@ -39,6 +39,8 @@ class ChatRepository(
         const val MAX_TEXT = 500
         const val MAX_IMAGE_BYTES = 4L * 1024 * 1024
         const val MAX_MEDIA_BYTES = 100L * 1024 * 1024
+        /** Bump only when the community-rule wording changes; keep SQL my_chat_status aligned. */
+        const val COMMUNITY_RULES_VERSION = "v1"
         val ALLOWED_IMAGE_MIME = setOf("image/jpeg", "image/jpg", "image/png", "image/webp")
         val EMOJIS = listOf(
             "😀", "😃", "😄", "😍", "😂", "🥰", "😎", "🤣", "😅", "😇", "😉", "🤔",
@@ -142,7 +144,7 @@ class ChatRepository(
         array?.mapNotNull { it.asString() } ?: emptyList()
     }.getOrElse { emptyList() }
 
-    suspend fun acceptRules(version: String = "v1"): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun acceptRules(version: String = COMMUNITY_RULES_VERSION): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             supabase.rpc("chat_accept_rules", mapOf("p_version" to JsonPrimitive(version)))
                 .asOutcome().requireOk()

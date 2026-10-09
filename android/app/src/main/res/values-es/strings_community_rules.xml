@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_rule_1_plain">Respeta a todos los miembros</string>
+    <string name="chat_rule_2_plain">Sin insultos ni acoso</string>
+    <string name="chat_rule_3_plain">Sin racismo ni discriminación</string>
+    <string name="chat_rule_4_plain">Sin enlaces sospechosos ni anuncios</string>
+    <string name="chat_rule_5_plain">No compartas información personal</string>
+    <string name="chat_rule_6_plain">Sin contenido inapropiado</string>
+    <string name="chat_rule_7_plain">Sin política</string>
+    <string name="chat_rule_8_plain">Las infracciones pueden provocar silencio o expulsión</string>
+    <string name="chat_rules_title_plain">Reglas de la comunidad</string>
+    <string name="chat_rules_list_description">7 reglas</string>
+</resources>
