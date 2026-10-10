@@ -582,7 +582,7 @@ fun ChatScreen(
                             onOpenImage = openFullSize,
                             onStickerTap = {
                                 // ضغطة سريعة على **أي** ملصق (لي أو لغيري) ⇒ لوحة الملصقات
-                                // تُفتح على مكانه وهو م�بالحجم الكامل.
+                                // تُفتح على مكانه وهو مبالحجم الكامل.
                                 // (الحذف يبقى من قائمة الضغط المطوّل خلال ٣ دقائق.)
                                 ui.message.stickerUrl?.takeIf { it.isNotBlank() }?.let { sticker ->
                                     resentSticker = sticker
