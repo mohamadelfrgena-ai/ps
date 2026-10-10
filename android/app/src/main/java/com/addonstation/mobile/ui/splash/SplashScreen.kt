@@ -327,6 +327,7 @@ fun SplashScreen(
             phase = phase,
             compactMode = compactMode,
             topPadding = 610.dp,
+            modifier = Modifier.align(Alignment.TopCenter),
         )
 
         // 6) الشعار النصّي: top = topInset + 722dp (13sp/700 muted).
@@ -357,6 +358,7 @@ fun SplashScreen(
             reduceMotion = reduceMotion,
             loadingText = loadingText,
             bottomPadding = bottomInset + 56.dp,
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 }
@@ -591,10 +593,13 @@ private fun BrandBlock(
     phase: () -> Float,
     compactMode: Boolean,
     topPadding: Dp,
+    modifier: Modifier = Modifier,
 ) {
     Box(
+        modifier = modifier.align(Alignment.TopCenter),
+    ) {
+    Box(
         modifier = Modifier
-            .align(Alignment.TopCenter)
             .padding(top = topPadding)
             .graphicsLayer {
                 val p = phase()
@@ -661,6 +666,7 @@ private fun BrandBlock(
         )
     }
     }
+    }
 }
 
 @Composable
@@ -670,13 +676,14 @@ private fun PixelLoader(
     reduceMotion: Boolean,
     loadingText: String,
     bottomPadding: Dp,
+    modifier: Modifier = Modifier,
 ) {
     val segments = 10
     val totalDuration = if (compactMode) 1.5f else 7f
     val phaseAt = progress()
+    Box(modifier = modifier.align(Alignment.BottomCenter)) {
     Box(
         modifier = Modifier
-            .align(Alignment.BottomCenter)
             .padding(bottom = bottomPadding)
             .semantics { contentDescription = loadingText },
     ) {
@@ -706,6 +713,7 @@ private fun PixelLoader(
                     .background(SplashGold, RoundedCornerShape(2.dp)),
             )
         }
+    }
     }
 }
 
