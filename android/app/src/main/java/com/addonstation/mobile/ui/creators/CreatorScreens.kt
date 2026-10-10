@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,10 +54,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.ContentItem
 import com.addonstation.mobile.data.model.CreatorCard
@@ -363,13 +368,13 @@ fun CreatorProfileScreen(
                     Icon(
                         Icons.Filled.Favorite,
                         contentDescription = null,
-                        tint = AppColors.GoldDeep,
+                        tint = AppColors.goldDark,
                         modifier = Modifier.size(22.dp),
                     )
                     Text(
                         stringResource(R.string.creator_tip_title),
                         style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.ExtraBold),
-                        color = AppColors.GoldDeep,
+                        color = AppColors.goldDark,
                     )
                 }
             }
