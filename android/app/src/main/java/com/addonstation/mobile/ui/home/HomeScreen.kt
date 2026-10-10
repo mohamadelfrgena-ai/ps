@@ -1461,7 +1461,6 @@ private fun ExclusiveCard(
         com.addonstation.mobile.ui.components.CoverImage(
             url = assetUrl(container, item.coverUrl),
             radius = 0.dp,
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
         // تدرّج تراكب

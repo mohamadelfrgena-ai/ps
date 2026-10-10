@@ -1302,8 +1302,8 @@ private fun ProfileAboutTab(
                     onClick = null,
                 )
                 Text(
-                    me.email.orEmpty().ifBlank { "—" },
-                    style = Spec.bodySmall,
+                    me.country.orEmpty().ifBlank { "—" },
+                    style = Spec.secondary,
                     color = Spec.chipLabel,
                     modifier = Modifier.padding(start = 0.dp, bottom = 10.dp),
                 )
@@ -1315,7 +1315,7 @@ private fun ProfileAboutTab(
                 )
                 Text(
                     specMemberSince(me.createdAt),
-                    style = Spec.bodySmall,
+                    style = Spec.secondary,
                     color = Spec.chipLabel,
                     modifier = Modifier.padding(start = 0.dp, bottom = 10.dp),
                 )

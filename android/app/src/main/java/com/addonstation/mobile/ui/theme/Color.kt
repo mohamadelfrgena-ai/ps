@@ -59,6 +59,8 @@ data class HomePalette(
     val goldInk: Color,
     val cardShadow: Color,
     val barShadow: Color,
+    val danger: Color,
+    val green: Color,
 )
 
 object HomePalettes {
@@ -74,6 +76,7 @@ object HomePalettes {
         notificationBadge = Color(0xFFFF6B78), heroOverlay = Color(0xFF0A0F1C),
         heroSubtitle = Color(0xFFD3DDF0), buttonText = Color.White, goldInk = Color(0xFF1B1405),
         cardShadow = Color.Transparent, barShadow = Color.Black.copy(alpha = 0.50f),
+        danger = Color(0xFFFF8791), green = Color(0xFF7FD99A),
     )
     val Light = HomePalette(
         isDark = false,
@@ -87,6 +90,7 @@ object HomePalettes {
         notificationBadge = Color(0xFFE5484D), heroOverlay = Color(0xFF0A0F1C),
         heroSubtitle = Color(0xFFD3DDF0), buttonText = Color.White, goldInk = Color(0xFF1B1405),
         cardShadow = Color(0x140E1526), barShadow = Color(0x2E0E1526),
+        danger = Color(0xFFE5484D), green = Color(0xFF34A853),
     )
 }
 
