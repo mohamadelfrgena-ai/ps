@@ -1288,7 +1288,7 @@ private fun ProfileAboutTab(
             Spacer(Modifier.height(6.dp))
             Text(
                 me.bio?.takeIf { it.isNotBlank() } ?: stringResource(R.string.profile_about_default),
-                style = Spec.body,
+                style = Spec.cardTitle,
                 color = Spec.text,
             )
         }
@@ -1538,7 +1538,9 @@ private fun ProfileFavoritesTab(
                                 .clickable {
                                     scope.launch {
                                         runCatching { container.content.toggleFavorite(item.id) }
-                                        items = items.filterNot { it.id == item.id }
+                                        val newList = items.toMutableList()
+                                        newList.removeAll { it.id == item.id }
+                                        items = newList
                                     }
                                 },
                             contentAlignment = Alignment.Center,
@@ -1602,7 +1604,7 @@ private fun ProfileMyPlanTab(
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(planLabel, style = Spec.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold), color = Spec.text)
+                Text(planLabel, style = Spec.cardTitle.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold), color = Spec.text)
                 Text(
                     stringResource(R.string.home_plan_active_forever),
                     style = Spec.secondary,
@@ -1638,6 +1640,7 @@ private fun ProfileMyPlanTab(
  * + اسم + @username + Online · chips للأدوار · صفّ زرّين (علاقة + رسالة)
  * + رابط «فتح الملف».
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileSheet(
     userId: String,
@@ -1693,7 +1696,7 @@ fun ProfileSheet(
                     com.addonstation.mobile.ui.components.AvatarImage(
                         url = assetUrl(container, me.avatarUrl),
                         size = 72.dp,
-                        online = status == com.addonstation.mobile.ui.components.PresenceState.Online,
+                        online = status == SpecStatus.ONLINE,
                     )
                 }
                 Spacer(Modifier.width(12.dp))

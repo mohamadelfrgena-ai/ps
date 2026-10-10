@@ -756,5 +756,3 @@ private fun ramp(value: Float, start: Float, end: Float): Float {
 
 private fun lerp(start: Float, end: Float, progress: Float): Float =
     start + (end - start) * progress
-
-@Composable
