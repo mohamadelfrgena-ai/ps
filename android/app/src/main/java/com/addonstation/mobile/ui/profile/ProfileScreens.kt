@@ -1396,7 +1396,7 @@ private fun ProfileAboutTab(
 @Composable
 private fun ProfileMyContentTab(
     scope: kotlinx.coroutines.CoroutineScope,
-    container: com.addonstation.mobile.data.di.AppContainer,
+    container: com.addonstation.mobile.data.AppContainer,
     onOpenMyContent: () -> Unit,
 ) {
     var items by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
@@ -1469,7 +1469,7 @@ private fun ProfileMyContentTab(
 @Composable
 private fun ProfileFavoritesTab(
     scope: kotlinx.coroutines.CoroutineScope,
-    container: com.addonstation.mobile.data.di.AppContainer,
+    container: com.addonstation.mobile.data.AppContainer,
     onOpenFavorites: () -> Unit,
 ) {
     var items by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
