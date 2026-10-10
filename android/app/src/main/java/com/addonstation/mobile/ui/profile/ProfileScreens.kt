@@ -377,9 +377,8 @@ fun ProfileScreen(
                     )
                 }
 
-                // لوحة الإدارة: مدخل لا بديل عنه للأدمن/المشرف (الوثيقة لا تذكره،
-                // وإخفاؤه يقطع الطريق الوحيد إلى اللوحة — لذا يظهر لهما وحدهما).
-                if (me.isStaff) {
+                // مدخل لوحة الإدارة للأدمن فقط؛ صلاحيات المشرف تبقى ضمن أدوات غرف الشات.
+                if (me.role == "admin") {
                     Spacer(Modifier.height(10.dp))
                     SpecGridTile(
                         stringResource(R.string.profile_dashboard),

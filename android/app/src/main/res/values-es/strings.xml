@@ -752,4 +752,11 @@ CRÉALO.</string>
     <string name="profile_banner_none_plain">Aún no tienes banner: elige uno de las secciones de abajo</string>
     <string name="profile_about_plain">Biografía</string>
     <string name="msg_username_taken">Ese nombre de usuario ya está en uso.</string>
+
+    <!-- Crash report -->
+    <string name="crash_report_title">Informe de cierre inesperado</string>
+    <string name="crash_report_body">La aplicación se detuvo inesperadamente en el inicio anterior. Copia este informe y envíalo al soporte para que podamos identificar la causa.</string>
+    <string name="crash_report_copy">Copiar informe de cierre</string>
+    <string name="crash_report_copied">Informe copiado. Pégalo en este chat.</string>
+    <string name="crash_report_continue">Intentar abrir la aplicación</string>
 </resources>

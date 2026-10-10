@@ -752,4 +752,11 @@
     <string name="profile_banner_none_plain">还没有横幅 — 从下方分类中选择一个</string>
     <string name="profile_about_plain">个人简介</string>
     <string name="msg_username_taken">该用户名已被使用。</string>
+
+    <!-- Crash report -->
+    <string name="crash_report_title">应用崩溃报告</string>
+    <string name="crash_report_body">应用在上次启动时意外停止。请复制此报告并发送给客服，以便我们查明原因。</string>
+    <string name="crash_report_copy">复制崩溃报告</string>
+    <string name="crash_report_copied">报告已复制。请将其粘贴到此聊天中。</string>
+    <string name="crash_report_continue">尝试打开应用</string>
 </resources>

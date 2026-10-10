@@ -87,9 +87,34 @@ spec_profile = read(os.path.join(SRC, "ui", "components", "ProfileSpecUi.kt"))
 if not re.search(r"CoverImage\(\s*\n?\s*url = bannerUrl,\s*\n?\s*radius = 0\.dp,\s*\n?\s*animate = true",
                  strip_comments(spec_profile)):
     problems.append("ui/components/ProfileSpecUi.kt: بانر الملف الشخصي لم يعد متحرّكاً (animate = true)")
-if not re.search(r"BannerThumb\(\s*\n\s*url = assetUrl\(container, asset\.fileUrl\),\s*\n\s*animate = false",
-                 strip_comments(profile)):
-    problems.append("ui/profile/ProfileScreens.kt: شبكة الأغلفة تُشغّل الحركة لكل خلية (يجب animate = false)")
+
+# موضع شبكة محتوى الملف تغيّر بين الإصدارات. في الإصدار الحالي تستخدم
+# ProfileScreens ContentGrid → ContentCard → CoverImage الافتراضي (animate=false).
+# الإصدارات السابقة تستعمل ProfileItemCard مباشرةً في ProfileWalletAdminScreens.
+profile_code = strip_comments(profile)
+profile_lists_path = os.path.join(SRC, "ui", "profile", "ProfileWalletAdminScreens.kt")
+profile_lists_code = strip_comments(io.open(profile_lists_path, encoding="utf-8").read()) if os.path.exists(profile_lists_path) else ""
+local_grid = re.search(
+    r"CoverImage\(url = assetUrl\(container, item\.coverUrl\), modifier = Modifier\.fillMaxSize\(\), radius = 12\.dp(?:,\s*animate = (true|false))?\)",
+    profile_lists_code,
+)
+remote_grid = (
+    "private fun ContentGrid(" in profile_code
+    and "ContentCard(" in profile_code
+    and "coverUrl = assetUrl(container, item.coverUrl)" in profile_code
+)
+if local_grid:
+    if local_grid.group(1) == "true":
+        problems.append("ui/profile/ProfileWalletAdminScreens.kt: شبكة العناصر تشغّل GIF لكل خلية (يجب animate = false)")
+elif remote_grid:
+    idx = code.find("fun ContentCard(")
+    end = code.find("\n}\n", idx) if idx >= 0 else -1
+    card_body = code[idx:end] if idx >= 0 and end > idx else ""
+    cover_call = re.search(r"CoverImage\s*\(", card_body)
+    if not cover_call or re.search(r"animate\s*=\s*true", card_body):
+        problems.append("ui/components/Common.kt: ContentCard يجب أن يعرض لقطة ثابتة افتراضياً")
+else:
+    problems.append("شبكة محتوى الملف: تعذر التحقق من استخدام CoverImage الثابت")
 
 # 5) المُحسِّن الخادمي
 opt_path = os.path.join(TOOLS, "optimize_site_assets.py")

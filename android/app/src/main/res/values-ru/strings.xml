@@ -752,4 +752,11 @@
     <string name="profile_banner_none_plain">Обложки пока нет — выберите одну из разделов ниже</string>
     <string name="profile_about_plain">О себе</string>
     <string name="msg_username_taken">Это имя пользователя уже занято.</string>
+
+    <!-- Crash report -->
+    <string name="crash_report_title">Отчёт о сбое приложения</string>
+    <string name="crash_report_body">При предыдущем запуске приложение неожиданно завершило работу. Скопируйте этот отчёт и отправьте его в службу поддержки, чтобы мы могли определить причину.</string>
+    <string name="crash_report_copy">Скопировать отчёт о сбое</string>
+    <string name="crash_report_copied">Отчёт скопирован. Вставьте его в этот чат.</string>
+    <string name="crash_report_continue">Попробовать открыть приложение</string>
 </resources>

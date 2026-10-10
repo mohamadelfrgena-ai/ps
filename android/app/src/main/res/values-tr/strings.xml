@@ -752,4 +752,11 @@ YARAT.</string>
     <string name="profile_banner_none_plain">Henüz bir kapak yok — aşağıdaki bölümlerden birini seçin</string>
     <string name="profile_about_plain">Hakkımda</string>
     <string name="msg_username_taken">Bu kullanıcı adı zaten kullanılıyor.</string>
+
+    <!-- Crash report -->
+    <string name="crash_report_title">Uygulama çökme raporu</string>
+    <string name="crash_report_body">Uygulama önceki açılışında beklenmedik şekilde durdu. Nedeni belirleyebilmemiz için bu raporu kopyalayıp desteğe gönderin.</string>
+    <string name="crash_report_copy">Çökme raporunu kopyala</string>
+    <string name="crash_report_copied">Rapor kopyalandı. Bu sohbete yapıştırın.</string>
+    <string name="crash_report_continue">Uygulamayı açmayı dene</string>
 </resources>

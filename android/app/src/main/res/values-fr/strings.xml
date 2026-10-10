@@ -752,4 +752,11 @@ CRÉE-LE.</string>
     <string name="profile_banner_none_plain">Aucune bannière pour le moment — choisissez-en une ci-dessous</string>
     <string name="profile_about_plain">Biographie</string>
     <string name="msg_username_taken">Ce nom d’utilisateur est déjà utilisé.</string>
+
+    <!-- Crash report -->
+    <string name="crash_report_title">Rapport de plantage de l’application</string>
+    <string name="crash_report_body">L’application s’est arrêtée inopinément lors de son précédent lancement. Copiez ce rapport et envoyez-le à l’assistance afin que nous puissions identifier la cause.</string>
+    <string name="crash_report_copy">Copier le rapport de plantage</string>
+    <string name="crash_report_copied">Rapport copié. Collez-le dans cette conversation.</string>
+    <string name="crash_report_continue">Essayer d’ouvrir l’application</string>
 </resources>

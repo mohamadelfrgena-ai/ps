@@ -752,4 +752,11 @@ CRIE.</string>
     <string name="profile_banner_none_plain">Ainda não há capa — escolha uma das secções abaixo</string>
     <string name="profile_about_plain">Biografia</string>
     <string name="msg_username_taken">Este nome de utilizador já está em uso.</string>
+
+    <!-- Crash report -->
+    <string name="crash_report_title">Relatório de falha da aplicação</string>
+    <string name="crash_report_body">A aplicação parou inesperadamente no início anterior. Copie este relatório e envie-o ao suporte para identificarmos a causa.</string>
+    <string name="crash_report_copy">Copiar relatório de falha</string>
+    <string name="crash_report_copied">Relatório copiado. Cole-o nesta conversa.</string>
+    <string name="crash_report_continue">Tentar abrir a aplicação</string>
 </resources>
