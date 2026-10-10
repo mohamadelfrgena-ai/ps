@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -358,7 +359,7 @@ fun CreatorProfileScreen(
                     .background(
                         Brush.horizontalGradient(listOf(AppColors.Gold, AppColors.GoldLight)),
                     )
-                    .clickable { if (signedIn) showSupportSheet = true else status = stringResource(R.string.msg_sign_in_needed) },
+                    .clickable { if (signedIn) showSupportSheet = true else status = signInNeededMsg },
                 contentAlignment = Alignment.Center,
             ) {
                 Row(
@@ -368,13 +369,13 @@ fun CreatorProfileScreen(
                     Icon(
                         Icons.Filled.Favorite,
                         contentDescription = null,
-                        tint = AppColors.goldDark,
+                        tint = AppColors.GoldDark,
                         modifier = Modifier.size(22.dp),
                     )
                     Text(
                         stringResource(R.string.creator_tip_title),
                         style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.ExtraBold),
-                        color = AppColors.goldDark,
+                        color = AppColors.GoldDark,
                     )
                 }
             }
