@@ -66,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
@@ -581,7 +582,7 @@ fun ChatScreen(
                             onOpenImage = openFullSize,
                             onStickerTap = {
                                 // ضغطة سريعة على **أي** ملصق (لي أو لغيري) ⇒ لوحة الملصقات
-                                // تُفتح على مكانه وهو محدَّد — بلا حذف ولا فتح بالحجم الكامل.
+                                // تُفتح على مكانه وهو م�بالحجم الكامل.
                                 // (الحذف يبقى من قائمة الضغط المطوّل خلال ٣ دقائق.)
                                 ui.message.stickerUrl?.takeIf { it.isNotBlank() }?.let { sticker ->
                                     resentSticker = sticker
@@ -1649,7 +1650,7 @@ private fun MessageBlock(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = if (isMine) 0.dp else 48.dp, vertical = 4.dp),
+                    .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp, bottom = 4.dp),
                 horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
             ) {
                 Row(
@@ -2188,4 +2189,6 @@ private inline fun <T> androidx.compose.foundation.lazy.LazyListScope.itemsIndex
         key = { index -> key(items[index]) },
         contentType = { index -> contentType(items[index]) },
     ) { index -> content(index, items[index]) }
+}
+ontent(index, items[index]) }
 }
