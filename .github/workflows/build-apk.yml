@@ -191,11 +191,14 @@ jobs:
           LOG=android/build.log
           [ -f "$LOG" ] || exit 0
           {
-            echo "### ❌ فشل بناء APK — قائمة الأخطاء"
+            echo "### ❌ فشل بناء APK — تفاصيل الخطأ"
             echo ""
             echo '```'
-            grep -n -E "^e: |^w: .*(deprecat|warning)|error: |What went wrong|> Task .* FAILED|Execution failed|Could not (resolve|find|determine)|Unresolved reference" "$LOG" \
-              | sed 's|file:///home/runner/work/ps/ps/||' | head -150
+            grep -n -A24 -B12 -Ei "mergeDebugResources FAILED|Android resource linking failed|AAPT2?|What went wrong|Execution failed" "$LOG" \
+              | sed 's|file:///home/runner/work/ps/ps/||' | head -180
+            echo '--- أبرز الأخطاء ---'
+            grep -n -E "^e: |^w: .*(deprecat|warning)|error: |ERROR:|> Task .* FAILED|Execution failed|Could not (resolve|find|determine)|Unresolved reference" "$LOG" \
+              | sed 's|file:///home/runner/work/ps/ps/||' | head -100
             echo '```'
           } > /tmp/body.md
           gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@/tmp/body.md >/dev/null \
