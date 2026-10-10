@@ -154,6 +154,12 @@ fun SettingsScreen(
     val wallet by container.state.wallet.collectAsState()
     val currentLocale by container.prefs.locale.collectAsState(initial = "en")
     val dark by container.prefs.darkTheme.collectAsState(initial = true)
+    // Fail closed: لا تظهر أدوات الإدارة إلا لجلسة مسجّلة وملف محمّل
+    // يطابق صاحب الجلسة ودوره admin حرفياً.
+    val adminToolsVisible = signedIn &&
+        profileLoadStatus == ProfileLoadStatus.READY &&
+        profile?.id == container.state.currentUserId &&
+        profile?.role == "admin"
 
     val supportSubjectHelp = stringResource(R.string.set_support_mail_help)
     val supportSubjectReport = stringResource(R.string.set_support_mail_report)
@@ -500,8 +506,8 @@ fun SettingsScreen(
                 )
             }
 
-            // 6 · ADMIN TOOLS — لا تُرسم للمستخدمين غير المشرفين.
-            if (profile?.role == "admin") {
+            // 6 · ADMIN TOOLS — لا تُرسم إلا بعد تأكيد ملف الأدمن الحالي.
+            if (adminToolsVisible) {
                 AuthSettingsSectionLabel(stringResource(R.string.settings_admin_tools), AppColors.AuthGold)
                 AuthSettingsGroupCard {
                     AuthSettingsRow(
