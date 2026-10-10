@@ -106,6 +106,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * لوحة الإدارة (Admin فقط). الفحص الحقيقي على الخادم: كل دالة RPC تتحقق من is_admin،
  * وأي محاولة من غير الأدمن تُرفض من قاعدة البيانات لا من الواجهة فقط.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AdminPanelScreen(
     onBackToApp: () -> Unit,
