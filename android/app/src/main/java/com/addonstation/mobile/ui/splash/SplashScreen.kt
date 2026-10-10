@@ -596,7 +596,7 @@ private fun BrandBlock(
     modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier.align(Alignment.TopCenter),
+        modifier = modifier,
     ) {
     Box(
         modifier = Modifier
@@ -681,7 +681,7 @@ private fun PixelLoader(
     val segments = 10
     val totalDuration = if (compactMode) 1.5f else 7f
     val phaseAt = progress()
-    Box(modifier = modifier.align(Alignment.BottomCenter)) {
+    Box(modifier = modifier) {
     Box(
         modifier = Modifier
             .padding(bottom = bottomPadding)
