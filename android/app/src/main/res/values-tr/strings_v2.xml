@@ -12,7 +12,6 @@
     <string name="home_latest_plain">Son eklentiler</string>
     <string name="item_download_plain">İndir</string>
     <string name="nav_chat">Sohbet</string>
-    <string name="profile_edit_plain">Profili düzenle</string>
     <string name="plan_buy_plain">Abonelik satın al</string>
     <string name="auth_login_subtitle_plain">Macerana devam etmek için giriş yap</string>
     <plurals name="ac_streak_days">

@@ -12,7 +12,6 @@
     <string name="home_latest_plain">أحدث الإضافات</string>
     <string name="item_download_plain">تحميل</string>
     <string name="nav_chat">الشات</string>
-    <string name="profile_edit_plain">تعديل الملف</string>
     <string name="plan_buy_plain">شراء اشتراك</string>
     <string name="auth_login_subtitle_plain">سجّل الدخول لمتابعة مغامرتك</string>
     <plurals name="ac_streak_days">

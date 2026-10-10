@@ -12,7 +12,6 @@
     <string name="home_latest_plain">Addons recentes</string>
     <string name="item_download_plain">Baixar</string>
     <string name="nav_chat">Chat</string>
-    <string name="profile_edit_plain">Editar perfil</string>
     <string name="plan_buy_plain">Comprar assinatura</string>
     <string name="auth_login_subtitle_plain">Entre para continuar sua aventura</string>
     <plurals name="ac_streak_days">

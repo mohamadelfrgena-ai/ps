@@ -12,7 +12,6 @@
     <string name="home_latest_plain">Новые дополнения</string>
     <string name="item_download_plain">Скачать</string>
     <string name="nav_chat">Чат</string>
-    <string name="profile_edit_plain">Редактировать профиль</string>
     <string name="plan_buy_plain">Купить подписку</string>
     <string name="auth_login_subtitle_plain">Войдите, чтобы продолжить приключение</string>
     <plurals name="ac_streak_days">

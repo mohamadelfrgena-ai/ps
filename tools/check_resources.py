@@ -8,7 +8,7 @@
   1) أسماء الملفات والمجلدات: حروف صغيرة وأرقام وشرطة سفلية فقط
      (ملف مثل res/font/FONT_LICENSE_OFL.txt يُفشل البناء)
   2) سلامة XML لكل ملفات values*/ (خطأ & أو < غير مهرّب)
-  3) تكرار اسم المورد داخل الملف نفسه
+  3) تكرار اسم المورد داخل الملف أو بين ملفات مجلد القيم نفسه
   4) صيغ % غير الصحيحة (مثل %5$s أو %s% في نص غير مُهيّأ)
   5) فواصل عليا ' أو علامات اقتباس " غير مهرّبة داخل النصوص
   6) نصوص تبدأ بـ @ أو ? (تُفسَّر كمرجع مورد)
@@ -47,6 +47,7 @@ def main() -> int:
 
     # 2..6 لكل ملفات القيم
     value_files = []
+    resources_by_folder = collections.defaultdict(list)
     for root, _dirs, files in os.walk(RES):
         if os.path.basename(root).startswith("values"):
             for f in files:
@@ -64,9 +65,13 @@ def main() -> int:
 
         names = []
         for el in tree.getroot():
+            name = el.get("name")
+            resource_type = el.get("type") if el.tag == "item" else el.tag
+            if name and el.tag not in {"public", "eat-comment"}:
+                resources_by_folder[(os.path.dirname(path), resource_type, name)].append(rel)
             if el.tag != "string":
                 continue
-            name = el.get("name") or "?"
+            name = name or "?"
             names.append(name)
             text = el.text or ""
 
@@ -88,6 +93,15 @@ def main() -> int:
                 problems.append(f'علامة اقتباس غير مهرّبة: {rel} · {name} → {body[:50]!r}')
             if re.search(r"(?<!\\)'", body):
                 problems.append(f"فاصلة عليا غير مهرّبة (استخدم \\'): {rel} · {name} → {body[:50]!r}")
+
+    for (folder, resource_type, name), paths in resources_by_folder.items():
+        unique_paths = sorted(set(paths))
+        if len(unique_paths) > 1:
+            folder_rel = os.path.relpath(folder, ROOT)
+            problems.append(
+                f"اسم مورد مكرر بين ملفات مجلد القيم نفسه: {folder_rel} · {resource_type}/{name} → "
+                + ", ".join(unique_paths)
+            )
 
     if problems:
         print("🔴 مشاكل في الموارد (ستُفشل mergeDebugResources):\n")

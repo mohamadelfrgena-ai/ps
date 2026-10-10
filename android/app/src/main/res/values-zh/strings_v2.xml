@@ -12,7 +12,6 @@
     <string name="home_latest_plain">最新附加内容</string>
     <string name="item_download_plain">下载</string>
     <string name="nav_chat">聊天</string>
-    <string name="profile_edit_plain">编辑个人资料</string>
     <string name="plan_buy_plain">购买订阅</string>
     <string name="auth_login_subtitle_plain">登录以继续你的冒险</string>
     <plurals name="ac_streak_days">
