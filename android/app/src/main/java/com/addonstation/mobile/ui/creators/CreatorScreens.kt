@@ -308,6 +308,7 @@ fun CreatorProfileScreen(
     }
     val sentMsg = stringResource(R.string.creator_tip_sent)
     val chooseReceiptMsg = stringResource(R.string.plan_choose_receipt)
+    val signInNeededMsg = stringResource(R.string.msg_sign_in_needed)
     var showSupportSheet by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {

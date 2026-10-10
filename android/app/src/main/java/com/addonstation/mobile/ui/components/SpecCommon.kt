@@ -373,7 +373,9 @@ fun CodeSlotInput(
     slotCount: Int = 8,
     enabled: Boolean = true,
 ) {
-    val focusRequesters = remember { List<androidx.compose.ui.focus.FocusRequester>(slotCount) { androidx.compose.ui.focus.FocusRequester() } }
+    val focusRequesters: List<androidx.compose.ui.focus.FocusRequester> = remember {
+        List(slotCount) { androidx.compose.ui.focus.FocusRequester() }
+    }
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     fun updateCode(newValue: String) {
