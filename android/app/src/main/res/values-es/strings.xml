@@ -7,9 +7,9 @@
     <string name="brand_tagline">AddonStation Mobile · v1.2</string>
     <string name="brand_platform">Plataforma de addons y mundos para Minecraft Bedrock</string>
     <string name="brand_rights">© 2026 AddonStation — Todos los derechos reservados</string>
-    <string name="splash_dream_it">SUÉÑALO.</string>
-    <string name="splash_build_it">CONSTRÚYELO.</string>
-    <string name="splash_create_it">CRÉALO.</string>
+    <string name="splash_dream_it">SUEÑA.</string>
+    <string name="splash_build_it">CONSTRUYE.</string>
+    <string name="splash_create_it">CREA.</string>
     <string name="splash_skip">Toca para omitir</string>
 
     <string name="nav_home">Inicio</string>

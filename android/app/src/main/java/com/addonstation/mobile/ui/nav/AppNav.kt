@@ -107,6 +107,9 @@ object Routes {
     const val USER_PROFILE = "user/{userId}"
     fun userProfile(id: String) = "user/$id"
     const val ADMIN = "admin"
+    const val ADMIN_CONTENT = "admin-content"
+    const val ADMIN_CONTENT_EDIT = "admin-content/{contentId}"
+    fun adminContentEdit(id: String) = "admin-content/$id"
     const val ADMIN_ASSETS = "admin-assets"
     const val ADMIN_CREATORS = "admin-creators"
     const val ADMIN_AC = "admin-ac"
@@ -862,7 +865,8 @@ private fun MainNavigation(
                     com.addonstation.mobile.ui.admin.AdminPanelScreen(
                         onBackToApp = { goTab(MainTab.Home) },
                         onOpenChat = { go(Routes.ADMIN_CHAT) },
-                        onOpenContent = { go(Routes.ADMIN_CREATORS) },
+                        onOpenContent = { go(Routes.ADMIN_CONTENT) },
+                        onEditContent = { item -> go(Routes.adminContentEdit(item.id)) },
                         onOpenPayments = { },
                         onOpenModeration = { },
                         onOpenAssets = { go(Routes.ADMIN_ASSETS) },
@@ -874,6 +878,22 @@ private fun MainNavigation(
                         onOpenAudit = { go(Routes.ADMIN_AUDIT) },
                         onOpenSettings = { go(Routes.ADMIN_SETTINGS) },
                     )
+                    }
+                }
+                composable(Routes.ADMIN_CONTENT) {
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                        com.addonstation.mobile.ui.admin.AdminContentEditorScreen(onBack = { back() })
+                    }
+                }
+                composable(
+                    Routes.ADMIN_CONTENT_EDIT,
+                    arguments = listOf(navArgument("contentId") { type = NavType.StringType }),
+                ) { entry ->
+                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                        com.addonstation.mobile.ui.admin.AdminContentEditorScreen(
+                            itemId = entry.arguments?.getString("contentId"),
+                            onBack = { back() },
+                        )
                     }
                 }
                 composable(Routes.ADMIN_ASSETS) {

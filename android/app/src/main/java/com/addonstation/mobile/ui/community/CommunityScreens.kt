@@ -478,7 +478,7 @@ private fun lastTimeOf(channelId: String): String {
 @Composable
 fun RoomsEmpty() {
     Text(
-        stringResource(R.string.chat_no_messages),
+        stringResource(R.string.chat_no_messages_plain),
         style = AppText.bodySmall,
         color = AppColors.Muted,
         textAlign = TextAlign.Center,

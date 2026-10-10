@@ -32,8 +32,10 @@ BANDS = {"login_bg": "auth/login_bg_master.jpg", "signup_bg": "auth/signup_bg_ma
 SPLASH_MASTER = DESIGN / "splash/splash_bg_master.jpg"
 SPLASH_OLD_MASTER = DESIGN / "splash/splash_bg_old_852x1356.jpg"
 SPLASH_LEGACY = RES / "drawable-nodpi/splash_bg_legacy.jpg"
-SPLASH_TIMELINE_BG = RES / "drawable-nodpi/splash_timeline_bg.jpg"
-MINECRAFT_WORDMARK = RES / "drawable-nodpi/minecraft_wordmark.png"
+SPLASH_ORIGINAL = RES / "drawable-nodpi/splash_bg_original.jpg"
+SPLASH_LOGO = RES / "drawable-nodpi/splash_logo.png"
+APP_ICON = RES / "drawable-nodpi/app_icon.png"
+PNG_SIGNATURE = bytes((137, 80, 78, 71))
 PHONE_ASPECT = 9 / 19.5
 
 
@@ -191,16 +193,19 @@ def main() -> int:
                      legacy == (852, 1356)))
     rows.append(("الإرجاع موثّق في الكود (splash_bg_legacy)",
                  "splash_bg_legacy" in splash))
-    timeline_size = size_of(SPLASH_TIMELINE_BG)
-    rows.append(("خلفية التايملاين المرفقة موجودة (540×750)",
-                 timeline_size == (540, 750)))
+    original_size = size_of(SPLASH_ORIGINAL)
+    rows.append(("صورة المشهد المعتمدة موجودة (540×750)",
+                 original_size == (540, 750)))
     rows.append(("شعار Minecraft المرفق موجود كـ PNG",
-                 MINECRAFT_WORDMARK.exists()
-                 and MINECRAFT_WORDMARK.read_bytes()[:4] == bytes((137, 80, 78, 71))))
-    rows.append(("SplashScreen تستخدم خلفية التايملاين الجديدة",
-                 "R.drawable.splash_timeline_bg" in splash))
+                 SPLASH_LOGO.exists()
+                 and SPLASH_LOGO.read_bytes()[:4] == PNG_SIGNATURE))
+    rows.append(("أيقونة التطبيق المرفقة موجودة كـ PNG",
+                 APP_ICON.exists()
+                 and APP_ICON.read_bytes()[:4] == PNG_SIGNATURE))
+    rows.append(("SplashScreen تستخدم صورة المشهد المعتمدة",
+                 "R.drawable.splash_bg_original" in splash))
     rows.append(("SplashScreen تستخدم شعار Minecraft المرفق",
-                 "R.drawable.minecraft_wordmark" in splash))
+                 "R.drawable.splash_logo" in splash))
 
     # ── ٥) المولّد + اللوحات بلا صورة واحدة مكبَّرة ──────────────────────
     rows.append(("مولّد المقاسات محفوظ (tools/make_auth_backgrounds.py)",
@@ -220,8 +225,8 @@ def main() -> int:
             print("✗", n)
         print(f"\n✗ عدد المشاكل: {len(failed)}")
         return 1
-    print("🟢 خلفيات المصادقة بمقاس كل كثافة · شاشة البداية تستخدم الخلفية "
-          "وشعار Minecraft من الأصول الجديدة · الخلفية القديمة محفوظة للإرجاع.")
+    print("🟢 خلفيات المصادقة بمقاس كل كثافة · شاشة البداية تستخدم صورة المشهد "
+          "وشعار Minecraft وأيقونة التطبيق من المواصفة المعتمدة · الخلفية القديمة محفوظة للإرجاع.")
     return 0
 
 

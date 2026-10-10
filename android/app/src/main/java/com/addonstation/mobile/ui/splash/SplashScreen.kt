@@ -62,8 +62,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
 import com.addonstation.mobile.ui.components.appLocaleCode
+import com.addonstation.mobile.ui.theme.NotoSansScBlackFont
+import com.addonstation.mobile.ui.theme.NotoSansScRegularFont
 import com.addonstation.mobile.ui.theme.NunitoFont
 import com.addonstation.mobile.ui.theme.PixelFont
+import com.addonstation.mobile.ui.theme.PixelifyCyrillicFont
 import com.addonstation.mobile.ui.theme.TajawalFont
 import com.addonstation.mobile.ui.theme.displayStyle
 import com.addonstation.mobile.util.AppPrefs
@@ -100,11 +103,14 @@ fun SplashScreen(
     val isFirstLaunch = remember(context) { !AppPrefs.splashCompleted(context) }
     val reduceMotion = remember(context) {
         runCatching {
-            Settings.Global.getFloat(
-                context.contentResolver,
+            val scales = listOf(
                 Settings.Global.ANIMATOR_DURATION_SCALE,
-                1f,
-            ) <= 0f
+                Settings.Global.TRANSITION_ANIMATION_SCALE,
+                Settings.Global.WINDOW_ANIMATION_SCALE,
+            )
+            scales.any { key ->
+                Settings.Global.getFloat(context.contentResolver, key, 1f) <= 0f
+            }
         }.getOrDefault(false)
     }
     val startedAt = remember { SystemClock.elapsedRealtime() }
@@ -114,15 +120,22 @@ fun SplashScreen(
         Animatable(if (isFirstLaunch && reduceMotion) FULL_TIMELINE_END else 0f)
     }
     val compactProgress = remember { Animatable(0f) }
-    var compactMode by remember(isFirstLaunch, reduceMotion) {
-        mutableStateOf(!isFirstLaunch)
-    }
+    val exitProgress = remember { Animatable(0f) }
+    var compactMode by remember(isFirstLaunch) { mutableStateOf(!isFirstLaunch) }
     var introComplete by remember(isFirstLaunch, reduceMotion) {
         mutableStateOf(!isFirstLaunch || reduceMotion)
     }
     var skipRequested by remember { mutableStateOf(false) }
+    var skipEnabled by remember { mutableStateOf(false) }
+    var completionHandled by remember { mutableStateOf(false) }
 
-    // المقدمة الكاملة طولها 6.6 ثوانٍ؛ النقر يسرّع إلى إطارها الأخير.
+    LaunchedEffect(Unit) {
+        delay(1_000L)
+        skipEnabled = true
+    }
+
+    // المقدمة الكاملة (6.6 ثوانٍ) تنتهي على الإطار النهائي؛ بعد جاهزية البيانات
+    // نتلاشى إلى الوجهة التالية. الضغط بعد ثانية واحدة يقفز إلى هذا الإطار.
     LaunchedEffect(isFirstLaunch, reduceMotion, skipRequested) {
         if (isFirstLaunch && !reduceMotion) {
             introProgress.animateTo(
@@ -133,11 +146,11 @@ fun SplashScreen(
                 ),
             )
             introComplete = true
-            compactMode = true
         }
     }
 
-    // حلقات قصيرة فقط عند الحاجة، وبلا حركة إذا فُعّل تقليل الحركة.
+    // في التشغيلات اللاحقة تُعاد حركة الشعار والتحميل كل 1.5 ثانية فقط
+    // أثناء انتظار الإقلاع؛ لا تُعاد المقدمة الطويلة.
     LaunchedEffect(compactMode, reduceMotion, skipRequested) {
         if (compactMode && !reduceMotion && !skipRequested) {
             while (true) {
@@ -150,13 +163,24 @@ fun SplashScreen(
         }
     }
 
-    // المقدمة الأولى تكتمل كاملةً (6.6 ثوانٍ) قبل الخروج؛ في التشغيلات
-    // اللاحقة تبقى الحركة قصيرة (1.5 ثانية). وفي الحالتين ننتظر جاهزية الإقلاع.
-    LaunchedEffect(startupReady, introComplete) {
-        if (!startupReady || !introComplete) return@LaunchedEffect
-        val elapsed = SystemClock.elapsedRealtime() - startedAt
-        val remaining = (MIN_SPLASH_MS - elapsed).coerceAtLeast(0L)
-        if (remaining > 0L) delay(remaining)
+    // لا ننتظر أطول من حركة المقدمة نفسها: الجلسة والبيانات تُحمّلان بالتوازي.
+    // بعد 1.5 ثانية (أو النقر على تخطٍ بعد الثانية الأولى) نُظهر التلاشي النهائي.
+    LaunchedEffect(startupReady, introComplete, skipRequested) {
+        if (!startupReady || !introComplete || completionHandled) return@LaunchedEffect
+        if (!isFirstLaunch && !reduceMotion && !skipRequested) {
+            val elapsed = SystemClock.elapsedRealtime() - startedAt
+            val remaining = (MIN_SPLASH_MS - elapsed).coerceAtLeast(0L)
+            if (remaining > 0L) delay(remaining)
+        }
+        completionHandled = true
+        if (reduceMotion) {
+            exitProgress.snapTo(1f)
+        } else {
+            exitProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = if (isFirstLaunch) 400 else 240),
+            )
+        }
         AppPrefs.markSplashCompleted(context)
         onFinished()
     }
@@ -169,32 +193,45 @@ fun SplashScreen(
     }
     val activePhase: () -> Float = if (compactMode) compactPhase else timelinePhase
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val arabic = appLocaleCode().equals("ar", ignoreCase = true)
+    val languageCode = appLocaleCode().substringBefore('-').lowercase(Locale.ROOT)
+    val arabic = languageCode == "ar"
+    val russian = languageCode == "ru"
+    val chinese = languageCode == "zh"
     val brandName = stringResource(R.string.brand_wordmark).uppercase(Locale.ROOT)
-    val platformTagline = stringResource(R.string.brand_platform)
+    val platformTagline = stringResource(R.string.home_guest_card_title_plain)
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val interactionSource = remember { MutableInteractionSource() }
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
+            .graphicsLayer { alpha = 1f - exitProgress.value }
             .background(SplashBackground)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
+                enabled = skipEnabled && !completionHandled,
+                onClickLabel = skipText,
             ) { skipRequested = true }
             .semantics { contentDescription = skipText },
     ) {
         val screenHeight = maxHeight
         val shortScreen = screenHeight < 760.dp
-        val sloganSize = if (shortScreen) 26.sp else 30.sp
-        val sloganLineHeight = if (shortScreen) 36.sp else 42.sp
+        val designSize = when {
+            arabic || chinese -> 38f
+            russian -> 32f
+            else -> 30f
+        }
+        val scaleForHeight = if (shortScreen) 0.84f else 1f
+        val sloganSize = (designSize * scaleForHeight).sp
+        val lineRatio = if (arabic || russian || chinese) 1.3f else 1.4f
+        val sloganLineHeight = (designSize * scaleForHeight * lineRatio).sp
         val imageHeight = screenHeight * 0.71f
 
         // الخلفية والصبغة العمودية كما في النموذج: صورة في الأعلى، ثم تذوب
         // تدريجياً إلى #0A0F1C أسفل العبارات والعلامة التجارية.
         Image(
-            painter = painterResource(R.drawable.splash_timeline_bg),
+            painter = painterResource(R.drawable.splash_bg_original),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             alignment = Alignment.TopCenter,
@@ -228,15 +265,14 @@ fun SplashScreen(
 
         // شعار Minecraft — سقوط قصير مع ارتداد، ثم يبقى أثناء المقدمة.
         Image(
-            painter = painterResource(R.drawable.minecraft_wordmark),
+            painter = painterResource(R.drawable.splash_logo),
             contentDescription = null,
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(horizontal = 12.dp)
-                .offset(y = screenHeight * 0.10f)
-                .fillMaxWidth(0.60f)
-                .aspectRatio(480f / 95f)
+                .offset(y = minOf(84.dp, screenHeight * 0.10f))
+                .width(230.dp)
+                .aspectRatio(1200f / 238f)
                 .graphicsLayer {
                     val p = activePhase()
                     if (compactMode) {
@@ -270,7 +306,7 @@ fun SplashScreen(
                     color = SplashText,
                     phase = timelinePhase,
                     fromX = if (rtl) 30f else -30f,
-                    arabic = arabic,
+                    languageCode = languageCode,
                     fontSize = sloganSize,
                     lineHeight = sloganLineHeight,
                 )
@@ -279,15 +315,16 @@ fun SplashScreen(
                     color = SplashBlue,
                     phase = timelinePhase,
                     fromX = if (rtl) -30f else 30f,
-                    arabic = arabic,
+                    languageCode = languageCode,
                     fontSize = sloganSize,
                     lineHeight = sloganLineHeight,
+                    startAt = 0.2714f,
+                    endAt = 0.3357f,
                 )
                 SplashSparkleLine(
                     text = stringResource(R.string.splash_create_it),
                     phase = timelinePhase,
-                    rtl = rtl,
-                    arabic = arabic,
+                    languageCode = languageCode,
                     fontSize = sloganSize,
                     lineHeight = sloganLineHeight,
                 )
@@ -307,7 +344,11 @@ fun SplashScreen(
             Text(
                 text = platformTagline,
                 style = TextStyle(
-                    fontFamily = if (arabic) TajawalFont else NunitoFont,
+                    fontFamily = when {
+                        arabic -> TajawalFont
+                        chinese -> NotoSansScRegularFont
+                        else -> NunitoFont
+                    },
                     fontSize = if (shortScreen) 11.sp else 13.sp,
                     fontWeight = FontWeight.Bold,
                     lineHeight = 18.sp,
@@ -332,6 +373,7 @@ fun SplashScreen(
         SplashLoadingBar(
             phase = activePhase,
             compactMode = compactMode,
+            startupReady = startupReady,
             loadingDescription = loadingText,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -350,7 +392,11 @@ fun SplashScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 18.dp + bottomInset)
-                .graphicsLayer { alpha = if (compactMode) 1f else 0.72f },
+                .graphicsLayer {
+                    alpha = if (skipEnabled && !completionHandled) {
+                        if (compactMode) 1f else 0.72f
+                    } else 0f
+                },
         )
     }
 }
@@ -361,11 +407,13 @@ private fun SplashSloganLine(
     color: Color,
     phase: () -> Float,
     fromX: Float,
-    arabic: Boolean,
+    languageCode: String,
     fontSize: androidx.compose.ui.unit.TextUnit,
     lineHeight: androidx.compose.ui.unit.TextUnit,
+    startAt: Float = 0.1714f,
+    endAt: Float = 0.2357f,
 ) {
-    val style = splashSloganStyle(text, arabic, fontSize, lineHeight)
+    val style = splashSloganStyle(text, languageCode, fontSize, lineHeight)
     val lineHeightDp = with(LocalDensity.current) { lineHeight.toDp() }
     Text(
         text = text,
@@ -378,8 +426,8 @@ private fun SplashSloganLine(
             .height(lineHeightDp)
             .graphicsLayer {
                 val p = phase()
-                val enter = ramp(p, 0.1714f, 0.2357f)
-                alpha = phaseWindow(p, 0.1714f, 0.2357f)
+                val enter = ramp(p, startAt, endAt)
+                alpha = phaseWindow(p, startAt, endAt)
                 translationX = (1f - enter) * fromX.dp.toPx()
             },
     )
@@ -389,15 +437,15 @@ private fun SplashSloganLine(
 private fun SplashSparkleLine(
     text: String,
     phase: () -> Float,
-    rtl: Boolean,
-    arabic: Boolean,
+    languageCode: String,
     fontSize: androidx.compose.ui.unit.TextUnit,
     lineHeight: androidx.compose.ui.unit.TextUnit,
 ) {
-    val baseStyle = splashSloganStyle(text, arabic, fontSize, lineHeight)
+    val baseStyle = splashSloganStyle(text, languageCode, fontSize, lineHeight)
     val density = LocalDensity.current
     val lineHeightDp = with(density) { lineHeight.toDp() }
-    val glowRadius = with(density) { 11.dp.toPx() }
+    val wideGlowRadius = with(density) { 22.dp.toPx() }
+    val tightGlowRadius = with(density) { 10.dp.toPx() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -417,24 +465,54 @@ private fun SplashSparkleLine(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = text,
-            style = baseStyle.copy(
-                color = SplashGold,
-                textAlign = TextAlign.Center,
-                shadow = Shadow(
-                    color = SplashGold.copy(alpha = 0.36f),
-                    blurRadius = glowRadius,
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                style = baseStyle.copy(
+                    color = SplashGold.copy(alpha = 0.01f),
+                    textAlign = TextAlign.Center,
+                    shadow = Shadow(color = SplashGold.copy(alpha = 0.90f), blurRadius = wideGlowRadius),
                 ),
-            ),
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
-        )
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.graphicsLayer {
+                    val p = phase()
+                    val peak = 0.4643f
+                    alpha = if (p < peak) {
+                        ramp(p, 0.4357f, peak)
+                    } else {
+                        1f - ramp(p, peak, 0.50f)
+                    }
+                },
+            )
+            Text(
+                text = text,
+                style = baseStyle.copy(
+                    color = SplashGold.copy(alpha = 0.01f),
+                    textAlign = TextAlign.Center,
+                    shadow = Shadow(color = SplashGold.copy(alpha = 0.40f), blurRadius = tightGlowRadius),
+                ),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.graphicsLayer {
+                    alpha = 0.40f * ramp(phase(), 0.4357f, 0.50f)
+                },
+            )
+            Text(
+                text = text,
+                style = baseStyle.copy(color = SplashGold, textAlign = TextAlign.Center),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Canvas(
             Modifier
                 .padding(start = 6.dp)
-                .size(22.dp)
+                .size(30.dp)
+                .offset(x = (-34).dp, y = (-10).dp)
                 .graphicsLayer {
                     val p = phase()
                     val inProgress = ramp(p, 0.4286f, 0.4857f)
@@ -452,7 +530,6 @@ private fun SplashSparkleLine(
                     } else {
                         lerp(45f, 90f, outProgress)
                     }
-                    translationY = -8.dp.toPx()
                 },
         ) {
             drawFourPointSparkle(SplashGold)
@@ -503,10 +580,10 @@ private fun SplashBrand(
             modifier = Modifier
                 .size(72.dp)
                 .shadow(
-                    elevation = 12.dp,
+                    elevation = 24.dp,
                     shape = iconShape,
-                    ambientColor = SplashGold.copy(alpha = 0.22f),
-                    spotColor = SplashGold.copy(alpha = 0.34f),
+                    ambientColor = SplashGold.copy(alpha = 0.35f),
+                    spotColor = SplashGold.copy(alpha = 0.35f),
                 )
                 .clip(iconShape)
                 .background(SplashBackground)
@@ -545,6 +622,7 @@ private fun SplashBrand(
 private fun SplashLoadingBar(
     phase: () -> Float,
     compactMode: Boolean,
+    startupReady: Boolean,
     loadingDescription: String,
     modifier: Modifier = Modifier,
 ) {
@@ -579,12 +657,15 @@ private fun SplashLoadingBar(
                         val peak = if (compactMode) {
                             (index + 1) / 10f
                         } else {
-                            start + 0.0143f
+                            start + 0.0200f
                         }
-                        val end = if (compactMode) peak else peak + 0.0257f
+                        val end = if (compactMode) peak else start + 0.0400f
                         val fill = ramp(p, start, peak)
-                        alpha = if (p < start) 0.18f else lerp(0.18f, 1f, fill)
-                        scaleY = if (p in start..peak) {
+                        val waitingOnData = !startupReady && index >= 8
+                        alpha = if (waitingOnData || p < start) 0.18f else lerp(0.18f, 1f, fill)
+                        scaleY = if (waitingOnData) {
+                            1f
+                        } else if (p in start..peak) {
                             lerp(1f, 1.35f, fill)
                         } else if (p > peak && p < end) {
                             lerp(1.35f, 1f, ramp(p, peak, end))
@@ -600,18 +681,30 @@ private fun SplashLoadingBar(
 @Composable
 private fun splashSloganStyle(
     text: String,
-    arabic: Boolean,
+    languageCode: String,
     fontSize: androidx.compose.ui.unit.TextUnit,
     lineHeight: androidx.compose.ui.unit.TextUnit,
-): TextStyle = if (arabic) {
-    TextStyle(
+): TextStyle = when (languageCode) {
+    "ar" -> TextStyle(
         fontFamily = TajawalFont,
         fontSize = fontSize,
         fontWeight = FontWeight.ExtraBold,
         lineHeight = lineHeight,
     )
-} else {
-    displayStyle(
+    "ru" -> TextStyle(
+        fontFamily = PixelifyCyrillicFont,
+        fontSize = fontSize,
+        fontWeight = FontWeight.Bold,
+        lineHeight = lineHeight,
+    )
+    "zh" -> TextStyle(
+        fontFamily = NotoSansScBlackFont,
+        fontSize = fontSize,
+        fontWeight = FontWeight.Black,
+        letterSpacing = 4.sp,
+        lineHeight = lineHeight,
+    )
+    else -> displayStyle(
         text = text,
         sizeSp = fontSize.value,
         color = Color.Unspecified,

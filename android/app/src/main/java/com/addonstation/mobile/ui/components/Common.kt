@@ -231,8 +231,8 @@ fun RankBadge(
     val colors = rankColors(role, plan)
     val label = when {
         role == "admin" -> stringResource(R.string.role_admin)
-        role == "moderator" -> stringResource(R.string.role_moderator)
-        role == "creator" -> stringResource(R.string.role_creator)
+        role == "moderator" -> stringResource(R.string.role_moderator_plain)
+        role == "creator" -> stringResource(R.string.role_creator_plain)
         plan == "legendary" -> stringResource(R.string.role_legendary)
         plan == "epic" -> stringResource(R.string.role_epic)
         else -> stringResource(R.string.role_free)

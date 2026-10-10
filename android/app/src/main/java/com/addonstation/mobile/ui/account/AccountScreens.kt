@@ -126,7 +126,7 @@ fun NotificationsScreen(
         } else if (failed) {
             com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
         } else if (items.isEmpty() && requests.isEmpty()) {
-            EmptyState(stringResource(R.string.notif_empty))
+            EmptyState(stringResource(R.string.notif_empty_plain))
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -281,7 +281,7 @@ fun FriendsScreen(onBack: () -> Unit, onOpenProfile: (String) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.profile_friends), onBack = onBack)
+        SubScreenHeader(title = stringResource(R.string.profile_friends_plain), onBack = onBack)
         if (loading) {
             LoadingBox(text = stringResource(R.string.common_loading))
         } else if (failed) {
@@ -315,7 +315,7 @@ fun FriendsScreen(onBack: () -> Unit, onOpenProfile: (String) -> Unit) {
                         }
                     }
                 }
-                item { SectionHeader(title = stringResource(R.string.profile_friends), leadingEmoji = "👥") }
+                item { SectionHeader(title = stringResource(R.string.profile_friends_plain), leadingEmoji = "👥") }
                 items(friends, key = { it.id }) { entry ->
                     val me = container.supabase.session()?.userId
                     val otherId = if (entry.requesterId == me) entry.receiverId else entry.requesterId

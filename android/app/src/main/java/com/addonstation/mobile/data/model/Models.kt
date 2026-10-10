@@ -263,6 +263,7 @@ data class ChatReport(
     val id: Long,
     @SerialName("message_id") val messageId: Long? = null,
     @SerialName("reporter_id") val reporterId: String = "",
+    @SerialName("target_user_id") val targetUserId: String? = null,
     val reason: String = "other",
     val note: String? = null,
     val status: String = "open",

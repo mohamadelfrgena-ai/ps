@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,13 +16,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -41,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -54,6 +59,8 @@ import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.components.AvatarImage
 import com.addonstation.mobile.ui.components.ContentCard
+import com.addonstation.mobile.ui.components.CoverImage
+import com.addonstation.mobile.ui.components.DividerLine
 import com.addonstation.mobile.ui.components.EmptyState
 import com.addonstation.mobile.ui.components.FilterChip
 import com.addonstation.mobile.ui.components.GhostButton
@@ -105,7 +112,7 @@ fun CreatorsScreen(
 
     Column(Modifier.fillMaxSize()) {
         PixelTopBar(
-            title = stringResource(R.string.creator_title),
+            title = stringResource(R.string.creators_title),
             onLogoClick = onBack,
             showWallet = false,
             icon = Icons.Filled.Person,
@@ -134,16 +141,23 @@ fun CreatorsScreen(
                 creators.isEmpty() -> EmptyState(stringResource(R.string.creator_empty))
                 else -> {
                     if (featured.isNotEmpty()) {
-                        SectionHeader(title = stringResource(R.string.creator_featured), leadingEmoji = "⭐")
-                        CreatorGrid(featured, onOpenCreator)
+                        SectionHeader(title = stringResource(R.string.creator_featured))
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            items(featured, key = { it.profile.id }) { card ->
+                                CreatorFeaturedCard(card, onOpenCreator)
+                            }
+                        }
                     }
                     if (popular.isNotEmpty()) {
-                        SectionHeader(title = stringResource(R.string.creator_popular), leadingEmoji = "🔥")
-                        CreatorGrid(popular, onOpenCreator)
+                        SectionHeader(title = stringResource(R.string.creator_popular))
+                        CreatorRows(popular, onOpenCreator)
                     }
                     if (fresh.isNotEmpty()) {
-                        SectionHeader(title = stringResource(R.string.creator_new), leadingEmoji = "🌱")
-                        CreatorGrid(fresh, onOpenCreator)
+                        SectionHeader(title = stringResource(R.string.creator_new))
+                        CreatorRows(fresh, onOpenCreator)
                     }
                 }
             }
@@ -153,40 +167,91 @@ fun CreatorsScreen(
 }
 
 @Composable
-private fun CreatorGrid(cards: List<CreatorCard>, onOpen: (String) -> Unit) {
+private fun CreatorFeaturedCard(card: CreatorCard, onOpen: (String) -> Unit) {
     val container = rememberContainer()
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = Modifier.height((((cards.size + 1) / 2) * 120).dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        userScrollEnabled = false,
+    val addons = (card.published - card.worlds).coerceAtLeast(0)
+    Column(
+        Modifier.width(150.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(AppColors.Surface)
+            .border(1.dp, AppColors.Border, RoundedCornerShape(16.dp))
+            .clickable { onOpen(card.profile.id) },
     ) {
-        items(cards, key = { it.profile.id }) { card ->
+        CoverImage(
+            url = assetUrl(container, card.profile.bannerUrl),
+            modifier = Modifier.fillMaxWidth().height(64.dp),
+            radius = 0.dp,
+        )
+        Box(Modifier.fillMaxWidth().height(24.dp)) {
+            AvatarImage(
+                url = assetUrl(container, card.profile.avatarUrl),
+                size = 48.dp,
+                modifier = Modifier.offset(y = (-24).dp).padding(start = 12.dp),
+                borderColor = AppColors.Surface,
+                borderWidth = 3.dp,
+            )
+        }
+        Text(
+            card.profile.displayName ?: card.profile.username.orEmpty(),
+            style = AppText.bodySmall,
+            color = AppColors.Text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
+        Text(
+            pluralStringResource(R.plurals.creator_addons_count, addons, addons),
+            style = AppText.tiny,
+            color = AppColors.Muted,
+            maxLines = 1,
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 3.dp, bottom = 10.dp),
+        )
+    }
+}
+
+@Composable
+private fun CreatorRows(cards: List<CreatorCard>, onOpen: (String) -> Unit) {
+    val container = rememberContainer()
+    Column(Modifier.fillMaxWidth()) {
+        cards.forEachIndexed { index, card ->
+            val addons = (card.published - card.worlds).coerceAtLeast(0)
+            val addonCount = pluralStringResource(R.plurals.creator_addons_count, addons, addons)
+            val downloadCount = stringResource(R.string.item_stats_downloads_cd, card.downloads)
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(AppColors.Surface)
-                    .border(1.dp, AppColors.Border, RoundedCornerShape(16.dp))
-                    .clickable { onOpen(card.profile.id) }
-                    .padding(10.dp),
+                Modifier.fillMaxWidth().clickable { onOpen(card.profile.id) }.padding(vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                AvatarImage(url = assetUrl(container, card.profile.avatarUrl), size = 44.dp, borderColor = AppColors.Green)
-                Column(Modifier.weight(1f)) {
+                AvatarImage(
+                    url = assetUrl(container, card.profile.avatarUrl),
+                    size = 44.dp,
+                    borderColor = AppColors.Blue,
+                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
-                        card.profile.displayName ?: card.profile.username ?: "",
+                        card.profile.displayName ?: card.profile.username.orEmpty(),
                         style = AppText.bodySmall,
                         color = AppColors.Text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text("@${card.profile.username ?: ""}", style = AppText.tiny, color = AppColors.Muted, maxLines = 1)
-                    Text("📥 ${card.downloads}", style = AppText.tiny, color = AppColors.Muted)
+                    Text(
+                        "$addonCount · $downloadCount",
+                        style = AppText.tiny,
+                        color = AppColors.Muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Box(
+                    Modifier.clip(RoundedCornerShape(9.dp))
+                        .background(AppColors.Blue.copy(alpha = 0.12f))
+                        .padding(horizontal = 9.dp, vertical = 5.dp),
+                ) {
+                    Text(stringResource(R.string.role_creator_plain), style = AppText.tiny, color = AppColors.Blue, maxLines = 1)
                 }
             }
+            if (index != cards.lastIndex) DividerLine()
         }
     }
 }
@@ -267,7 +332,7 @@ fun CreatorProfileScreen(
             }
             Spacer(Modifier.height(10.dp))
             GhostButton(
-                text = stringResource(R.string.profile_open_profile),
+                text = stringResource(R.string.profile_open_profile_plain),
                 onClick = { onOpenProfile(userId) },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -308,7 +373,7 @@ fun CreatorProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     GradientButton(
-                        text = stringResource(R.string.creator_tip_send),
+                        text = stringResource(R.string.creator_tip_send_plain),
                         onClick = {
                             val value = amount.toDoubleOrNull()
                             val selectedMethod = method
@@ -342,7 +407,7 @@ fun CreatorProfileScreen(
 
             SectionHeader(title = stringResource(R.string.profile_tab_content), leadingEmoji = "📦")
             if (items.isEmpty()) {
-                EmptyState(stringResource(R.string.profile_my_content_empty))
+                EmptyState(stringResource(R.string.profile_my_content_empty_plain))
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
@@ -386,7 +451,7 @@ fun CreatorApplicationScreen(onBack: () -> Unit, onSubmitted: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var existing by remember { mutableStateOf<com.addonstation.mobile.data.model.CreatorApplication?>(null) }
-    val sentMsg = stringResource(R.string.plan_order_sent)
+    val sentMsg = stringResource(R.string.plan_order_sent_plain)
 
     LaunchedEffect(Unit) { existing = container.creators.myApplication() }
 
@@ -429,7 +494,7 @@ fun CreatorApplicationScreen(onBack: () -> Unit, onSubmitted: () -> Unit) {
             Field(stringResource(R.string.profile_about_me), bio, lines = 2) { bio = it }
 
             Spacer(Modifier.height(8.dp))
-            val guidelinesLabel = stringResource(R.string.creator_guidelines_ok)
+            val guidelinesLabel = stringResource(R.string.creator_guidelines_ok_plain)
             val ownWorkLabel = stringResource(R.string.creator_own_work)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(guidelinesLabel, guideline, { guideline = true })
@@ -510,7 +575,7 @@ fun CreatorStudioScreen(
     var fileName by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
-    val sentMsg = stringResource(R.string.plan_order_sent)
+    val sentMsg = stringResource(R.string.plan_order_sent_plain)
 
     LaunchedEffect(Unit) { submissions = container.creators.mySubmissions() }
 
@@ -526,7 +591,7 @@ fun CreatorStudioScreen(
         }
     }
     // نصوص جاهزة من الموارد: كانت مكتوبة في الكود (إنجليزي/عربي) ⇒ لا تُترجم
-    val guidelinesLabel = stringResource(R.string.creator_guidelines_ok)
+    val guidelinesLabel = stringResource(R.string.creator_guidelines_ok_plain)
     val ownWorkLabel = stringResource(R.string.creator_own_work)
     val coverFailedMsg = stringResource(R.string.creator_cover_failed)
     val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -556,9 +621,9 @@ fun CreatorStudioScreen(
             GlassCard {
                 Text(stringResource(R.string.home_creator_text), style = AppText.bodySmall, color = AppColors.Muted)
             }
-            SectionHeader(title = stringResource(R.string.admin_content), leadingEmoji = "📦")
+            SectionHeader(title = stringResource(R.string.admin_tab_submissions), leadingEmoji = "📦")
             Field(stringResource(R.string.creator_field_title), title) { title = it }
-            Field(stringResource(R.string.item_description), description, lines = 3) { description = it }
+            Field(stringResource(R.string.admin_content_description), description, lines = 3) { description = it }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("addon", "world", "resource_pack", "map").forEach { type ->
                     FilterChip(type, contentType == type, { contentType = type })
@@ -579,7 +644,7 @@ fun CreatorStudioScreen(
             Spacer(Modifier.height(6.dp))
             Field(stringResource(R.string.creator_field_version), version) { version = it }
             GhostButton(
-                text = fileName ?: stringResource(R.string.admin_add_content),
+                text = fileName ?: stringResource(R.string.admin_add_content_plain),
                 onClick = { filePicker.launch("*/*") },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -591,7 +656,7 @@ fun CreatorStudioScreen(
             )
             Spacer(Modifier.height(10.dp))
             GradientButton(
-                text = stringResource(R.string.admin_add_content),
+                text = stringResource(R.string.admin_add_content_plain),
                 onClick = {
                     scope.launch {
                         busy = true
@@ -625,9 +690,9 @@ fun CreatorStudioScreen(
                 Text(it, style = AppText.bodySmall, color = AppColors.Green)
             }
 
-            SectionHeader(title = stringResource(R.string.admin_content), leadingEmoji = "🗂")
+            SectionHeader(title = stringResource(R.string.admin_tab_submissions), leadingEmoji = "🗂")
             if (submissions.isEmpty()) {
-                EmptyState(stringResource(R.string.profile_my_content_empty))
+                EmptyState(stringResource(R.string.profile_my_content_empty_plain))
             } else {
                 submissions.forEach { submission ->
                     Row(

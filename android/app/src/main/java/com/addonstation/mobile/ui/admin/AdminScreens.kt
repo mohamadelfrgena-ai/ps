@@ -108,6 +108,7 @@ fun AdminPanelScreen(
     onBackToApp: () -> Unit,
     onOpenChat: () -> Unit,
     onOpenContent: () -> Unit,
+    onEditContent: (ContentItem) -> Unit,
     onOpenPayments: () -> Unit,
     onOpenModeration: () -> Unit,
     onOpenAssets: () -> Unit,
@@ -133,9 +134,11 @@ fun AdminPanelScreen(
     var message by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
     var dialog by remember { mutableStateOf<String?>(null) }
+    var pendingDeleteContent by remember { mutableStateOf<ContentItem?>(null) }
+    var pendingBanReport by remember { mutableStateOf<ChatReport?>(null) }
     /** المستخدم الذي نفتح له نافذة «إشراف الغرف» (null ⇒ النافذة مغلقة). */
     var roomsFor by remember { mutableStateOf<Profile?>(null) }
-    val roomsSavedMsg = stringResource(R.string.admin_rooms_saved)
+    val roomsSavedMsg = stringResource(R.string.admin_rooms_saved_plain)
     val roomsFailedMsg = stringResource(R.string.msg_generic_error)
 
     // بوابة الوصول: لا يظهر شيء لغير الأدمن
@@ -184,7 +187,7 @@ fun AdminPanelScreen(
         PixelTopBar(
             title = when (tab) {
                 0 -> stringResource(R.string.admin_overview)
-                1 -> stringResource(R.string.admin_content)
+                1 -> stringResource(R.string.admin_tab_submissions)
                 2 -> stringResource(R.string.admin_payments)
                 3 -> stringResource(R.string.admin_moderation)
                 else -> stringResource(R.string.admin_more)
@@ -241,14 +244,8 @@ fun AdminPanelScreen(
                                 .onFailure { message = it.message }
                         }
                     },
-                    onEditContent = onOpenContent,
-                    onDeleteContent = { item ->
-                        scope.launch {
-                            container.admin.deleteContent(item.id)
-                                .onSuccess { content = container.admin.allContent(20) }
-                                .onFailure { message = it.message }
-                        }
-                    },
+                    onEditContent = onEditContent,
+                    onDeleteContent = { item -> pendingDeleteContent = item },
                     onQuick = { index ->
                         when (index) {
                             0 -> onOpenContent()
@@ -264,6 +261,8 @@ fun AdminPanelScreen(
                     content = content,
                     loading = loading,
                     onOpenContentAdmin = onOpenContent,
+                    onEditContent = onEditContent,
+                    onDeleteContent = { item -> pendingDeleteContent = item },
                     onRefresh = {
                         scope.launch { content = container.admin.allContent(200) }
                     },
@@ -300,19 +299,39 @@ fun AdminPanelScreen(
                     onRetry = { reloadTick += 1 },
                     onHideMessage = { report ->
                         scope.launch {
-                            report.messageId?.let { container.chat.moderateMessage(it, true) }
-                            container.chat.closeReport(report.id, "hide")
-                            reports = container.chat.openReports()
+                            val messageId = report.messageId
+                            if (messageId == null) {
+                                message = roomsFailedMsg
+                                return@launch
+                            }
+                            container.chat.moderateMessage(messageId, true)
+                                .onSuccess {
+                                    container.chat.closeReport(report.id, "hide")
+                                        .onSuccess {
+                                            reports = container.chat.openReports()
+                                            message = null
+                                        }
+                                        .onFailure { failure -> message = failure.message ?: roomsFailedMsg }
+                                }
+                                .onFailure { failure -> message = failure.message ?: roomsFailedMsg }
                         }
                     },
                     onMuteAuthor = { report, minutes ->
                         scope.launch {
-                            val author = report.reporterId
-                            container.chat.muteUser(author, minutes, "Report #${report.id}")
-                            container.chat.closeReport(report.id, "mute")
-                            reports = container.chat.openReports()
+                            val target = container.chat.reportedUserId(report)
+                            if (target.isNullOrBlank()) {
+                                message = roomsFailedMsg
+                            } else {
+                                container.chat.muteUser(target, minutes, "Report #${report.id}")
+                                    .onSuccess {
+                                        container.chat.closeReport(report.id, "mute")
+                                        reports = container.chat.openReports()
+                                    }
+                                    .onFailure { message = it.message ?: roomsFailedMsg }
+                            }
                         }
                     },
+                    onBanUser = { report -> pendingBanReport = report },
                     onClose = { report ->
                         scope.launch {
                             container.chat.closeReport(report.id, "close")
@@ -372,7 +391,7 @@ fun AdminPanelScreen(
             ) {
                 listOf(
                     stringResource(R.string.admin_overview) to Icons.Filled.AdminPanelSettings,
-                    stringResource(R.string.admin_content) to Icons.Filled.Image,
+                    stringResource(R.string.admin_tab_submissions) to Icons.Filled.Image,
                     stringResource(R.string.admin_payments) to Icons.Filled.Receipt,
                     stringResource(R.string.admin_moderation) to Icons.Filled.Flag,
                     stringResource(R.string.admin_more) to Icons.Filled.Settings,
@@ -416,6 +435,53 @@ fun AdminPanelScreen(
             },
         )
     }
+
+    pendingDeleteContent?.let { item ->
+        ConfirmDialog(
+            title = stringResource(R.string.admin_delete_content_label),
+            text = item.title,
+            confirmText = stringResource(R.string.common_delete),
+            onConfirm = {
+                pendingDeleteContent = null
+                scope.launch {
+                    container.admin.deleteContent(item.id)
+                        .onSuccess {
+                            content = container.admin.allContent(200)
+                            message = null
+                        }
+                        .onFailure { message = it.message ?: roomsFailedMsg }
+                }
+            },
+            onDismiss = { pendingDeleteContent = null },
+        )
+    }
+
+    pendingBanReport?.let { report ->
+        ConfirmDialog(
+            title = stringResource(R.string.admin_ban_user),
+            text = report.note?.takeIf(String::isNotBlank)
+                ?: "#${report.id} · ${report.reason} · ${report.targetUserId?.take(8) ?: report.messageId ?: "—"}",
+            confirmText = stringResource(R.string.admin_ban_user),
+            onConfirm = {
+                pendingBanReport = null
+                scope.launch {
+                    val target = container.chat.reportedUserId(report)
+                    if (target.isNullOrBlank()) {
+                        message = roomsFailedMsg
+                        return@launch
+                    }
+                    container.chat.banUser(target, "Report #${report.id}")
+                        .onSuccess {
+                            container.chat.closeReport(report.id, "ban")
+                            reports = container.chat.openReports()
+                            message = "✓"
+                        }
+                        .onFailure { message = it.message ?: roomsFailedMsg }
+                }
+            },
+            onDismiss = { pendingBanReport = null },
+        )
+    }
 }
 
 @Composable
@@ -434,7 +500,7 @@ private fun OverviewTab(
     onSaveUser: (Profile, String?, String?, Int?) -> Unit,
     /** فتح نافذة «إشراف الغرف» لهذا المستخدم. */
     onManageRooms: (Profile) -> Unit = {},
-    onEditContent: () -> Unit,
+    onEditContent: (ContentItem) -> Unit,
     onDeleteContent: (ContentItem) -> Unit,
     onQuick: (Int) -> Unit,
 ) {
@@ -459,8 +525,8 @@ private fun OverviewTab(
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CounterCard("${stats?.pendingOrders ?: 0}", stringResource(R.string.admin_payments), Modifier.weight(1f), AppColors.Gold)
-            CounterCard("${stats?.openReports ?: 0}", stringResource(R.string.admin_chat_reports), Modifier.weight(1f), AppColors.Red)
-            CounterCard("${stats?.pendingCreatorApps ?: 0}", stringResource(R.string.admin_creator_requests), Modifier.weight(1f), AppColors.Purple)
+            CounterCard("${stats?.openReports ?: 0}", stringResource(R.string.admin_chat_reports_plain), Modifier.weight(1f), AppColors.Red)
+            CounterCard("${stats?.pendingCreatorApps ?: 0}", stringResource(R.string.admin_creator_requests_plain), Modifier.weight(1f), AppColors.Purple)
             CounterCard("${stats?.acBalanceTotal ?: 0}", "AC", Modifier.weight(1f), AppColors.Green)
         }
 
@@ -481,8 +547,8 @@ private fun OverviewTab(
             listOf(
                 "all" to stringResource(R.string.common_all),
                 "user" to stringResource(R.string.role_user),
-                "creator" to stringResource(R.string.role_creator),
-                "moderator" to stringResource(R.string.role_moderator),
+                "creator" to stringResource(R.string.role_creator_plain),
+                "moderator" to stringResource(R.string.role_moderator_plain),
                 "admin" to stringResource(R.string.role_admin),
             ).forEach { (key, label) ->
                 FilterChip(label = label, selected = roleFilter == key, onClick = { onRoleFilter(key) })
@@ -505,7 +571,7 @@ private fun OverviewTab(
             }
         }
 
-        SectionHeader(title = stringResource(R.string.admin_content), leadingEmoji = "📦")
+        SectionHeader(title = stringResource(R.string.admin_tab_submissions), leadingEmoji = "📦")
         content.take(10).forEach { item ->
             Row(
                 modifier = Modifier
@@ -532,7 +598,7 @@ private fun OverviewTab(
                     tint = AppColors.Blue,
                     modifier = Modifier
                         .size(18.dp)
-                        .clickable { onEditContent() },
+                        .clickable { onEditContent(item) },
                 )
                 androidx.compose.material3.Icon(
                     Icons.Filled.Delete,
@@ -552,12 +618,12 @@ private fun OverviewTab(
 private fun LazyRowQuick(onQuick: (Int) -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
         val buttons = listOf(
-            "＋" to stringResource(R.string.admin_add_content),
+            "＋" to stringResource(R.string.admin_add_content_plain),
             "💳" to stringResource(R.string.admin_payments),
-            "⚑" to stringResource(R.string.admin_chat_reports),
-            "🧪" to stringResource(R.string.admin_creator_requests),
-            "⚙" to stringResource(R.string.admin_plans_and_payment),
-            "🖼" to stringResource(R.string.admin_assets),
+            "⚑" to stringResource(R.string.admin_chat_reports_plain),
+            "🧪" to stringResource(R.string.admin_creator_requests_plain),
+            "⚙" to stringResource(R.string.admin_plans_and_payment_plain),
+            "🖼" to stringResource(R.string.admin_assets_plain),
         )
         buttons.forEachIndexed { index, (emoji, label) ->
             Column(
@@ -792,7 +858,7 @@ private fun AdminUserRow(
             )
             GhostButton(
                 // +30 يوماً للاشتراك (ليس رصيد AC)
-                text = stringResource(R.string.admin_plan_days),
+                text = stringResource(R.string.admin_plan_days_plain),
                 onClick = { onSave(user, plan, role, 30) },
                 modifier = Modifier.weight(1f),
             )
@@ -818,6 +884,8 @@ private fun ContentTab(
     failed: Boolean = false,
     onRetry: () -> Unit = {},
     onOpenContentAdmin: () -> Unit,
+    onEditContent: (ContentItem) -> Unit,
+    onDeleteContent: (ContentItem) -> Unit,
     onRefresh: () -> Unit,
 ) {
     val container = rememberContainer()
@@ -831,7 +899,7 @@ private fun ContentTab(
         Spacer(Modifier.height(10.dp))
         Text(stringResource(R.string.admin_kicker_content), style = AppText.kicker, color = AppColors.Blue)
         GradientButton(
-            text = stringResource(R.string.admin_add_content),
+            text = stringResource(R.string.admin_add_content_plain),
             onClick = onOpenContentAdmin,
             icon = Icons.Filled.Add,
             modifier = Modifier.fillMaxWidth(),
@@ -851,6 +919,7 @@ private fun ContentTab(
                         .padding(vertical = 4.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(AppColors.Elevated)
+                        .clickable { onEditContent(item) }
                         .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -868,7 +937,29 @@ private fun ContentTab(
                             color = AppColors.Muted,
                         )
                     }
-                    Text(metaOf(item), style = AppText.tiny, color = AppColors.Dim)
+                    Text(metaOf(item), style = AppText.tiny, color = AppColors.Dim, maxLines = 1)
+                    Box(
+                        Modifier.size(44.dp).clickable { onEditContent(item) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        androidx.compose.material3.Icon(
+                            Icons.Filled.Edit,
+                            contentDescription = stringResource(R.string.common_edit),
+                            tint = AppColors.Blue,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Box(
+                        Modifier.size(44.dp).clickable { onDeleteContent(item) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        androidx.compose.material3.Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.common_delete),
+                            tint = AppColors.Red,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 }
             }
         }
@@ -886,6 +977,7 @@ private fun PaymentsTab(
     onReject: (PaymentOrder, String?) -> Unit,
     onOpenReceipt: (PaymentOrder) -> Unit,
 ) {
+    var pendingApproval by remember { mutableStateOf<PaymentOrder?>(null) }
     Column(
         Modifier
             .fillMaxSize()
@@ -926,7 +1018,7 @@ private fun PaymentsTab(
                         )
                         GradientButton(
                             text = stringResource(R.string.admin_confirm_payment),
-                            onClick = { onApprove(order) },
+                            onClick = { pendingApproval = order },
                             modifier = Modifier.weight(1f),
                         )
                         GhostButton(
@@ -941,6 +1033,25 @@ private fun PaymentsTab(
         }
         Spacer(Modifier.height(96.dp))
     }
+
+    pendingApproval?.let { order ->
+        ConfirmDialog(
+            title = stringResource(R.string.admin_confirm_payment),
+            text = stringResource(
+                R.string.admin_confirm_payment_body,
+                order.referenceCode.ifBlank { order.userId.take(8) },
+                order.planId,
+                order.amountLyd.toString(),
+            ),
+            confirmText = stringResource(R.string.admin_approve),
+            confirmColor = AppColors.Green,
+            onConfirm = {
+                pendingApproval = null
+                onApprove(order)
+            },
+            onDismiss = { pendingApproval = null },
+        )
+    }
 }
 
 @Composable
@@ -951,6 +1062,7 @@ private fun ModerationTab(
     onRetry: () -> Unit = {},
     onHideMessage: (ChatReport) -> Unit,
     onMuteAuthor: (ChatReport, Int) -> Unit,
+    onBanUser: (ChatReport) -> Unit,
     onClose: (ChatReport) -> Unit,
 ) {
     Column(
@@ -967,7 +1079,7 @@ private fun ModerationTab(
         } else if (failed) {
             com.addonstation.mobile.ui.components.ErrorState(onRetry = onRetry)
         } else if (reports.isEmpty()) {
-            EmptyState(stringResource(R.string.admin_open_reports_none))
+            EmptyState(stringResource(R.string.admin_open_reports_none_plain))
         } else {
             reports.forEach { report ->
                 GlassCard(padding = 10.dp) {
@@ -977,7 +1089,7 @@ private fun ModerationTab(
                         color = AppColors.Text,
                     )
                     Text(
-                        "message: ${report.messageId ?: "—"} · author: ${report.reporterId.take(8)}",
+                        "message: ${report.messageId ?: "—"} · reporter: ${report.reporterId.take(8)} · target: ${report.targetUserId?.take(8) ?: "—"}",
                         style = AppText.tiny,
                         color = AppColors.Muted,
                     )
@@ -987,17 +1099,25 @@ private fun ModerationTab(
                             text = stringResource(R.string.chat_hide_message),
                             onClick = { onHideMessage(report) },
                             modifier = Modifier.weight(1f),
+                            enabled = report.messageId != null,
                         )
                         GhostButton(
                             text = stringResource(R.string.chat_mute_user),
                             onClick = { onMuteAuthor(report, 60) },
                             modifier = Modifier.weight(1f),
                         )
-                        GhostButton(
-                            text = stringResource(R.string.common_close),
-                            onClick = { onClose(report) },
-                        )
                     }
+                    GhostButton(
+                        text = stringResource(R.string.admin_ban_user),
+                        onClick = { onBanUser(report) },
+                        modifier = Modifier.fillMaxWidth(),
+                        borderColor = AppColors.Red.copy(alpha = 0.55f),
+                    )
+                    GhostButton(
+                        text = stringResource(R.string.admin_close_report),
+                        onClick = { onClose(report) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 Spacer(Modifier.height(8.dp))
             }
@@ -1019,9 +1139,9 @@ private fun MoreTab(onOpen: (String) -> Unit) {
         Text(stringResource(R.string.admin_tools), style = AppText.pageTitle, color = AppColors.Text)
         Spacer(Modifier.height(10.dp))
         GlassCard(padding = 8.dp) {
-            RowItem(Icons.Filled.Image, stringResource(R.string.admin_assets), onClick = { onOpen("assets") }, tint = AppColors.Blue)
-            RowItem(Icons.Filled.Person, stringResource(R.string.admin_creator_requests), onClick = { onOpen("creators") }, tint = AppColors.Purple)
-            RowItem(Icons.Filled.Settings, stringResource(R.string.admin_plans_and_payment), onClick = { onOpen("settings") }, tint = AppColors.Gold)
+            RowItem(Icons.Filled.Image, stringResource(R.string.admin_assets_plain), onClick = { onOpen("assets") }, tint = AppColors.Blue)
+            RowItem(Icons.Filled.Person, stringResource(R.string.admin_creator_requests_plain), onClick = { onOpen("creators") }, tint = AppColors.Purple)
+            RowItem(Icons.Filled.Settings, stringResource(R.string.admin_plans_and_payment_plain), onClick = { onOpen("settings") }, tint = AppColors.Gold)
             RowItem(Icons.Filled.MonetizationOn, stringResource(R.string.admin_ac_tools), onClick = { onOpen("ac") }, tint = AppColors.Green)
             RowItem(Icons.Filled.Receipt, stringResource(R.string.admin_tips_title), onClick = { onOpen("tips") }, tint = AppColors.Gold)
             RowItem(Icons.Filled.Chat, stringResource(R.string.admin_chat_plain), onClick = { onOpen("chat") }, tint = AppColors.Blue)
@@ -1107,7 +1227,7 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.admin_assets), onBack = onBack)
+        SubScreenHeader(title = stringResource(R.string.admin_assets_plain), onBack = onBack)
         Column(
             Modifier
                 .fillMaxSize()
@@ -1143,8 +1263,13 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("avatar", "banner", "sticker", "item").forEach { t ->
-                    FilterChip(t, type == t, { type = t })
+                listOf(
+                    "avatar" to stringResource(R.string.admin_tab_avatars),
+                    "sticker" to stringResource(R.string.chat_stickers_tab),
+                    "banner" to stringResource(R.string.profile_banner_section),
+                    "item" to stringResource(R.string.admin_tab_submissions),
+                ).forEach { (assetType, label) ->
+                    FilterChip(label, type == assetType, { type = assetType })
                 }
             }
             Spacer(Modifier.height(6.dp))
@@ -1174,8 +1299,9 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
             }
             Spacer(Modifier.height(8.dp))
             GradientButton(
-                text = stringResource(R.string.admin_save),
+                text = stringResource(R.string.admin_upload),
                 onClick = { picker.launch("image/*") },
+                icon = Icons.Filled.Image,
                 modifier = Modifier.fillMaxWidth(),
             )
             message?.let {
@@ -1186,7 +1312,7 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
                     color = if (messageIsError) AppColors.Red else AppColors.Green,
                 )
             }
-            SectionHeader(title = stringResource(R.string.admin_assets))
+            SectionHeader(title = stringResource(R.string.admin_assets_plain))
             if (loading) {
                 LoadingBox()
             } else if (failed) {
@@ -1266,16 +1392,16 @@ fun AdminCreatorReviewScreen(onBack: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.admin_creator_requests), onBack = onBack)
+        SubScreenHeader(title = stringResource(R.string.admin_creator_requests_plain), onBack = onBack)
         Row(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            FilterChip(stringResource(R.string.admin_creator_requests), tab == 0, { tab = 0 })
-            FilterChip("CREATOR REVIEW", tab == 1, { tab = 1 })
-            FilterChip("TIPS", tab == 2, { tab = 2 })
+            FilterChip(stringResource(R.string.admin_tab_requests), tab == 0, { tab = 0 })
+            FilterChip(stringResource(R.string.admin_tab_submissions), tab == 1, { tab = 1 })
+            FilterChip(stringResource(R.string.admin_tips_title), tab == 2, { tab = 2 })
         }
         Column(
             Modifier
@@ -1576,7 +1702,7 @@ fun AdminAcScreen(onBack: () -> Unit, preselectUserId: String? = null) {
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     GradientButton(
-                        text = stringResource(R.string.admin_give_ac_give),
+                        text = stringResource(R.string.admin_give_plain),
                         onClick = { if (targetId != null) ask(targetId, amountValue) else badAmount = true },
                         enabled = !busy && targetId != null,
                         modifier = Modifier.weight(1f),
@@ -1607,8 +1733,8 @@ fun AdminAcScreen(onBack: () -> Unit, preselectUserId: String? = null) {
             result?.let { (value, balance) ->
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    if (value >= 0) stringResource(R.string.admin_give_ac_done, value, balance)
-                    else stringResource(R.string.admin_give_ac_done_deduct, -value, balance),
+                    if (value >= 0) stringResource(R.string.admin_give_ac_done_plain, value, balance)
+                    else stringResource(R.string.admin_give_ac_done_deduct_plain, -value, balance),
                     style = AppText.tiny,
                     color = AppColors.Green,
                 )
@@ -1793,6 +1919,14 @@ fun AdminAcScreen(onBack: () -> Unit, preselectUserId: String? = null) {
             if (existingCodes.isNotEmpty()) {
                 SectionHeader(title = stringResource(R.string.admin_codes_latest))
                 existingCodes.take(12).forEach { row ->
+                    val codeAmount = (row["amount"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+                    val usedCount = (row["used_count"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+                    val maxUses = (row["max_uses"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 1
+                    val expiresAt = (row["expires_at"] as? JsonPrimitive)?.content
+                    val disabled = (row["active"] as? JsonPrimitive)?.content == "false"
+                    val expired = com.addonstation.mobile.data.model.parseIsoMillis(expiresAt)
+                        ?.let { it < System.currentTimeMillis() } == true
+                    val used = usedCount >= maxUses
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1809,15 +1943,18 @@ fun AdminAcScreen(onBack: () -> Unit, preselectUserId: String? = null) {
                             modifier = Modifier.weight(1f),
                         )
                         Text(
-                            "%,d AC".format(java.util.Locale.US, (row["amount"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0),
+                            text = when {
+                                expired -> stringResource(R.string.admin_code_expired)
+                                used -> stringResource(R.string.admin_code_used)
+                                disabled -> stringResource(R.string.ac_redeem_off)
+                                else -> "+%,d AC".format(java.util.Locale.US, codeAmount)
+                            },
                             style = AppText.tiny,
-                            color = AppColors.Gold,
-                        )
-                        Spacer(Modifier.padding(horizontal = 6.dp))
-                        Text(
-                            "${(row["used_count"] as? JsonPrimitive)?.content ?: "0"}/${(row["max_uses"] as? JsonPrimitive)?.content ?: "1"}",
-                            style = AppText.tiny,
-                            color = AppColors.Muted,
+                            color = when {
+                                expired || disabled -> AppColors.Red
+                                used -> AppColors.Gold
+                                else -> AppColors.Green
+                            },
                         )
                     }
                 }
@@ -1961,7 +2098,7 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.admin_plans_and_payment), onBack = onBack)
+        SubScreenHeader(title = stringResource(R.string.admin_plans_and_payment_plain), onBack = onBack)
         Column(
             Modifier
                 .fillMaxSize()
@@ -2360,7 +2497,7 @@ fun AdminChatScreen(onBack: () -> Unit) {
             }
             Spacer(Modifier.height(8.dp))
             GradientButton(
-                text = stringResource(R.string.chat_send),
+                text = stringResource(R.string.admin_send_announcement),
                 onClick = {
                     scope.launch {
                         container.chat.sendAnnouncement(targetChannel, announcement)

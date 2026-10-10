@@ -26,6 +26,19 @@ val PixelFont: FontFamily = FontFamily(
     Font(R.font.pixel_regular, FontWeight.Black),
 )
 
+/** Pixelify Sans: Cyrillic fallback for the Russian splash headlines. */
+val PixelifyCyrillicFont: FontFamily = FontFamily(
+    Font(R.font.pixelify_sans_bold, FontWeight.Bold),
+)
+
+/** Small glyph subsets of Noto Sans SC used by the Chinese splash text. */
+val NotoSansScRegularFont: FontFamily = FontFamily(
+    Font(R.font.noto_sans_sc_regular, FontWeight.Normal),
+)
+val NotoSansScBlackFont: FontFamily = FontFamily(
+    Font(R.font.noto_sans_sc_black, FontWeight.Black),
+)
+
 val BodyFont: FontFamily = FontFamily.Default
 
 /** أرقام المحفظة: أرقام روبوتو متوسطة واضحة على الخلفيات الداكنة. */

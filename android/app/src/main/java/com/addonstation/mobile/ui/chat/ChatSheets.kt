@@ -281,8 +281,8 @@ fun AttachSheet(
 @Composable
 fun AttachMediaSheet(onDismiss: () -> Unit, onAudio: () -> Unit, onVideo: () -> Unit) {
     SheetScaffold(onDismiss) {
-        SheetRow("🎙️", stringResource(R.string.chat_audio_label), onAudio)
-        SheetRow("🎬", stringResource(R.string.chat_video_label), onVideo)
+        SheetRow("🎙️", stringResource(R.string.chat_audio_label_plain), onAudio)
+        SheetRow("🎬", stringResource(R.string.chat_video_label_plain), onVideo)
     }
 }
 
@@ -386,8 +386,8 @@ private fun groupLabel(key: String): String = when (key) {
     "admin" -> stringResource(R.string.grp_admin)
     "moderator" -> stringResource(R.string.grp_moderators)
     "creator" -> stringResource(R.string.grp_creators)
-    "legendary" -> stringResource(R.string.grp_legendary)
-    "epic" -> stringResource(R.string.grp_epic)
+    "legendary" -> stringResource(R.string.grp_legendary_plain)
+    "epic" -> stringResource(R.string.grp_epic_plain)
     "online" -> stringResource(R.string.grp_online)
     else -> stringResource(R.string.grp_offline)
 }
@@ -500,7 +500,7 @@ fun MessageActionsSheet(
                 if (ui.message.status != "deleted") {
                     ActionRow(
                         Icons.Filled.Delete,
-                        stringResource(R.string.chat_delete_staff),
+                        stringResource(R.string.chat_delete_staff_plain),
                         onDeleteStaff,
                         AppColors.Red,
                     )
@@ -841,22 +841,22 @@ fun DiscordProfileCardSheet(
                 if (isSelf(container, profile)) {
                     // ملفي أنا: لا «مراسلة» ولا «إضافة صديق» — زرّ تعديل الملف
                     com.addonstation.mobile.ui.components.GradientButton(
-                        text = stringResource(R.string.profile_edit_mine),
+                        text = stringResource(R.string.profile_edit_mine_plain),
                         onClick = onEditProfile,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         com.addonstation.mobile.ui.components.GradientButton(
-                            text = stringResource(R.string.profile_message),
+                            text = stringResource(R.string.profile_message_plain),
                             onClick = onMessage,
                             modifier = Modifier.weight(1f),
                         )
                         GhostButton(
                             text = when (friendState) {
-                                "friends" -> stringResource(R.string.profile_friends)
+                                "friends" -> stringResource(R.string.profile_friends_plain)
                                 "sent" -> stringResource(R.string.profile_friend_sent)
-                                else -> stringResource(R.string.profile_add_friend)
+                                else -> stringResource(R.string.profile_add_friend_plain)
                             },
                             onClick = { if (friendState == "none") onAddFriend() },
                             enabled = friendState == "none",

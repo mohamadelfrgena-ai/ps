@@ -116,7 +116,7 @@ for token, description in (
     ("FULL_TIMELINE_MS = 6_600", "مدة المقدمة الأولى 6.6s"),
     ("COMPACT_LOOP_MS = 1_500", "حلقة التشغيلات التالية 1.5s"),
     ("MIN_SPLASH_MS = 1_500L", "الحد الأدنى لعرض البداية 1.5s"),
-    ("if (!startupReady || !introComplete) return@LaunchedEffect", "الخروج ينتظر الجاهزية واكتمال المقدمة"),
+    ("if (!startupReady || !introComplete || completionHandled) return@LaunchedEffect", "الخروج ينتظر الجاهزية واكتمال المقدمة ولا يتكرر"),
     ("introComplete = true", "علامة اكتمال المقدمة"),
     ("skipRequested", "تخطي الحركة بالنقر"),
     ("AppPrefs.splashCompleted(context)", "تذكّر اكتمال أول تشغيل"),

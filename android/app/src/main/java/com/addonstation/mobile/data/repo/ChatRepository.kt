@@ -624,6 +624,19 @@ class ChatRepository(
         )
     }.getOrElse { emptyList() }
 
+    /** Target of a user report, or the author of a message report. */
+    suspend fun reportedUserId(report: ChatReport): String? {
+        report.targetUserId?.takeIf(String::isNotBlank)?.let { return it }
+        val messageId = report.messageId ?: return null
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                supabase.decodeList<Map<String, kotlinx.serialization.json.JsonElement>>(
+                    supabase.select("chat_messages", "select=user_id&id=eq.$messageId&limit=1")
+                ).firstOrNull()?.get("user_id")?.asString()
+            }.getOrNull()
+        }
+    }
+
     suspend fun closeReport(reportId: Long, action: String = "close"): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {

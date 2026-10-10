@@ -44,10 +44,18 @@ def strip_noise(src: str) -> str:
                 i += 1
             i += 1
         elif c == "'":
+            # Kotlin char literals can contain escaped characters (for example
+            # '\\\\'); consume escapes as pairs so the escaped quote is not
+            # mistaken for the end of the literal.
             i += 1
-            while i < n and not (src[i] == "'" and src[i - 1] != "\\"):
-                i += 1
-            i += 1
+            while i < n:
+                if src[i] == "\\":
+                    i += 2
+                elif src[i] == "'":
+                    i += 1
+                    break
+                else:
+                    i += 1
         else:
             out.append(c)
             i += 1

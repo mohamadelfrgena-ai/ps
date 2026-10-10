@@ -103,6 +103,12 @@ class AdminRepository(private val supabase: SupabaseClient) {
         )
     }.getOrElse { emptyList() }
 
+    suspend fun contentById(id: String): ContentItem? = runCatching {
+        supabase.decodeList<ContentItem>(
+            supabase.select("content_items", "select=*&id=eq.$id&limit=1")
+        ).firstOrNull()
+    }.getOrNull()
+
     suspend fun upsertContent(
         id: String?,
         title: String,

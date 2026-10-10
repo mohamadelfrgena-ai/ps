@@ -279,10 +279,10 @@ fun ContentDetailScreen(
         fileMissing = stringResource(R.string.item_file_missing),
         notEnoughAc = stringResource(R.string.ac_not_enough),
         downloadLimit = stringResource(R.string.plan_download_limit),
-        downloading = stringResource(R.string.item_downloading),
-        fileSavedAt = stringResource(R.string.item_downloading),
+        downloading = stringResource(R.string.item_downloading_plain),
+        fileSavedAt = stringResource(R.string.item_downloading_plain),
     )
-    val addedFav = stringResource(R.string.item_added_fav)
+    val addedFav = stringResource(R.string.item_added_fav_plain)
     val removedFav = stringResource(R.string.item_removed_fav)
 
     LaunchedEffect(itemId) {
@@ -349,7 +349,7 @@ fun ContentDetailScreen(
                     )
                     RankBadge(role = creatorProfile.role, plan = creatorProfile.effectivePlan)
                     Text(
-                        text = "← " + stringResource(R.string.item_view),
+                        text = "← " + stringResource(R.string.item_view_plain),
                         style = AppText.bodySmall,
                         color = AppColors.Blue,
                         modifier = Modifier.clickable { onOpenCreatorProfile(creatorProfile.id) },
@@ -382,14 +382,14 @@ fun ContentDetailScreen(
                         icon = Icons.Filled.FileDownload,
                     )
                     access is com.addonstation.mobile.data.repo.AccessState.RequiresEpic -> GradientButton(
-                        text = stringResource(R.string.item_requires_epic),
+                        text = stringResource(R.string.item_requires_epic_plain),
                         onClick = onUpgrade,
                         modifier = Modifier.weight(1f),
                         colors = listOf(AppColors.Purple, AppColors.Purple.copy(alpha = 0.65f)),
                         textColor = Color.Black,
                     )
                     access is com.addonstation.mobile.data.repo.AccessState.RequiresLegendary -> GradientButton(
-                        text = stringResource(R.string.item_requires_legendary),
+                        text = stringResource(R.string.item_requires_legendary_plain),
                         onClick = onUpgrade,
                         modifier = Modifier.weight(1f),
                         colors = listOf(AppColors.GoldLight, AppColors.GoldDark),
@@ -420,7 +420,7 @@ fun ContentDetailScreen(
                     )
                 }
                 GhostButton(
-                    text = if (favourite) stringResource(R.string.item_saved) else stringResource(R.string.item_save),
+                    text = if (favourite) stringResource(R.string.item_saved_plain) else stringResource(R.string.item_save_plain),
                     onClick = {
                         scope.launch {
                             if (container.supabase.session() == null) {
@@ -441,7 +441,7 @@ fun ContentDetailScreen(
 
             if (busy) {
                 Spacer(Modifier.height(10.dp))
-                LoadingBox(text = stringResource(R.string.item_downloading))
+                LoadingBox(text = stringResource(R.string.item_downloading_plain))
             }
             message?.let {
                 Spacer(Modifier.height(8.dp))

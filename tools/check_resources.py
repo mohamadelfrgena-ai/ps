@@ -75,7 +75,10 @@ def main() -> int:
             names.append(name)
             text = el.text or ""
 
-            bad = FMT_RE.search(text)
+            # Android String.format escapes a literal percent as "%%". Remove
+            # those complete escapes before checking placeholders so the last
+            # percent of "%1$d%%" is not mistaken for a dangling conversion.
+            bad = FMT_RE.search(text.replace("%%", ""))
             if bad:
                 problems.append(f"صيغة % غير صحيحة: {rel} · {name} → {text[:50]!r}")
 
