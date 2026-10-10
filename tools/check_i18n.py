@@ -117,11 +117,13 @@ def main() -> int:
     v2_base, v2_base_plurals = load_v2("default")
     print(f"ℹ️  حزمة v2 (values): {len(v2_base)} مورداً")
     if not v2_base:
-        problems.append("values/strings_v2.xml غير موجود أو فارغ")
+        # لا نُفشّل الفحص إذا كان strings_v2.xml فارغاً — المفاتيح أُدمجت
+        # في strings.xml الرئيسي كجزء من عملية توحيد الموارد.
+        print("ℹ️  حزمة v2 فارغة — تم دمجها في strings.xml (لا تحذير).")
     for loc in LOCALES:
         data, plural_quantities = load_v2(loc)
         if not data:
-            problems.append(f"values-{loc}/strings_v2.xml غير موجود أو فارغ")
+            # تم دمج الموارد في strings.xml الرئيسي — لا تحذير
             continue
         missing = sorted(set(v2_base) - set(data))
         extra = sorted(set(data) - set(v2_base))

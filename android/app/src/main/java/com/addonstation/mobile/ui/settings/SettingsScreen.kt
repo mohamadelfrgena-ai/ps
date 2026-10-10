@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.outlined.Info
@@ -685,7 +686,289 @@ fun SettingsScreen(
             "password_error" -> { title = stringResource(R.string.auth_recovery_title); message = dialogError?.let { apiErrorText(it) } ?: stringResource(R.string.msg_generic_error) }
             else -> { title = stringResource(R.string.set_about); message = "" }
         }
-        InfoDialog(title = title, text = message, onClose = { dialogKey = null; dialogError = null })
+        when (key) {
+            "about" -> AboutDialog(
+                version = BuildConfig.VERSION_NAME,
+                versionCode = BuildConfig.VERSION_CODE,
+                onClose = { dialogKey = null },
+            )
+            "terms" -> ParagraphsDialog(
+                title = stringResource(R.string.set_terms),
+                fullText = stringResource(R.string.set_terms_text),
+                onClose = { dialogKey = null },
+            )
+            "privacy" -> ParagraphsDialog(
+                title = stringResource(R.string.set_privacy),
+                fullText = stringResource(R.string.set_privacy_text),
+                onClose = { dialogKey = null },
+            )
+            else -> InfoDialog(title = title, text = message, onClose = { dialogKey = null; dialogError = null })
+        }
+    }
+}
+
+/**
+ * SPEC §6 — Privacy/Terms: تقسيم النص إلى فقرات بناءً على أسطر فارغة.
+ * الفقرة الأخيرة (تاريخ التحديث) تُعرض كشريحة، والباقي كصفوف مرقّمة.
+ */
+@Composable
+private fun ParagraphsDialog(title: String, fullText: String, onClose: () -> Unit) {
+    val parts = fullText.split("\n\n", "\n", limit = 2)
+    val body = parts.getOrNull(0) ?: fullText
+    val lastUpdated = parts.getOrNull(1)
+    val paragraphs = body.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+
+    AlertDialog(
+        onDismissRequest = onClose,
+        containerColor = AppColors.AuthSurface,
+        titleContentColor = AppColors.AuthText,
+        textContentColor = AppColors.AuthMuted,
+        title = { Text(title, style = AppText.sectionTitle) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 460.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                if (!lastUpdated.isNullOrBlank()) {
+                    // شريحة "Last updated" — 32dp، surfaceHigh، 12sp/800
+                    Box(
+                        modifier = Modifier
+                            .padding(bottom = 10.dp)
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(AppColors.AuthSurfaceHigh)
+                            .border(1.dp, AppColors.AuthBorder, RoundedCornerShape(16.dp))
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        Text(
+                            lastUpdated,
+                            style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold),
+                            color = AppColors.AuthText,
+                        )
+                    }
+                }
+                // بطاقة الفقرات
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AppColors.AuthSurfaceHigh)
+                        .border(1.dp, AppColors.AuthBorder, RoundedCornerShape(16.dp)),
+                ) {
+                    paragraphs.forEachIndexed { index, paragraph ->
+                        if (index > 0) {
+                            Box(Modifier.fillMaxWidth().height(1.dp).background(AppColors.AuthBorder))
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            // رقم الفقرة في دائرة 26
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(AppColors.AuthBlue.copy(alpha = 0.16f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "${index + 1}",
+                                    style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold),
+                                    color = AppColors.AuthAccentBlue,
+                                )
+                            }
+                            Text(
+                                paragraph,
+                                style = TextStyle(fontSize = 14.sp, lineHeight = 22.sp),
+                                color = AppColors.AuthText,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onClose) {
+                Text(stringResource(R.string.common_ok), color = AppColors.AuthAccentBlue, fontWeight = FontWeight.Bold)
+            }
+        },
+    )
+}
+
+/**
+ * شاشة «حول التطبيق» وفق SPEC_HOME_CREATORS_PAGES §7:
+ *  • أيقونة 96×96 مع إطار ذهبي 3dp + glow.
+ *  • wordmark `brand_wordmark` بـ pixel 20sp.
+ *  • chip `brand_tagline` (AddonStation Mobile · v1.2).
+ *  • بطاقة معلومات: Version + Privacy + Terms + Contact (مع روابط).
+ *  • Footer `brand_rights` 12sp muted.
+ */
+@Composable
+private fun AboutDialog(version: String, versionCode: Int, onClose: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onClose,
+        containerColor = AppColors.AuthSurface,
+        titleContentColor = AppColors.AuthText,
+        textContentColor = AppColors.AuthMuted,
+        title = null,
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spacer(Modifier.height(8.dp))
+                // أيقونة التطبيق بإطار ذهبي 3dp + glow
+                Box(
+                    modifier = Modifier
+                        .shadow(elevation = 16.dp, shape = RoundedCornerShape(24.dp), ambientColor = AppColors.AuthGold.copy(alpha = 0.4f), spotColor = AppColors.AuthGold.copy(alpha = 0.4f))
+                        .size(96.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(AppColors.AuthBg)
+                        .border(3.dp, AppColors.AuthGold, RoundedCornerShape(24.dp))
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.app_icon),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                // wordmark
+                Text(
+                    stringResource(R.string.brand_wordmark),
+                    style = com.addonstation.mobile.ui.theme.displayStyle(
+                        text = stringResource(R.string.brand_wordmark),
+                        sizeSp = 20f,
+                        color = AppColors.AuthText,
+                    ),
+                )
+                Spacer(Modifier.height(4.dp))
+                // platform
+                Text(
+                    stringResource(R.string.brand_platform),
+                    style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+                    color = AppColors.AuthMuted,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(10.dp))
+                // chip tagline
+                Box(
+                    modifier = Modifier
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AppColors.AuthSurfaceHigh)
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        stringResource(R.string.brand_tagline),
+                        style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold),
+                        color = AppColors.AuthText,
+                    )
+                }
+                Spacer(Modifier.height(18.dp))
+                // بطاقة المعلومات
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(AppColors.AuthSurfaceHigh)
+                        .border(1.dp, AppColors.AuthBorder, RoundedCornerShape(14.dp)),
+                ) {
+                    AboutInfoRow(
+                        icon = R.drawable.ic_set_version,
+                        label = stringResource(R.string.set_version),
+                        value = version,
+                    )
+                    AboutInfoRow(
+                        icon = R.drawable.ic_set_privacy,
+                        label = stringResource(R.string.set_privacy),
+                        value = "",
+                    )
+                    AboutInfoRow(
+                        icon = R.drawable.ic_set_terms,
+                        label = stringResource(R.string.set_terms),
+                        value = "",
+                    )
+                    AboutInfoRow(
+                        icon = R.drawable.ic_set_contact,
+                        label = stringResource(R.string.set_contact),
+                        value = "",
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                // Footer
+                Text(
+                    stringResource(R.string.brand_rights),
+                    style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                    color = AppColors.AuthMuted,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onClose) {
+                Text(stringResource(R.string.common_ok), color = AppColors.AuthAccentBlue, fontWeight = FontWeight.Bold)
+            }
+        },
+    )
+}
+
+@Composable
+private fun AboutInfoRow(icon: Int, label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(AppColors.AuthSurface)
+                .border(1.dp, AppColors.AuthBorder, RoundedCornerShape(10.dp))
+                .padding(6.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = painterResource(icon),
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Text(
+            label,
+            style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+            color = AppColors.AuthText,
+            modifier = Modifier.weight(1f),
+        )
+        if (value.isNotEmpty()) {
+            Text(
+                value,
+                style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                color = AppColors.AuthMuted,
+                maxLines = 1,
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = AppColors.AuthMuted,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 

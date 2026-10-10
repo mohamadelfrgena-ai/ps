@@ -74,6 +74,210 @@ import java.util.Locale
 
 private val RECENT_FALLBACK = listOf("👍", "❤️", "😂", "🔥", "🎉", "😮")
 
+/**
+ * لوحة الإيموجي/الملصقات المدمجة (docked) تحت الـ composer، وفق SPEC_CHAT_PANELS_STORE §2.4-2.5:
+ *  • ارتفاع ثابت 300 (إيموجي) / 340 (ملصقات) — لا تقفز الواجهة عند الفتح.
+ *  • الـ Composer يبقى مرئياً فوقها.
+ *  • شريط تبويبات Segmented Container (Emoji / Stickers).
+ *  • شريط فئات سفلي (5 أزرار) في تبويب الإيموجي.
+ *  • شرائح الحزم **فوق** الشبكة في تبويب الملصقات.
+ *  • إغلاق بـ BackHandler (سابقاً في ChatScreen) أو اختيار ملصق/إيموجي.
+ */
+@Composable
+fun ChatPanel(
+    stickers: List<com.addonstation.mobile.data.model.SiteAsset>,
+    packs: List<com.addonstation.mobile.data.model.StickerPack>,
+    resolvedStickerUrl: (String) -> String?,
+    onEmoji: (String) -> Unit,
+    onSticker: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var tab by remember { mutableStateOf(0) } // 0 = emoji, 1 = stickers
+    var selectedPack by remember { mutableStateOf<String?>(null) }
+    val container = rememberContainer()
+    val recentRaw by container.prefs.recentEmojis.collectAsState(initial = "")
+    val recent = recentRaw.split(' ').filter { it.isNotBlank() }
+
+    val isEmoji = tab == 0
+    val panelHeight = if (isEmoji) 300.dp else 340.dp
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(panelHeight)
+            .background(Spec.barSurface)
+            .border(1.dp, Spec.border, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .padding(horizontal = 12.dp),
+    ) {
+        Spacer(Modifier.height(8.dp))
+        // شريط التبويبات Segmented
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Spec.surface)
+                .border(1.dp, Spec.border, RoundedCornerShape(14.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isEmoji) Spec.blue else Color.Transparent)
+                    .clickable { tab = 0 },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    stringResource(R.string.chat_emoji),
+                    style = TextStyle13BoldSpec(),
+                    color = if (isEmoji) Color.White else Spec.textMuted,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (!isEmoji) Spec.blue else Color.Transparent)
+                    .clickable { tab = 1 },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    stringResource(R.string.chat_stickers_tab),
+                    style = TextStyle13BoldSpec(),
+                    color = if (!isEmoji) Color.White else Spec.textMuted,
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        if (isEmoji) {
+            // العنوان "حديثاً" + صف الإيموجيات الحديثة
+            if (recent.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.chat_recent),
+                    style = TextStyle13BoldSpec(),
+                    color = Spec.gold,
+                    modifier = Modifier.padding(start = 2.dp, bottom = 4.dp),
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    items(recent) { emoji ->
+                        Text(
+                            emoji,
+                            style = AppText.welcomeName,
+                            modifier = Modifier
+                                .padding(2.dp)
+                                .clickable { onEmoji(emoji) }
+                                .padding(4.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(Spec.border),
+                )
+            }
+            // شبكة الإيموجيات (8 أعمدة، ارتفاع الصف 38)
+            val emojiColumns = 8
+            val emojiGridHeight = panelHeight - 140.dp
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(emojiColumns),
+                modifier = Modifier.height(emojiGridHeight.coerceAtLeast(150.dp)),
+                contentPadding = PaddingValues(vertical = 4.dp),
+            ) {
+                items(ChatViewModel_Emojis) { emoji ->
+                    Text(
+                        emoji,
+                        style = TextStyle(fontSize = 24.sp),
+                        modifier = Modifier
+                            .height(38.dp)
+                            .clickable { onEmoji(emoji) }
+                            .padding(2.dp),
+                    )
+                }
+            }
+        } else {
+            // شريط حزم الملصقات (فوق الشبكة)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .height(36.dp)
+                            .clip(CircleShape)
+                            .background(if (selectedPack == null) Spec.blue else Spec.surface)
+                            .border(1.dp, if (selectedPack == null) Spec.blue else Spec.border, CircleShape)
+                            .clickable { selectedPack = null }
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            stringResource(R.string.common_all),
+                            style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                            color = if (selectedPack == null) Color.White else Spec.textMuted,
+                        )
+                    }
+                }
+                items(packs, key = { it.id }) { pack ->
+                    val sel = selectedPack == pack.id
+                    Box(
+                        modifier = Modifier
+                            .height(36.dp)
+                            .clip(CircleShape)
+                            .background(if (sel) Spec.blue else Spec.surface)
+                            .border(1.dp, if (sel) Spec.blue else Spec.border, CircleShape)
+                            .clickable { selectedPack = pack.id }
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            pack.name,
+                            style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                            color = if (sel) Color.White else Spec.textMuted,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            // شبكة الملصقات (4 أعمدة)
+            val visible = stickers.filter { selectedPack == null || it.packId == selectedPack }
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(4),
+                modifier = Modifier.height(panelHeight - 170.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(visible, key = { it.id }) { sticker ->
+                    Box(
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Spec.surface)
+                            .border(1.dp, Spec.border, RoundedCornerShape(14.dp))
+                            .clickable { onSticker(sticker.fileUrl) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        com.addonstation.mobile.ui.components.CoverImage(
+                            url = resolvedStickerUrl(sticker.fileUrl),
+                            radius = 12.dp,
+                            modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun TextStyle13BoldSpec() = androidx.compose.ui.text.TextStyle(
+    fontSize = 13.sp,
+    fontWeight = FontWeight.Bold,
+)
+
 /** نافذة الإيموجي + الملصقات (تبويبان: Emoji / Stickers). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

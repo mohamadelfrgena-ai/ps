@@ -25,7 +25,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AddonStation">
+        android:theme="@style/Theme.AddonStation.Splash">
 
         <!-- إشعارات FCM: الخدمة تستقبل الرسائل وتبني الإشعار بنفسها (نص بلغة
              الجهاز + القناة المناسبة + الفتح على الشاشة المطلوبة). -->

@@ -41,9 +41,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -761,7 +763,8 @@ fun ChatScreen(
                     if (value.isNotEmpty()) vm.notifyTyping()
                 },
                 onAttach = { showAttach = true },
-                onEmoji = { showEmoji = true },
+                onEmoji = { showEmoji = !showEmoji },
+                showEmojiPanel = showEmoji,
                 onSend = { sendNow() },
                 remaining = 500 - text.length,
                 mentionSuggestions = if (text.endsWith("@")) authors.values.map { it.username ?: "" }
@@ -775,18 +778,18 @@ fun ChatScreen(
         }
     }
 
-    // النوافذ المنبثقة (E4/C4/C6/C7)
+    // اللوحة المدمجة (docked) تحت الـ composer وفق SPEC §2.4-2.5
+    //  • ترتفع 300 (إيموجي) أو 340 (ملصقات) — لا تقفز الواجهة.
+    //  • الإغلاق من BackHandler في ChatScreen (سطر 207) أو من اختيار إيموجي/ملصق.
     if (showEmoji) {
-        EmojiStickerSheet(
+        ChatPanel(
             stickers = stickers,
             packs = packs,
             resolvedStickerUrl = { container.siteAssetUrl(it) },
-            onDismiss = { showEmoji = false },
             onEmoji = { emoji ->
                 text += emoji
                 showEmoji = false
             },
-            focusSticker = resentSticker,
             onSticker = { stickerUrl ->
                 // اختيار الملصق لا يُرسله فوراً: يوضعه في مربع الإرسال (معاينة + ✕ أحمر)
                 // فيستطيع صاحبه أن يكتب نصاً تحته إن أراد، ثم يضغط إرسال.
@@ -1056,6 +1059,8 @@ private fun ChatInputBar(
     onAttach: () -> Unit,
     onEmoji: () -> Unit,
     onSend: () -> Unit,
+    /** هل اللوحة (إيموجي/ملصقات) مفتوحة؟ لتبديل شكل زر الـ emoji. */
+    showEmojiPanel: Boolean = false,
     remaining: Int,
     mentionSuggestions: List<String>,
     onMention: (String) -> Unit,
@@ -1125,7 +1130,7 @@ private fun ChatInputBar(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // صورة (44 دائري · خلفية surface)
                 SpecComposerCircle(
@@ -1133,12 +1138,34 @@ private fun ChatInputBar(
                     description = stringResource(R.string.chat_add_photo),
                     onClick = onAttach,
                 )
-                // ملصقات (44 دائري · خلفية surface)
-                SpecComposerCircle(
-                    icon = Icons.Filled.EmojiEmotions,
-                    description = stringResource(R.string.chat_stickers),
-                    onClick = onEmoji,
-                )
+                // زر emoji toggle — SPEC §2.3:
+                //  • مغلق: smile icon على سطح
+                //  • مفتوح: keyboard icon بتعبئة زرقاء@18% وحدّ أزرق@45%
+                //  نفس الارتفاع (44) فلا يقفز الـ layout.
+                val emojiOpen = showEmojiPanel
+                Box(
+                    modifier = Modifier
+                        .size(Spec.touch)
+                        .clip(CircleShape)
+                        .background(if (emojiOpen) Spec.blue.copy(alpha = 0.18f) else Spec.surface)
+                        .border(
+                            1.dp,
+                            if (emojiOpen) Spec.blue.copy(alpha = 0.45f) else Color.Transparent,
+                            CircleShape,
+                        )
+                        .clickable { onEmoji() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (emojiOpen) Icons.Filled.Keyboard else Icons.Filled.EmojiEmotions,
+                        contentDescription = stringResource(
+                            if (emojiOpen) R.string.cd_emoji_toggle_keyboard
+                            else R.string.cd_emoji_toggle_open
+                        ),
+                        tint = if (emojiOpen) Spec.blue else Spec.textMuted,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
                 // الحقل: 44 ارتفاعاً · نصف قطر 22 · خلفية surface · إطار 1dp · 14sp
                 Box(
                     modifier = Modifier
@@ -1464,23 +1491,29 @@ private fun MessageBlock(
     val showAuthorHeader = !grouped || isMine
 
     if (showDate) {
-        Row(
+        // SPEC §2.2 — Date chip: centered, surfaceHigh, textMuted 12sp/800,
+        // padding 5×14, radius 14, margin 4 (top/bottom).
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(vertical = 4.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.weight(1f).height(1.dp).background(Spec.border))
             Text(
                 TimeFormat.dayLabel(
                     message.createdAt, Locale.getDefault(),
                     stringResource(R.string.chat_today), stringResource(R.string.chat_yesterday),
                 ),
-                style = Spec.msgTime,
+                style = TextStyle(
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                ),
                 color = Spec.textMuted,
-                modifier = Modifier.padding(horizontal = 8.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Spec.surfaceHigh)
+                    .padding(horizontal = 14.dp, vertical = 5.dp),
             )
-            Box(Modifier.weight(1f).height(1.dp).background(Spec.border))
         }
     }
 
@@ -1609,14 +1642,35 @@ private fun MessageBlock(
             }
         }
 
-        // رسالة محذوفة أو مخفية: سطر واحد فقط لكل الأنواع (نص/ملصق/وسائط/صورة)
+        // رسالة محذوفة أو مخفية: pill بسيط (SPEC §2.2) — surfaceHigh + eye-off icon
         if (message.status == "hidden" || message.status == "deleted") {
-            Text(
-                stringResource(R.string.chat_hidden_message),
-                style = Spec.msgBody.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
-                color = Spec.textMuted,
-                modifier = Modifier.padding(start = if (isMine) 0.dp else 48.dp),
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = if (isMine) 0.dp else 48.dp, vertical = 4.dp),
+                horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Spec.surfaceHigh)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.VisibilityOff,
+                        contentDescription = null,
+                        tint = Spec.textMuted,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        stringResource(R.string.chat_hidden_message_plain),
+                        style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                        color = Spec.textMuted,
+                    )
+                }
+            }
             return@messageBody
         }
 
@@ -1838,9 +1892,17 @@ private fun MessageBlock(
                                         bottomStart = 16.dp,
                                     )
                                 )
-                                .background(Spec.blue)
+                                // SPEC §2.2: تدرّج 135° من Spec.blue إلى Spec.accentBlue
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(Spec.blue, Spec.accentBlue),
+                                        start = androidx.compose.ui.geometry.Offset.Zero,
+                                        end = androidx.compose.ui.geometry.Offset.Infinite,
+                                    ),
+                                )
                                 .combinedClickable(onClick = onReply, onLongClick = onLongPress)
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                                // padding 10×12×8 (أفقي 12، عمودي 10، أسفل 8 للنص)
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
                         ) {
                             Text(
                                 text = message.content.orEmpty(),
@@ -1855,11 +1917,24 @@ private fun MessageBlock(
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
+                        // SPEC §2.2: فقاعة رسائل الآخرين = surface + حد 1dp + نصف قطر 16/16/16/4
                         Text(
                             text = message.content.orEmpty(),
                             style = Spec.msgBody,
                             color = Spec.text,
-                            modifier = Modifier.weight(1f, fill = false),
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .clip(
+                                    RoundedCornerShape(
+                                        topStart = 16.dp,
+                                        topEnd = 16.dp,
+                                        bottomEnd = 16.dp,
+                                        bottomStart = 4.dp,
+                                    ),
+                                )
+                                .background(Spec.surface)
+                                .border(1.dp, Spec.border, RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
                         )
                         // الوقت في نهاية السطر (على حافة الرسالة) — طلب المالك
                         MessageStatus(

@@ -446,56 +446,29 @@ private fun GiftCodeCard(
         }
 
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(AppColors.AuthBg)
-                    .border(1.dp, AppColors.AuthBorder, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 14.dp),
-                singleLine = true,
-                textStyle = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, color = AppColors.AuthText),
-                cursorBrush = SolidColor(AppColors.AuthAccentBlue),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Characters,
-                    keyboardType = KeyboardType.Ascii,
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(onDone = { onRedeem() }),
-                decorationBox = { innerTextField ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (value.isEmpty()) {
-                            Text(
-                                androidx.compose.ui.res.stringResource(R.string.admin_method_code_label),
-                                style = TextStyle(fontSize = 14.sp, lineHeight = 18.sp),
-                                color = AppColors.AuthMuted,
-                            )
-                        }
-                        innerTextField()
-                    }
-                },
+        // SPEC §4.2 — 8 slots منفصلة (gap 6، flex 1، 48 high، radius 10)
+        com.addonstation.mobile.ui.components.CodeSlotInput(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = !redeeming,
+        )
+        Spacer(Modifier.height(10.dp))
+        val enabled = !redeeming && value.length == 8
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (enabled) AppColors.AuthBlue else AppColors.AuthBlue.copy(alpha = 0.45f))
+                .clickable(enabled = enabled, onClick = onRedeem),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                androidx.compose.ui.res.stringResource(R.string.ac_redeem_action),
+                style = TextStyle(fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.ExtraBold),
+                color = AppColors.AuthWhite,
+                maxLines = 1,
             )
-            val enabled = !redeeming && value.length >= 4
-            Box(
-                Modifier
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (enabled) AppColors.AuthBlue else AppColors.AuthBlue.copy(alpha = 0.45f))
-                    .clickable(enabled = enabled, onClick = onRedeem)
-                    .padding(horizontal = 16.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    androidx.compose.ui.res.stringResource(R.string.ac_redeem_action),
-                    style = TextStyle(fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.ExtraBold),
-                    color = AppColors.AuthWhite,
-                    maxLines = 1,
-                )
-            }
         }
         redeemMessage?.let { message ->
             Spacer(Modifier.height(8.dp))

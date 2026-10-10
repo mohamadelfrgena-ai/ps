@@ -31,7 +31,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -298,6 +301,7 @@ fun CreatorProfileScreen(
     }
     val sentMsg = stringResource(R.string.creator_tip_sent)
     val chooseReceiptMsg = stringResource(R.string.plan_choose_receipt)
+    var showSupportSheet by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         SubScreenHeader(title = stringResource(R.string.creator_title), onBack = onBack)
@@ -338,71 +342,34 @@ fun CreatorProfileScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            SectionHeader(title = stringResource(R.string.creator_tip_title), leadingEmoji = "💛")
-            GlassCard(color = AppColors.Gold.copy(alpha = 0.06f), borderColor = AppColors.Gold.copy(alpha = 0.3f)) {
-                if (!signedIn) {
-                    Text(stringResource(R.string.msg_sign_in_needed), style = AppText.bodySmall, color = AppColors.Muted)
-                } else {
-                    OutlinedTextField(
-                        value = amount,
-                        onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' } },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                        label = { Text(stringResource(R.string.creator_tip_amount)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+            // زر الدعم البارز (SPEC §3): 56 high · gold gradient · heart + creator_tip_title
+            Spacer(Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        Brush.horizontalGradient(listOf(AppColors.Gold, AppColors.GoldLight)),
                     )
-                    Text(stringResource(R.string.creator_tip_method), style = AppText.tiny, color = AppColors.Muted)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        methods.take(4).forEach { option ->
-                            FilterChip(
-                                label = option.name,
-                                selected = method == option.code,
-                                onClick = { method = option.code },
-                            )
-                        }
-                    }
-                    OutlinedTextField(
-                        value = message,
-                        onValueChange = { if (it.length <= 200) message = it },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                        label = { Text(stringResource(R.string.creator_tip_message)) },
-                        modifier = Modifier.fillMaxWidth(),
+                    .clickable { if (signedIn) showSupportSheet = true else status = stringResource(R.string.msg_sign_in_needed) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.Favorite,
+                        contentDescription = null,
+                        tint = AppColors.GoldDeep,
+                        modifier = Modifier.size(22.dp),
                     )
-                    GhostButton(
-                        text = receiptName ?: stringResource(R.string.creator_tip_upload_receipt),
-                        onClick = { picker.launch("image/*") },
-                        modifier = Modifier.fillMaxWidth(),
+                    Text(
+                        stringResource(R.string.creator_tip_title),
+                        style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.ExtraBold),
+                        color = AppColors.GoldDeep,
                     )
-                    GradientButton(
-                        text = stringResource(R.string.creator_tip_send_plain),
-                        onClick = {
-                            val value = amount.toDoubleOrNull()
-                            val selectedMethod = method
-                            if (value == null || selectedMethod == null || receiptBytes == null) {
-                                status = chooseReceiptMsg
-                                return@GradientButton
-                            }
-                            scope.launch {
-                                busy = true
-                                val path = container.creators
-                                    .uploadTipReceipt(receiptBytes!!, receiptMime, receiptName ?: "tip.png")
-                                    .getOrNull()
-                                container.creators.submitTip(
-                                    creatorId = userId,
-                                    amount = value,
-                                    method = selectedMethod,
-                                    message = message.takeIf { it.isNotBlank() },
-                                    receiptPath = path,
-                                    transactionReference = null,
-                                ).onSuccess { status = sentMsg }
-                                    .onFailure { status = it.message }
-                                busy = false
-                            }
-                        },
-                        enabled = !busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    status?.let { Text(it, style = AppText.tiny, color = AppColors.Green) }
                 }
             }
 
@@ -448,7 +415,8 @@ fun CreatorApplicationScreen(onBack: () -> Unit, onSubmitted: () -> Unit) {
     var wallets by remember { mutableStateOf("") }
     var motivation by remember { mutableStateOf("") }
     var bio by remember { mutableStateOf("") }
-    var guideline by remember { mutableStateOf(true) }
+    var guideline by remember { mutableStateOf(false) }
+    var ownWork by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var existing by remember { mutableStateOf<com.addonstation.mobile.data.model.CreatorApplication?>(null) }
@@ -481,26 +449,85 @@ fun CreatorApplicationScreen(onBack: () -> Unit, onSubmitted: () -> Unit) {
                 }
                 Spacer(Modifier.height(10.dp))
             }
-            Text(stringResource(R.string.home_creator_text), style = AppText.bodySmall, color = AppColors.Muted)
+            // SPEC §4 — Info card: kicker + home_creator_text
+            GlassCard(
+                color = AppColors.Blue.copy(alpha = 0.08f),
+                borderColor = AppColors.Blue.copy(alpha = 0.3f),
+            ) {
+                Text(
+                    stringResource(R.string.home_creator_kicker),
+                    style = AppText.kicker,
+                    color = AppColors.Gold,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.home_creator_text),
+                    style = AppText.bodySmall,
+                    color = AppColors.Muted,
+                )
+            }
             Spacer(Modifier.height(12.dp))
-            Field(stringResource(R.string.creator_field_content_types), contentTypes) { contentTypes = it }
+
+            // SPEC §4 — Multi-select content type chips
             Field(stringResource(R.string.creator_field_country), country) { country = it }
-            Field(stringResource(R.string.profile_about), about, lines = 3) { about = it }
             Field(stringResource(R.string.creator_field_experience), experience, lines = 3) { experience = it }
-            Field(stringResource(R.string.creator_field_publish_plan), plan, lines = 2) { plan = it }
-            Field(stringResource(R.string.creator_field_previous_work), previousWork) { previousWork = it }
-            Field(stringResource(R.string.creator_field_portfolio), portfolio) { portfolio = it }
-            Field(stringResource(R.string.creator_field_wallets), wallets) { wallets = it }
+            // أنواع المحتوى: multi-select chips
+            Text(
+                stringResource(R.string.creator_field_content_types),
+                style = AppText.kicker,
+                color = AppColors.Muted,
+            )
+            Spacer(Modifier.height(6.dp))
+            val contentTypesSet = remember(contentTypes) {
+                contentTypes.split(",", "،").map { it.trim() }.filter { it.isNotBlank() }.toMutableSet()
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    stringResource(R.string.creator_type_addons) to "addons",
+                    stringResource(R.string.creator_type_worlds) to "worlds",
+                    stringResource(R.string.creator_type_maps) to "maps",
+                ).forEach { (label, key) ->
+                    val selected = contentTypesSet.contains(key)
+                    val bg = if (selected) AppColors.Blue else AppColors.Surface
+                    val fg = if (selected) androidx.compose.ui.graphics.Color.White else AppColors.Text
+                    Box(
+                        modifier = Modifier
+                            .height(40.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                            .background(bg)
+                            .border(1.dp, AppColors.Border, androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                            .clickable {
+                                val newSet = contentTypesSet.toMutableSet()
+                                if (selected) newSet.remove(key) else newSet.add(key)
+                                contentTypes = newSet.joinToString(",")
+                            }
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(label, style = AppText.body, color = fg)
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
             Field(stringResource(R.string.creator_field_motivation), motivation, lines = 3) { motivation = it }
-            Field(stringResource(R.string.profile_about_me), bio, lines = 2) { bio = it }
+            Field(stringResource(R.string.creator_field_portfolio), portfolio) { portfolio = it }
+            Field(stringResource(R.string.creator_field_previous_work), previousWork) { previousWork = it }
+            Field(stringResource(R.string.creator_field_publish_plan), plan, lines = 2) { plan = it }
+            Field(stringResource(R.string.creator_field_wallets), wallets) { wallets = it }
+            Field(stringResource(R.string.profile_about), about, lines = 3) { about = it }
 
             Spacer(Modifier.height(8.dp))
-            val guidelinesLabel = stringResource(R.string.creator_guidelines_ok_plain)
-            val ownWorkLabel = stringResource(R.string.creator_own_work)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(guidelinesLabel, guideline, { guideline = true })
-                FilterChip(ownWorkLabel, !guideline, { guideline = false })
-            }
+            // SPEC §4 — Checkboxes (24×24) للـ own_work و guidelines_ok
+            SpecCheckRow(
+                label = stringResource(R.string.creator_own_work),
+                checked = ownWork,
+                onCheckedChange = { ownWork = it },
+            )
+            SpecCheckRow(
+                label = stringResource(R.string.creator_guidelines_ok_plain),
+                checked = guideline,
+                onCheckedChange = { guideline = it },
+            )
 
             Spacer(Modifier.height(14.dp))
             GradientButton(
@@ -527,7 +554,7 @@ fun CreatorApplicationScreen(onBack: () -> Unit, onSubmitted: () -> Unit) {
                         busy = false
                     }
                 },
-                enabled = !busy,
+                enabled = !busy && guideline && ownWork,
                 modifier = Modifier.fillMaxWidth(),
             )
             message?.let {
@@ -722,5 +749,55 @@ fun CreatorStudioScreen(
             }
             Spacer(Modifier.height(96.dp))
         }
+    }
+}
+
+/**
+ * SPEC §4 — صف موافقة: صندوق 24×24 مع نصف قطر 7، مختار = تعبئة زرقاء + علامة
+ * صحّ بيضاء، النصّ بجانبه بارتفاع صفّ 48dp على الأقل.
+ */
+@Composable
+private fun SpecCheckRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(7.dp))
+                .background(if (checked) AppColors.Blue else androidx.compose.ui.graphics.Color.Transparent)
+                .border(
+                    1.dp,
+                    if (checked) AppColors.Blue else AppColors.Border,
+                    androidx.compose.foundation.shape.RoundedCornerShape(7.dp),
+                )
+                .clickable { onCheckedChange(!checked) },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (checked) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = androidx.compose.ui.graphics.Color.White,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            label,
+            style = AppText.body,
+            color = AppColors.Text,
+            modifier = Modifier.weight(1f),
+        )
     }
 }

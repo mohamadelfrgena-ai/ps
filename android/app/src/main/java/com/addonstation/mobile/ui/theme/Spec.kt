@@ -31,6 +31,7 @@ object Spec {
     val textMuted = Color(0xFF9DB0CF)     // النص الثانوي والتلميحات
     val chipLabel = Color(0xFFC4D1E8)     // نص الشرائح غير المختارة
     val blue = Color(0xFF2E7BEF)          // الأزرار الأساسية · رسائلي · شارة NEW
+    val accentBlue = Color(0xFF4C9AFF)    // الـ gradient الأزرق (يبدأ من blue وينتهي هنا)
     val blueLink = Color(0xFF6FA8FF)      // «عرض الكل»
     val gold = Color(0xFFF0C25E)          // عناوين البكسل · رصيد AC · Legendary
     val goldDeepBg = Color(0xFF1B1405)    // خلفية بطاقة Legendary

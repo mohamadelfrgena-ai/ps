@@ -37,10 +37,12 @@ import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
@@ -170,9 +172,10 @@ fun AdminPanelScreen(
                     users = container.admin.users(userQuery, roleFilter)
                     content = container.admin.allContent(20)
                 }
-                1 -> content = container.admin.allContent(200)
+                1 -> users = container.admin.users(userQuery, roleFilter)
                 2 -> orders = container.admin.orders()
-                3 -> reports = container.chat.openReports()
+                3 -> content = container.admin.allContent(200)
+                4 -> reports = container.chat.openReports()
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -187,15 +190,32 @@ fun AdminPanelScreen(
         PixelTopBar(
             title = when (tab) {
                 0 -> stringResource(R.string.admin_overview)
-                1 -> stringResource(R.string.admin_tab_submissions)
+                1 -> stringResource(R.string.admin_users)
                 2 -> stringResource(R.string.admin_payments)
-                3 -> stringResource(R.string.admin_moderation)
+                3 -> stringResource(R.string.admin_content)
+                4 -> stringResource(R.string.admin_moderation)
                 else -> stringResource(R.string.admin_more)
             },
             walletBalance = wallet?.balance,
             onWalletClick = { },
             icon = Icons.Filled.AdminPanelSettings,
             actions = {
+                // SPEC §3.1 — زر More (⋯) بجانب القفل في الشريط العلوي
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(AppColors.Elevated2)
+                        .clickable { moreOpen = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.MoreHoriz,
+                        contentDescription = stringResource(R.string.admin_more),
+                        tint = AppColors.Text,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
                 // قفل فوري: يُخفي اللوحة ويعيد طلب كلمة المرور عند الدخول التالي
                 Box(
                     modifier = Modifier
@@ -219,6 +239,7 @@ fun AdminPanelScreen(
         )
         Box(Modifier.weight(1f)) {
             when (tab) {
+                // SPEC §3 — Overview (stats + tools + AC history فقط)
                 0 -> OverviewTab(
                     stats = stats,
                     users = users,
@@ -250,23 +271,48 @@ fun AdminPanelScreen(
                         when (index) {
                             0 -> onOpenContent()
                             1 -> tab = 2
-                            2 -> tab = 3
+                            2 -> tab = 4
                             3 -> onOpenCreatorApps()
                             4 -> onOpenSettings()
                             5 -> onOpenAssets()
                         }
                     },
+                    includeUsers = false,
+                    includeContent = false,
                 )
-                1 -> ContentTab(
+                // SPEC §4 — Users and AC grants
+                1 -> OverviewTab(
+                    stats = stats,
+                    users = users,
                     content = content,
+                    userQuery = userQuery,
+                    onUserQuery = { userQuery = it },
+                    roleFilter = roleFilter,
+                    onRoleFilter = { roleFilter = it },
                     loading = loading,
-                    onOpenContentAdmin = onOpenContent,
+                    failed = failed,
+                    onRetry = { reloadTick += 1 },
+                    onGiveAc = { userId -> onOpenAc(userId) },
+                    onManageRooms = { user -> roomsFor = user },
+                    onSaveUser = { user, plan, role, grantDays ->
+                        scope.launch {
+                            container.admin.updateUserPlanRole(
+                                userId = user.id,
+                                plan = plan,
+                                role = role,
+                                expiresIso = null,
+                                grantDays = grantDays,
+                            ).onSuccess { message = "✓ ${user.username}" }
+                                .onFailure { message = it.message }
+                        }
+                    },
                     onEditContent = onEditContent,
                     onDeleteContent = { item -> pendingDeleteContent = item },
-                    onRefresh = {
-                        scope.launch { content = container.admin.allContent(200) }
-                    },
+                    onQuick = { _ -> },
+                    includeUsers = true,
+                    includeContent = false,
                 )
+                // SPEC §6 — Payments
                 2 -> PaymentsTab(
                     orders = orders,
                     loading = loading,
@@ -292,7 +338,19 @@ fun AdminPanelScreen(
                         }
                     },
                 )
-                3 -> ModerationTab(
+                // SPEC §8 — Content
+                3 -> ContentTab(
+                    content = content,
+                    loading = loading,
+                    onOpenContentAdmin = onOpenContent,
+                    onEditContent = onEditContent,
+                    onDeleteContent = { item -> pendingDeleteContent = item },
+                    onRefresh = {
+                        scope.launch { content = container.admin.allContent(200) }
+                    },
+                )
+                // SPEC §9 — Chat moderation
+                4 -> ModerationTab(
                     reports = reports,
                     loading = loading,
                     failed = failed,
@@ -339,6 +397,7 @@ fun AdminPanelScreen(
                         }
                     },
                 )
+                // More tab in floating bar (Option B 6-tab); kept for legacy
                 else -> MoreTab(
                     onOpen = { key ->
                         when (key) {
@@ -370,54 +429,58 @@ fun AdminPanelScreen(
             )
         }
 
-        // شريط اللوحة السفلي (5 عناصر)
-        // **حجز منطقة شريط التنقّل**: التطبيق يرسم من الحافة إلى الحافة، فكان
-        // الشريط ينزل **تحت** أزرار النظام ويتداخل معها. الحاوية هنا تحجز
-        // المنطقة (`bottomBarInsets()` = أزرار ثلاثة **أو** إيماءات — تلقائياً
-        // حسب جهاز المستخدم) وتلوّنها بلون التطبيق، والشريط يبقى **فوقها**.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AppColors.Bg)
-                .windowInsetsPadding(bottomBarInsets()),
+        // شريط اللوحة السفلي — SPEC §3.1 floating bar (5 tabs)
+        com.addonstation.mobile.ui.components.AdminBottomBar(
+            tabs = listOf(
+                com.addonstation.mobile.ui.components.AdminTabSpec(
+                    labelRes = R.string.admin_overview,
+                    icon = Icons.Filled.AdminPanelSettings,
+                ),
+                com.addonstation.mobile.ui.components.AdminTabSpec(
+                    labelRes = R.string.admin_users,
+                    icon = Icons.Filled.Group,
+                ),
+                com.addonstation.mobile.ui.components.AdminTabSpec(
+                    labelRes = R.string.admin_payments,
+                    icon = Icons.Filled.Receipt,
+                    badgeCount = stats?.pendingOrders ?: 0,
+                ),
+                com.addonstation.mobile.ui.components.AdminTabSpec(
+                    labelRes = R.string.admin_content,
+                    icon = Icons.Filled.Image,
+                ),
+                com.addonstation.mobile.ui.components.AdminTabSpec(
+                    labelRes = R.string.admin_moderation,
+                    icon = Icons.Filled.Flag,
+                    badgeCount = stats?.openReports ?: 0,
+                ),
+            ),
+            current = tab.coerceIn(0, 4),
+            onSelect = { tab = it },
+        )
+    }
+
+    // SPEC §3.1 — More sheet (يفتح من زر ⋯ في الـ top bar)
+    if (moreOpen) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { moreOpen = false },
+            containerColor = AppColors.Bg,
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AppColors.Bg.copy(alpha = 0.96f))
-                    .border(1.dp, AppColors.Border)
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                listOf(
-                    stringResource(R.string.admin_overview) to Icons.Filled.AdminPanelSettings,
-                    stringResource(R.string.admin_tab_submissions) to Icons.Filled.Image,
-                    stringResource(R.string.admin_payments) to Icons.Filled.Receipt,
-                    stringResource(R.string.admin_moderation) to Icons.Filled.Flag,
-                    stringResource(R.string.admin_more) to Icons.Filled.Settings,
-                ).forEachIndexed { index, (label, icon) ->
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { tab = index },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        androidx.compose.material3.Icon(
-                            icon,
-                            contentDescription = label,
-                            tint = if (tab == index) AppColors.Green else AppColors.Dim,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Text(
-                            label,
-                            style = AppText.tiny,
-                            color = if (tab == index) AppColors.Green else AppColors.Dim,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+            MoreTab(
+                onOpen = { key ->
+                    moreOpen = false
+                    when (key) {
+                        "assets" -> onOpenAssets()
+                        "creators" -> onOpenCreatorApps()
+                        "settings" -> onOpenSettings()
+                        "ac" -> onOpenAc(null)
+                        "tips" -> onOpenTips()
+                        "chat" -> onOpenChat()
+                        "audit" -> onOpenAudit()
+                        "back" -> onBackToApp()
                     }
-                }
-            }
+                },
+            )
         }
     }
 
@@ -503,6 +566,11 @@ private fun OverviewTab(
     onEditContent: (ContentItem) -> Unit,
     onDeleteContent: (ContentItem) -> Unit,
     onQuick: (Int) -> Unit,
+    /** SPEC §3/§4: في تبويب «نظرة عامة» نُخفي المستخدمون والمحتوى لأن
+     *  كلاً منهما له تبويب مستقل (Users · Content) في الـ floating bar. */
+    includeUsers: Boolean = true,
+    includeContent: Boolean = true,
+    contentLimit: Int = 10,
 ) {
     val container = rememberContainer()
     Column(
@@ -533,6 +601,7 @@ private fun OverviewTab(
         SectionHeader(title = stringResource(R.string.admin_tools), leadingEmoji = "⚡")
         LazyRowQuick(onQuick)
 
+        if (includeUsers) {
         SectionHeader(title = stringResource(R.string.admin_users), leadingEmoji = "👥")
         OutlinedTextField(
             value = userQuery,
@@ -570,9 +639,11 @@ private fun OverviewTab(
                 Spacer(Modifier.height(8.dp))
             }
         }
+        }
 
+        if (includeContent) {
         SectionHeader(title = stringResource(R.string.admin_tab_submissions), leadingEmoji = "📦")
-        content.take(10).forEach { item ->
+        content.take(contentLimit).forEach { item ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -609,6 +680,7 @@ private fun OverviewTab(
                         .clickable { onDeleteContent(item) },
                 )
             }
+        }
         }
         Spacer(Modifier.height(96.dp))
     }

@@ -30,10 +30,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -98,6 +101,8 @@ data class HomeActions(
     val openDownloads: () -> Unit,
     val openPlans: () -> Unit,
     val openSupport: () -> Unit,
+    /** «الجهاز» من Quick Actions (SPEC §1.1) — قد لا يكون مُفعَّلاً في بعض الإصدارات. */
+    val openDevice: () -> Unit = {},
     val openCreators: () -> Unit,
     val openCreatorApply: () -> Unit,
     val openStudio: () -> Unit,
@@ -148,25 +153,34 @@ fun HomeScreen(
     var featured by remember { mutableStateOf(container.content.cachedFeatured()) }
     var latest by remember { mutableStateOf(container.content.cachedLatest()) }
     var recommended by remember { mutableStateOf(container.content.cachedRecommended()) }
+    var exclusives by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var creators by remember { mutableStateOf(container.creators.cachedCreators()) }
     var favorites by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var loading by remember { mutableStateOf(featured.isEmpty() && latest.isEmpty()) }
     var failed by remember { mutableStateOf(false) }
     var chip by remember { mutableStateOf(ChipFilter.All) }
 
+    // الـ loading لا يُعرض إلا حين لا توجد بيانات مخزّنة (TTL). فإذا كان
+    // featured غير فارغ، لا نضع spinner فوقه أبداً (تجنّب الوميض).
+    val showInitialLoading = loading && featured.isEmpty()
+
     LaunchedEffect(profileRetryTick, signedIn) {
         loading = latest.isEmpty() && featured.isEmpty()
         failed = false
-        try {
+            try {
             coroutineScope {
                 val featuredRequest = async(Dispatchers.IO) { container.content.featured() }
                 val latestRequest = async(Dispatchers.IO) { container.content.latest() }
                 val recommendedRequest = async(Dispatchers.IO) { container.content.recommended() }
+                val exclusivesRequest = async(Dispatchers.IO) {
+                    runCatching { container.content.exclusives(6) }.getOrDefault(emptyList())
+                }
                 val creatorsRequest = async(Dispatchers.IO) { container.creators.creators() }
                 val favoritesRequest = async(Dispatchers.IO) { container.content.favorites() }
                 featured = featuredRequest.await()
                 latest = latestRequest.await()
                 recommended = recommendedRequest.await()
+                exclusives = exclusivesRequest.await()
                 creators = creatorsRequest.await()
                 favorites = favoritesRequest.await()
             }
@@ -309,6 +323,18 @@ fun HomeScreen(
                     )
                 }
             }
+            // Quick Actions (SPEC §1.1) — 4 بلاطات: المفضلة · تحميلاتي · ترقية · الجهاز
+            item {
+                HomeQuickActions(
+                    font = font,
+                    palette = palette,
+                    onFavorites = actions.openFavorites,
+                    onDownloads = actions.openDownloads,
+                    onUpgrade = actions.openPlans,
+                    onDevice = actions.openDevice,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 14.dp),
+                )
+            }
             item {
                 LazyRow(
                     modifier = Modifier.padding(top = 14.dp),
@@ -442,6 +468,40 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+            // Recommended for you (SPEC §1.2)
+            item {
+                HomeRecommendedRow(
+                    items = recommended,
+                    palette = palette,
+                    font = font,
+                    isArabic = isArabic,
+                    onItem = { actions.openItem(it) },
+                    onSeeAll = actions.openStore,
+                )
+            }
+            // Exclusives (SPEC §1.3)
+            item {
+                HomeExclusivesRow(
+                    items = exclusives,
+                    palette = palette,
+                    font = font,
+                    isArabic = isArabic,
+                    onItem = { actions.openItem(it) },
+                    onSeeAll = actions.openExclusives,
+                )
+            }
+            // Creator program card (SPEC §1.5)
+            item {
+                val isCreator = profile?.role?.contains("creator", ignoreCase = true) == true ||
+                    profile?.role?.contains("admin", ignoreCase = true) == true
+                HomeCreatorProgramCard(
+                    isCreator = isCreator,
+                    palette = palette,
+                    font = font,
+                    isArabic = isArabic,
+                    onCta = if (isCreator) actions.openStudio else actions.openCreatorApply,
+                )
             }
         }
     }
@@ -812,36 +872,53 @@ private fun HomeSectionHeader(
     isArabic: Boolean,
     font: FontFamily,
     palette: HomePalette,
-    onAction: () -> Unit,
+    onAction: (() -> Unit)?,
+    subtitle: String? = null,
 ) {
-    Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(
-            if (isArabic) title else title.uppercase(Locale.ROOT),
-            style = TextStyle(
-                fontFamily = font,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = if (isArabic) 0.sp else 1.sp,
-                lineHeight = 19.sp,
-            ),
-            color = palette.text,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Box(
-            Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp))
-                .clickable(onClick = onAction).padding(horizontal = 6.dp),
-            contentAlignment = Alignment.Center,
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                stringResource(R.string.view_all),
-                style = homeTextStyle(font, 13.sp, FontWeight.Bold, 18.sp),
-                color = palette.blueLink,
+                if (isArabic) title else title.uppercase(Locale.ROOT),
+                style = TextStyle(
+                    fontFamily = font,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = if (isArabic) 0.sp else 1.sp,
+                    lineHeight = 19.sp,
+                ),
+                color = palette.text,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (onAction != null) {
+                Box(
+                    Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp))
+                        .clickable(onClick = onAction).padding(horizontal = 6.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        stringResource(R.string.view_all),
+                        style = homeTextStyle(font, 13.sp, FontWeight.Bold, 18.sp),
+                        color = palette.blueLink,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        if (subtitle != null) {
+            Text(
+                subtitle,
+                style = homeTextStyle(font, 13.sp, FontWeight.Medium, 18.sp),
+                color = palette.textMuted,
             )
         }
     }
@@ -1093,7 +1170,7 @@ private fun HomeErrorBanner(font: FontFamily, palette: HomePalette, onRetry: () 
 }
 
 @Composable
-private fun HomeEmptyNote(font: FontFamily, palette: HomePalette) {
+private fun HomeEmptyNote(font: FontFamily, palette: HomePalette, modifier: Modifier = Modifier) {
     Text(
         stringResource(R.string.home_no_content),
         style = homeTextStyle(font, 13.sp, FontWeight.Medium, 18.sp),
@@ -1203,4 +1280,365 @@ private fun homeBadgeFor(item: ContentItem, palette: HomePalette): Triple<String
     item.plan == "epic" -> Triple("EPIC", palette.epic, palette.buttonText)
     item.isFeatured -> Triple("NEW", palette.blue, palette.buttonText)
     else -> null
+}
+
+// ─── الأقسام الجديدة وفق SPEC_HOME_CREATORS_PAGES §1 ───────────────────────
+
+/**
+ * Quick Actions (SPEC §1.1): 4 بلاطات متساوية (فجوة 8) بارتفاع أدنى 84dp،
+ * نصف قطر 16، خلفية surface + حد 1dp، عمود مركزي: بلاطة أيقونة 40 + تسمية 12sp/800.
+ *  • المفضلة (heart · error) · التحميلات (download · blue) ·
+ *    ترقية (crown · gold) · الجهاز (phone · ok).
+ */
+@Composable
+private fun HomeQuickActions(
+    font: FontFamily,
+    palette: HomePalette,
+    onFavorites: () -> Unit,
+    onDownloads: () -> Unit,
+    onUpgrade: () -> Unit,
+    onDevice: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        HomeSectionHeader(
+            title = androidx.compose.ui.res.stringResource(R.string.home_quick_actions_plain),
+            isArabic = false,
+            font = font,
+            palette = palette,
+            onAction = null,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            QuickActionTile(
+                icon = androidx.compose.material.icons.Icons.Filled.Favorite,
+                label = androidx.compose.ui.res.stringResource(R.string.home_qa_favorites),
+                tint = palette.danger,
+                font = font,
+                palette = palette,
+                onClick = onFavorites,
+                modifier = Modifier.weight(1f),
+            )
+            QuickActionTile(
+                icon = androidx.compose.material.icons.Icons.Filled.FileDownload,
+                label = androidx.compose.ui.res.stringResource(R.string.home_qa_downloads),
+                tint = palette.blue,
+                font = font,
+                palette = palette,
+                onClick = onDownloads,
+                modifier = Modifier.weight(1f),
+            )
+            QuickActionTile(
+                icon = androidx.compose.material.icons.Icons.Filled.WorkspacePremium,
+                label = androidx.compose.ui.res.stringResource(R.string.home_qa_upgrade),
+                tint = palette.goldFill,
+                font = font,
+                palette = palette,
+                onClick = onUpgrade,
+                modifier = Modifier.weight(1f),
+            )
+            QuickActionTile(
+                icon = androidx.compose.material.icons.Icons.Filled.PhoneAndroid,
+                label = androidx.compose.ui.res.stringResource(R.string.home_qa_device),
+                tint = palette.green,
+                font = font,
+                palette = palette,
+                onClick = onDevice,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuickActionTile(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    tint: Color,
+    font: FontFamily,
+    palette: HomePalette,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier = modifier
+            .heightIn(min = 84.dp)
+            .clip(shape)
+            .background(palette.surface)
+            .border(1.dp, palette.border, shape)
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(palette.surfaceHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        }
+        Text(
+            label,
+            style = TextStyle(fontFamily = font, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold),
+            color = palette.text,
+            maxLines = 2,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/**
+ * Exclusives (SPEC §1.3): بطاقات عريضة 260×150، تدرّج تراكب من شفاف → `#0A0F1C`@88%.
+ * شارة الخطة أعلى البداية، العنوان في الأسفل.
+ */
+@Composable
+private fun HomeExclusivesRow(
+    items: List<ContentItem>,
+    palette: HomePalette,
+    font: FontFamily,
+    isArabic: Boolean,
+    onItem: (ContentItem) -> Unit,
+    onSeeAll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        HomeSectionHeader(
+            title = androidx.compose.ui.res.stringResource(R.string.home_exclusives_plain),
+            subtitle = androidx.compose.ui.res.stringResource(R.string.home_exclusives_sub),
+            isArabic = isArabic,
+            font = font,
+            palette = palette,
+            onAction = onSeeAll,
+        )
+        if (items.isEmpty()) {
+            HomeEmptyNote(font, palette, modifier = Modifier.padding(horizontal = 16.dp).padding(top = 6.dp))
+        } else {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+            ) {
+                items(items, key = { it.id }) { item ->
+                    ExclusiveCard(
+                        item = item,
+                        palette = palette,
+                        font = font,
+                        isArabic = isArabic,
+                        onClick = { onItem(item) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExclusiveCard(
+    item: ContentItem,
+    palette: HomePalette,
+    font: FontFamily,
+    isArabic: Boolean,
+    onClick: () -> Unit,
+) {
+    val container = rememberContainer()
+    val shape = RoundedCornerShape(18.dp)
+    Box(
+        modifier = Modifier
+            .size(width = 260.dp, height = 150.dp)
+            .clip(shape)
+            .background(palette.surface)
+            .border(1.dp, palette.border, shape)
+            .clickable(onClick = onClick),
+    ) {
+        com.addonstation.mobile.ui.components.CoverImage(
+            url = assetUrl(container, item.coverUrl),
+            radius = 0.dp,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        // تدرّج تراكب
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(Color.Transparent, Color(0xE10A0F1C)),
+                    ),
+                ),
+        )
+        // شارة الخطة أعلى البداية
+        val badge = homeBadgeFor(item, palette)
+        if (badge != null) {
+            Box(
+                modifier = Modifier
+                    .padding(10.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(badge.second)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    badge.first,
+                    style = TextStyle(fontFamily = font, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp),
+                    color = badge.third,
+                )
+            }
+        }
+        // العنوان + المبدع في الأسفل
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 14.dp, end = 12.dp, bottom = 12.dp),
+        ) {
+            Text(
+                item.title,
+                style = TextStyle(fontFamily = font, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold),
+                color = Color.White,
+                maxLines = 2,
+            )
+            item.createdBy?.let { id ->
+                val byName = com.addonstation.mobile.ui.common.metaOf(item).takeIf { it.isNotBlank() }
+                if (!byName.isNullOrBlank()) {
+                    Text(
+                        byName,
+                        style = TextStyle(fontFamily = font, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                        color = Color(0xFFC4D1E8),
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Recommended for you (SPEC §1.2): صف أفقي من بطاقات Latest نفسها (150 wide).
+ */
+@Composable
+private fun HomeRecommendedRow(
+    items: List<ContentItem>,
+    palette: HomePalette,
+    font: FontFamily,
+    isArabic: Boolean,
+    onItem: (ContentItem) -> Unit,
+    onSeeAll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        HomeSectionHeader(
+            title = androidx.compose.ui.res.stringResource(R.string.home_recommended_plain),
+            isArabic = isArabic,
+            font = font,
+            palette = palette,
+            onAction = onSeeAll,
+        )
+        if (items.isEmpty()) {
+            HomeEmptyNote(font, palette, modifier = Modifier.padding(horizontal = 16.dp).padding(top = 6.dp))
+        } else {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
+            ) {
+                items(items, key = { it.id }) { item ->
+                    HomeLatestCard(
+                        item = item,
+                        byName = null,
+                        font = font,
+                        palette = palette,
+                        isArabic = isArabic,
+                        onClick = { onItem(item) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Creator program card (SPEC §1.5): بطاقة بتدرّج `#102244`→`#121A2B`، حد أزرق 1dp،
+ * كيكر ذهبي + عنوان + نص + زر CTA (44 high primary gradient).
+ *  • للمبدع الحالي: العنوان = home_creator_dashboard والزر gold يفتح لوحة المبدع.
+ */
+@Composable
+private fun HomeCreatorProgramCard(
+    isCreator: Boolean,
+    palette: HomePalette,
+    font: FontFamily,
+    isArabic: Boolean,
+    onCta: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(20.dp)
+    Column(
+        modifier = modifier
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .fillMaxWidth()
+            .clip(shape)
+            .background(
+                androidx.compose.ui.graphics.Brush.linearGradient(
+                    listOf(Color(0xFF102244), Color(0xFF121A2B)),
+                ),
+            )
+            .border(1.dp, palette.blue, shape)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            androidx.compose.ui.res.stringResource(R.string.home_creator_kicker),
+            style = if (isArabic) {
+                TextStyle(fontFamily = TajawalFont, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+            } else {
+                TextStyle(fontFamily = PixelFont, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            },
+            color = palette.goldFill,
+        )
+        Text(
+            androidx.compose.ui.res.stringResource(
+                if (isCreator) R.string.home_creator_dashboard else R.string.home_creator_title,
+            ),
+            style = TextStyle(fontFamily = font, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold),
+            color = palette.text,
+        )
+        Text(
+            androidx.compose.ui.res.stringResource(R.string.home_creator_text),
+            style = TextStyle(fontFamily = font, fontSize = 13.sp, fontWeight = FontWeight.Medium, lineHeight = 20.sp),
+            color = palette.textMuted,
+        )
+        Box(
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .fillMaxWidth()
+                .height(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    if (isCreator) {
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(palette.goldFill, palette.goldInk),
+                        )
+                    } else {
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(palette.blue, palette.accentBlue),
+                        )
+                    },
+                )
+                .clickable(onClick = onCta),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                androidx.compose.ui.res.stringResource(
+                    if (isCreator) R.string.home_creator_open else R.string.home_creator_cta,
+                ),
+                style = TextStyle(fontFamily = font, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold),
+                color = if (isCreator) palette.goldInk else palette.buttonText,
+            )
+        }
+    }
 }

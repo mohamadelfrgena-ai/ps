@@ -72,6 +72,8 @@ import com.addonstation.mobile.ui.components.LoadingBox
 import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.components.SectionHeader
+import com.addonstation.mobile.ui.components.SpecSegmentedControl
+import com.addonstation.mobile.ui.components.SpecStoreHeader
 import com.addonstation.mobile.ui.components.SubScreenHeader
 import com.addonstation.mobile.ui.common.metaOf
 import com.addonstation.mobile.ui.common.planLabelOf
@@ -135,12 +137,14 @@ fun StoreScreen(
     val signedIn by container.state.signedIn.collectAsState()
     LaunchedEffect(type, sort, query, reloadTick, signedIn) { reload() }
 
+    // SPEC_CHAT_PANELS_STORE §3 — الترويسة الجديدة
+    val isArabic = androidx.compose.ui.platform.LocalLayoutDirection.current ==
+        androidx.compose.ui.unit.LayoutDirection.Rtl
     Column(Modifier.fillMaxSize()) {
-        PixelTopBar(
-            title = stringResource(R.string.nav_store),
-            walletBalance = wallet?.balance,
+        SpecStoreHeader(
+            balance = wallet?.balance,
             onWalletClick = onOpenWallet,
-            icon = Icons.Filled.ShoppingCart,
+            isArabic = isArabic,
         )
         Column(
             Modifier
@@ -149,10 +153,11 @@ fun StoreScreen(
                 .verticalScroll(scrollState)
                 .padding(horizontal = 14.dp),
         ) {
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(4.dp))
             Text(stringResource(R.string.store_title), style = AppText.bodySmall, color = AppColors.Muted)
 
             Spacer(Modifier.height(10.dp))
+            // حقل البحث — SPEC §3.3: 48dp، نصف قطر 14، مع أيقونة 20
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
@@ -161,24 +166,24 @@ fun StoreScreen(
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = AppColors.Muted) },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { scope.launch { reload() } }),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
 
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    label = stringResource(R.string.store_tab_addons),
-                    selected = type == "addon",
-                    onClick = { type = "addon" },
-                )
-                FilterChip(
-                    label = stringResource(R.string.store_tab_worlds),
-                    selected = type == "world",
-                    onClick = { type = "world" },
-                )
-            }
+            // شريط نوع المحتوى — SPEC §3.4: Segmented Container
+            SpecSegmentedControl(
+                options = listOf(
+                    "addon" to stringResource(R.string.store_tab_addons),
+                    "world" to stringResource(R.string.store_tab_worlds),
+                ),
+                selectedKey = type,
+                onSelect = { type = it },
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
+            // شرائح الترتيب — SPEC §3.5: صف أفقي قابل للتمرير، شريحة واحدة محددة
             val sorts = listOf(
                 "newest" to stringResource(R.string.store_sort_newest),
                 "downloads" to stringResource(R.string.store_sort_downloads),
@@ -194,9 +199,12 @@ fun StoreScreen(
             Spacer(Modifier.height(12.dp))
             when {
                 loading -> LoadingBox(text = stringResource(R.string.common_loading))
-                failed -> com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
-                items.isEmpty() -> EmptyState(
-                    stringResource(R.string.store_empty) + "\n" + stringResource(R.string.store_empty_hint)
+                failed -> com.addonstation.mobile.ui.components.SpecErrorState(
+                    onRetry = { reloadTick += 1 },
+                )
+                items.isEmpty() -> com.addonstation.mobile.ui.components.SpecEmptyStateIcon(
+                    title = stringResource(R.string.store_empty),
+                    hint = stringResource(R.string.store_empty_hint),
                 )
                 else -> LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
