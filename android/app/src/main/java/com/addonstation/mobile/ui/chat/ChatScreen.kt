@@ -2190,5 +2190,3 @@ private inline fun <T> androidx.compose.foundation.lazy.LazyListScope.itemsIndex
         contentType = { index -> contentType(items[index]) },
     ) { index -> content(index, items[index]) }
 }
-ontent(index, items[index]) }
-}
