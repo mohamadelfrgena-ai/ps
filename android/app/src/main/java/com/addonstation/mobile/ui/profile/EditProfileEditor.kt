@@ -1080,7 +1080,7 @@ private fun PreviewAvatar(url: String?, online: Boolean) {
                     if (online) Brush.radialGradient(listOf(Color(0xFF8CF2AD), Color(0xFF2FB35C)))
                     else SolidColor(palette.textMuted),
                 )
-                .border(4.dp, palette.surface, CircleShape),
+                .border(2.dp, palette.surface, CircleShape),
         )
     }
 }

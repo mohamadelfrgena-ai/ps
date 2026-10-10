@@ -134,8 +134,9 @@ check("أزرار تعديل الملف: ارتفاع 44dp وحشو أفقي 20d
       screens.count("buttonHeight = 44.dp") >= 4
       and screens.count("horizontalPadding = 20.dp") >= 4
       and "padding(horizontal = horizontalPadding)" in body(comp, "SpecFillButton"))
-check("٢٫٢ نقطة الحالة: توهّج 14dp@65% + حلقة 2dp@35% + حدّ داخلي بلون الخلفية",
-      "alpha = 0.65f" in comp and "alpha = 0.35f" in comp and "r - 2.5.dp.toPx()" in comp)
+check("٢٫٢ نقطة الحالة: توهّج 14dp@65% + حلقة 2dp@35% + حدّ داخلي رفيع 2dp",
+      "alpha = 0.65f" in comp and "alpha = 0.35f" in comp
+      and "radius = r - 1.dp.toPx()" in comp and "Stroke(width = 2.dp.toPx())" in comp)
 check("٢٫٢ «غير متصل» رمادي بلا توهّج · «مخفيّ الحالة» بلا نقطة",
       "Spec.offlineGrey" in comp and "if (status == SpecStatus.ONLINE)" in comp
       and "status != SpecStatus.HIDDEN" in comp)

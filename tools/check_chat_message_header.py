@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""فحص ترويسة رسائل الآخرين ومحاذاة رسائل المالك وأداة الشات.
+"""فحص ترويسة الرسائل (ومنها رسائل المالك) ومحاذاة الفقاعة وأداة الشات.
 
 الترتيب المطلوب (اختاره المالك):
     • الصورة (40dp) جنبها الاسم كما هو.
@@ -48,13 +48,20 @@ def branch(text: str, marker: str) -> str:
     return text[start:]
 
 
-header = branch(chat, "if (!grouped && !isMine) {")
+header = branch(chat, "if (showAuthorHeader) {")
 name_col = branch(header, "Column(modifier = Modifier.weight(1f, fill = false))")
 
 AVATAR_DP, ITEM_DP, OLD_ITEM_DP = 40, 32, 16
 
 if not header:
-    problems.append("لا كتلة ترويسة رسائل الآخرين (!grouped && !isMine) في ChatScreen.kt")
+    problems.append("لا كتلة ترويسة الرسائل (if showAuthorHeader) في ChatScreen.kt")
+
+# المالك طلب إظهار بيانات المرسل لنفسه أيضاً، حتى في الرسائل المتتابعة المجمّعة.
+if "val showAuthorHeader = !grouped || isMine" not in chat:
+    problems.append("ترويسة المالك ليست ظاهرة لكل رسالة صادرة")
+if "currentProfile = profile" not in chat or \
+        "currentProfile?.takeIf { isMine && it.id == myId }" not in chat:
+    problems.append("رسالة المالك لا تستخدم ملف الجلسة كبديل إذا غاب المؤلف من الخريطة")
 
 # 1) الاسم واللقب في عمود واحد: الاسم فوق، واللقب تحته
 if not name_col:
@@ -129,7 +136,11 @@ rows = [
     ("المجّاني بلا لقب (لا Free 🍃)",
      bool(gate_text) and '"free"' not in gate_text and "epic" in gate_text and "legendary" in gate_text),
     ("اللقب محكوم بالبوابة في الترويسة", "hasRankTitle(" in (header or "")),
-    ("ترويسة الاسم والأداة للآخرين فقط", "if (!grouped && !isMine)" in chat),
+    ("ترويسة الاسم والأداة ظاهرة للمرسل أيضًا", "val showAuthorHeader = !grouped || isMine" in chat
+     and "if (showAuthorHeader)" in chat),
+    ("بيانات المرسل تستعين بملفه الحالي عند الحاجة",
+     "currentProfile = profile" in chat
+     and "currentProfile?.takeIf { isMine && it.id == myId }" in chat),
     ("خلفية الأداة شفافة بلا إطار مضاف", "backgroundColor = Color.Transparent" in (header or "")),
     ("عمود الرسالة يعكس جهة رسائلي", "horizontalAlignment = if (isMine) Alignment.End else Alignment.Start" in chat),
     ("فقاعة النص الصادر عند نهاية السطر", "horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End)" in chat),

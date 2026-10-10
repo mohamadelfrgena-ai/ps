@@ -571,6 +571,7 @@ fun ChatScreen(
                             showDate = previous == null || previous.dayKey != ui.dayKey,
                             isNewDivider = false,
                             myId = myId,
+                            currentProfile = profile,
                             onLongPress = { actionsFor = ui },
                             onReply = { replyTo = ui.message },
                             onOpenImage = openFullSize,
@@ -585,7 +586,7 @@ fun ChatScreen(
                             },
                             onToggleReaction = { emoji -> vm.toggleReaction(ui.message.id, emoji) },
                             onOpenUser = { userId ->
-                                authors[userId]?.let { onOpenUser(it) }
+                                (authors[userId] ?: profile?.takeIf { it.id == userId })?.let(onOpenUser)
                             },
                             stickerUrlResolver = stickerUrlResolver,
                             onPlayVideo = {
@@ -1417,6 +1418,7 @@ private fun MessageBlock(
     showDate: Boolean,
     isNewDivider: Boolean,
     myId: String?,
+    currentProfile: Profile?,
     onLongPress: () -> Unit,
     /** ضغطة بسيطة على الرسالة ⇒ الرد عليها مباشرة (الضغط المطوّل = قائمة الإبلاغ/الحذف). */
     onReply: () -> Unit,
@@ -1437,12 +1439,10 @@ private fun MessageBlock(
 ) {
     val container = rememberContainer()
     val message = ui.message
-    val author = ui.author
-    /**
-     * رسالتي أنا؟ ⇒ وفق الوثيقة (§٤٫٣): محاذاة يمين، **بلا صورة ولا اسم**،
-     * وفقاعة زرقاء بنصف قطر 16/16/4/16 وبعرض أقصى 260.
-     */
     val isMine = myId != null && message.userId == myId
+    // رسائلي تستخدم ملف الجلسة المحلي إن لم تكن نسخة المرسل موجودة في قائمة المؤلفين.
+    val author = ui.author ?: currentProfile?.takeIf { isMine && it.id == myId }
+    /** فقاعة الرسالة الصادرة تبقى زرقاء ومحاذاة النهاية؛ الترويسة تُعرض أعلاها. */
     // رابط الصورة المرفقة: يُوقَّع من الخادم مرة واحدة لكل رسالة (بدونه تظهر فارغة)
     var imageUrl by remember(message.id, message.imagePath) { mutableStateOf<String?>(null) }
     // إعادة توقيع الرابط عند الطلب (ضغطة على الصورة البيضاء) — لا ننتظر التحديث
@@ -1460,6 +1460,8 @@ private fun MessageBlock(
     val grouped = previous != null &&
         previous.message.userId == message.userId &&
         TimeFormat.withinFiveMinutes(previous.message.createdAt, message.createdAt)
+    // أظهر هويتي مع كل رسالة صادرة؛ رسائل الآخرين تبقى مجمّعة كالسابق.
+    val showAuthorHeader = !grouped || isMine
 
     if (showDate) {
         Row(
@@ -1521,7 +1523,7 @@ private fun MessageBlock(
             )
         }
 
-        if (!grouped && !isMine) {
+        if (showAuthorHeader) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 com.addonstation.mobile.ui.components.AvatarImage(
                     url = assetUrl(container, author?.avatarUrl),
@@ -1808,8 +1810,8 @@ private fun MessageBlock(
             }
             else -> {
                 if (isMine) {
-                    // ── رسالتي: فقاعة زرقاء يميناً (§٤٫٣) بلا صورة ولا اسم،
-                    //    والوقت **في نهاية الرسالة** على حافتها السفلية (طلب المالك)
+                    // ── رسالتي: فقاعة زرقاء بمحاذاة النهاية (§٤٫٣)،
+                    //    والوقت **في نهاية الرسالة** على حافتها السفلية.
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
