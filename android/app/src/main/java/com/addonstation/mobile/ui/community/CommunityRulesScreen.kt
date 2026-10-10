@@ -175,7 +175,8 @@ internal fun CommunityRulesScreen(
             palette = palette,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, top = 16.dp),
+                .padding(horizontal = 20.dp)
+                .padding(top = 16.dp),
         )
 
         Column(

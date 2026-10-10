@@ -765,7 +765,7 @@ internal fun ProfileEditorScreen(
         Snackbar(
             containerColor = palette.surface,
             contentColor = palette.text,
-            actionColor = EditBlueLight,
+            actionContentColor = EditBlueLight,
             dismissActionContentColor = palette.textMuted,
             shape = RoundedCornerShape(14.dp),
         ) {
@@ -1173,7 +1173,7 @@ private fun EditorTextField(
     val palette = LocalHomePalette.current
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, bottom = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
