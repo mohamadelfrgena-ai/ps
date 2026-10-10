@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -591,7 +592,7 @@ private fun BrandBlock(
     compactMode: Boolean,
     topPadding: Dp,
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .align(Alignment.TopCenter)
             .padding(top = topPadding)
@@ -613,8 +614,11 @@ private fun BrandBlock(
                     alpha = ramp(p, 3.5f, 3.875f) * (1f - ramp(p, 6.6f, 7f))
                 }
             },
-        horizontalAlignment = Alignment.CenterHorizontally,
+        contentAlignment = Alignment.TopCenter,
     ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
         val iconShape = RoundedCornerShape(18.dp)
         Box(
             modifier = Modifier
@@ -656,6 +660,7 @@ private fun BrandBlock(
             overflow = TextOverflow.Ellipsis,
         )
     }
+    }
 }
 
 @Composable
@@ -669,7 +674,7 @@ private fun PixelLoader(
     val segments = 10
     val totalDuration = if (compactMode) 1.5f else 7f
     val phaseAt = progress()
-    Row(
+    Box(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .padding(bottom = bottomPadding)
@@ -681,7 +686,7 @@ private fun PixelLoader(
             } else {
                 phaseAt - (4.3f + 0.17f * i)
             }
-            val (alpha, scaleY) = if (reduceMotion) {
+            val (alpha, scaleFactor) = if (reduceMotion) {
                 1f to 1.35f
             } else {
                 val lit = timeAt.coerceIn(0f, 0.28f) / 0.28f
@@ -695,7 +700,7 @@ private fun PixelLoader(
                     .size(width = 22.dp, height = 10.dp)
                     .graphicsLayer {
                         this.alpha = alpha
-                        scaleY = scaleY
+                        this.scaleY = scaleFactor
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f)
                     }
                     .background(SplashGold, RoundedCornerShape(2.dp)),
