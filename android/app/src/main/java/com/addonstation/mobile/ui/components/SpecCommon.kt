@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -454,6 +455,75 @@ fun CodeSlotInput(
                         .fillMaxWidth()
                         .focusRequester(focusRequesters[i]),
                 )
+            }
+        }
+    }
+}
+
+/** مواصفة تبويب واحد من شريط الأدمن السفلي. */
+data class AdminTabSpec(
+    val labelRes: Int,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val badgeCount: Int = 0,
+)
+
+/**
+ * شريط الأدمن السفلي العائم (SPEC §3.1) — 5 تبويبات، خلفية سطح مرتفعة،
+ * حدّ علوي 1dp، لا زرّ مركزي مرتفع.
+ */
+@Composable
+fun AdminBottomBar(
+    tabs: List<AdminTabSpec>,
+    current: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(androidx.compose.ui.graphics.Color(0xFF1A2438))
+            .border(1.dp, androidx.compose.ui.graphics.Color(0xFF223049), RoundedCornerShape(0.dp))
+            .padding(vertical = 6.dp),
+    ) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            tabs.forEachIndexed { idx, tab ->
+                val selected = idx == current
+                val tint = if (selected) AppColors.Blue else AppColors.Muted
+                androidx.compose.foundation.layout.Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onSelect(idx) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                ) {
+                    androidx.compose.foundation.layout.Box {
+                        androidx.compose.material3.Icon(
+                            imageVector = tab.icon,
+                            contentDescription = null,
+                            tint = tint,
+                            modifier = Modifier.size(22.dp),
+                        )
+                        if (tab.badgeCount > 0) {
+                            androidx.compose.foundation.layout.Box(
+                                modifier = Modifier
+                                    .align(androidx.compose.ui.Alignment.TopEnd)
+                                    .size(8.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(AppColors.Red),
+                            )
+                        }
+                    }
+                    androidx.compose.material3.Text(
+                        text = androidx.compose.ui.res.stringResource(tab.labelRes),
+                        color = tint,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }
