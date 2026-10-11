@@ -84,6 +84,7 @@ import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
+import com.addonstation.mobile.ui.theme.Spec
 import com.addonstation.mobile.ui.theme.nameColor
 import androidx.compose.runtime.collectAsState
 import com.addonstation.mobile.util.TimeFormat

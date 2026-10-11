@@ -120,6 +120,7 @@ import com.addonstation.mobile.ui.theme.LocalHomePalette
 import com.addonstation.mobile.util.TimeFormat
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
+import java.util.Locale
 
 /** A bottom-bar selection made from an admin detail route is consumed by the restored panel. */
 internal object AdminPanelTabRequest {
@@ -1630,15 +1631,14 @@ fun AdminAssetsScreen(onBack: () -> Unit) {
                     color = AppColors.Muted,
                 )
             }
+            val assetTypeFilters = listOf(
+                "avatar" to stringResource(R.string.admin_tab_avatars),
+                "sticker" to stringResource(R.string.chat_stickers_tab),
+                "banner" to stringResource(R.string.profile_banner_section),
+                "item" to stringResource(R.string.admin_tab_submissions),
+            )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(
-                    listOf(
-                        "avatar" to stringResource(R.string.admin_tab_avatars),
-                        "sticker" to stringResource(R.string.chat_stickers_tab),
-                        "banner" to stringResource(R.string.profile_banner_section),
-                        "item" to stringResource(R.string.admin_tab_submissions),
-                    ),
-                ) { (assetType, label) ->
+                items(assetTypeFilters) { (assetType, label) ->
                     AdminFilterChip(label, type == assetType, { type = assetType }, height = 36.dp)
                 }
             }
@@ -3034,13 +3034,12 @@ fun AdminChatScreen(onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(6.dp))
+            val roomCategories = listOf(
+                "main" to stringResource(R.string.comm_main_rooms),
+                "lang" to stringResource(R.string.comm_lang_rooms),
+            )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(
-                    listOf(
-                        "main" to stringResource(R.string.comm_main_rooms),
-                        "lang" to stringResource(R.string.comm_lang_rooms),
-                    ),
-                ) { (value, label) ->
+                items(roomCategories) { (value, label) ->
                     AdminFilterChip(label, newRoomCategory == value, { newRoomCategory = value })
                 }
             }

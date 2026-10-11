@@ -1056,11 +1056,11 @@ private fun HomeExclusiveCard(
 
 @Composable
 private fun HomeExclusiveSkeleton(palette: HomePalette, motionEnabled: Boolean) {
-    val color = homeSkeletonColor(palette, motionEnabled)
-    Box(
-        Modifier.width(260.dp).height(150.dp).clip(RoundedCornerShape(18.dp))
-            .background(color).border(1.dp, palette.border, RoundedCornerShape(18.dp)),
-    )
+    val shape = RoundedCornerShape(18.dp)
+    Box(Modifier.width(260.dp).height(150.dp).clip(shape)) {
+        HomeSkeletonBlock(Modifier.fillMaxSize(), palette, motionEnabled, radius = 18.dp)
+        Box(Modifier.fillMaxSize().border(1.dp, palette.border, shape))
+    }
 }
 
 @Composable

@@ -3,6 +3,7 @@ package com.addonstation.mobile.ui.store
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -118,7 +119,7 @@ fun StoreScreen(
     val wallet by container.state.wallet.collectAsState()
     val scope = rememberCoroutineScope()
     val homePalette = com.addonstation.mobile.ui.theme.LocalHomePalette.current
-    val snackbarHostState = androidx.compose.material3.rememberSnackbarHostState()
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     val networkErrorText = stringResource(R.string.msg_network_error)
 
     var type by remember { mutableStateOf("addon") }
