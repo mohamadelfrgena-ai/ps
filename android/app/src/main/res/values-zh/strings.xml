@@ -824,4 +824,8 @@
     <string name="admin_creator_reject_reason">暂不符合要求。</string>
     <string name="admin_submission_reject_reason">内容需要修改。</string>
     <string name="creator_status_more_info">已请求补充信息。</string>
+    <string name="chat_admin_only_short">仅管理员</string>
+    <string name="edit_profile_tab_item">道具</string>
+    <string name="edit_profile_tab_about">关于</string>
+    <string name="edit_profile_message_preview">[消息内容]</string>
 </resources>

@@ -30,7 +30,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -243,10 +242,9 @@ fun SpecBannerIconButton(
 // ────────────────────────────────────────────────── 2.2 الأفاتار + نقطة الحالة
 
 /**
- * أفاتار 96×96 دائري · حدّ 5dp بلون الخلفية · ونقطة حالة 30×30 في الرُّكن
- * السفلي الأيمن (ملتصقة · إزاحة 0) بحدّ داخلي رفيع 2dp وتدرّج شعاعي أخضر
- * من أعلى اليسار مع توهّج ناعم (حلقة 2dp بشفافية 35% + ضباب 14dp بشفافية 65%).
- * «بعيد» كهرماني · «غير متصل» رمادي بلا توهّج · ومخفيّ الحالة: بلا نقطة.
+ * أفاتار 96×96 دائري · حدّ 5dp بلون الخلفية · ونقطة حالة 30×30 في الركن
+ * السفلي الأيمن. نقطة الاتصال خضراء مصمتة بلا هالة أو إطار رمادي، كما في
+ * الصورة المرجعية؛ «بعيد» كهرماني · «غير متصل» رمادي · ومخفيّ الحالة: بلا نقطة.
  */
 @Composable
 fun SpecProfileAvatar(
@@ -290,50 +288,22 @@ fun SpecProfileAvatar(
     }
 }
 
-/** رسم نقطة الحالة: توهّج + حلقة + قرص متدرّج + حدّ داخلي بلون الخلفية. */
+/** نقطة الاتصال خضراء مصمتة؛ الحالات الأخرى تحتفظ بحدّها الداكن للتمييز. */
 private fun Modifier.specStatusDot(status: SpecStatus): Modifier = drawBehind {
     val r = size.minDimension / 2f
-    val light = when (status) {
-        SpecStatus.ONLINE -> Spec.dotStart
+    val fill = when (status) {
+        SpecStatus.ONLINE -> Spec.onlineFill
         SpecStatus.AWAY -> Spec.awayAmber
         else -> Spec.offlineGrey
     }
-    val dark = when (status) {
-        SpecStatus.ONLINE -> Spec.dotEnd
-        SpecStatus.AWAY -> Spec.gold
-        else -> Spec.offlineGrey
-    }
-    if (status == SpecStatus.ONLINE) {
-        // توهّج: ضباب 14dp بشفافية 65% + حلقة 2dp بشفافية 35%
+    drawCircle(color = fill, radius = r)
+    if (status != SpecStatus.ONLINE) {
         drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Spec.dotStart.copy(alpha = 0.65f), Color.Transparent),
-                center = center,
-                radius = r + 14.dp.toPx(),
-            ),
-            radius = r + 14.dp.toPx(),
-        )
-        drawCircle(
-            color = Spec.dotStart.copy(alpha = 0.35f),
-            radius = r + 2.dp.toPx(),
+            color = Spec.bg,
+            radius = r - 1.dp.toPx(),
             style = Stroke(width = 2.dp.toPx()),
         )
     }
-    // القرص المتدرّج (الضوء من أعلى اليسار)
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(light, dark),
-            center = Offset(size.width * 0.28f, size.height * 0.24f),
-            radius = size.minDimension * 1.05f,
-        ),
-        radius = r,
-    )
-    // حدّ رفيع 2dp بلون الخلفية؛ يبقي النقطة واضحة من دون حلقة سوداء سميكة.
-    drawCircle(
-        color = Spec.bg,
-        radius = r - 1.dp.toPx(),
-        style = Stroke(width = 2.dp.toPx()),
-    )
 }
 
 // ────────────────────────────────────────────────────── 2.3 بطاقة الهوية
@@ -373,12 +343,11 @@ fun SpecIdentityCard(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            when (profile.effectivePlan) {
-                "legendary" -> SpecBadgeChip(stringResource(R.string.grp_legendary_plain), Spec.gold, Spec.goldDeepBg)
-                "epic" -> SpecBadgeChip(stringResource(R.string.grp_epic_plain), Spec.epic, Color.White)
+            if (profile.effectivePlan == "legendary" || profile.effectivePlan == "epic") {
+                SpecBadgeChip(stringResource(R.string.badge_premium), Spec.gold, Spec.goldDeepBg)
             }
-            if (profile.role == "creator") {
-                SpecBadgeChip(stringResource(R.string.role_creator_plain), Spec.blue, Color.White)
+            if (profile.isCreator || profile.role == "creator") {
+                SpecBadgeChip(stringResource(R.string.badge_creator), Spec.blue, Color.White)
             }
             SpecBadgeChip(stringResource(R.string.badge_level, level), Spec.surfaceHigh, Spec.chipLabel)
             if (profile.role == "admin") {

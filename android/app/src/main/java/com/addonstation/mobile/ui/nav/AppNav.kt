@@ -63,6 +63,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** مسارات التنقل كلها في مكان واحد. */
 object Routes {
@@ -138,7 +139,8 @@ fun AppRoot(
 
     var splashDone by remember { mutableStateOf(false) }
     var configured by remember { mutableStateOf(container.isConfigured) }
-    var launchReady by remember { mutableStateOf(false) }
+    var startupProgress by remember { mutableStateOf(0f) }
+    var startupReady by remember { mutableStateOf(false) }
 
     // أيقونات شريط الحالة تتبع وضع التطبيق نفسه (لا وضع الجهاز):
     // في الوضع الفاتح تصير الأيقونات داكنة فوق الخلفية الفاتحة.
@@ -174,44 +176,71 @@ fun AppRoot(
         onRecoveryConsumed()
     }
 
-    // استعادة الجلسة عند الإقلاع
-    LaunchedEffect(Unit) {
-        // كل عمل الإقلاع (شبكة + فك ترميز JSON) على خيط الإدخال/الإخراج،
-        // بالتوازي مع حركة البداية. تخرج شاشة الترحيب بعد الحد الأدنى عندما
-        // يصبح هذا العمل جاهزاً، لا بعد انتظار مدة الحركة كاملة.
+    // استعادة الجلسة وتحميل أساسيات التطبيق بالتوازي مع شاشة البداية.
+    // كل مرحلة تحدّث شريطاً حقيقياً؛ عند انقطاع الشبكة لا يبقى التطبيق عالقاً
+    // على شاشة البداية، بل ينتهي التمهيد بعد حدّ زمني وتظهر حالات إعادة المحاولة.
+    LaunchedEffect(container) {
+        startupProgress = 0.04f
         try {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val signedIn = container.auth.isSignedIn()
-                    if (signedIn) container.auth.ensureFreshSession()
+            withTimeoutOrNull(10_000L) {
+                val signedIn = withContext(Dispatchers.IO) {
+                    val hasSession = container.auth.isSignedIn()
+                    if (hasSession) container.auth.ensureFreshSession()
+                    hasSession
+                }
+                startupProgress = 0.18f
+
+                if (signedIn) {
                     coroutineScope {
-                        if (signedIn) {
-                            // جلسة المستخدم والأصول تُحمّلان معاً؛ غرفة الخدمات
-                            // تنتظر الملف الشخصي فقط، والخطط/الطرق تُحمّل ضمن refreshAll.
-                            val refresh = async { container.state.refreshAll() }
-                            val assets = async { container.assets.all() }
-                            refresh.await()
-                            val cashRoom = async {
-                                // الخادم يمنع الإنشاء لغير الأدمن، ونستدعيها دائماً.
+                        // ملف المستخدم والخطط والأصول تُحمّل بالتوازي كما في مسار الإقلاع السابق.
+                        val refresh = async {
+                            withContext(Dispatchers.IO) { container.state.refreshAll() }
+                        }
+                        val assets = async {
+                            withContext(Dispatchers.IO) { container.assets.all() }
+                        }
+                        startupProgress = 0.30f
+                        refresh.await()
+                        startupProgress = 0.65f
+
+                        val cashRoom = async {
+                            withContext(Dispatchers.IO) {
+                                // الخادم يمنع الإنشاء لغير الأدمن؛ نمرر الدور المحمّل كما كان.
                                 container.chat.ensureCashServicesRoom(
                                     container.state.profile.value?.role == "admin",
                                 )
                             }
-                            assets.await()
-                            cashRoom.await()
-                        } else {
-                            // بيانات المتجر العامة مستقلة؛ لا نجعل الطريقتين متتابعتين.
-                            val plans = async { container.plans.loadPlans() }
-                            val paymentMethods = async { container.plans.loadPaymentMethods() }
-                            plans.await()
-                            paymentMethods.await()
                         }
+                        assets.await()
+                        startupProgress = 0.88f
+                        cashRoom.await()
+                        startupProgress = 0.96f
+                    }
+                } else {
+                    // بيانات المتجر العامة مستقلة؛ لا نجعل الخطط وطرق الدفع متتابعتين.
+                    coroutineScope {
+                        val plans = async {
+                            withContext(Dispatchers.IO) { container.plans.loadPlans() }
+                        }
+                        val paymentMethods = async {
+                            withContext(Dispatchers.IO) { container.plans.loadPaymentMethods() }
+                        }
+                        startupProgress = 0.34f
+                        plans.await()
+                        startupProgress = 0.64f
+                        paymentMethods.await()
+                        startupProgress = 0.96f
                     }
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            // التمهيد اكتمل بحالة متدهورة؛ الشاشة التالية تملك إعادة المحاولة.
         } finally {
             configured = container.isConfigured
-            launchReady = true
+            startupProgress = 1f
+            startupReady = true
         }
     }
 
@@ -250,7 +279,8 @@ fun AppRoot(
                     if (!splashDone) {
                         // الشاشة نفسها فوق كل شيء، وتخرج بتلاشٍ يكشف ما تحتها
                         SplashScreen(
-                            startupReady = launchReady,
+                            loadingProgress = startupProgress,
+                            startupReady = startupReady,
                             onFinished = { splashDone = true },
                         )
                     }

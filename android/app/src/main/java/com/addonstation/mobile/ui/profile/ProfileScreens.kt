@@ -170,6 +170,7 @@ fun ProfileScreen(
     LaunchedEffect(scrollToTopRequest) {
         if (scrollToTopRequest > 0) scrollState.animateScrollTo(0)
     }
+
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
     val wallet by container.state.wallet.collectAsState()
@@ -181,25 +182,14 @@ fun ProfileScreen(
     val dailyAlreadyClaimed = stringResource(R.string.ac_claimed)
     val dailySignInNeeded = stringResource(R.string.msg_sign_in_needed)
     val dailyGenericError = stringResource(R.string.msg_generic_error)
-    val lockedHint = stringResource(R.string.plan_locked_online_plain)
-    val isArabic = com.addonstation.mobile.ui.components.appLocaleCode().equals("ar", ignoreCase = true)
 
     var profileRetryTick by remember { mutableStateOf(0) }
     var statsTick by remember { mutableStateOf(0) }
     var stats by remember { mutableStateOf<ProfileStats?>(null) }
     var claiming by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableStateOf(ProfileTab.About) }
-    var myContent by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
-    var favoriteContent by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
-    var creatorNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var contentLoading by remember { mutableStateOf(true) }
-    var contentFailed by remember { mutableStateOf(false) }
-    var favoritesLoading by remember { mutableStateOf(false) }
-    var favoritesFailed by remember { mutableStateOf(false) }
-    var contentReloadTick by remember { mutableStateOf(0) }
-    var accountNote by remember { mutableStateOf<String?>(null) }
+    var signingOut by remember { mutableStateOf(false) }
 
-    // Keep the existing signed-in profile recovery and server-backed stats/wallet requests.
+    // Preserve session/profile recovery and server-backed wallet/stat requests.
     LaunchedEffect(signedIn, profileRetryTick) {
         if (signedIn && container.state.currentProfile == null) {
             try {
@@ -217,53 +207,7 @@ fun ProfileScreen(
         runCatching { container.profile.refreshWallet() }
         runCatching { container.profile.stats(id) }.onSuccess { stats = it }
     }
-    // Load published content up front because its counts are visible on the profile header.
-    LaunchedEffect(signedIn, profile?.id, contentReloadTick) {
-        if (!signedIn || profile?.id == null) return@LaunchedEffect
-        contentLoading = true
-        contentFailed = false
-        try {
-            myContent = withContext(Dispatchers.IO) { container.content.myContent() }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Throwable) {
-            contentFailed = true
-        } finally {
-            contentLoading = false
-        }
-    }
-    LaunchedEffect(signedIn, profile?.id, selectedTab, contentReloadTick) {
-        if (!signedIn || profile?.id == null || selectedTab != ProfileTab.Favorites) return@LaunchedEffect
-        favoritesLoading = true
-        favoritesFailed = false
-        try {
-            favoriteContent = withContext(Dispatchers.IO) { container.content.favorites() }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Throwable) {
-            favoritesFailed = true
-        } finally {
-            favoritesLoading = false
-        }
-    }
-    val authorIds = remember(myContent, favoriteContent) {
-        (myContent + favoriteContent).mapNotNull { it.createdBy }.distinct()
-    }
-    LaunchedEffect(authorIds) {
-        if (authorIds.isEmpty()) {
-            creatorNames = emptyMap()
-        } else {
-            creatorNames = runCatching {
-                withContext(Dispatchers.IO) {
-                    container.profile.loadProfiles(authorIds).mapValues { (_, author) ->
-                        author.username ?: author.displayName.orEmpty()
-                    }
-                }
-            }.getOrDefault(emptyMap())
-        }
-    }
 
-    // Daily claim stays on the compact wallet card; server-side task logic is unchanged.
     fun claimDaily() {
         if (claiming) return
         scope.launch {
@@ -280,13 +224,11 @@ fun ProfileScreen(
                         snackbarHostState.showSnackbar(dailySuccessTemplate.format(amount))
                     }
                     .onFailure { error ->
-                        val raw = error.message.orEmpty()
-                        val normalized = raw.lowercase(Locale.ROOT)
+                        val normalized = error.message.orEmpty().lowercase(Locale.ROOT)
                         val message = when {
                             normalized.contains("already_claimed") || normalized.contains("max_claims") -> dailyAlreadyClaimed
                             normalized.contains("sign_in_required") -> dailySignInNeeded
-                            raw.isBlank() -> dailyGenericError
-                            else -> raw
+                            else -> dailyGenericError
                         }
                         snackbarHostState.showSnackbar(message)
                     }
@@ -294,18 +236,6 @@ fun ProfileScreen(
             } finally {
                 claiming = false
             }
-        }
-    }
-
-    fun removeFavorite(item: ContentItem) {
-        scope.launch {
-            container.content.toggleFavorite(item.id)
-                .onSuccess { saved ->
-                    if (!saved) favoriteContent = favoriteContent.filterNot { it.id == item.id }
-                    else contentReloadTick += 1
-                    statsTick += 1
-                }
-                .onFailure { accountNote = it.message ?: dailyGenericError }
         }
     }
 
@@ -326,157 +256,165 @@ fun ProfileScreen(
     }
 
     val me = profile!!
-    val status = specStatusOf(me, isMe = true)
     val level = stats?.level ?: me.userLevel
     val balance = wallet?.balance ?: 0
     val streak = stats?.streak ?: 0
     val dailyClaimed = stats?.dailyClaimed ?: false
-    val publishedCount = myContent.count { it.isPublished }
-    val worldCount = myContent.count { it.contentType == "world" }
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            Column(
-                Modifier.fillMaxSize().imePadding().verticalScroll(scrollState),
-            ) {
-                SpecProfileBanner(
-                    bannerUrl = assetUrl(container, me.bannerUrl),
-                    onBack = onBack,
-                    more = {
-                        SpecBannerIconButton(
-                            icon = Icons.Filled.Settings,
-                            description = stringResource(R.string.profile_full_settings),
-                            onClick = onOpenSettings,
-                        )
-                    },
-                )
+        Column(
+            Modifier
+                .fillMaxSize()
+                .imePadding()
+                .verticalScroll(scrollState),
+        ) {
+            // A · banner with back only.
+            SpecProfileBanner(
+                bannerUrl = assetUrl(container, me.bannerUrl),
+                onBack = onBack,
+            )
 
-                // Avatar and identity overlap the banner by 38dp, as in the profile-page spec.
-                Box(Modifier.fillMaxWidth().height(86.dp)) {
-                    Row(
-                        Modifier.fillMaxWidth().offset(y = (-38).dp).padding(horizontal = Spec.screenPad),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
+            // Avatar overlaps the banner; the edit action shares its bottom edge.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(Spec.avatarLg - Spec.avatarOverlap),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
+                    Box(Modifier.padding(start = Spec.screenPad)) {
                         SpecProfileAvatar(
                             avatarUrl = assetUrl(container, me.avatarUrl),
-                            status = status,
-                            size = 80.dp,
-                            borderWidth = 4.dp,
-                            dotSize = 22.dp,
+                            status = specStatusOf(me, isMe = true),
                             showHiddenDot = true,
                         )
-                        Column(Modifier.weight(1f)) {
-                            SpecIdentityCard(profile = me, status = status, level = level)
-                        }
                     }
                 }
+                SpecFillButton(
+                    text = stringResource(R.string.profile_edit),
+                    onClick = onOpenEdit,
+                    buttonHeight = 44.dp,
+                    horizontalPadding = 20.dp,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = Spec.screenPad),
+                )
+            }
 
-                Column(Modifier.padding(horizontal = Spec.screenPad)) {
-                    Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        SpecFillButton(
-                            text = stringResource(R.string.profile_edit_mine_plain),
-                            onClick = onOpenEdit,
-                            buttonHeight = 44.dp,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (me.isCreator || me.role == "admin") {
-                            SpecOutlineButton(
-                                text = stringResource(R.string.profile_dashboard_plain),
-                                onClick = { if (me.role == "admin") onOpenAdmin() else onOpenCreatorStudio() },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
+            Column(Modifier.fillMaxWidth().padding(horizontal = Spec.screenPad)) {
+                Spacer(Modifier.height(12.dp))
+                SpecIdentityCard(profile = me, status = specStatusOf(me, isMe = true), level = level)
 
-                    Spacer(Modifier.height(12.dp))
-                    SpecLevelCard(level = level, xpInLevel = stats?.xpInLevel ?: 0)
-                    Spacer(Modifier.height(12.dp))
-                    SpecSmallCaps(stringResource(R.string.profile_statistics))
-                    Spacer(Modifier.height(8.dp))
-                    ProfileStatisticsGrid(
-                        published = publishedCount,
-                        worlds = worldCount,
-                        content = myContent.size,
-                        downloads = stats?.downloads ?: 0,
-                        favorites = stats?.favorites ?: 0,
-                        level = level,
+                // Wallet remains the existing server-backed card and daily-task entry point.
+                Spacer(Modifier.height(12.dp))
+                SpecWalletCard(
+                    balance = balance,
+                    streak = streak,
+                    dailyClaimed = dailyClaimed,
+                    claiming = claiming,
+                    onOpenWallet = onOpenWallet,
+                    onClaim = ::claimDaily,
+                )
+
+                Spacer(Modifier.height(12.dp))
+                SpecAboutCard(bio = me.bio, memberSince = specMemberSince(me.createdAt))
+
+                Spacer(Modifier.height(12.dp))
+                SpecStatsStrip(
+                    friends = stats?.friends ?: 0,
+                    downloads = stats?.downloads ?: 0,
+                    favorites = stats?.favorites ?: 0,
+                )
+
+                Spacer(Modifier.height(12.dp))
+                SpecLevelCard(level = level, xpInLevel = stats?.xpInLevel ?: 0)
+
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SpecGridTile(
+                        text = stringResource(R.string.profile_tab_favorites),
+                        onClick = onOpenFavorites,
+                        modifier = Modifier.weight(1f),
                     )
+                    SpecGridTile(
+                        text = stringResource(R.string.profile_stats_downloads),
+                        onClick = onOpenDownloads,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SpecGridTile(
+                        text = stringResource(R.string.profile_orders),
+                        onClick = onOpenOrders,
+                        modifier = Modifier.weight(1f),
+                    )
+                    SpecGridTile(
+                        text = stringResource(R.string.profile_stats_content),
+                        onClick = onOpenMyContent,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
 
-                    Spacer(Modifier.height(16.dp))
-                    ProfileTabs(selected = selectedTab, onSelect = { selectedTab = it })
-                    Spacer(Modifier.height(12.dp))
-                    when (selectedTab) {
-                        ProfileTab.About -> ProfileAboutTab(
-                            me = me,
-                            balance = balance,
-                            streak = streak,
-                            dailyClaimed = dailyClaimed,
-                            claiming = claiming,
-                            accountNote = accountNote,
-                            onClaim = ::claimDaily,
-                            onOpenWallet = onOpenWallet,
-                            container = container,
-                            onToggleOnline = { next ->
-                                if (container.profile.planRank(me.effectivePlan) < 3) {
-                                    accountNote = lockedHint
-                                } else {
-                                    scope.launch {
-                                        container.profile.setShowOnline(next)
-                                            .onSuccess { accountNote = null }
-                                            .onFailure { accountNote = it.message ?: dailyGenericError }
-                                    }
-                                }
-                            },
-                        )
-                        ProfileTab.Content -> {
-                            WalletSectionHeader(text = stringResource(R.string.profile_content_section))
-                            ProfileItemsGrid(
-                                items = myContent,
-                                loading = contentLoading,
-                                failed = contentFailed,
-                                favorite = false,
-                                emptyText = stringResource(R.string.profile_my_content_empty_plain),
-                                creatorNames = creatorNames,
-                                onRetry = { contentReloadTick += 1 },
-                                onOpenItem = onOpenItem,
-                                onToggleFavorite = null,
-                            )
-                        }
-                        ProfileTab.Favorites -> {
-                            WalletSectionHeader(text = stringResource(R.string.profile_tab_favorites))
-                            ProfileItemsGrid(
-                                items = favoriteContent,
-                                loading = favoritesLoading,
-                                failed = favoritesFailed,
-                                favorite = true,
-                                emptyText = stringResource(R.string.profile_favorites_empty_plain),
-                                creatorNames = creatorNames,
-                                onRetry = { contentReloadTick += 1 },
-                                onOpenItem = onOpenItem,
-                                onToggleFavorite = ::removeFavorite,
-                            )
-                        }
-                        ProfileTab.Plan -> ProfilePlanTab(
-                            me = me,
-                            onManage = onOpenOrders,
-                            onUpgrade = onOpenPlans,
-                        )
-                    }
-
-                    Spacer(Modifier.height(20.dp))
-                    ProfileSettingsFooter(onClick = onOpenSettings)
-                    Spacer(Modifier.height(30.dp))
+                // The profile preview is an explicit entry on A (also available from Edit Profile).
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onViewAsOthers)
+                        .padding(vertical = 14.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.Visibility,
+                        contentDescription = null,
+                        tint = Spec.blueLink,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        stringResource(R.string.profile_view_as_others),
+                        style = Spec.link,
+                        color = Spec.blueLink,
+                    )
                 }
             }
+
+            SpecDangerButton(
+                text = stringResource(R.string.profile_logout),
+                onClick = {
+                    if (!signingOut) {
+                        scope.launch {
+                            signingOut = true
+                            try {
+                                container.auth.signOut()
+                                container.state.setSignedIn(false)
+                                onSignedOut()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Throwable) {
+                                snackbarHostState.showSnackbar(dailyGenericError)
+                            } finally {
+                                signingOut = false
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.padding(horizontal = Spec.screenPad).padding(top = 16.dp, bottom = 24.dp),
+            )
         }
+
         SnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().imePadding()
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .imePadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) { data ->
-            Snackbar(containerColor = AppColors.AuthSurfaceHigh, contentColor = AppColors.AuthText, shape = RoundedCornerShape(14.dp)) {
+            Snackbar(
+                containerColor = AppColors.AuthSurfaceHigh,
+                contentColor = AppColors.AuthText,
+                shape = RoundedCornerShape(14.dp),
+            ) {
                 Text(data.visuals.message, style = AppText.bodySmall, color = AppColors.AuthText)
             }
         }
@@ -1234,24 +1172,24 @@ fun UserProfileScreen(
             },
         )
 
-        // ٢) الأفاتار — بلا زرّ بجانبه (زرّ التعديل لملفي أنا وحدي)
-        Box(Modifier.fillMaxWidth().height(Spec.avatarLg - Spec.avatarOverlap)) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = Spec.screenPad),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
+        // ٢) الأفاتار؛ ويصطفّ زر التعديل (إن كان الملف ملفي) مع حافته السفلية.
+        Box(
+            Modifier.fillMaxWidth().height(Spec.avatarLg - Spec.avatarOverlap),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
+                Box(Modifier.padding(start = Spec.screenPad)) {
                     SpecProfileAvatar(avatarUrl = assetUrl(container, me.avatarUrl), status = status)
                 }
-                if (isMyProfile) {
-                    Spacer(Modifier.weight(1f))
-                    SpecFillButton(
-                        text = stringResource(R.string.profile_edit),
-                        onClick = onEditProfile,
-                        buttonHeight = 44.dp,
-                        horizontalPadding = 20.dp,
-                    )
-                }
+            }
+            if (isMyProfile) {
+                SpecFillButton(
+                    text = stringResource(R.string.profile_edit),
+                    onClick = onEditProfile,
+                    buttonHeight = 44.dp,
+                    horizontalPadding = 20.dp,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = Spec.screenPad),
+                )
             }
         }
 
@@ -1288,13 +1226,7 @@ fun UserProfileScreen(
                     )
                 }
             } else if (isMyProfile) {
-                SpecFillButton(
-                    text = stringResource(R.string.profile_edit),
-                    onClick = onEditProfile,
-                    buttonHeight = 44.dp,
-                    horizontalPadding = 20.dp,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                // زر التعديل موجود بجانب الأفاتار؛ لا نكررّه في صفّ إجراءات العضو.
             } else {
                 // «مراسلة [الاسم]»: مخفيّ مؤقتاً بقرار المالك (لا محادثات خاصة في الخادم بعد)
                 FriendActionButtons(
@@ -1325,17 +1257,19 @@ fun UserProfileScreen(
                 )
             }
 
-            // ٥) الإحصاءات
+            // ٥) الإحصاءات · المستوى · النبذة — كلها بأعداد الخادم.
             Spacer(Modifier.height(12.dp))
-            ProfileMemberStats(
-                published = userContent.size,
+            SpecStatsStrip(
+                friends = stats?.friends ?: 0,
                 downloads = stats?.downloads ?: 0,
-                level = level,
+                favorites = stats?.favorites ?: 0,
             )
-
-            // نبذة، ثم عناصر منشورة لهذا العضو.
+            Spacer(Modifier.height(12.dp))
+            SpecLevelCard(level = level, xpInLevel = stats?.xpInLevel ?: 0)
             Spacer(Modifier.height(12.dp))
             SpecAboutCard(bio = me.bio, memberSince = specMemberSince(me.createdAt))
+
+            // عناصر العضو المنشورة تبقى متاحة كما في السلوك السابق.
             Spacer(Modifier.height(12.dp))
             SectionHeader(title = stringResource(R.string.profile_content_section))
             ContentGrid(
@@ -1613,22 +1547,22 @@ fun ProfileAsOthersScreen(
             onBack = onBack,
         )
 
-        Box(Modifier.fillMaxWidth().height(Spec.avatarLg - Spec.avatarOverlap)) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = Spec.screenPad),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
+        Box(
+            Modifier.fillMaxWidth().height(Spec.avatarLg - Spec.avatarOverlap),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
+                Box(Modifier.padding(start = Spec.screenPad)) {
                     SpecProfileAvatar(avatarUrl = assetUrl(container, me.avatarUrl), status = status)
                 }
-                Spacer(Modifier.weight(1f))
-                SpecFillButton(
-                    text = stringResource(R.string.profile_edit),
-                    onClick = onOpenEdit,
-                    buttonHeight = 44.dp,
-                    horizontalPadding = 20.dp,
-                )
             }
+            SpecFillButton(
+                text = stringResource(R.string.profile_edit),
+                onClick = onOpenEdit,
+                buttonHeight = 44.dp,
+                horizontalPadding = 20.dp,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = Spec.screenPad),
+            )
         }
 
         Column(Modifier.padding(horizontal = Spec.screenPad)) {

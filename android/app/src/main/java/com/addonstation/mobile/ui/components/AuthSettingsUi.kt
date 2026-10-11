@@ -452,9 +452,10 @@ fun AuthSettingsRow(
                 style = Spec.rowValue,
                 color = AppColors.AuthChipLabel,
                 textAlign = TextAlign.End,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 120.dp),
+                maxLines = 2,
+                softWrap = true,
+                overflow = TextOverflow.Clip,
+                modifier = Modifier.widthIn(max = 160.dp),
             )
         }
         trailing?.invoke()

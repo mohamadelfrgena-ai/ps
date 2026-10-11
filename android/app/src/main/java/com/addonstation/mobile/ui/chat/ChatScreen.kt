@@ -4,6 +4,7 @@ package com.addonstation.mobile.ui.chat
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -45,16 +46,20 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -102,6 +107,7 @@ import com.addonstation.mobile.ui.components.EmptyState
 import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.RoomIcon
 import com.addonstation.mobile.ui.components.LoadingBox
+import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
@@ -160,6 +166,7 @@ fun ChatScreen(
     val authors by vm.authors.collectAsState()
     val loading by vm.loading.collectAsState()
     val newBelow by vm.newMessagesBelow.collectAsState()
+    val newDividerId by vm.newDividerId.collectAsState()
     /** من حظرتُهم — يُقرأ من القاعدة ويُحدَّث فوراً عند الحظر/الإلغاء في هذه الشاشة. */
     val blockedIds by vm.blockedIds.collectAsState()
     val scrollTick by vm.scrollTick.collectAsState()
@@ -567,8 +574,8 @@ fun ChatScreen(
 
         Box(Modifier.weight(1f)) {
             when {
-                loading -> LoadingBox(text = stringResource(R.string.chat_loading_messages))
-                messages.isEmpty() -> EmptyState(stringResource(R.string.chat_no_messages))
+                loading -> ChatMessagesLoadingSkeleton()
+                messages.isEmpty() -> ChatMessagesEmptyState(stringResource(R.string.chat_no_messages))
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
@@ -589,7 +596,7 @@ fun ChatScreen(
                             // مقارنة مفتاح اليوم (مُخزَّن في العنصر) بدل حساب
                             // نصّ التاريخ مرّتين لكل رسالة — انظر Models.dayKey.
                             showDate = previous == null || previous.dayKey != ui.dayKey,
-                            isNewDivider = false,
+                            isNewDivider = newDividerId == ui.message.id,
                             myId = myId,
                             currentProfile = profile,
                             onLongPress = { actionsFor = ui },
@@ -651,15 +658,33 @@ fun ChatScreen(
         }
 
         typing.firstOrNull()?.let { name ->
-            Text(
-                stringResource(R.string.chat_typing, name),
-                style = Spec.msgQuote,
-                color = Spec.textMuted,
-                modifier = Modifier.padding(start = 50.dp, bottom = 2.dp),
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Spec.barSurface)
+                    .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ChatTypingDots()
+                Text(
+                    stringResource(R.string.chat_typing, name),
+                    style = Spec.msgQuote,
+                    color = Spec.textMuted,
+                )
+            }
         }
 
         replyTo?.let { original ->
+            val replyPreview = when {
+                original.status == "deleted" -> stringResource(R.string.chat_delete_done)
+                !original.content.isNullOrBlank() -> original.content.orEmpty().replace('\n', ' ')
+                original.messageType == "image" -> stringResource(R.string.chat_attach_photo)
+                original.messageType == "sticker" -> stringResource(R.string.chat_stickers)
+                original.messageType == "video" -> stringResource(R.string.chat_video_label)
+                original.messageType == "audio" -> stringResource(R.string.chat_audio_label)
+                else -> stringResource(R.string.chat_announcement)
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -670,17 +695,25 @@ fun ChatScreen(
                     .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    stringResource(
-                        R.string.chat_replying_to,
-                        authors[original.userId]?.username ?: "",
-                    ),
-                    style = Spec.msgQuote,
-                    color = Spec.blueLink,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Column(Modifier.weight(1f).padding(vertical = 2.dp)) {
+                    Text(
+                        stringResource(
+                            R.string.chat_replying_to,
+                            authors[original.userId]?.username ?: "",
+                        ),
+                        style = Spec.msgQuote.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold),
+                        color = Spec.blueLink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        replyPreview,
+                        style = Spec.msgTime,
+                        color = Spec.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 // زرّ الإغلاق 44dp (هدف لمس كامل)
                 Box(
                     modifier = Modifier
@@ -828,6 +861,9 @@ fun ChatScreen(
                 // فيستطيع صاحبه أن يكتب نصاً تحته إن أراد، ثم يضغط إرسال.
                 pendingSticker = stickerUrl
                 resentSticker = null
+                showEmoji = false
+                keyboardController?.hide()
+                focusManager.clearFocus(force = true)
             },
         )
     }
@@ -986,6 +1022,268 @@ fun ChatScreen(
     }
 }
 
+
+@Composable
+private fun ChatMessagesLoadingSkeleton() {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "chat-message-skeleton")
+    val alpha by transition.animateFloat(
+        initialValue = 0.28f,
+        targetValue = 0.82f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(1100),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "chat-message-skeleton-alpha",
+    )
+    val shimmer = Spec.surfaceHigh.copy(alpha = alpha)
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        repeat(6) { index ->
+            val outgoing = index % 3 == 2
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = if (outgoing) Arrangement.End else Arrangement.Start,
+            ) {
+                if (!outgoing) {
+                    Box(Modifier.size(36.dp).clip(CircleShape).background(shimmer))
+                    Spacer(Modifier.size(8.dp))
+                }
+                Column(
+                    Modifier
+                        .fillMaxWidth(if (outgoing) 0.72f else 0.82f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Spec.surface)
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(Modifier.fillMaxWidth(0.34f).height(10.dp).clip(CircleShape).background(shimmer))
+                    Box(Modifier.fillMaxWidth(if (index % 2 == 0) 0.88f else 0.64f).height(16.dp).clip(CircleShape).background(shimmer))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatMessagesEmptyState(message: String) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(Spec.surface)
+                .border(1.dp, Spec.border, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("💬", style = Spec.chatName, color = Spec.blueLink)
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            message,
+            style = Spec.msgQuote,
+            color = Spec.textMuted,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun NewMessagesDivider() {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(Modifier.weight(1f).height(1.dp).background(Spec.blue))
+        Text(
+            stringResource(R.string.chat_new_tag),
+            style = Spec.badge.copy(letterSpacing = 0.8.sp),
+            color = Spec.blueLink,
+            maxLines = 1,
+        )
+        Box(Modifier.weight(1f).height(1.dp).background(Spec.blue))
+    }
+}
+
+
+@Composable
+private fun ChatTypingDots() {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "chat-typing")
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(3) { index ->
+            val alpha by transition.animateFloat(
+                initialValue = 0.28f,
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = androidx.compose.animation.core.tween(650, delayMillis = index * 150),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+                ),
+                label = "chat-typing-dot-$index",
+            )
+            Box(
+                Modifier
+                    .size(6.dp)
+                    .alpha(alpha)
+                    .clip(CircleShape)
+                    .background(Spec.blueLink),
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun AudioMessageTile(
+    mediaPath: String?,
+    durationSeconds: Int?,
+    sizeBytes: Long?,
+    isMine: Boolean,
+    onReply: () -> Unit,
+    onLongPress: () -> Unit,
+) {
+    val context = LocalContext.current
+    val container = rememberContainer()
+    val scope = rememberCoroutineScope()
+    var player by remember(mediaPath) { mutableStateOf<ExoPlayer?>(null) }
+    var loading by remember(mediaPath) { mutableStateOf(false) }
+    var playing by remember(mediaPath) { mutableStateOf(false) }
+    val activePlayer = player
+
+    DisposableEffect(activePlayer) {
+        if (activePlayer == null) {
+            onDispose { }
+        } else {
+            val listener = object : Player.Listener {
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    playing = isPlaying
+                }
+
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_ENDED) {
+                        activePlayer.seekTo(0)
+                        playing = false
+                    }
+                }
+
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    playing = false
+                }
+            }
+            activePlayer.addListener(listener)
+            onDispose {
+                activePlayer.removeListener(listener)
+                runCatching { activePlayer.stop() }
+                activePlayer.release()
+            }
+        }
+    }
+
+    fun togglePlayback() {
+        val current = player
+        if (current != null) {
+            if (current.isPlaying) current.pause()
+            else {
+                if (current.playbackState == Player.STATE_ENDED) current.seekTo(0)
+                current.play()
+            }
+            return
+        }
+        if (loading || mediaPath.isNullOrBlank()) return
+        loading = true
+        scope.launch {
+            val url = runCatching { container.chat.mediaUrl(mediaPath) }.getOrNull()
+            if (url != null) {
+                val created = ExoPlayer.Builder(context).build().apply {
+                    setMediaItem(MediaItem.fromUri(url))
+                    prepare()
+                    playWhenReady = true
+                }
+                player = created
+                playing = true
+            }
+            loading = false
+        }
+    }
+
+    val foreground = if (isMine) Color.White else Spec.text
+    val muted = if (isMine) Color.White.copy(alpha = 0.78f) else Spec.textMuted
+    val background = if (isMine) Spec.blue else Spec.surface
+    Row(
+        modifier = Modifier
+            .widthIn(max = 260.dp)
+            .clip(RoundedCornerShape(if (isMine) 16.dp else 14.dp))
+            .background(background)
+            .combinedClickable(onClick = onReply, onLongClick = onLongPress)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(if (isMine) Color.White else Spec.blue)
+                .clickable(enabled = mediaPath?.isNotBlank() == true) { togglePlayback() },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(19.dp),
+                    color = if (isMine) Spec.blue else Color.White,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = stringResource(R.string.chat_audio_label),
+                    tint = if (isMine) Spec.blue else Color.White,
+                    modifier = Modifier.size(23.dp),
+                )
+            }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                stringResource(R.string.chat_audio_label),
+                style = Spec.msgTime.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                color = foreground,
+                maxLines = 1,
+            )
+            val heights = listOf(10, 16, 23, 14, 27, 19, 11, 25, 15, 20, 28, 12, 18, 24, 14, 21)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                heights.forEachIndexed { index, height ->
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(height.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(
+                                if (playing && index < heights.size / 2) foreground
+                                else (if (isMine) foreground else Spec.blueLink).copy(alpha = if (isMine) 0.72f else 0.84f),
+                            ),
+                    )
+                }
+            }
+            Text(
+                TimeFormat.durationLabel(durationSeconds) + " · " + TimeFormat.fileSizeLabel(sizeBytes),
+                style = Spec.msgTime,
+                color = muted,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
 @Composable
 private fun ChatHeader(
     channel: ChatChannel,
@@ -1092,45 +1390,6 @@ private fun roleColorOf(role: String?, plan: String?, userId: String): Color = w
     plan == "epic" -> Spec.epic
     else -> Spec.nameColors[Math.floorMod(userId.hashCode(), Spec.nameColors.size)]
 }
-
-/** Compact role/plan chip; business role and plan values remain unchanged. */
-@Composable
-private fun ChatRoleChip(role: String?, plan: String?) {
-    val (labelRes, tint, fill, foreground, moderator) = when {
-        role == "admin" -> FiveColorRole(R.string.role_admin, Spec.gold, Spec.gold, Spec.goldDeepBg)
-        role == "moderator" -> FiveColorRole(R.string.role_moderator_plain, Spec.green, Spec.green.copy(alpha = 0.18f), Spec.green, true)
-        role == "creator" -> FiveColorRole(R.string.role_creator_plain, Spec.blueLink, Spec.blue, Color.White)
-        plan == "legendary" -> FiveColorRole(R.string.role_legendary, Spec.gold, Spec.gold, Spec.goldDeepBg)
-        plan == "epic" -> FiveColorRole(R.string.role_epic, Spec.epic, Spec.epic, Color.White)
-        else -> return
-    }
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(9.dp))
-            .background(fill)
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        if (moderator) {
-            Icon(Icons.Filled.Shield, contentDescription = null, tint = tint, modifier = Modifier.size(12.dp))
-        }
-        Text(
-            stringResource(labelRes),
-            style = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold),
-            color = foreground,
-            maxLines = 1,
-        )
-    }
-}
-
-private data class FiveColorRole(
-    val labelRes: Int,
-    val tint: Color,
-    val fill: Color,
-    val foreground: Color,
-    val moderator: Boolean = false,
-)
 
 /**
  * نصّ مختصر للرسالة المثبّتة (شريط §٤٫٢): نصّها، وإن كانت ملصقاً أو صورة فرمز
@@ -1619,8 +1878,8 @@ private fun MessageBlock(
     val grouped = previous != null &&
         previous.message.userId == message.userId &&
         TimeFormat.withinFiveMinutes(previous.message.createdAt, message.createdAt)
-    // Incoming messages use a compact author row; own messages are just the end-aligned bubble.
-    val showAuthorHeader = !isMine && !grouped
+    // Show a profile header on each outgoing message and the first message in an incoming group.
+    val showAuthorHeader = !grouped || isMine
 
     if (showDate) {
         Row(
@@ -1642,6 +1901,8 @@ private fun MessageBlock(
             )
         }
     }
+
+    if (isNewDivider) NewMessagesDivider()
 
     if (message.messageType == "system") {
         Text(
@@ -1684,44 +1945,39 @@ private fun MessageBlock(
 
         if (showAuthorHeader) {
             Row(
+                modifier = Modifier.widthIn(max = 300.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 com.addonstation.mobile.ui.components.AvatarImage(
                     url = assetUrl(container, author?.avatarUrl),
-                    size = 36.dp,
+                    size = 40.dp,
                     online = author?.showOnlineStatus == true,
                     modifier = Modifier.clickable { onOpenUser(message.userId) },
                 )
-                Row(
-                    Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
+                Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
                         text = author?.displayName ?: author?.username ?: "—",
-                        style = Spec.msgQuote.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold),
+                        style = Spec.msgAuthor,
                         color = roleColorOf(author?.role, author?.effectivePlan, message.userId),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
                     )
                     if (author != null && hasRankTitle(author.role, author.effectivePlan)) {
-                        ChatRoleChip(role = author.role, plan = author.effectivePlan)
+                        RankBadge(role = author.role, plan = author.effectivePlan)
                     }
                 }
                 if (author?.equippedItemId != null && author.equippedItemId != "none") {
-                    // Keep equipped profile cosmetics, scaled to fit the compact message header.
                     val itemImg = com.addonstation.mobile.ui.equippedItemUrl(container, author.equippedItemId)
                     if (itemImg != null) {
                         com.addonstation.mobile.ui.components.CoverImage(
                             url = itemImg,
-                            radius = 7.dp,
-                            modifier = Modifier.size(24.dp),
+                            radius = 8.dp,
+                            modifier = Modifier.size(32.dp),
                             backgroundColor = Color.Transparent,
                         )
                     } else {
-                        Text("🎖", style = AppText.body.copy(fontSize = 18.sp))
+                        Text("🎖", style = AppText.body.copy(fontSize = 22.sp))
                     }
                 }
             }
@@ -1952,27 +2208,17 @@ private fun MessageBlock(
                         )
                     }
                     Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Spec.surface)
-                            .combinedClickable(onClick = onReply, onLongClick = onLongPress)
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text("🎙️", style = Spec.msgBody)
-                        Column {
-                            Text(
-                                stringResource(R.string.chat_audio_label),
-                                style = Spec.msgTime,
-                                color = Spec.text,
-                            )
-                            Text(
-                                TimeFormat.durationLabel(message.mediaDuration) + " · " + TimeFormat.fileSizeLabel(message.mediaSize),
-                                style = Spec.msgTime,
-                                color = Spec.textMuted,
-                            )
-                        }
+                        AudioMessageTile(
+                            mediaPath = message.mediaPath,
+                            durationSeconds = message.mediaDuration,
+                            sizeBytes = message.mediaSize,
+                            isMine = isMine,
+                            onReply = onReply,
+                            onLongPress = onLongPress,
+                        )
                         MessageStatus(
                             ui = ui,
                             createdAt = message.createdAt,
@@ -1988,7 +2234,7 @@ private fun MessageBlock(
                 if (isMine) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = if (grouped) 2.dp else 10.dp),
-                        horizontalArrangement = Arrangement.End,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
                         verticalAlignment = Alignment.Bottom,
                     ) {
                         Column(

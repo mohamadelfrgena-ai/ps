@@ -824,4 +824,8 @@ CRÉE-LE.</string>
     <string name="admin_creator_reject_reason">Les critères ne sont pas encore remplis.</string>
     <string name="admin_submission_reject_reason">Le contenu doit être modifié.</string>
     <string name="creator_status_more_info">Informations complémentaires demandées.</string>
+    <string name="chat_admin_only_short">Admin uniquement</string>
+    <string name="edit_profile_tab_item">Objet</string>
+    <string name="edit_profile_tab_about">À propos</string>
+    <string name="edit_profile_message_preview">[Texte du message]</string>
 </resources>

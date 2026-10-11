@@ -53,8 +53,7 @@ object Spec {
     val awayAmber = Color(0xFFF0C25E)      // «بعيد/خامل»: الوثيقة قالت amber بلا قيمة ⇒ كهرمان اللوحة
     val offlineGrey = Color(0xFF6B7A94)    // «غير متصل» — بلا توهّج
     val dashedBorder = Color(0xFF2E3C58)   // إطار متقطّع (بطاقة المحفظة المخفيّة في شاشة C)
-    val dotStart = Color(0xFF8CF2AD)       // تدرّج النقطة: الفاتح (من أعلى اليسار)
-    val dotEnd = Color(0xFF2FB35C)         // تدرّج النقطة: الغامق
+
 
     // ── المقاسات ──────────────────────────────────────────────────────────────
     val screenPad = 16.dp
@@ -73,14 +72,14 @@ object Spec {
     val avatar40 = 40.dp
     val composerField = 44.dp
 
-    // مقاسات الملف الشخصي (SPEC_PROFILES.md §2)
-    val bannerH = 130.dp           // ارتفاع بانر الملف وفق الحزمة الحالية
-    val avatarLg = 80.dp           // أفاتار الملف الشخصي
-    val avatarOverlap = 38.dp      // مقدار تجاوز الأفاتار للبانر
-    val dotSize = 22.dp            // نقطة الحالة
+    // مقاسات الملف الشخصي (docs/SPEC_PROFILES.md §1–§4)
+    val bannerH = 150.dp           // ارتفاع بانر الملف
+    val avatarLg = 96.dp           // أفاتار الملف الشخصي
+    val avatarOverlap = 46.dp      // مقدار تجاوز الأفاتار للبانر
+    val dotSize = 30.dp            // نقطة الحالة
     val profileCardRadius = 16.dp  // بطاقات الملف
     val badgeRadius = 8.dp         // شرائح الشارات
-    val actionBtnH = 44.dp         // أزرار إجراءات الملف والصداقة
+    val actionBtnH = 48.dp         // أزرار إجراءات الملف والصداقة
     val gridBtnH = 56.dp           // أزرار الشبكة 2×2
     val safetyRowH = 52.dp         // صفوف بطاقة السلامة
     val statBarH = 8.dp            // شريط تقدّم المستوى

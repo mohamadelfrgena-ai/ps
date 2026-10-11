@@ -824,4 +824,8 @@ YARAT.</string>
     <string name="admin_creator_reject_reason">Henüz koşulları karşılamıyor.</string>
     <string name="admin_submission_reject_reason">İçeriğin değiştirilmesi gerekiyor.</string>
     <string name="creator_status_more_info">Ek bilgi istendi.</string>
+    <string name="chat_admin_only_short">Yalnızca yönetici</string>
+    <string name="edit_profile_tab_item">Eşya</string>
+    <string name="edit_profile_tab_about">Hakkında</string>
+    <string name="edit_profile_message_preview">[Mesaj metni]</string>
 </resources>

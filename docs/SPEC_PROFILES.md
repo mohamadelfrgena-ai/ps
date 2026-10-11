@@ -29,8 +29,7 @@ Overlay icon buttons (44×44 circle, bg `bg` @60% alpha, white icon 22dp, 10dp f
 
 ### 2.2 Avatar with status dot
 Avatar 96×96 circle, 5dp border in `bg`, overlaps the banner by 46dp, 16dp from the left. Default avatar: `ic_default_profile.jpg`.
-Status dot at the bottom-right corner (flush, offset 0): 30×30 circle, 5dp border in `bg`, fill = green radial gradient (`#8CF2AD` → `#2FB35C`, light from top-left), soft green glow (2dp ring @35% alpha + 14dp blur @65%).
-Dot colors by status: online green · away/idle amber · offline grey `#6B7A94` (no glow). If the user hides their online status (a Legendary-only setting) show no dot and no "Online" text.
+Status dot at the bottom-right corner (flush, offset 0): 30×30 circle. **Online is a solid `onlineFill` green circle with no halo or outer/gray ring**, matching the owner's latest screenshot correction; keep the avatar's own dark edge separate. Dot colors by status: online `#3FBF6A` · away/idle amber · offline grey `#6B7A94`. If the user hides their online status (a Legendary-only setting) show no dot and no "Online" text.
 
 ### 2.3 Identity card
 - Display name 22sp/800.
@@ -59,9 +58,9 @@ Top to bottom:
 2. Avatar row: avatar (left) + **Edit profile** button on the right, aligned to the avatar bottom (44h, radius 12, bg blue, white 14sp/800, padding 20).
 3. Identity card.
 4. **Wallet card** — directly under the identity card.
-5. Stats strip.
-6. Level card.
-7. About card.
+5. **About card**.
+6. Stats strip.
+7. Level card.
 8. 2×2 grid, gap 10, margin top 12: **My favorites · My downloads · My orders · My content** (56h, radius 14, bg surface, 13sp/800).
 9. **Log out** button: full width minus margins, 48h, radius 12, transparent, 1dp `danger border`, text `danger text` 14sp/800, margin 16.
 Settings are a separate screen — not shown here.

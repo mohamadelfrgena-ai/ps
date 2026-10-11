@@ -838,4 +838,8 @@ CREATE IT.</string>
     <string name="admin_creator_reject_reason">Not eligible yet.</string>
     <string name="admin_submission_reject_reason">Needs changes.</string>
     <string name="creator_status_more_info">More information requested.</string>
+    <string name="chat_admin_only_short">Admin only</string>
+    <string name="edit_profile_tab_item">Item</string>
+    <string name="edit_profile_tab_about">About</string>
+    <string name="edit_profile_message_preview">[Message text]</string>
 </resources>

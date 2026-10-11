@@ -1,31 +1,67 @@
 package com.addonstation.mobile.ui.chat
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 /**
- * ذاكرة خفيفة جداً لـ«آخر رسالة» في كل غرفة — تُستعمل في **قائمة الغرف**
- * (التصميم الجديد يعرض وقت آخر رسالة في يمين كل صف).
+ * Small in-memory snapshot of rooms the user has already opened.
  *
- * لماذا هنا؟ لأن [com.addonstation.mobile.data.model.ChatChannel] لا يحمل حقل
- * «آخر رسالة»، وجلب آخر رسالة لكل غرفة من الشبكة = عشرات الطلبات عند فتح
- * القائمة. الحل: كل غرفة **تُفتح** تُسجّل وقت آخر رسالة عندها هنا (سطر واحد في
- * ChatViewModel)، فتظهر الأوقات فوراً في القائمة بلا أي طلب إضافي، وبلا وقت
- * كاذب لغرفة لم تُفتح بعد.
- *
- * الخريطة متزامنة (Concurrent) لأن القراءة من الواجهة والكتابة من خيط الشبكة.
+ * The rooms screen uses this for a real last-message preview, timestamp and (when
+ * Realtime presence has reported it) online count. It deliberately never fetches
+ * each room just to paint the list; rooms not opened in this session fall back to
+ * their server-provided description and omit unknown counts.
  */
+data class ChatRoomPeek(
+    val createdAt: String? = null,
+    val preview: String? = null,
+    val messageType: String? = null,
+    val onlineCount: Int? = null,
+)
+
 object ChatPeek {
+    private val lock = Any()
+    private val _rooms = MutableStateFlow<Map<String, ChatRoomPeek>>(emptyMap())
+    val rooms: StateFlow<Map<String, ChatRoomPeek>> = _rooms.asStateFlow()
 
-    private val lastAtByChannel =
-        java.util.concurrent.ConcurrentHashMap<String, String>()
-
-    /** يُسجّل وقت آخر رسالة معروضة في الغرفة (فارغاً يُتجاهل). */
-    fun note(channelId: String, iso: String?) {
+    /** Record the latest real message already loaded by the open room. */
+    fun note(
+        channelId: String,
+        iso: String?,
+        preview: String? = null,
+        messageType: String? = null,
+    ) {
         if (channelId.isBlank() || iso.isNullOrBlank()) return
-        lastAtByChannel[channelId] = iso
+        synchronized(lock) {
+            val current = _rooms.value
+            val old = current[channelId] ?: ChatRoomPeek()
+            val next = old.copy(
+                createdAt = iso,
+                preview = preview?.trim()?.takeIf { it.isNotEmpty() },
+                messageType = messageType?.takeIf { it.isNotBlank() },
+            )
+            if (next != old) _rooms.value = current + (channelId to next)
+        }
     }
 
-    /** وقت آخر رسالة معروفة في الغرفة — أو null إن لم تُفتح بعد. */
-    fun last(channelId: String): String? = lastAtByChannel[channelId]
+    /** A presence callback is room-scoped; null means this room has not reported yet. */
+    fun noteOnline(channelId: String, count: Int) {
+        if (channelId.isBlank()) return
+        synchronized(lock) {
+            val current = _rooms.value
+            val old = current[channelId] ?: ChatRoomPeek()
+            val next = old.copy(onlineCount = count.coerceAtLeast(0))
+            if (next != old) _rooms.value = current + (channelId to next)
+        }
+    }
 
-    /** يُفرَّغ عند الخروج من الحساب (لا أوقات لحساب سابق). */
-    fun clear() = lastAtByChannel.clear()
+    fun room(channelId: String): ChatRoomPeek? = _rooms.value[channelId]
+
+    /** Compatibility helper for the existing room-time call sites. */
+    fun last(channelId: String): String? = _rooms.value[channelId]?.createdAt
+
+    /** Clear the previous account's room snippets on sign-out. */
+    fun clear() {
+        synchronized(lock) { _rooms.value = emptyMap() }
+    }
 }

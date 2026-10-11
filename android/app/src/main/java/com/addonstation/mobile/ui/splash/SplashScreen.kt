@@ -51,7 +51,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -89,13 +91,15 @@ private val SplashMuted = Color(0xFFC4D1E8)
  * خلفية Minecraft تتلاشى وتبتعد، شعار Minecraft يهبط بارتداد، ثم العبارات
  * الثلاث، وبعدها شعار التطبيق والوصف وشريط تحميل من 10 شرائح.
  *
- * تعرض المقدمة الطويلة مرة واحدة فقط. في التشغيلات اللاحقة (أو أثناء انتظار
- * بيانات بطيئة بعد المقدمة) تستمر الحركة المختصرة: شعار Minecraft + أيقونة
- * التطبيق + شريط التحميل. يجري تحميل الجلسة والبيانات تحت الشاشة بالتوازي.
+ * تعرض المقدمة الطويلة مرة واحدة فقط. في التشغيلات اللاحقة تستمر حركة مختصرة
+ * مدتها 1.5 ثانية، مع إبقاء العبارات المترجمة ظاهرة في كل تشغيل. يجري تحميل
+ * الجلسة والبيانات خلف الشاشة بالتوازي؛ لا تكتمل الشاشة حتى تجهز البيانات أو
+ * تنتهي مهلة الإقلاع، ويمكن للمستخدم تخطي الانتظار صراحةً.
  * الخلفية السابقة `splash_bg_legacy.jpg` بقيت محفوظة ولم تُحذف.
  */
 @Composable
 fun SplashScreen(
+    loadingProgress: Float = 0f,
     startupReady: Boolean = true,
     onFinished: () -> Unit,
 ) {
@@ -134,8 +138,8 @@ fun SplashScreen(
         skipEnabled = true
     }
 
-    // المقدمة الكاملة (6.6 ثوانٍ) تنتهي على الإطار النهائي؛ بعد جاهزية البيانات
-    // نتلاشى إلى الوجهة التالية. الضغط بعد ثانية واحدة يقفز إلى هذا الإطار.
+    // المقدمة الكاملة (6.6 ثوانٍ) تنتهي على الإطار النهائي؛ لا ننتقل بعدها
+    // حتى تصبح البيانات جاهزة، إلا إذا اختار المستخدم التخطي صراحةً.
     LaunchedEffect(isFirstLaunch, reduceMotion, skipRequested) {
         if (isFirstLaunch && !reduceMotion) {
             introProgress.animateTo(
@@ -163,10 +167,11 @@ fun SplashScreen(
         }
     }
 
-    // لا ننتظر أطول من حركة المقدمة نفسها: الجلسة والبيانات تُحمّلان بالتوازي.
-    // بعد 1.5 ثانية (أو النقر على تخطٍ بعد الثانية الأولى) نُظهر التلاشي النهائي.
-    LaunchedEffect(startupReady, introComplete, skipRequested) {
-        if (!startupReady || !introComplete || completionHandled) return@LaunchedEffect
+    // تخرج الشاشة عند اكتمال الحركة وجاهزية الإقلاع. AppRoot يضع حداً أقصى
+    // للتحميل الأولي، لذلك يبقى التخطي متاحاً للشبكات المتعثرة أو بطيئة الاستجابة.
+    // في التشغيل اللاحق تكفي 1.5 ثانية، ويمكن التخطي بعد الثانية الأولى.
+    LaunchedEffect(introComplete, skipRequested, startupReady) {
+        if (!introComplete || completionHandled || (!startupReady && !skipRequested)) return@LaunchedEffect
         if (!isFirstLaunch && !reduceMotion && !skipRequested) {
             val elapsed = SystemClock.elapsedRealtime() - startedAt
             val remaining = (MIN_SPLASH_MS - elapsed).coerceAtLeast(0L)
@@ -217,6 +222,29 @@ fun SplashScreen(
     ) {
         val screenHeight = maxHeight
         val shortScreen = screenHeight < 760.dp
+        val veryShortScreen = screenHeight < 600.dp
+        val sloganOffset = when {
+            compactMode && veryShortScreen -> screenHeight * 0.21f
+            compactMode -> screenHeight * 0.17f
+            veryShortScreen -> screenHeight * 0.30f
+            shortScreen -> screenHeight * 0.34f
+            else -> screenHeight * 0.39f
+        }
+        val brandOffset = when {
+            compactMode && veryShortScreen -> screenHeight * 0.47f
+            compactMode -> screenHeight * 0.43f
+            veryShortScreen -> screenHeight * 0.56f
+            shortScreen -> screenHeight * 0.60f
+            else -> screenHeight * 0.72f
+        }
+        val taglineOffset = when {
+            compactMode && veryShortScreen -> screenHeight * 0.68f
+            compactMode && shortScreen -> screenHeight * 0.61f
+            compactMode -> screenHeight * 0.60f
+            veryShortScreen -> screenHeight * 0.78f
+            shortScreen -> screenHeight * 0.79f
+            else -> screenHeight * 0.855f
+        }
         val designSize = when {
             arabic || chinese -> 38f
             russian -> 32f
@@ -292,43 +320,49 @@ fun SplashScreen(
                 },
         )
 
-        if (!compactMode) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .offset(y = screenHeight * 0.39f)
-                    .padding(horizontal = 14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(0.dp),
-            ) {
-                SplashSloganLine(
-                    text = stringResource(R.string.splash_dream_it),
-                    color = SplashText,
-                    phase = timelinePhase,
-                    fromX = if (rtl) 30f else -30f,
-                    languageCode = languageCode,
-                    fontSize = sloganSize,
-                    lineHeight = sloganLineHeight,
-                )
-                SplashSloganLine(
-                    text = stringResource(R.string.splash_build_it),
-                    color = SplashBlue,
-                    phase = timelinePhase,
-                    fromX = if (rtl) -30f else 30f,
-                    languageCode = languageCode,
-                    fontSize = sloganSize,
-                    lineHeight = sloganLineHeight,
-                    startAt = 0.2714f,
-                    endAt = 0.3357f,
-                )
-                SplashSparkleLine(
-                    text = stringResource(R.string.splash_create_it),
-                    phase = timelinePhase,
-                    languageCode = languageCode,
-                    fontSize = sloganSize,
-                    lineHeight = sloganLineHeight,
-                )
-            }
+        // العبارات المترجمة تبقى ظاهرة في كل تشغيل؛ في الحلقة المختصرة تدخل
+        // أسرع بدلاً من حذفها كما كان يحدث بعد أول فتح للتطبيق.
+        val dreamStart = if (compactMode) 0.10f else 0.1714f
+        val dreamEnd = if (compactMode) 0.18f else 0.2357f
+        val buildStart = if (compactMode) 0.20f else 0.2714f
+        val buildEnd = if (compactMode) 0.28f else 0.3357f
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(y = sloganOffset)
+                .padding(horizontal = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            SplashSloganLine(
+                text = stringResource(R.string.splash_dream_it),
+                color = SplashText,
+                phase = activePhase,
+                fromX = if (rtl) 30f else -30f,
+                languageCode = languageCode,
+                fontSize = sloganSize,
+                lineHeight = sloganLineHeight,
+                startAt = dreamStart,
+                endAt = dreamEnd,
+            )
+            SplashSloganLine(
+                text = stringResource(R.string.splash_build_it),
+                color = SplashBlue,
+                phase = activePhase,
+                fromX = if (rtl) -30f else 30f,
+                languageCode = languageCode,
+                fontSize = sloganSize,
+                lineHeight = sloganLineHeight,
+                startAt = buildStart,
+                endAt = buildEnd,
+            )
+            SplashSparkleLine(
+                text = stringResource(R.string.splash_create_it),
+                phase = activePhase,
+                languageCode = languageCode,
+                fontSize = sloganSize,
+                lineHeight = sloganLineHeight,
+            )
         }
 
         SplashBrand(
@@ -337,43 +371,47 @@ fun SplashScreen(
             phase = activePhase,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = screenHeight * (if (compactMode) 0.43f else 0.72f)),
+                .offset(y = brandOffset),
         )
 
-        if (!compactMode) {
-            Text(
-                text = platformTagline,
-                style = TextStyle(
-                    fontFamily = when {
-                        arabic -> TajawalFont
-                        chinese -> NotoSansScRegularFont
-                        else -> NunitoFont
-                    },
-                    fontSize = if (shortScreen) 11.sp else 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    lineHeight = 18.sp,
-                    color = SplashMuted,
-                    textAlign = TextAlign.Center,
-                ),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .offset(y = screenHeight * 0.855f)
-                    .padding(horizontal = 18.dp)
-                    .graphicsLayer {
-                        val p = timelinePhase()
-                        alpha = phaseWindow(p, 0.60f, 0.6714f)
-                        translationY = (1f - ramp(p, 0.60f, 0.6714f)) * 8.dp.toPx()
-                    },
-            )
-        }
+        Text(
+            text = platformTagline,
+            style = TextStyle(
+                fontFamily = when {
+                    arabic -> TajawalFont
+                    chinese -> NotoSansScRegularFont
+                    else -> NunitoFont
+                },
+                fontSize = if (shortScreen) 11.sp else 13.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 18.sp,
+                color = SplashMuted,
+                textAlign = TextAlign.Center,
+            ),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .offset(y = taglineOffset)
+                .padding(horizontal = 18.dp)
+                .graphicsLayer {
+                    val p = activePhase()
+                    val startAt = if (compactMode) 0.42f else 0.60f
+                    val endAt = if (compactMode) 0.50f else 0.6714f
+                    alpha = phaseWindow(p, startAt, endAt)
+                    translationY = (1f - ramp(p, startAt, endAt)) * 8.dp.toPx()
+                },
+        )
 
         SplashLoadingBar(
             phase = activePhase,
             compactMode = compactMode,
+            loadingProgress = loadingProgress,
             startupReady = startupReady,
+            skipRequested = skipRequested,
+            reduceMotion = reduceMotion,
             loadingDescription = loadingText,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -622,13 +660,41 @@ private fun SplashBrand(
 private fun SplashLoadingBar(
     phase: () -> Float,
     compactMode: Boolean,
+    loadingProgress: Float,
     startupReady: Boolean,
+    skipRequested: Boolean,
+    reduceMotion: Boolean,
     loadingDescription: String,
     modifier: Modifier = Modifier,
 ) {
+    val waitingPulse = remember { Animatable(0f) }
+    LaunchedEffect(startupReady, skipRequested, reduceMotion) {
+        if (!startupReady && !skipRequested && !reduceMotion) {
+            while (true) {
+                waitingPulse.snapTo(0f)
+                waitingPulse.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(900, easing = LinearEasing),
+                )
+            }
+        }
+    }
+
+    val safeProgress = loadingProgress.coerceIn(0f, 1f)
+    // The timeline is a minimum, while staged bootstrap is the measured progress.
+    // Read the animated phase inside graphicsLayer to avoid recomposition per frame.
+    // Hold the final two segments until boot is ready; a moving pulse marks the pending work.
+    val semanticProgress = when {
+        reduceMotion || startupReady || skipRequested -> 1f
+        else -> safeProgress.coerceAtMost(0.80f)
+    }
+
     Row(
         modifier = modifier
-            .semantics { contentDescription = loadingDescription }
+            .semantics {
+                contentDescription = loadingDescription
+                progressBarRangeInfo = ProgressBarRangeInfo(semanticProgress, 0f..1f)
+            }
             .graphicsLayer {
                 val p = phase()
                 alpha = if (compactMode) {
@@ -649,28 +715,24 @@ private fun SplashLoadingBar(
                     .background(SplashGold)
                     .graphicsLayer {
                         val p = phase()
-                        val start = if (compactMode) {
-                            index / 10f
-                        } else {
-                            0.6143f + index * 0.0243f
+                        val timeMinimum = if (compactMode) 0f else ramp(p, 0.6143f, 0.8714f) * 0.80f
+                        val visibleProgress = when {
+                            reduceMotion || startupReady || skipRequested -> 1f
+                            else -> maxOf(safeProgress, timeMinimum).coerceAtMost(0.80f)
                         }
-                        val peak = if (compactMode) {
-                            (index + 1) / 10f
+                        val fill = (visibleProgress * 10f - index).coerceIn(0f, 1f)
+                        val pulsePhase = (visibleProgress + waitingPulse.value * 0.20f).coerceIn(0f, 1f)
+                        val pulseDistance = kotlin.math.abs(pulsePhase * 10f - (index + 0.5f))
+                        val pulse = if (!startupReady && !skipRequested && !reduceMotion) {
+                            (1f - pulseDistance).coerceIn(0f, 1f)
                         } else {
-                            start + 0.0200f
+                            0f
                         }
-                        val end = if (compactMode) peak else start + 0.0400f
-                        val fill = ramp(p, start, peak)
-                        val waitingOnData = !startupReady && index >= 8
-                        alpha = if (waitingOnData || p < start) 0.18f else lerp(0.18f, 1f, fill)
-                        scaleY = if (waitingOnData) {
-                            1f
-                        } else if (p in start..peak) {
-                            lerp(1f, 1.35f, fill)
-                        } else if (p > peak && p < end) {
-                            lerp(1.35f, 1f, ramp(p, peak, end))
-                        } else {
-                            1f
+                        alpha = maxOf(lerp(0.18f, 1f, fill), lerp(0.18f, 1f, pulse))
+                        scaleY = when {
+                            pulse > 0f -> lerp(1f, 1.35f, pulse)
+                            fill > 0f && fill < 1f -> lerp(1f, 1.35f, fill)
+                            else -> 1f
                         }
                     },
             )

@@ -824,4 +824,8 @@ CRIE.</string>
     <string name="admin_creator_reject_reason">Ainda não atende aos critérios.</string>
     <string name="admin_submission_reject_reason">O conteúdo precisa de alterações.</string>
     <string name="creator_status_more_info">Mais informações solicitadas.</string>
+    <string name="chat_admin_only_short">Somente admin</string>
+    <string name="edit_profile_tab_item">Item</string>
+    <string name="edit_profile_tab_about">Sobre</string>
+    <string name="edit_profile_message_preview">[Texto da mensagem]</string>
 </resources>

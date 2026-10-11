@@ -119,6 +119,8 @@ class ChatViewModel(private val container: AppContainer) {
         if (_channel.value?.id != channel.id) {
             _pinned.value = emptyList()
             _online.value = 0
+            _newMessagesBelow.value = false
+            _newDividerId.value = null
         }
         _channel.value = channel
         scope.launch {
@@ -162,7 +164,9 @@ class ChatViewModel(private val container: AppContainer) {
         val byId = list.associateBy { it.id }
         _authors.value = profiles
         // وقت آخر رسالة يُسجَّل لقائمة الغرف (تصميم ٣: وقت في كل صف)
-        list.maxByOrNull { it.createdAt ?: "" }?.let { ChatPeek.note(it.channelId, it.createdAt) }
+        list.maxByOrNull { it.createdAt ?: "" }?.let { last ->
+            ChatPeek.note(last.channelId, last.createdAt, last.content, last.messageType)
+        }
         _messages.value = list.map { message ->
             val reply = message.replyToId?.let { byId[it] }
             ChatMessageUi(
@@ -195,7 +199,10 @@ class ChatViewModel(private val container: AppContainer) {
                 if (status == "failed") scope.launch { refreshTails() }
             },
             // عدّاد الحضور: من نفس المقبس، وبلا أي طلب إضافي
-            onPresence = { count -> if (count != _online.value) _online.value = count },
+            onPresence = { count ->
+                if (count != _online.value) _online.value = count
+                ChatPeek.noteOnline(channelId, count)
+            },
         )
         container.realtime.replace(sub)
     }
@@ -243,10 +250,12 @@ class ChatViewModel(private val container: AppContainer) {
         if (message.userId in _blockedIds.value) return          // محظور: لا يظهر
         if (message.userId in _mutedIds.value) return            // مكتوم عندي: لا يظهر
         _messages.value = _messages.value + toUi(message)
+        ChatPeek.note(message.channelId, message.createdAt, message.content, message.messageType)
         if (message.userId != container.supabase.session()?.userId &&
             !_newMessagesBelow.value
         ) {
-            // تظهر شارة «↓ New messages» ويمسحها المستخدم بالتمرير للأسفل
+            // يعرض الفاصل عند أول رسالة جديدة، وتبقى الشارة حتى يمرّر المستخدم للأسفل.
+            _newDividerId.value = message.id
             _newMessagesBelow.value = true
         }
     }
@@ -276,6 +285,7 @@ class ChatViewModel(private val container: AppContainer) {
                                 it
                             }
                         }
+                        ChatPeek.note(message.channelId, message.createdAt, message.content, message.messageType)
                     } else if (message.userId !in _blockedIds.value &&
                         message.userId !in _mutedIds.value &&
                         list.none { it.message.id == message.id }
@@ -284,9 +294,14 @@ class ChatViewModel(private val container: AppContainer) {
                     }
                 }
                 if (mapped.isNotEmpty() || list !== current) _messages.value = list + mapped
+                mapped.lastOrNull()?.message?.let { last ->
+                    ChatPeek.note(last.channelId, last.createdAt, last.content, last.messageType)
+                }
                 // رسائل الآخرين فقط ترفع شارة «رسائل بالأسفل» — لا رسائلي أنا
                 // (ولا نُسنِد القيمة إن كانت مرفوعة أصلاً: كل إسناد = إعادة تركيب)
-                if (mapped.any { it.message.userId != myId } && !_newMessagesBelow.value) {
+                val firstIncoming = mapped.firstOrNull { it.message.userId != myId }
+                if (firstIncoming != null && !_newMessagesBelow.value) {
+                    _newDividerId.value = firstIncoming.message.id
                     _newMessagesBelow.value = true
                 }
             }
@@ -384,6 +399,7 @@ class ChatViewModel(private val container: AppContainer) {
         // رسالتي أنا: تظهر دائماً وتُمرَّر إليها، والشارة «رسائل بالأسفل» تُصفَّر
         _newMessagesBelow.value = false
         _scrollTick.value += 1
+        _newDividerId.value = null
 
         scope.launch {
             val members = _authors.value.values.toList()
@@ -634,6 +650,7 @@ class ChatViewModel(private val container: AppContainer) {
         val last = _messages.value.lastOrNull()?.message?.id ?: return
         lastReadId = maxOf(lastReadId, last)
         _newMessagesBelow.value = false
+        _newDividerId.value = null
         scope.launch {
             container.chat.markRead(channel.id, lastReadId)
             container.chat.refreshUnread()

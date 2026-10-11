@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Flag
@@ -105,7 +107,7 @@ fun EmojiStickerPanel(
     focusSticker: String? = null,
 ) {
     val container = rememberContainer()
-    var tab by remember { mutableIntStateOf(if (focusSticker != null) 1 else 0) }
+    var tab by remember { mutableStateOf(if (focusSticker != null) 1 else 0) }
     LaunchedEffect(focusSticker) {
         if (focusSticker != null) tab = 1
     }
@@ -348,6 +350,7 @@ fun EmojiStickerPanel(
                                         .aspectRatio(1f)
                                         .clip(RoundedCornerShape(14.dp))
                                         .background(Spec.surfaceHigh)
+                                        .background(if (restored) AppColors.Green else Color.Transparent)
                                         .border(1.dp, if (restored) Spec.blue else Spec.border, RoundedCornerShape(14.dp))
                                         .semantics(mergeDescendants = true) { contentDescription = "${section.title}, ${index + 1}" }
                                         .clickable { onSticker(sticker.fileUrl) },
@@ -428,8 +431,8 @@ private val ChatViewModel_Emojis: List<String> = listOf(
 )
 
 /**
- * نافذة الإرفاق: صورة من المعرض (للجميع) أو ملف صوت/فيديو (**للأدمن فقط**).
- * غير الأدمن لا يرى خيار الوسائط إطلاقاً — والقاعدة ترفضه من جهة الخادم أيضاً.
+ * Attachment chooser: both options remain visible; the server remains authoritative
+ * and the audio/video tile explains that only admins may use it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -440,16 +443,81 @@ fun AttachSheet(
     isAdmin: Boolean = false,
 ) {
     SheetScaffold(onDismiss) {
-        SheetRow("🖼", stringResource(R.string.chat_attach_photo), onPhoto)
-        if (isAdmin) {
-            SheetRow("🎬", stringResource(R.string.chat_attach_media), onAudioVideo)
-        } else {
-            Text(
-                stringResource(R.string.chat_media_admin_only),
-                style = AppText.tiny,
-                color = AppColors.Muted,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AttachmentOptionCard(
+                emoji = "🖼",
+                title = stringResource(R.string.chat_attach_photo),
+                description = stringResource(R.string.chat_image_formats),
+                modifier = Modifier.weight(1f),
+                onClick = onPhoto,
             )
+            AttachmentOptionCard(
+                emoji = "🎬",
+                title = stringResource(R.string.chat_attach_media),
+                description = stringResource(R.string.chat_media_admin_only),
+                modifier = Modifier.weight(1f),
+                locked = !isAdmin,
+                lockedLabel = stringResource(R.string.chat_admin_only_short),
+                onClick = onAudioVideo,
+            )
+        }
+        Text(
+            stringResource(R.string.chat_media_max),
+            style = AppText.tiny,
+            color = AppColors.Muted,
+            modifier = Modifier.padding(start = 4.dp, top = 10.dp),
+        )
+    }
+}
+
+@Composable
+private fun AttachmentOptionCard(
+    emoji: String,
+    title: String,
+    description: String,
+    modifier: Modifier = Modifier,
+    locked: Boolean = false,
+    lockedLabel: String = "",
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        modifier = modifier
+            .heightIn(min = 152.dp)
+            .clip(shape)
+            .background(if (locked) AppColors.Surface.copy(alpha = 0.72f) else AppColors.Surface)
+            .border(1.dp, AppColors.Border, shape)
+            .clickable(enabled = !locked, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(emoji, style = AppText.sectionTitle.copy(fontSize = 28.sp))
+        Text(
+            title,
+            style = AppText.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+            color = AppColors.Text,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            description,
+            style = AppText.tiny,
+            color = AppColors.Muted,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (locked) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(AppColors.Elevated)
+                    .padding(horizontal = 7.dp, vertical = 4.dp),
+            ) {
+                Icon(Icons.Filled.Lock, contentDescription = null, tint = AppColors.Muted, modifier = Modifier.size(12.dp))
+                Text(lockedLabel, style = AppText.tiny, color = AppColors.Muted, maxLines = 1)
+            }
         }
     }
 }

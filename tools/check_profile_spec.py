@@ -12,7 +12,7 @@
   • مكوّنات §2 المشتركة (بانر 150 · أفاتار 96 يتجاوز 46 · نقطة 30 · بطاقة 16 …).
   • ترتيب عناصر الشاشة A، وبطاقة السلامة في B، والبطاقة المتقطّعة في C.
   • قرارات المالك: زرّ «مراسلة [الاسم]» مخفيّ · الإحصاءات من دالة الخادم ·
-    المستوى = كل 100 AC مكتسَب = مستوى · تعديلات الشات السابقة كما هي.
+    المستوى = كل 100 AC مكتسَب = مستوى · وفحص الشات مربوط برمز الوقت الحالي.
 """
 import io
 import os
@@ -91,8 +91,6 @@ TOKENS = {
     "awayAmber": "FFF0C25E",
     "offlineGrey": "FF6B7A94",
     "dashedBorder": "FF2E3C58",
-    "dotStart": "FF8CF2AD",
-    "dotEnd": "FF2FB35C",
 }
 missing = [k for k, v in TOKENS.items() if not re.search(r"val %s = Color\(0x%s\)" % (k, v), spec)]
 check("رموز الألوان الجديدة في Spec.kt (§1)", not missing, "ناقص: " + " · ".join(missing))
@@ -130,15 +128,21 @@ check("٢٫٢ الأفاتار 96 بحدّ 5dp بلون الخلفية ولا ي
       and "border(borderWidth, Spec.bg, CircleShape)" in comp)
 check("٢٫٢ تداخل الأفاتار 46dp مع تعويض قصّ الصف في الشاشات الثلاث",
       screens.count("Box(Modifier.offset(y = -(Spec.avatarOverlap / 2)))") >= 3)
-check("أزرار تعديل الملف: ارتفاع 44dp وحشو أفقي 20dp",
-      screens.count("buttonHeight = 44.dp") >= 4
-      and screens.count("horizontalPadding = 20.dp") >= 4
+edit_screens = [body(screens, name) for name in ("ProfileScreen", "UserProfileScreen", "ProfileAsOthersScreen")]
+check("أزرار تعديل الملف في A/B/C: ارتفاع 44dp وحشو أفقي 20dp",
+      all("buttonHeight = 44.dp" in screen and "horizontalPadding = 20.dp" in screen
+          for screen in edit_screens)
       and "padding(horizontal = horizontalPadding)" in body(comp, "SpecFillButton"))
-check("٢٫٢ نقطة الحالة: توهّج 14dp@65% + حلقة 2dp@35% + حدّ داخلي رفيع 2dp",
-      "alpha = 0.65f" in comp and "alpha = 0.35f" in comp
-      and "radius = r - 1.dp.toPx()" in comp and "Stroke(width = 2.dp.toPx())" in comp)
-check("٢٫٢ «غير متصل» رمادي بلا توهّج · «مخفيّ الحالة» بلا نقطة",
-      "Spec.offlineGrey" in comp and "if (status == SpecStatus.ONLINE)" in comp
+status_dot = comp[comp.find("private fun Modifier.specStatusDot"):comp.find("fun SpecIdentityCard")]
+check("٢٫٢ نقطة الاتصال خضراء مصمتة بلا هالة أو إطار رمادي",
+      "SpecStatus.ONLINE -> Spec.onlineFill" in status_dot
+      and "drawCircle(color = fill, radius = r)" in status_dot
+      and "Spec.dotStart" not in status_dot
+      and "Spec.dotEnd" not in status_dot
+      and "r + 14.dp.toPx()" not in status_dot
+      and "if (status != SpecStatus.ONLINE)" in status_dot)
+check("٢٫٢ «غير متصل» رمادي · «مخفيّ الحالة» بلا نقطة",
+      "Spec.offlineGrey" in comp and "if (status != SpecStatus.ONLINE)" in status_dot
       and "status != SpecStatus.HIDDEN" in comp)
 check("٢٫٣ سطر الهوية: @username 13/700 + «· الحالة»",
       "Spec.profileHandle" in comp and "statusLabel(status)" in comp)
@@ -173,7 +177,7 @@ check("إطار متقطّع 1dp (§5) بـ dashPathEffect",
 # ── ٣) الشاشة A (§3) ────────────────────────────────────────────────────────
 a = body(screens, "ProfileScreen")
 order = ["SpecProfileBanner", "SpecProfileAvatar", "R.string.profile_edit", "SpecIdentityCard",
-         "SpecWalletCard", "SpecStatsStrip", "SpecLevelCard", "SpecAboutCard",
+         "SpecWalletCard", "SpecAboutCard", "SpecStatsStrip", "SpecLevelCard",
          "SpecGridTile", "SpecDangerButton"]
 pos = [a.find(k) for k in order]
 check("A: ترتيب العناصر التسعة كالوثيقة §3",
@@ -183,7 +187,9 @@ check("A: البانر بزرّ الرجوع وحده (لا «المزيد»)",
       re.search(r"SpecProfileBanner\([\s\S]{0,200}?onBack = onBack", a) is not None
       and "more = {" not in a)
 check("A: المحفظة مباشرة تحت بطاقة الهوية",
-      a.find("SpecIdentityCard") < a.find("SpecWalletCard") < a.find("SpecStatsStrip"))
+      a.find("SpecIdentityCard") < a.find("SpecWalletCard") < a.find("SpecAboutCard"))
+check("A: المحفظة و«عنّي» قبل الإحصاءات",
+      a.find("SpecWalletCard") < a.find("SpecAboutCard") < a.find("SpecStatsStrip"))
 check("A: شبكة 2×2 بالأربعة (المفضّلة · التنزيلات · طلباتي · محتواي)",
       all(k in a for k in ("R.string.profile_tab_favorites", "R.string.profile_stats_downloads",
                            "R.string.profile_orders", "R.string.profile_stats_content")))
@@ -286,9 +292,10 @@ check("الفاحص 99 يعرف الملفين (بندان 54 و55)",
       "36_profile_stats" in verify and "37_profile_reports" in verify
       and "select 54," in verify and "select 55," in verify)
 
-# ── ٨) تعديلات الشات السابقة كما هي (طلب المالك) ─────────────────────────────
-check("قرار المالك: تعديلات غرفة الشات السابقة لم تُمسّ",
-      "AppText.chatTime" in read(os.path.join(SRC, "ui", "chat", "ChatScreen.kt")))
+# ── ٨) الشات: تحقق إيجابي مناسب للتصميم الحالي لا يعتمد على رمز قديم ─────────
+chat_screen = read(os.path.join(SRC, "ui", "chat", "ChatScreen.kt"))
+check("الشات يبني طوابع الوقت على نمط Spec الحالي",
+      "Spec.msgTime" in chat_screen)
 
 print("الفحص                                                     | النتيجة")
 print("-" * 66)

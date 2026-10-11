@@ -3,7 +3,8 @@
 package com.addonstation.mobile.ui.profile
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.Image as ComposeImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +35,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -65,7 +70,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -85,8 +92,10 @@ import coil.compose.AsyncImage
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.SiteAsset
+import com.addonstation.mobile.ui.AssetSection
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.equippedItemUrl
+import com.addonstation.mobile.ui.groupAssetsByCollection
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.components.BannerThumb
 import com.addonstation.mobile.ui.components.CoverImage
@@ -118,7 +127,23 @@ private val UpgradeEnd = Color(0xFF1B1405)
 private val UpgradeBorder = Color(0xFF8A6A22)
 private val UpgradeText = Color(0xFFE8D5A3)
 
-private enum class EditorTab { AvatarAndItem, Banners }
+private enum class EditorTab { Avatar, Banners, Item, About }
+
+private data class EditorCollectionOption(
+    val key: String?,
+    val title: String,
+    val locked: Boolean,
+)
+
+private enum class EditorAssetEntryKind { TierHeading, CollectionHeading, Assets }
+
+private data class EditorAssetListEntry(
+    val key: String,
+    val kind: EditorAssetEntryKind,
+    val title: String? = null,
+    val count: Int = 0,
+    val assets: List<SiteAsset> = emptyList(),
+)
 
 private data class ProfileEditorBaseline(
     val username: String,
@@ -146,6 +171,50 @@ private fun String?.normalizeAssetSelection(): String? =
 private fun normalizeItemSelection(value: String?): String =
     value?.trim()?.takeIf { it.isNotEmpty() && !it.equals(ITEM_NONE, ignoreCase = true) } ?: ITEM_NONE
 
+private fun collectionAssetEntries(
+    sections: List<AssetSection>,
+    selectedCollection: String?,
+    query: String,
+    columns: Int,
+    keyPrefix: String,
+): List<EditorAssetListEntry> = buildList {
+    val normalizedQuery = query.trim()
+    sections
+        .filter { selectedCollection == null || it.title == selectedCollection }
+        .forEach { section ->
+            val matching = if (normalizedQuery.isBlank()) section.assets
+            else section.assets.filter { it.name.contains(normalizedQuery, ignoreCase = true) }
+            if (matching.isNotEmpty()) {
+                val sectionKey = "$keyPrefix:${section.title}"
+                add(EditorAssetListEntry("$sectionKey:heading", EditorAssetEntryKind.CollectionHeading, section.title, matching.size))
+                matching.chunked(columns).forEachIndexed { index, row ->
+                    add(EditorAssetListEntry("$sectionKey:row:$index", EditorAssetEntryKind.Assets, assets = row))
+                }
+            }
+        }
+}
+
+private fun itemAssetEntries(
+    epicTitle: String,
+    epicAssets: List<SiteAsset>,
+    legendaryTitle: String,
+    legendaryAssets: List<SiteAsset>,
+    othersTitle: String,
+): List<EditorAssetListEntry> = buildList {
+    listOf(epicTitle to epicAssets, legendaryTitle to legendaryAssets).forEach { (tierTitle, assets) ->
+        if (assets.isEmpty()) return@forEach
+        val tierKey = "item-tier:${tierTitle.lowercase(Locale.ROOT)}"
+        add(EditorAssetListEntry(tierKey, EditorAssetEntryKind.TierHeading, tierTitle, assets.size))
+        groupAssetsByCollection(assets, othersTitle).forEach { section ->
+            val sectionKey = "$tierKey:${section.title}"
+            add(EditorAssetListEntry("$sectionKey:heading", EditorAssetEntryKind.CollectionHeading, section.title, section.assets.size))
+            section.assets.chunked(4).forEachIndexed { index, row ->
+                add(EditorAssetListEntry("$sectionKey:row:$index", EditorAssetEntryKind.Assets, assets = row))
+            }
+        }
+    }
+}
+
 /**
  * محرّر الملف الشخصي بتغييرات مرحلية: المعاينة تتحدّث فوراً، لكن لا يُرسل أي تعديل
  * إلى الخادم حتى يضغط المستخدم «حفظ». تبقى تعديلات التبويبين محفوظة أثناء التنقل بينهما.
@@ -163,6 +232,8 @@ internal fun ProfileEditorScreen(
     val palette = LocalHomePalette.current
     val isRtl = LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     val bodyFont = if (isRtl) TajawalFont else NunitoFont
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     val profileKey = profile?.id ?: "profile-pending"
@@ -174,10 +245,12 @@ internal fun ProfileEditorScreen(
     var selectedAvatar by remember(profileKey) { mutableStateOf(baseline.avatar) }
     var selectedBanner by remember(profileKey) { mutableStateOf(baseline.banner) }
     var selectedItem by remember(profileKey) { mutableStateOf(baseline.item) }
-    var activeItemTier by remember(profileKey) { mutableStateOf<String?>(null) }
 
-    var currentTab by remember(profileKey) { mutableStateOf(EditorTab.AvatarAndItem) }
+    var currentTab by remember(profileKey) { mutableStateOf(EditorTab.Avatar) }
     var avatarSearch by remember(profileKey) { mutableStateOf("") }
+    var bannerSearch by remember(profileKey) { mutableStateOf("") }
+    var selectedAvatarCollection by remember(profileKey) { mutableStateOf<String?>(null) }
+    var selectedBannerCollection by remember(profileKey) { mutableStateOf<String?>(null) }
     var avatarAssets by remember {
         mutableStateOf(container.state.siteAssets.value.filter { it.assetType == "avatar" })
     }
@@ -220,19 +293,24 @@ internal fun ProfileEditorScreen(
         loadingAssets = true
         assetsUnavailable = false
         try {
-            if (currentTab == EditorTab.AvatarAndItem) {
-                val loaded = coroutineScope {
-                    val avatars = async { container.assets.byType("avatar") }
-                    val items = async { container.assets.byType("item") }
-                    avatars.await() to items.await()
+            when (currentTab) {
+                EditorTab.Avatar, EditorTab.Item -> {
+                    val loaded = coroutineScope {
+                        val avatars = async { container.assets.byType("avatar") }
+                        val items = async { container.assets.byType("item") }
+                        avatars.await() to items.await()
+                    }
+                    avatarAssets = loaded.first
+                    itemAssets = loaded.second
+                    assetsUnavailable = loaded.first.isEmpty() && loaded.second.isEmpty()
                 }
-                avatarAssets = loaded.first
-                itemAssets = loaded.second
-                assetsUnavailable = loaded.first.isEmpty()
-            } else {
-                val loaded = container.assets.byType("banner")
-                bannerAssets = loaded
-                assetsUnavailable = loaded.isEmpty()
+                EditorTab.Banners -> {
+                    bannerAssets = container.assets.byType("banner")
+                    assetsUnavailable = bannerAssets.isEmpty()
+                }
+                EditorTab.About -> {
+                    assetsUnavailable = false
+                }
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -260,12 +338,6 @@ internal fun ProfileEditorScreen(
             it.name.equals(selectedItem, ignoreCase = true) || it.fileUrl.equals(selectedItem, ignoreCase = true)
         }
     }
-    val equippedTier = when {
-        selectedItem.equals(ITEM_NONE, ignoreCase = true) -> null
-        selectedItemAsset?.requiredPlan.equals("epic", ignoreCase = true) -> "epic"
-        else -> "legendary"
-    }
-    val displayedItemTier = activeItemTier ?: equippedTier
     val previewAvatarUrl = assetUrl(container, selectedAvatar)
     val previewBannerUrl = assetUrl(container, selectedBanner)
     val previewItemUrl = selectedItemAsset?.let { assetUrl(container, it.fileUrl) }
@@ -276,26 +348,70 @@ internal fun ProfileEditorScreen(
     val statusLine = "@${username.ifBlank { profile?.username.orEmpty() }}" +
         if (showOnline) " · $onlineLabel" else offlineSuffix
 
-    fun canUseAsset(asset: SiteAsset): Boolean =
-        isAdmin || (asset.requiredPlan != "admin" && container.profile.planRank(asset.requiredPlan) <= profileRank)
-
-    fun canUsePlan(plan: String): Boolean = isAdmin || profileRank >= container.profile.planRank(plan)
-
-    val filteredAvatars = remember(avatarAssets, avatarSearch) {
-        val query = avatarSearch.trim()
-        if (query.isBlank()) avatarAssets
-        else avatarAssets.filter { it.name.contains(query, ignoreCase = true) }
+    fun canUseAsset(asset: SiteAsset): Boolean {
+        val required = asset.requiredPlan.lowercase(Locale.ROOT)
+        return isAdmin || (required != "admin" && container.profile.planRank(required) <= profileRank)
     }
-    val selectedTierAssets = remember(itemAssets, displayedItemTier, isAdmin, profileRank) {
-        if (displayedItemTier == null) emptyList()
-        else itemAssets.filter { asset ->
-            val tier = when (asset.requiredPlan.lowercase(Locale.ROOT)) {
-                "epic" -> "epic"
-                "legendary" -> "legendary"
-                "admin" -> if (isAdmin) "legendary" else "admin"
-                else -> "epic"
-            }
-            tier == displayedItemTier && canUseAsset(asset)
+
+    val allCollectionsLabel = stringResource(R.string.common_all)
+    val otherCollectionLabel = stringResource(R.string.creator_category_other)
+    val avatarSections = remember(avatarAssets, otherCollectionLabel) {
+        groupAssetsByCollection(avatarAssets, otherCollectionLabel)
+    }
+    val bannerSections = remember(bannerAssets, otherCollectionLabel) {
+        groupAssetsByCollection(bannerAssets, otherCollectionLabel)
+    }
+    val avatarCollectionOptions = listOf(EditorCollectionOption(null, allCollectionsLabel, false)) +
+        avatarSections.map { section ->
+            EditorCollectionOption(section.title, section.title, section.assets.none(::canUseAsset))
+        }
+    val bannerCollectionOptions = listOf(EditorCollectionOption(null, allCollectionsLabel, false)) +
+        bannerSections.map { section ->
+            EditorCollectionOption(section.title, section.title, section.assets.none(::canUseAsset))
+        }
+    val avatarEntries = remember(avatarSections, selectedAvatarCollection, avatarSearch) {
+        collectionAssetEntries(avatarSections, selectedAvatarCollection, avatarSearch, 4, "avatar")
+    }
+    val bannerEntries = remember(bannerSections, selectedBannerCollection, bannerSearch) {
+        collectionAssetEntries(bannerSections, selectedBannerCollection, bannerSearch, 2, "banner")
+    }
+    val epicItemAssets = remember(itemAssets) {
+        itemAssets.filter { asset ->
+            val plan = asset.requiredPlan.lowercase(Locale.ROOT)
+            plan != "legendary" && plan != "admin"
+        }
+    }
+    val legendaryItemAssets = remember(itemAssets, isAdmin) {
+        itemAssets.filter { asset ->
+            val plan = asset.requiredPlan.lowercase(Locale.ROOT)
+            plan == "legendary" || (isAdmin && plan == "admin")
+        }
+    }
+    val epicItemTitle = stringResource(R.string.edit_profile_epic_item)
+    val legendaryItemTitle = stringResource(R.string.edit_profile_golden_item)
+    val itemEntries = remember(
+        otherCollectionLabel,
+        epicItemTitle,
+        legendaryItemTitle,
+        epicItemAssets,
+        legendaryItemAssets,
+    ) {
+        itemAssetEntries(
+            epicTitle = epicItemTitle,
+            epicAssets = epicItemAssets,
+            legendaryTitle = legendaryItemTitle,
+            legendaryAssets = legendaryItemAssets,
+            othersTitle = otherCollectionLabel,
+        )
+    }
+    LaunchedEffect(avatarSections) {
+        if (selectedAvatarCollection != null && avatarSections.none { it.title == selectedAvatarCollection }) {
+            selectedAvatarCollection = null
+        }
+    }
+    LaunchedEffect(bannerSections) {
+        if (selectedBannerCollection != null && bannerSections.none { it.title == selectedBannerCollection }) {
+            selectedBannerCollection = null
         }
     }
 
@@ -402,171 +518,255 @@ internal fun ProfileEditorScreen(
                     selected = currentTab,
                     bodyFont = bodyFont,
                     enabled = !saving,
-                    onSelect = { currentTab = it },
+                    onSelect = { tab ->
+                        if (tab != currentTab) {
+                            keyboardController?.hide()
+                            focusManager.clearFocus(force = true)
+                            currentTab = tab
+                        }
+                    },
                 )
             }
 
-            if (currentTab == EditorTab.AvatarAndItem) {
-                item(key = "avatar-section-title") {
-                    EditorSectionHeader(
-                        title = stringResource(R.string.edit_profile_avatar_label),
-                        accent = EditBlueLight,
-                        isRtl = isRtl,
-                    )
-                }
-                item(key = "avatar-search") {
-                    EditorSearchField(
-                        value = avatarSearch,
-                        onValueChange = { avatarSearch = it },
-                        enabled = !saving,
-                        bodyFont = bodyFont,
-                    )
-                }
-                item(key = "avatar-count") {
-                    Text(
-                        text = if (loadingAssets) stringResource(R.string.profile_assets_loading)
-                        else stringResource(R.string.profile_assets_count, filteredAvatars.size, avatarAssets.size),
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                        style = TextStyle(fontFamily = bodyFont, fontSize = 12.sp, fontWeight = FontWeight.Medium),
-                        color = palette.textMuted,
-                    )
-                }
-                when {
-                    loadingAssets && avatarAssets.isEmpty() -> item(key = "avatar-skeleton") {
-                        EditorAssetSkeleton(columns = 4, ratio = 1f, bodyFont = bodyFont)
-                    }
-                    assetsUnavailable && avatarAssets.isEmpty() -> item(key = "avatar-retry") {
-                        AssetsRetryCard(bodyFont = bodyFont, onRetry = { assetsRetry += 1 })
-                    }
-                    filteredAvatars.isEmpty() -> item(key = "avatar-empty-search") {
-                        Text(
-                            stringResource(R.string.edit_profile_no_results),
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-                            style = TextStyle(fontFamily = bodyFont, fontSize = 13.sp),
-                            color = palette.textMuted,
-                            textAlign = TextAlign.Center,
+            when (currentTab) {
+                EditorTab.Avatar -> {
+                    item(key = "avatar-section-title") {
+                        EditorSectionHeader(
+                            title = stringResource(R.string.edit_profile_avatar_label),
+                            accent = EditBlueLight,
+                            isRtl = isRtl,
                         )
                     }
-                    else -> items(
-                        items = filteredAvatars.chunked(4),
-                        key = { row -> "avatar-row-${row.firstOrNull()?.id ?: 0L}" },
-                    ) { row ->
-                        AssetGridRow {
-                            row.forEach { asset ->
-                                val unlocked = canUseAsset(asset)
-                                val planName = assetPlanName(asset.requiredPlan)
-                                val description = if (!unlocked) {
-                                    stringResource(R.string.cd_avatar_locked, asset.name, planName)
-                                } else if (selectedAvatar == asset.fileUrl) {
-                                    stringResource(R.string.cd_avatar_selected, asset.name)
-                                } else asset.name
-                                AvatarAssetTile(
-                                    modifier = Modifier.weight(1f),
-                                    asset = asset,
-                                    selected = selectedAvatar == asset.fileUrl,
-                                    locked = !unlocked,
-                                    planName = planName,
-                                    contentDescription = description,
-                                    enabled = !saving,
-                                    onClick = {
-                                        if (!unlocked) showUpgradePrompt(planLockedAvatars)
-                                        else {
-                                            selectedAvatar = asset.fileUrl
-                                            saveError = null
-                                        }
-                                    },
+                    item(key = "avatar-collections") {
+                        EditorCollectionChips(
+                            options = avatarCollectionOptions,
+                            selected = selectedAvatarCollection,
+                            bodyFont = bodyFont,
+                            onSelect = { selectedAvatarCollection = it },
+                        )
+                    }
+                    item(key = "avatar-search") {
+                        EditorSearchField(
+                            value = avatarSearch,
+                            onValueChange = { avatarSearch = it },
+                            enabled = !saving,
+                            bodyFont = bodyFont,
+                        )
+                    }
+                    item(key = "avatar-count") {
+                        val visibleCount = avatarEntries
+                            .filter { it.kind == EditorAssetEntryKind.Assets }
+                            .sumOf { it.assets.size }
+                        Text(
+                            text = if (loadingAssets) stringResource(R.string.profile_assets_loading)
+                            else stringResource(R.string.profile_assets_count, visibleCount, avatarAssets.size),
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                            style = TextStyle(fontFamily = bodyFont, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                            color = palette.textMuted,
+                        )
+                    }
+                    when {
+                        loadingAssets && avatarAssets.isEmpty() -> item(key = "avatar-skeleton") {
+                            EditorAssetSkeleton(columns = 4, ratio = 1f, bodyFont = bodyFont)
+                        }
+                        assetsUnavailable && avatarAssets.isEmpty() -> item(key = "avatar-retry") {
+                            AssetsRetryCard(bodyFont = bodyFont, onRetry = { assetsRetry += 1 })
+                        }
+                        avatarEntries.isEmpty() -> item(key = "avatar-empty-search") {
+                            Text(
+                                stringResource(R.string.edit_profile_no_results),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                                style = TextStyle(fontFamily = bodyFont, fontSize = 13.sp),
+                                color = palette.textMuted,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                        else -> items(avatarEntries, key = { it.key }) { entry ->
+                            when (entry.kind) {
+                                EditorAssetEntryKind.TierHeading -> Unit
+                                EditorAssetEntryKind.CollectionHeading -> EditorCollectionHeader(
+                                    title = entry.title.orEmpty(),
+                                    count = entry.count,
+                                    accent = EditBlueLight,
+                                    bodyFont = bodyFont,
                                 )
+                                EditorAssetEntryKind.Assets -> AssetGridRow {
+                                    entry.assets.forEach { asset ->
+                                        val unlocked = canUseAsset(asset)
+                                        val planName = assetPlanName(asset.requiredPlan)
+                                        val description = if (!unlocked) {
+                                            stringResource(R.string.cd_avatar_locked, asset.name, planName)
+                                        } else if (selectedAvatar == asset.fileUrl) {
+                                            stringResource(R.string.cd_avatar_selected, asset.name)
+                                        } else asset.name
+                                        AvatarAssetTile(
+                                            modifier = Modifier.weight(1f),
+                                            asset = asset,
+                                            selected = selectedAvatar == asset.fileUrl,
+                                            locked = !unlocked,
+                                            planName = planName,
+                                            contentDescription = description,
+                                            enabled = !saving,
+                                            onClick = {
+                                                if (!unlocked) showUpgradePrompt(planLockedAvatars)
+                                                else {
+                                                    selectedAvatar = asset.fileUrl
+                                                    saveError = null
+                                                }
+                                            },
+                                        )
+                                    }
+                                    repeat(4 - entry.assets.size) { Spacer(Modifier.weight(1f)) }
+                                }
                             }
-                            repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
-                }
-                if (avatarAssets.any { !canUseAsset(it) }) {
-                    item(key = "avatar-upgrade") {
-                        UpgradeCard(
-                            message = planLockedAvatars,
-                            bodyFont = bodyFont,
-                            onUpgrade = onOpenPlans,
-                        )
+                    if (avatarAssets.any { !canUseAsset(it) }) {
+                        item(key = "avatar-upgrade") {
+                            UpgradeCard(
+                                message = planLockedAvatars,
+                                bodyFont = bodyFont,
+                                onUpgrade = onOpenPlans,
+                            )
+                        }
                     }
                 }
 
-                item(key = "item-section-title") {
-                    EditorSectionHeader(
-                        title = stringResource(R.string.plan_item_section),
-                        accent = EditGold,
-                        isRtl = isRtl,
-                    )
-                }
-                item(key = "item-tier-cards") {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        ItemTierCard(
-                            modifier = Modifier.weight(1f),
-                            label = stringResource(R.string.profile_item_none),
-                            icon = Icons.Filled.Block,
-                            accent = palette.textMuted,
-                            selected = selectedItem.equals(ITEM_NONE, ignoreCase = true),
-                            equipped = selectedItem.equals(ITEM_NONE, ignoreCase = true),
-                            locked = false,
+                EditorTab.Banners -> {
+                    item(key = "banner-section-title") {
+                        EditorSectionHeader(
+                            title = stringResource(R.string.profile_banner_section),
+                            accent = EditEpic,
+                            isRtl = isRtl,
+                        )
+                    }
+                    item(key = "banner-collections") {
+                        EditorCollectionChips(
+                            options = bannerCollectionOptions,
+                            selected = selectedBannerCollection,
                             bodyFont = bodyFont,
+                            onSelect = { selectedBannerCollection = it },
+                        )
+                    }
+                    item(key = "banner-search") {
+                        EditorSearchField(
+                            value = bannerSearch,
+                            onValueChange = { bannerSearch = it },
                             enabled = !saving,
+                            bodyFont = bodyFont,
+                        )
+                    }
+                    item(key = "banner-clear") {
+                        RemoveBannerButton(
+                            enabled = selectedBanner != null && !saving,
+                            bodyFont = bodyFont,
                             onClick = {
-                                selectedItem = ITEM_NONE
-                                activeItemTier = null
+                                selectedBanner = null
                                 saveError = null
                             },
                         )
-                        ItemTierCard(
-                            modifier = Modifier.weight(1f),
-                            label = stringResource(R.string.edit_profile_epic_item),
-                            icon = Icons.Filled.Star,
-                            accent = EditEpic,
-                            selected = activeItemTier == "epic" || equippedTier == "epic",
-                            equipped = equippedTier == "epic",
-                            locked = !canUsePlan("epic"),
-                            bodyFont = bodyFont,
-                            enabled = !saving,
-                            onClick = {
-                                if (!canUsePlan("epic")) showUpgradePrompt(planLockedItems)
-                                else activeItemTier = "epic"
-                            },
-                        )
-                        ItemTierCard(
-                            modifier = Modifier.weight(1f),
-                            label = stringResource(R.string.edit_profile_golden_item),
-                            icon = Icons.Filled.Star,
-                            accent = EditGold,
-                            selected = activeItemTier == "legendary" || equippedTier == "legendary",
-                            equipped = equippedTier == "legendary",
-                            locked = !canUsePlan("legendary"),
-                            bodyFont = bodyFont,
-                            enabled = !saving,
-                            onClick = {
-                                if (!canUsePlan("legendary")) showUpgradePrompt(planLockedItems)
-                                else activeItemTier = "legendary"
-                            },
-                        )
+                    }
+                    if (selectedBanner == null && bannerAssets.isNotEmpty() && bannerAssets.none(::canUseAsset)) {
+                        item(key = "banner-free-plan-note") {
+                            FreeBannerState(bodyFont = bodyFont)
+                        }
+                    }
+                    when {
+                        loadingAssets && bannerAssets.isEmpty() -> item(key = "banner-skeleton") {
+                            EditorAssetSkeleton(columns = 2, ratio = 16f / 7f, bodyFont = bodyFont)
+                        }
+                        assetsUnavailable && bannerAssets.isEmpty() -> item(key = "banner-retry") {
+                            AssetsRetryCard(bodyFont = bodyFont, onRetry = { assetsRetry += 1 })
+                        }
+                        bannerEntries.isEmpty() -> item(key = "banner-no-results") {
+                            Text(
+                                stringResource(R.string.edit_profile_no_results),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                                style = TextStyle(fontFamily = bodyFont, fontSize = 13.sp),
+                                color = palette.textMuted,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                        else -> items(bannerEntries, key = { it.key }) { entry ->
+                            when (entry.kind) {
+                                EditorAssetEntryKind.TierHeading -> Unit
+                                EditorAssetEntryKind.CollectionHeading -> EditorCollectionHeader(
+                                    title = entry.title.orEmpty(),
+                                    count = entry.count,
+                                    accent = EditEpic,
+                                    bodyFont = bodyFont,
+                                )
+                                EditorAssetEntryKind.Assets -> AssetGridRow {
+                                    entry.assets.forEach { asset ->
+                                        val unlocked = canUseAsset(asset)
+                                        val planName = assetPlanName(asset.requiredPlan)
+                                        BannerAssetTile(
+                                            modifier = Modifier.weight(1f),
+                                            asset = asset,
+                                            selected = selectedBanner == asset.fileUrl,
+                                            locked = !unlocked,
+                                            planName = planName,
+                                            enabled = !saving,
+                                            onClick = {
+                                                if (!unlocked) showUpgradePrompt(planLockedBanners)
+                                                else {
+                                                    selectedBanner = asset.fileUrl
+                                                    saveError = null
+                                                }
+                                            },
+                                        )
+                                    }
+                                    repeat(2 - entry.assets.size) { Spacer(Modifier.weight(1f)) }
+                                }
+                            }
+                        }
+                    }
+                    if (bannerAssets.any { !canUseAsset(it) }) {
+                        item(key = "banner-upgrade") {
+                            UpgradeCard(
+                                message = planLockedBanners,
+                                bodyFont = bodyFont,
+                                onUpgrade = onOpenPlans,
+                            )
+                        }
                     }
                 }
-                if (displayedItemTier != null) {
-                    item {
-                        Text(
-                            text = if (displayedItemTier == "epic") stringResource(R.string.edit_profile_epic_item)
-                            else stringResource(R.string.edit_profile_golden_item),
-                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 2.dp),
-                            style = TextStyle(fontFamily = bodyFont, fontSize = 12.sp, fontWeight = FontWeight.Bold),
-                            color = palette.textMuted,
+
+                EditorTab.Item -> {
+                    item(key = "item-section-title") {
+                        EditorSectionHeader(
+                            title = stringResource(R.string.plan_item_section),
+                            accent = EditGold,
+                            isRtl = isRtl,
                         )
                     }
-                    if (loadingAssets && itemAssets.isEmpty()) {
-                        item(key = "item-skeleton") {
+                    item(key = "item-chat-preview") {
+                        ItemChatPreviewCard(
+                            displayName = displayName,
+                            avatarUrl = previewAvatarUrl,
+                            itemUrl = previewItemUrl,
+                            online = showOnline,
+                            bodyFont = bodyFont,
+                        )
+                    }
+                    item(key = "item-none") {
+                        NoneItemRow(
+                            selected = selectedItem.equals(ITEM_NONE, ignoreCase = true),
+                            bodyFont = bodyFont,
+                            onClick = {
+                                selectedItem = ITEM_NONE
+                                saveError = null
+                            },
+                        )
+                    }
+                    when {
+                        loadingAssets && itemAssets.isEmpty() -> item(key = "item-skeleton") {
                             EditorAssetSkeleton(columns = 4, ratio = 1f, bodyFont = bodyFont)
                         }
-                    } else if (selectedTierAssets.isEmpty()) {
-                        item(key = "item-no-assets") {
+                        assetsUnavailable && itemAssets.isEmpty() -> item(key = "item-retry") {
+                            AssetsRetryCard(bodyFont = bodyFont, onRetry = { assetsRetry += 1 })
+                        }
+                        itemEntries.isEmpty() -> item(key = "item-no-assets") {
                             Text(
                                 stringResource(R.string.edit_profile_no_items),
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
@@ -575,148 +775,116 @@ internal fun ProfileEditorScreen(
                                 textAlign = TextAlign.Center,
                             )
                         }
-                    } else {
-                        items(
-                            items = selectedTierAssets.chunked(4),
-                            key = { row -> "item-row-${row.firstOrNull()?.id ?: 0L}" },
-                        ) { row ->
-                            AssetGridRow {
-                                row.forEach { asset ->
-                                    val selected = selectedItem.equals(asset.name, ignoreCase = true)
-                                    ItemAssetTile(
-                                        modifier = Modifier.weight(1f),
-                                        asset = asset,
-                                        selected = selected,
-                                        enabled = !saving,
-                                        bodyFont = bodyFont,
-                                        onClick = {
-                                            selectedItem = asset.name
-                                            activeItemTier = if (asset.requiredPlan.equals("epic", ignoreCase = true)) "epic" else "legendary"
-                                            saveError = null
-                                        },
-                                    )
+                        else -> items(itemEntries, key = { it.key }) { entry ->
+                            when (entry.kind) {
+                                EditorAssetEntryKind.TierHeading -> EditorSectionHeader(
+                                    title = entry.title.orEmpty(),
+                                    accent = if (entry.title == epicItemTitle) EditEpic else EditGold,
+                                    isRtl = isRtl,
+                                )
+                                EditorAssetEntryKind.CollectionHeading -> EditorCollectionHeader(
+                                    title = entry.title.orEmpty(),
+                                    count = entry.count,
+                                    accent = palette.textMuted,
+                                    bodyFont = bodyFont,
+                                )
+                                EditorAssetEntryKind.Assets -> AssetGridRow {
+                                    entry.assets.forEach { asset ->
+                                        val selected = selectedItem.equals(asset.name, ignoreCase = true) ||
+                                            selectedItem.equals(asset.fileUrl, ignoreCase = true)
+                                        val unlocked = canUseAsset(asset)
+                                        ItemAssetTile(
+                                            modifier = Modifier.weight(1f),
+                                            asset = asset,
+                                            selected = selected,
+                                            locked = !unlocked,
+                                            planName = assetPlanName(asset.requiredPlan),
+                                            equipped = selected,
+                                            enabled = !saving,
+                                            bodyFont = bodyFont,
+                                            onClick = {
+                                                if (!unlocked) showUpgradePrompt(planLockedItems)
+                                                else {
+                                                    selectedItem = asset.name
+                                                    saveError = null
+                                                }
+                                            },
+                                        )
+                                    }
+                                    repeat(4 - entry.assets.size) { Spacer(Modifier.weight(1f)) }
                                 }
-                                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
                             }
+                        }
+                    }
+                    if (itemAssets.any { it.requiredPlan.lowercase(Locale.ROOT) != "admin" && !canUseAsset(it) }) {
+                        item(key = "item-upgrade") {
+                            UpgradeCard(
+                                message = planLockedItems,
+                                bodyFont = bodyFont,
+                                onUpgrade = onOpenPlans,
+                            )
                         }
                     }
                 }
 
-                item(key = "username-field") {
-                    EditorTextField(
-                        label = stringResource(R.string.set_username_row),
-                        value = username,
-                        onValueChange = { username = it; saveError = null },
-                        placeholder = stringResource(R.string.set_username_row),
-                        maxLength = null,
-                        multiline = false,
-                        enabled = !saving,
-                        bodyFont = bodyFont,
-                    )
-                }
-                item(key = "custom-status-field") {
-                    EditorTextField(
-                        label = stringResource(R.string.profile_custom_status),
-                        value = customStatus,
-                        onValueChange = { customStatus = it; saveError = null },
-                        placeholder = stringResource(R.string.edit_profile_status_hint),
-                        maxLength = STATUS_MAX_LENGTH,
-                        multiline = false,
-                        enabled = !saving,
-                        bodyFont = bodyFont,
-                    )
-                }
-                item(key = "bio-field") {
-                    EditorTextField(
-                        label = stringResource(R.string.profile_about_me),
-                        value = bio,
-                        onValueChange = { bio = it; saveError = null },
-                        placeholder = stringResource(R.string.profile_about_default),
-                        maxLength = BIO_MAX_LENGTH,
-                        multiline = true,
-                        enabled = !saving,
-                        bodyFont = bodyFont,
-                    )
-                }
-                item(key = "online-status") {
-                    OnlineStatusEditor(
-                        checked = showOnline,
-                        legendary = legendaryUp,
-                        enabled = !saving,
-                        bodyFont = bodyFont,
-                        onCheckedChange = { checked ->
-                            if (!legendaryUp) showUpgradePrompt(planLockedOnline)
-                            else {
-                                showOnline = checked
-                                saveError = null
-                            }
-                        },
-                    )
-                }
-            } else {
-                item(key = "banner-section-title") {
-                    EditorSectionHeader(
-                        title = stringResource(R.string.profile_banner_section),
-                        accent = EditEpic,
-                        isRtl = isRtl,
-                    )
-                }
-                item(key = "banner-clear") {
-                    RemoveBannerButton(
-                        enabled = selectedBanner != null && !saving,
-                        bodyFont = bodyFont,
-                        onClick = {
-                            selectedBanner = null
-                            saveError = null
-                        },
-                    )
-                }
-                if (selectedBanner == null && bannerAssets.isNotEmpty() && bannerAssets.none(::canUseAsset)) {
-                    item(key = "banner-free-plan-note") {
-                        FreeBannerState(bodyFont = bodyFont)
+                EditorTab.About -> {
+                    item(key = "about-section-title") {
+                        EditorSectionHeader(
+                            title = stringResource(R.string.edit_profile_tab_about),
+                            accent = EditBlueLight,
+                            isRtl = isRtl,
+                        )
                     }
-                }
-                when {
-                    loadingAssets && bannerAssets.isEmpty() -> item(key = "banner-skeleton") {
-                        EditorAssetSkeleton(columns = 2, ratio = 16f / 7f, bodyFont = bodyFont)
-                    }
-                    assetsUnavailable && bannerAssets.isEmpty() -> item(key = "banner-retry") {
-                        AssetsRetryCard(bodyFont = bodyFont, onRetry = { assetsRetry += 1 })
-                    }
-                    else -> items(
-                        items = bannerAssets.chunked(2),
-                        key = { row -> "banner-row-${row.firstOrNull()?.id ?: 0L}" },
-                    ) { row ->
-                        AssetGridRow {
-                            row.forEach { asset ->
-                                val unlocked = canUseAsset(asset)
-                                val planName = assetPlanName(asset.requiredPlan)
-                                BannerAssetTile(
-                                    modifier = Modifier.weight(1f),
-                                    asset = asset,
-                                    selected = selectedBanner == asset.fileUrl,
-                                    locked = !unlocked,
-                                    planName = planName,
-                                    enabled = !saving,
-                                    onClick = {
-                                        if (!unlocked) showUpgradePrompt(planLockedBanners)
-                                        else {
-                                            selectedBanner = asset.fileUrl
-                                            saveError = null
-                                        }
-                                    },
-                                )
-                            }
-                            repeat(2 - row.size) { Spacer(Modifier.weight(1f)) }
-                        }
-                    }
-                }
-                if (bannerAssets.any { !canUseAsset(it) }) {
-                    item(key = "banner-upgrade") {
-                        UpgradeCard(
-                            message = planLockedBanners,
+                    item(key = "username-field") {
+                        EditorTextField(
+                            label = stringResource(R.string.set_username_row),
+                            value = username,
+                            onValueChange = { username = it; saveError = null },
+                            placeholder = stringResource(R.string.set_username_row),
+                            maxLength = null,
+                            multiline = false,
+                            enabled = !saving,
                             bodyFont = bodyFont,
-                            onUpgrade = onOpenPlans,
+                        )
+                    }
+                    item(key = "custom-status-field") {
+                        EditorTextField(
+                            label = stringResource(R.string.profile_custom_status),
+                            value = customStatus,
+                            onValueChange = { customStatus = it; saveError = null },
+                            placeholder = stringResource(R.string.edit_profile_status_hint),
+                            maxLength = STATUS_MAX_LENGTH,
+                            multiline = false,
+                            enabled = !saving,
+                            bodyFont = bodyFont,
+                        )
+                    }
+                    item(key = "bio-field") {
+                        EditorTextField(
+                            label = stringResource(R.string.profile_about_me),
+                            value = bio,
+                            onValueChange = { bio = it; saveError = null },
+                            placeholder = stringResource(R.string.profile_about_default),
+                            maxLength = BIO_MAX_LENGTH,
+                            multiline = true,
+                            enabled = !saving,
+                            bodyFont = bodyFont,
+                        )
+                    }
+                    item(key = "online-status") {
+                        OnlineStatusEditor(
+                            checked = showOnline,
+                            legendary = legendaryUp,
+                            lockedMessage = planLockedOnline,
+                            enabled = !saving,
+                            bodyFont = bodyFont,
+                            onCheckedChange = { checked ->
+                                if (!legendaryUp) showUpgradePrompt(planLockedOnline)
+                                else {
+                                    showOnline = checked
+                                    saveError = null
+                                }
+                            },
                         )
                     }
                 }
@@ -896,32 +1064,119 @@ private fun EditorTabs(
             .background(palette.surface)
             .border(1.dp, palette.border, RoundedCornerShape(16.dp))
             .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         EditorTab.values().forEach { tab ->
             val isSelected = tab == selected
-            val label = when (tab) {
-                EditorTab.AvatarAndItem -> stringResource(R.string.profile_avatar_item)
-                EditorTab.Banners -> stringResource(R.string.profile_banner_section)
+            val (label, icon) = when (tab) {
+                EditorTab.Avatar -> stringResource(R.string.edit_profile_avatar_label) to Icons.Filled.Person
+                EditorTab.Banners -> stringResource(R.string.profile_banner_section) to Icons.Filled.Image
+                EditorTab.Item -> stringResource(R.string.edit_profile_tab_item) to Icons.Filled.Star
+                EditorTab.About -> stringResource(R.string.edit_profile_tab_about) to Icons.Filled.Info
             }
-            Box(
+            Column(
                 modifier = Modifier
                     .weight(1f)
-                    .height(44.dp)
+                    .height(48.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSelected) EditBlue else Color.Transparent)
+                    .background(if (isSelected) palette.blue else Color.Transparent)
                     .clickable(enabled = enabled) { onSelect(tab) },
-                contentAlignment = Alignment.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (isSelected) Color.White else palette.textMuted,
+                    modifier = Modifier.size(16.dp),
+                )
                 Text(
                     text = label,
-                    style = TextStyle(fontFamily = bodyFont, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold),
+                    style = TextStyle(fontFamily = bodyFont, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold),
                     color = if (isSelected) Color.White else palette.textMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+    }
+}
+
+
+@Composable
+private fun EditorCollectionChips(
+    options: List<EditorCollectionOption>,
+    selected: String?,
+    bodyFont: FontFamily,
+    onSelect: (String?) -> Unit,
+) {
+    val palette = LocalHomePalette.current
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(options, key = { it.key ?: "all-collections" }) { option ->
+            val active = option.key == selected
+            val shape = RoundedCornerShape(20.dp)
+            Row(
+                modifier = Modifier
+                    .height(40.dp)
+                    .clip(shape)
+                    .background(if (active) palette.blue else palette.surface)
+                    .border(if (active) 0.dp else 1.dp, if (active) palette.blue else palette.border, shape)
+                    .clickable { onSelect(option.key) }
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (option.locked) {
+                    Icon(
+                        Icons.Filled.Lock,
+                        contentDescription = null,
+                        tint = if (active) Color.White else palette.textMuted,
+                        modifier = Modifier.size(13.dp),
+                    )
+                }
+                Text(
+                    option.title,
+                    style = TextStyle(fontFamily = bodyFont, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold),
+                    color = if (active) Color.White else palette.chipText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditorCollectionHeader(
+    title: String,
+    count: Int,
+    accent: Color,
+    bodyFont: FontFamily,
+) {
+    val palette = LocalHomePalette.current
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 5.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(Modifier.size(width = 5.dp, height = 13.dp).clip(RoundedCornerShape(2.dp)).background(accent))
+        Text(
+            title,
+            modifier = Modifier.weight(1f),
+            style = TextStyle(fontFamily = bodyFont, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold),
+            color = accent,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            count.toString(),
+            style = TextStyle(fontFamily = NumberFont, fontSize = 10.sp, fontWeight = FontWeight.Bold),
+            color = palette.textMuted,
+        )
     }
 }
 
@@ -1051,7 +1306,7 @@ private fun ProfilePreviewCard(
 private fun PreviewAvatar(url: String?, online: Boolean) {
     val palette = LocalHomePalette.current
     Box(Modifier.size(76.dp)) {
-        Image(
+        ComposeImage(
             painter = painterResource(R.drawable.ic_default_profile),
             contentDescription = null,
             contentScale = ContentScale.Crop,
@@ -1082,6 +1337,93 @@ private fun PreviewAvatar(url: String?, online: Boolean) {
                 )
                 .border(2.dp, palette.surface, CircleShape),
         )
+    }
+}
+
+
+@Composable
+private fun ItemChatPreviewCard(
+    displayName: String,
+    avatarUrl: String?,
+    itemUrl: String?,
+    online: Boolean,
+    bodyFont: FontFamily,
+) {
+    val palette = LocalHomePalette.current
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(shape)
+            .background(palette.surface)
+            .border(1.dp, palette.border, shape)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Text(
+            stringResource(R.string.plan_item_section),
+            style = TextStyle(fontFamily = bodyFont, fontSize = 11.sp, fontWeight = FontWeight.Bold),
+            color = palette.textMuted,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.size(38.dp)) {
+                ComposeImage(
+                    painter = painterResource(R.drawable.ic_default_profile),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                )
+                if (!avatarUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    )
+                }
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(if (online) EditGreen else palette.textMuted)
+                        .border(1.5.dp, palette.surface, CircleShape),
+                )
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                val previewName = if (displayName.isBlank()) stringResource(R.string.common_guest) else displayName
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        previewName,
+                        style = TextStyle(fontFamily = bodyFont, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold),
+                        color = palette.blueLink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (!itemUrl.isNullOrBlank()) {
+                        CoverImage(
+                            url = itemUrl,
+                            modifier = Modifier.size(22.dp),
+                            radius = 6.dp,
+                            animate = true,
+                            backgroundColor = palette.surfaceHigh,
+                        )
+                    }
+                }
+                Text(
+                    stringResource(R.string.edit_profile_message_preview),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(palette.surfaceHigh)
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                    style = TextStyle(fontFamily = bodyFont, fontSize = 12.sp),
+                    color = palette.text,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
@@ -1232,39 +1574,58 @@ private fun EditorTextField(
 private fun OnlineStatusEditor(
     checked: Boolean,
     legendary: Boolean,
+    lockedMessage: String,
     enabled: Boolean,
     bodyFont: FontFamily,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val palette = LocalHomePalette.current
-    val statusLabel = stringResource(R.string.profile_online)
-    val hiddenSuffix = stringResource(R.string.profile_offline_suffix)
-    Row(
+    val statusLabel = stringResource(R.string.profile_online_status)
+    val hiddenForOthers = stringResource(R.string.profile_hidden_from_others)
+    Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = palette.barSurface,
-                checkedTrackColor = EditGreen,
-                checkedBorderColor = EditGreen,
-                uncheckedThumbColor = palette.textMuted,
-                uncheckedTrackColor = palette.surfaceHigh,
-                uncheckedBorderColor = palette.border,
-            ),
-        )
-        Text(
-            text = statusLabel + if (checked) "" else hiddenSuffix,
-            modifier = Modifier.weight(1f),
-            style = TextStyle(fontFamily = bodyFont, fontSize = 13.sp, fontWeight = FontWeight.Bold),
-            color = palette.text,
-        )
-        if (!legendary) {
-            Icon(Icons.Filled.Lock, contentDescription = null, tint = EditGold, modifier = Modifier.size(18.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                enabled = enabled,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = palette.barSurface,
+                    checkedTrackColor = EditGreen,
+                    checkedBorderColor = EditGreen,
+                    uncheckedThumbColor = palette.textMuted,
+                    uncheckedTrackColor = palette.surfaceHigh,
+                    uncheckedBorderColor = palette.border,
+                ),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = statusLabel,
+                    style = TextStyle(fontFamily = bodyFont, fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                    color = palette.text,
+                )
+                when {
+                    !legendary -> Text(
+                        lockedMessage,
+                        style = TextStyle(fontFamily = bodyFont, fontSize = 11.sp),
+                        color = palette.textMuted,
+                    )
+                    !checked -> Text(
+                        hiddenForOthers,
+                        style = TextStyle(fontFamily = bodyFont, fontSize = 11.sp),
+                        color = palette.textMuted,
+                    )
+                }
+            }
+            if (!legendary) {
+                Icon(Icons.Filled.Lock, contentDescription = null, tint = EditGold, modifier = Modifier.size(18.dp))
+            }
         }
     }
 }
@@ -1387,12 +1748,17 @@ private fun BannerAssetTile(
     onClick: () -> Unit,
 ) {
     val palette = LocalHomePalette.current
+    val accessibilityLabel = if (locked) {
+        stringResource(R.string.cd_avatar_locked, asset.name, planName)
+    } else {
+        asset.name
+    }
     val shape = RoundedCornerShape(14.dp)
     Box(
         modifier = modifier
             .aspectRatio(16f / 7f)
             .semantics(mergeDescendants = true) {
-                contentDescription = asset.name
+                contentDescription = accessibilityLabel
                 role = Role.Button
             }
             .clickable(enabled = enabled, onClick = onClick),
@@ -1426,16 +1792,70 @@ private fun BannerAssetTile(
     }
 }
 
+
+@Composable
+private fun NoneItemRow(
+    selected: Boolean,
+    bodyFont: FontFamily,
+    onClick: () -> Unit,
+) {
+    val palette = LocalHomePalette.current
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .height(62.dp)
+            .clip(shape)
+            .background(if (selected) palette.blue.copy(alpha = 0.10f) else palette.surface)
+            .border(if (selected) 2.dp else 1.dp, if (selected) EditBlue else palette.border, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            Modifier.size(42.dp).clip(CircleShape).background(palette.surfaceHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Block, contentDescription = null, tint = palette.textMuted, modifier = Modifier.size(20.dp))
+        }
+        Text(
+            stringResource(R.string.profile_item_none),
+            modifier = Modifier.weight(1f),
+            style = TextStyle(fontFamily = bodyFont, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold),
+            color = palette.text,
+        )
+        if (selected) {
+            Text(
+                stringResource(R.string.profile_item_equipped),
+                modifier = Modifier.clip(RoundedCornerShape(7.dp)).background(EditBlue).padding(horizontal = 8.dp, vertical = 3.dp),
+                style = TextStyle(fontFamily = bodyFont, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold),
+                color = Color.White,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
 @Composable
 private fun ItemAssetTile(
     modifier: Modifier,
     asset: SiteAsset,
     selected: Boolean,
+    locked: Boolean,
+    planName: String,
+    equipped: Boolean,
     enabled: Boolean,
     bodyFont: FontFamily,
     onClick: () -> Unit,
 ) {
     val palette = LocalHomePalette.current
+    val accessibilityLabel = if (locked) {
+        stringResource(R.string.cd_avatar_locked, asset.name, planName)
+    } else {
+        asset.name
+    }
     val shape = RoundedCornerShape(16.dp)
     Box(
         modifier = modifier
@@ -1443,6 +1863,10 @@ private fun ItemAssetTile(
             .clip(shape)
             .background(if (selected) palette.blue.copy(alpha = 0.12f) else palette.surface)
             .border(if (selected) 3.dp else 1.dp, if (selected) EditBlue else palette.border, shape)
+            .semantics(mergeDescendants = true) {
+                contentDescription = accessibilityLabel
+                role = Role.Button
+            }
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -1468,81 +1892,29 @@ private fun ItemAssetTile(
                 textAlign = TextAlign.Center,
             )
         }
-        if (selected) SelectionBadge(Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-6).dp))
-    }
-}
-
-@Composable
-private fun ItemTierCard(
-    modifier: Modifier,
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    accent: Color,
-    selected: Boolean,
-    equipped: Boolean,
-    locked: Boolean,
-    bodyFont: FontFamily,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val palette = LocalHomePalette.current
-    val shape = RoundedCornerShape(16.dp)
-    Box(
-        modifier = modifier
-            .height(92.dp)
-            .semantics(mergeDescendants = true) { role = Role.Button }
-            .clickable(enabled = enabled, onClick = onClick),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(shape)
-                .background(
-                    when {
-                        equipped -> if (palette.isDark) Color(0xFF102244) else palette.blue.copy(alpha = 0.10f)
-                        selected -> palette.surfaceHigh
-                        else -> palette.surface
-                    },
-                )
-                .border(if (equipped) 2.dp else 1.dp, if (equipped) EditBlue else palette.border, shape)
-                .padding(horizontal = 5.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Box(
-                modifier = Modifier.size(34.dp).clip(CircleShape).background(accent.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(19.dp))
-            }
-            Text(
-                label,
-                style = TextStyle(fontFamily = bodyFont, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold),
-                color = if (equipped) palette.text else palette.textMuted,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
         if (locked) {
             Box(
-                Modifier.fillMaxSize().clip(shape).background(palette.bg.copy(alpha = 0.60f)),
+                Modifier.fillMaxSize().clip(shape).background(palette.bg.copy(alpha = 0.58f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(Icons.Filled.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    PlanChip(planName)
+                }
             }
         }
+        if (selected) SelectionBadge(Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-6).dp))
         if (equipped) {
             Text(
                 stringResource(R.string.profile_item_equipped),
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(y = (-8).dp)
-                    .padding(end = 7.dp)
+                    .align(Alignment.TopStart)
+                    .offset(y = (-7).dp)
+                    .padding(start = 6.dp)
                     .clip(RoundedCornerShape(7.dp))
                     .background(EditBlue)
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                style = TextStyle(fontFamily = bodyFont, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold),
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                style = TextStyle(fontFamily = bodyFont, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold),
                 color = Color.White,
                 maxLines = 1,
             )
@@ -1566,10 +1938,19 @@ private fun SelectionBadge(modifier: Modifier) {
 
 @Composable
 private fun PlanChip(planName: String) {
-    val isLegendary = planName.equals(stringResource(R.string.plan_legendary_name), ignoreCase = true) ||
-        planName.equals("legendary", ignoreCase = true)
-    val background = if (isLegendary) EditGold else EditEpic
-    val foreground = if (isLegendary) Color(0xFF1B1405) else Color.White
+    val palette = LocalHomePalette.current
+    val isLegendary = planName.equals(stringResource(R.string.plan_legendary_name), ignoreCase = true)
+    val isAdminOnly = planName.equals(stringResource(R.string.chat_admin_only_short), ignoreCase = true)
+    val background = when {
+        isLegendary -> EditGold
+        isAdminOnly -> palette.surfaceHigh
+        else -> EditEpic
+    }
+    val foreground = when {
+        isLegendary -> Color(0xFF1B1405)
+        isAdminOnly -> palette.text
+        else -> Color.White
+    }
     Text(
         text = planName,
         modifier = Modifier.clip(RoundedCornerShape(7.dp)).background(background).padding(horizontal = 7.dp, vertical = 1.dp),
@@ -1581,13 +1962,21 @@ private fun PlanChip(planName: String) {
 
 @Composable
 private fun UpgradeCard(message: String, bodyFont: FontFamily, onUpgrade: () -> Unit) {
+    val palette = LocalHomePalette.current
+    val upgradeColors = if (palette.isDark) {
+        listOf(UpgradeStart, UpgradeEnd)
+    } else {
+        listOf(Color(0xFFFFF3D2), Color(0xFFFFFBF3))
+    }
+    val upgradeBorder = if (palette.isDark) UpgradeBorder else Color(0xFFE0B744)
+    val upgradeText = if (palette.isDark) UpgradeText else Color(0xFF6B4D0A)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(UpgradeStart, UpgradeEnd)))
-            .border(1.dp, UpgradeBorder, RoundedCornerShape(16.dp))
+            .background(Brush.linearGradient(upgradeColors))
+            .border(1.dp, upgradeBorder, RoundedCornerShape(16.dp))
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1597,7 +1986,7 @@ private fun UpgradeCard(message: String, bodyFont: FontFamily, onUpgrade: () -> 
             message,
             modifier = Modifier.weight(1f),
             style = TextStyle(fontFamily = bodyFont, fontSize = 12.sp, fontWeight = FontWeight.Medium),
-            color = UpgradeText,
+            color = upgradeText,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
         )
@@ -1622,6 +2011,17 @@ private fun UpgradeCard(message: String, bodyFont: FontFamily, onUpgrade: () -> 
 @Composable
 private fun EditorAssetSkeleton(columns: Int, ratio: Float, bodyFont: FontFamily) {
     val palette = LocalHomePalette.current
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "profile-assets-skeleton")
+    val alpha by transition.animateFloat(
+        initialValue = 0.28f,
+        targetValue = 0.78f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(1100),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "profile-assets-skeleton-alpha",
+    )
+    val shimmer = palette.surfaceHigh.copy(alpha = alpha)
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -1634,7 +2034,7 @@ private fun EditorAssetSkeleton(columns: Int, ratio: Float, bodyFont: FontFamily
                             .weight(1f)
                             .aspectRatio(ratio)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(palette.surfaceHigh),
+                            .background(shimmer),
                     )
                 }
             }
@@ -1726,8 +2126,10 @@ private fun SaveProfileButton(
     }
 }
 
+@Composable
 private fun assetPlanName(requiredPlan: String): String = when (requiredPlan.lowercase(Locale.ROOT)) {
-    "legendary" -> "Legendary"
-    "admin" -> "Admin"
-    else -> "Epic"
+    "free" -> stringResource(R.string.plan_free_name)
+    "legendary" -> stringResource(R.string.plan_legendary_name)
+    "admin" -> stringResource(R.string.chat_admin_only_short)
+    else -> stringResource(R.string.plan_epic_name)
 }

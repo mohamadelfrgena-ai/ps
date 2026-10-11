@@ -822,4 +822,8 @@
     <string name="admin_creator_reject_reason">غير مستوفٍ للشروط حالياً.</string>
     <string name="admin_submission_reject_reason">المحتوى يحتاج إلى تعديلات.</string>
     <string name="creator_status_more_info">تم طلب معلومات إضافية.</string>
+    <string name="chat_admin_only_short">للمشرف فقط</string>
+    <string name="edit_profile_tab_item">الأداة</string>
+    <string name="edit_profile_tab_about">نبذة</string>
+    <string name="edit_profile_message_preview">[نص الرسالة]</string>
 </resources>

@@ -38,8 +38,7 @@ GREEN = "#7FD99A"
 DANGER = "#FF8791"
 DANGER_BORDER = "#B3414B"
 DASH_BORDER = "#2E3C58"
-DOT_START = (140, 242, 173)
-DOT_END = (47, 179, 92)
+ONLINE_FILL = "#3FBF6A"
 DIM = "#5C6F82"       # نصّ باهت (وصف المفتاح)
 WHITE = "#FFFFFF"
 
@@ -165,33 +164,19 @@ def circle_bg(img, cx, cy, r, color_rgba):
 
 
 def avatar(img, d, x, y, status="online"):
-    """§2.2 الأفاتار 96 بحدّ 5dp بلون الخلفية + نقطة حالة 30 في الرُّكن."""
+    """§2.2 أفاتار 96 بحدّ 5dp + نقطة 30؛ المتصل أخضر مصمت بلا هالة/إطار."""
     size = 96
     rr(d, (x, y, x + size, y + size), 48, fill=SURFACE_HIGH)
     paste_img(img, "ic_default_profile.jpg", (x, y, x + size, y + size), circle_mask=True)
-    # حدّ 5dp بلون الخلفية (دائري · مرسوم على المحيط الداخلي)
+    # حدّ 5dp الداكن يخص صورة الأفاتار نفسها ولا يحيط بنقطة الاتصال.
     for i in range(5):
         d.ellipse((x + i, y + i, x + size - 1 - i, y + size - 1 - i), outline=BG)
-    # نقطة الحالة: توهّج + تدرّج + حدّ 5dp داخلي
     cx, cy, r = x + size - 1 - 15, y + size - 1 - 15, 15
-    glow = Image.new("RGBA", (2 * (r + 16), 2 * (r + 16)), (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glow)
-    for k in range(16, 0, -1):
-        a = int(120 * (1 - k / 16) ** 1.5)
-        gd.ellipse((16 - k, 16 - k, 16 + 2 * r + k, 16 + 2 * r + k), outline=(140, 242, 173, a))
-    img.paste(glow.convert("RGB"), (cx - r - 16, cy - r - 16), glow.split()[3])
-    d.ellipse((cx - r - 2, cy - r - 2, cx + r + 2, cy + r + 2), outline=(140, 242, 173))
-    # القرص: تدرّج شعاعي بسيط (حلقات من الفاتح إلى الغامق)
-    steps = [GOLD] if status == "away" else ([DANGER] if status == "hidden" else None)
-    for k in range(r, 0, -1):
-        f = k / r
-        if steps:
-            col = steps[0]
-        else:
-            col = tuple(int(DOT_START[i] + (DOT_END[i] - DOT_START[i]) * (1 - f)) for i in range(3))
-        d.ellipse((cx - k, cy - k, cx + k, cy + k), fill=col)
-    for i in range(5):
-        d.ellipse((cx - r + i, cy - r + i, cx + r - i, cy + r - i), outline=BG)
+    fill = ONLINE_FILL if status == "online" else GOLD if status == "away" else DIM
+    d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=fill)
+    if status != "online":
+        for i in range(2):
+            d.ellipse((cx - r + i, cy - r + i, cx + r - i, cy + r - i), outline=BG)
 
 
 def chip(d, x, y, label, bg, fg, size=11):

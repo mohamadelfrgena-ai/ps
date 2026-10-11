@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -344,6 +345,7 @@ fun SettingsScreen(
                     DropdownMenu(
                         expanded = languageMenu,
                         onDismissRequest = { languageMenu = false },
+                        modifier = Modifier.widthIn(min = 180.dp, max = 260.dp),
                         containerColor = AppColors.AuthSurfaceHigh,
                     ) {
                         LocaleManager.supported.forEach { language ->
@@ -357,8 +359,12 @@ fun SettingsScreen(
                                 },
                                 text = {
                                     Text(
-                                        language.label,
+                                        text = language.label,
                                         color = if (language.code == currentLocale) AppColors.AuthGreenText else AppColors.AuthText,
+                                        style = Spec.rowValue,
+                                        maxLines = 2,
+                                        softWrap = true,
+                                        overflow = TextOverflow.Clip,
                                     )
                                 },
                                 onClick = {

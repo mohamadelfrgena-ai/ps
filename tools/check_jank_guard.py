@@ -21,9 +21,9 @@
   5) حساب نصّ فاصل التاريخ مرّتين لكل رسالة في كل إطار ⇒ يجب الاعتماد على
      `ChatMessageUi.dayKey` (يُحسب مرة واحدة) ومقارنته نصّياً.
 
-  6) شاشة البداية الجديدة: مقدمة 6.6s لمرة واحدة، ولا تنتهي قبل اكتمالها
-     وجاهزية الإقلاع؛ ثم حلقة مختصرة 1.5s للتشغيلات اللاحقة. المحتوى يُبنى
-     بالتوازي، مع حد أدنى 1.5s واحترام تقليل الحركة والتخطي بالنقر.
+  6) شاشة البداية: المقدمة الأولى 6.6s، ثم حلقة 1.5s؛ العبارات المترجمة
+     تظهر في كل تشغيل. الشريط يجمع مراحل الإقلاع الفعلية مع حدّ زمني أدنى،
+     وينتظر الجاهزية أو انتهاء المهلة، مع نبض متحرك وتخطي صريح واحترام تقليل الحركة.
 
 الاستخدام:
     python3 tools/check_jank_guard.py        # 0 = سليم · 1 = عاد أحد الأسباب
@@ -110,24 +110,38 @@ fmt = read("util/TimeFormat.kt")
 if "fun localDayKey(" not in fmt:
     problems.append("util/TimeFormat.kt: localDayKey مفقودة")
 
-# 6) البداية: مقدمة أولى 6.6s، ثم حلقة 1.5s؛ الجاهزية لا تنتظر الحركة
+# 6) البداية: النصوص في كل وضع، والتقدم مربوط بمراحل الإقلاع والجاهزية
 splash = read("ui/splash/SplashScreen.kt")
 for token, description in (
     ("FULL_TIMELINE_MS = 6_600", "مدة المقدمة الأولى 6.6s"),
     ("COMPACT_LOOP_MS = 1_500", "حلقة التشغيلات التالية 1.5s"),
     ("MIN_SPLASH_MS = 1_500L", "الحد الأدنى لعرض البداية 1.5s"),
-    ("if (!startupReady || !introComplete || completionHandled) return@LaunchedEffect", "الخروج ينتظر الجاهزية واكتمال المقدمة ولا يتكرر"),
+    ("LaunchedEffect(introComplete, skipRequested, startupReady)", "الخروج مرتبط باكتمال الحركة وجاهزية الإقلاع"),
+    ("if (!introComplete || completionHandled || (!startupReady && !skipRequested)) return@LaunchedEffect", "الخروج ينتظر الجاهزية إلا عند التخطي ولا يتكرر"),
     ("introComplete = true", "علامة اكتمال المقدمة"),
     ("skipRequested", "تخطي الحركة بالنقر"),
     ("AppPrefs.splashCompleted(context)", "تذكّر اكتمال أول تشغيل"),
+    ("waitingPulse.animateTo(", "نبض متحرك لشريط التحميل"),
+    ("ProgressBarRangeInfo(semanticProgress", "التقدم متاح لقارئات الشاشة"),
+    ("ramp(p, 0.6143f, 0.8714f)", "حدّ زمني أدنى وفق المقدمة"),
+    ("startupReady || skipRequested -> 1f", "اكتمال الشريط عند الجاهزية أو التخطي"),
 ):
     if token not in splash:
         problems.append(f"ui/splash/SplashScreen.kt: {description} غير موجود")
+for key in ("splash_dream_it", "splash_build_it", "splash_create_it"):
+    if f"R.string.{key}" not in splash:
+        problems.append(f"ui/splash/SplashScreen.kt: العبارة المترجمة {key} غير مستخدمة")
+if "if (!compactMode)" in splash:
+    problems.append("ui/splash/SplashScreen.kt: العبارات/الوصف ما زالت محجوبة في التشغيلات المختصرة")
+if "startupReady" not in splash or "loadingProgress" not in splash:
+    problems.append("ui/splash/SplashScreen.kt: حالة الإقلاع/التقدم غير موصولة بالشريط")
 nav = read("ui/nav/AppNav.kt")
 if "if (!splashDone)" not in nav:
     problems.append("ui/nav/AppNav.kt: شاشة البداية ليست طبقة فوق المحتوى (المحتوى يُبنى خلفها)")
-if "startupReady = launchReady" not in nav or "launchReady = true" not in nav:
-    problems.append("ui/nav/AppNav.kt: إشارة جاهزية الإقلاع غير موصولة إلى شاشة البداية")
+if "startupReady by remember" not in nav or "startupProgress by remember" not in nav:
+    problems.append("ui/nav/AppNav.kt: حالة الجاهزية/التقدم غير معرفة عند الإقلاع")
+if "withTimeoutOrNull(10_000L)" not in nav:
+    problems.append("ui/nav/AppNav.kt: الإقلاع قد يعلّق شاشة البداية بلا حدّ زمني")
 for token in ("val refresh = async", "val assets = async", "val plans = async", "val paymentMethods = async"):
     if token not in nav:
         problems.append(f"ui/nav/AppNav.kt: تحميل الإقلاع المتوازي مفقود ({token})")
@@ -143,4 +157,4 @@ if problems:
     sys.exit(1)
 print("🟢 لا توليف فرعي في القوائم · الجلسة من الذاكرة · فهرس أدوات O(1) ·")
 print("   الرئيسية كسولة · فاصل التاريخ مرة واحدة · المقدمة 6.6s والحلقة 1.5s،")
-print("   البداية قابلة للتخطي، بحد أدنى 1.5s، والمحتوى يُبنى خلفها بالتوازي.")
+print("   العبارات المترجمة ظاهرة في كل تشغيل · الشريط يعكس تقدم الإقلاع وينبض حتى الجاهزية · المهلة والتخطي يمنعان الانتظار المفتوح.")
