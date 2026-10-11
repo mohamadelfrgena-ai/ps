@@ -84,6 +84,7 @@ import com.addonstation.mobile.ui.components.AuthSettingsDivider
 import com.addonstation.mobile.ui.components.AuthSettingsGroupCard
 import com.addonstation.mobile.ui.components.AuthSettingsIconTile
 import com.addonstation.mobile.ui.components.AuthSettingsImageTile
+import com.addonstation.mobile.ui.components.AuthSettingsPrimaryButton
 import com.addonstation.mobile.ui.components.AuthSettingsPill
 import com.addonstation.mobile.ui.components.AuthSettingsRow
 import com.addonstation.mobile.ui.components.AuthSettingsSectionLabel
@@ -92,7 +93,6 @@ import com.addonstation.mobile.ui.components.AuthSettingsSwitch
 import com.addonstation.mobile.ui.components.AuthSettingsTopBar
 import com.addonstation.mobile.ui.components.AvatarImage
 import com.addonstation.mobile.ui.components.ErrorState
-import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.appLocaleCode
 import com.addonstation.mobile.ui.components.langFlagRes
 import com.addonstation.mobile.ui.rememberContainer
@@ -137,6 +137,9 @@ fun SettingsScreen(
     onSignedOut: () -> Unit,
     onOpenPlans: () -> Unit = {},
     onOpenAdmin: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
+    onOpenPrivacy: () -> Unit = {},
+    onOpenTerms: () -> Unit = {},
     onBack: () -> Unit = {},
     scrollToTopRequest: Int = 0,
 ) {
@@ -479,7 +482,7 @@ fun SettingsScreen(
                     title = stringResource(R.string.set_about),
                     tile = { AuthSettingsIconTile(Icons.Outlined.Info, AppColors.AuthAccentBlue) },
                     clickable = true,
-                    onClick = { dialogKey = "about" },
+                    onClick = onOpenAbout,
                     chevron = true,
                 )
                 AuthSettingsDivider()
@@ -487,7 +490,7 @@ fun SettingsScreen(
                     title = stringResource(R.string.set_privacy),
                     tile = { AuthSettingsImageTile(R.drawable.ic_set_privacy) },
                     clickable = true,
-                    onClick = { dialogKey = "privacy" },
+                    onClick = onOpenPrivacy,
                     chevron = true,
                 )
                 AuthSettingsDivider()
@@ -495,7 +498,7 @@ fun SettingsScreen(
                     title = stringResource(R.string.set_terms),
                     tile = { AuthSettingsImageTile(R.drawable.ic_set_terms) },
                     clickable = true,
-                    onClick = { dialogKey = "terms" },
+                    onClick = onOpenTerms,
                     chevron = true,
                 )
                 AuthSettingsDivider()
@@ -552,7 +555,7 @@ fun SettingsScreen(
                 }
             } else {
                 AuthSettingsGroupCard(modifier = Modifier.padding(horizontal = 0.dp)) {
-                    GradientButton(
+                    AuthSettingsPrimaryButton(
                         text = stringResource(R.string.auth_sign_in),
                         onClick = onLogin,
                         modifier = Modifier.fillMaxWidth(),
@@ -675,12 +678,6 @@ fun SettingsScreen(
         val message: String
         when (key) {
             "no_mail_app" -> { title = stringResource(R.string.set_contact); message = stringResource(R.string.set_support_no_mail_app) }
-            "terms" -> { title = stringResource(R.string.set_terms); message = stringResource(R.string.set_terms_text) }
-            "privacy" -> { title = stringResource(R.string.set_privacy); message = stringResource(R.string.set_privacy_text) }
-            "about" -> {
-                title = stringResource(R.string.set_about)
-                message = stringResource(R.string.app_build_stamp, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toString())
-            }
             "password_sent" -> { title = stringResource(R.string.auth_recovery_title); message = stringResource(R.string.msg_check_email) }
             "password_error" -> { title = stringResource(R.string.auth_recovery_title); message = dialogError?.let { apiErrorText(it) } ?: stringResource(R.string.msg_generic_error) }
             else -> { title = stringResource(R.string.set_about); message = "" }

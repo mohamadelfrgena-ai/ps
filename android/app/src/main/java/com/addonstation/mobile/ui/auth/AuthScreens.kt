@@ -384,7 +384,7 @@ fun SignUpScreen(
     }
 
     Column(Modifier.fillMaxSize().background(AppColors.AuthBg).imePadding()) {
-        AuthSettingsHeader(onBack = onBack)
+        AuthSettingsHeader(onBack = onBack, backgroundRes = R.drawable.signup_bg)
         Column(
             Modifier
                 .weight(1f)

@@ -757,4 +757,69 @@
     <string name="profile_banner_none_plain">ما في غلاف — اختر واحداً من الفقرات تحت</string>
     <string name="profile_about_plain">النبذة</string>
     <string name="msg_username_taken">اسم المستخدم مستخدم بالفعل.</string>
+
+    <!-- Home v2 sections -->
+
+    <!-- Imported missing localized resources from AddonStation_chat_panels_store -->
+
+    <!-- Imported missing localized resources from AddonStation_profile_wallet_admin -->
+
+    <!-- Imported missing localized resources from AddonStation_creators_pages -->
+    <string name="profile_remove_favorite">إزالة من المفضلة</string>
+
+    <!-- Creator form labels -->
+    <string name="creator_file_types">أي نوع ملف (*/*)</string>
+    <string name="creator_optional_details">تفاصيل اختيارية</string>
+    <string name="creator_required_fields">أكمل الحقول المطلوبة ووافق على التأكيدين.</string>
+    <string name="creator_category_adventure">مغامرة</string>
+    <string name="creator_category_survival">بقاء</string>
+    <string name="creator_category_pvp">لاعب ضد لاعب</string>
+    <string name="creator_category_building">بناء</string>
+    <string name="creator_category_skins">مظاهر</string>
+    <string name="creator_category_other">أخرى</string>
+
+    <!-- Admin asset confirmations and progress -->
+    <string name="admin_delete_asset">حذف الأصل</string>
+    <string name="admin_asset_reading">جارٍ تجهيز الصورة…</string>
+    <string name="admin_asset_read_failed">تعذّرت قراءة الملف المختار.</string>
+    <string name="admin_asset_uploading">جارٍ رفع الصورة… (%1$d ك.ب)</string>
+    <string name="admin_asset_uploaded">تم رفع %1$s (%2$d ك.ب)</string>
+    <string name="admin_asset_upload_failed">فشل الرفع: %1$s</string>
+    <string name="admin_asset_resize_running">جارٍ تصغير الصور المخزنة… لا تغلق هذه الشاشة.</string>
+    <string name="admin_asset_resize_done">تم تصغير %1$d صورة.</string>
+    <string name="admin_asset_resize_failed">فشل التصغير: %1$s</string>
+
+    <!-- Plain plan feature labels -->
+    <string name="plan_free_features_plain">محتوى مجاني · تنزيلات أساسية · دون اشتراك</string>
+    <string name="creator_confirm_required">وافق على التأكيدين قبل الإرسال.</string>
+
+    <!-- Admin creator tip review -->
+    <string name="admin_tip_from_to">%1$s ← %2$s</string>
+    <string name="admin_tip_approve_confirm">هل توافق على دعم بقيمة %1$s د.ل من %2$s إلى %3$s؟</string>
+    <string name="admin_tip_reject_confirm">هل ترفض دعم %1$s د.ل من %2$s إلى %3$s؟</string>
+    <string name="admin_tip_reject_reason">لم يتم التحقق من الإيصال</string>
+    <string name="admin_tip_approved">تمت الموافقة على الدعم.</string>
+    <string name="admin_tip_rejected">تم رفض الدعم.</string>
+    <string name="admin_tip_review_failed">تعذّر تحديث الدعم: %1$s</string>
+    <string name="admin_tip_receipt_missing">لا يوجد إيصال مرفق بهذا الدعم.</string>
+    <string name="admin_tip_status_pending">قيد المراجعة</string>
+    <string name="admin_tip_status_approved">مقبول</string>
+    <string name="admin_tip_status_rejected">مرفوض</string>
+
+    <!-- Creator moderation copy -->
+    <string name="creator_status_pending">قيد المراجعة</string>
+    <string name="creator_status_approved">مقبول</string>
+    <string name="creator_status_rejected">مرفوض</string>
+    <string name="admin_creator_more_info">طلب معلومات إضافية</string>
+    <string name="admin_creator_more_info_note">يرجى إرسال مزيد من التفاصيل.</string>
+    <string name="admin_creator_approved">تمت الموافقة على طلب المبدع.</string>
+    <string name="admin_creator_rejected">تم رفض طلب المبدع.</string>
+    <string name="admin_creator_more_info_sent">تم طلب معلومات إضافية.</string>
+    <string name="admin_creator_review_failed">تعذّر تحديث الطلب: %1$s</string>
+    <string name="admin_submission_approved">تمت الموافقة على المحتوى المقدم.</string>
+    <string name="admin_submission_rejected">تم رفض المحتوى المقدم.</string>
+    <string name="admin_submission_review_failed">تعذّر تحديث المحتوى المقدم: %1$s</string>
+    <string name="admin_creator_reject_reason">غير مستوفٍ للشروط حالياً.</string>
+    <string name="admin_submission_reject_reason">المحتوى يحتاج إلى تعديلات.</string>
+    <string name="creator_status_more_info">تم طلب معلومات إضافية.</string>
 </resources>

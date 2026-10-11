@@ -74,13 +74,13 @@ object Spec {
     val composerField = 44.dp
 
     // مقاسات الملف الشخصي (SPEC_PROFILES.md §2)
-    val bannerH = 150.dp           // ارتفاع البانر
-    val avatarLg = 96.dp           // أفاتار الملف
-    val avatarOverlap = 46.dp      // مقدار تجاوز الأفاتار للبانر
-    val dotSize = 30.dp            // نقطة الحالة
+    val bannerH = 130.dp           // ارتفاع بانر الملف وفق الحزمة الحالية
+    val avatarLg = 80.dp           // أفاتار الملف الشخصي
+    val avatarOverlap = 38.dp      // مقدار تجاوز الأفاتار للبانر
+    val dotSize = 22.dp            // نقطة الحالة
     val profileCardRadius = 16.dp  // بطاقات الملف
     val badgeRadius = 8.dp         // شرائح الشارات
-    val actionBtnH = 48.dp         // «مراسلة» · «طلب صداقة» · «تسجيل الخروج»
+    val actionBtnH = 44.dp         // أزرار إجراءات الملف والصداقة
     val gridBtnH = 56.dp           // أزرار الشبكة 2×2
     val safetyRowH = 52.dp         // صفوف بطاقة السلامة
     val statBarH = 8.dp            // شريط تقدّم المستوى
@@ -127,7 +127,7 @@ object Spec {
     val stickerSize = 96.dp
     val ownBubbleMax = 260.dp
     val incomingImageW = 230.dp
-    val incomingImageH = 130.dp
+    val incomingImageH = 150.dp
 
     // ── خطوط الملف الشخصي (SPEC_PROFILES.md §2) ───────────────────────────────
     /** تسمية قسم صغيرة بالأحرف الكبيرة (بكسل · 11 · ذهبي · تباعد 1). */

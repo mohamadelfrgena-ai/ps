@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,14 +49,13 @@ import com.addonstation.mobile.data.model.ContentItem
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.common.ConfirmDialog
 import com.addonstation.mobile.ui.components.EmptyState
-import com.addonstation.mobile.ui.components.FilterChip
 import com.addonstation.mobile.ui.components.GhostButton
 import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.LoadingBox
-import com.addonstation.mobile.ui.components.SubScreenHeader
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
+import com.addonstation.mobile.ui.theme.LocalHomePalette
 import com.addonstation.mobile.util.prepareImageForUpload
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -238,16 +238,18 @@ fun AdminContentEditorScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(
+    Column(Modifier.fillMaxSize().background(LocalHomePalette.current.bg)) {
+        AdminSubscreenHeader(
+            kicker = stringResource(R.string.admin_kicker_content),
             title = stringResource(if (isEditing) R.string.common_edit else R.string.admin_add_content_plain),
             onBack = onBack,
         )
         when {
-            loading -> LoadingBox()
+            loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { LoadingBox() }
             loadFailed -> Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .padding(20.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -262,14 +264,12 @@ fun AdminContentEditorScreen(
             }
             else -> Column(
                 Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .imePadding()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 14.dp),
+                    .padding(horizontal = 16.dp),
             ) {
-                Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.admin_kicker_content), style = AppText.kicker, color = AppColors.Blue)
-                Text(stringResource(R.string.admin_content), style = AppText.pageTitle, color = AppColors.Text)
                 Spacer(Modifier.height(12.dp))
 
                 OutlinedTextField(
@@ -282,16 +282,26 @@ fun AdminContentEditorScreen(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(stringResource(R.string.creator_field_content_types), style = AppText.tiny, color = AppColors.Muted)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(LocalHomePalette.current.surface)
+                        .border(1.dp, LocalHomePalette.current.border, RoundedCornerShape(14.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    AdminSegmentTab(
                         label = stringResource(R.string.store_tab_addons),
                         selected = contentType == "addon",
                         onClick = { contentType = "addon" },
+                        modifier = Modifier.weight(1f),
                     )
-                    FilterChip(
+                    AdminSegmentTab(
                         label = stringResource(R.string.store_tab_worlds),
                         selected = contentType == "world",
                         onClick = { contentType = "world" },
+                        modifier = Modifier.weight(1f),
                     )
                 }
                 Spacer(Modifier.height(8.dp))
@@ -301,7 +311,7 @@ fun AdminContentEditorScreen(
                     .forEach { categoryRow ->
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             categoryRow.forEach { value ->
-                                FilterChip(
+                                AdminFilterChip(
                                     label = value,
                                     selected = category == value,
                                     onClick = { category = value },
@@ -336,7 +346,7 @@ fun AdminContentEditorScreen(
                         "epic" to R.string.plan_epic_name,
                         "legendary" to R.string.plan_legendary_name,
                     ).forEach { (key, labelRes) ->
-                        FilterChip(
+                        AdminFilterChip(
                             label = stringResource(labelRes),
                             selected = plan == key,
                             onClick = { plan = key },

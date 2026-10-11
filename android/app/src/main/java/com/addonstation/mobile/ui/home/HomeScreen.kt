@@ -31,6 +31,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
@@ -201,6 +204,8 @@ fun HomeScreen(
         .sortedByDescending { it.downloadsCount }
         .take(6)
     val favoriteCreatorIds = favorites.mapNotNull { it.createdBy }.toSet()
+    val exclusiveItems = allItems.filter { it.isExclusive }.distinctBy { it.id }
+    val recommendedShown = if (chip == ChipFilter.Favorites) favorites else recommended.filter { chip.accepts(it) }
     val creatorsShown = when (chip) {
         ChipFilter.Favorites -> creators.filter { it.profile.id in favoriteCreatorIds }
         ChipFilter.Addons, ChipFilter.Worlds -> creators.filter { it.profile.isCreator }
@@ -310,6 +315,14 @@ fun HomeScreen(
                 }
             }
             item {
+                HomeQuickActions(
+                    font = font,
+                    palette = palette,
+                    actions = actions,
+                    modifier = Modifier.padding(top = 14.dp),
+                )
+            }
+            item {
                 LazyRow(
                     modifier = Modifier.padding(top = 14.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -364,6 +377,74 @@ fun HomeScreen(
                     ) {
                         items(latestShown.take(12), key = { it.id }) { item ->
                             HomeLatestCard(
+                                item = item,
+                                byName = creatorNameOf(item),
+                                font = font,
+                                palette = palette,
+                                isArabic = isArabic,
+                                onClick = { actions.openItem(item) },
+                            )
+                        }
+                    }
+                }
+            }
+            item {
+                HomeSectionHeader(
+                    title = androidx.compose.ui.res.stringResource(R.string.home_recommended_plain),
+                    isArabic = isArabic,
+                    font = font,
+                    palette = palette,
+                    onAction = actions.openStore,
+                )
+                when {
+                    loading && recommendedShown.isEmpty() -> LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) { items(4) { HomeLatestSkeleton(palette, motionEnabled) } }
+                    recommendedShown.isEmpty() -> HomeEmptyNote(font, palette)
+                    else -> LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(recommendedShown.take(12), key = { it.id }) { item ->
+                            HomeLatestCard(
+                                item = item,
+                                byName = creatorNameOf(item),
+                                font = font,
+                                palette = palette,
+                                isArabic = isArabic,
+                                onClick = { actions.openItem(item) },
+                            )
+                        }
+                    }
+                }
+            }
+            item {
+                HomeSectionHeader(
+                    title = androidx.compose.ui.res.stringResource(R.string.home_exclusives_plain),
+                    isArabic = isArabic,
+                    font = font,
+                    palette = palette,
+                    onAction = actions.openExclusives,
+                )
+                Text(
+                    androidx.compose.ui.res.stringResource(R.string.home_exclusives_sub),
+                    style = homeTextStyle(font, 13.sp, FontWeight.Medium, 18.sp),
+                    color = palette.textMuted,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+                )
+                when {
+                    loading && exclusiveItems.isEmpty() -> LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) { items(2) { HomeExclusiveSkeleton(palette, motionEnabled) } }
+                    exclusiveItems.isEmpty() -> HomeEmptyNote(font, palette)
+                    else -> LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(exclusiveItems.take(12), key = { it.id }) { item ->
+                            HomeExclusiveCard(
                                 item = item,
                                 byName = creatorNameOf(item),
                                 font = font,
@@ -442,6 +523,16 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+            item {
+                HomeCreatorProgramCard(
+                    isCreator = profile?.isCreator == true,
+                    font = font,
+                    palette = palette,
+                    onBecomeCreator = actions.openCreatorApply,
+                    onOpenDashboard = actions.openStudio,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 22.dp, bottom = 30.dp),
+                )
             }
         }
     }
@@ -803,6 +894,237 @@ private fun HomeChip(
             maxLines = 1,
             softWrap = false,
         )
+    }
+}
+
+@Composable
+private fun HomeQuickActions(
+    font: FontFamily,
+    palette: HomePalette,
+    actions: HomeActions,
+    modifier: Modifier = Modifier,
+) {
+    HomeSectionHeader(
+        title = stringResource(R.string.home_quick_actions_plain),
+        isArabic = appLocaleCode().equals("ar", ignoreCase = true),
+        font = font,
+        palette = palette,
+        onAction = actions.openStore,
+    )
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        HomeQuickActionTile(
+            icon = Icons.Filled.Favorite,
+            label = stringResource(R.string.home_qa_favorites),
+            accent = Color(0xFFFF6B78),
+            font = font,
+            palette = palette,
+            onClick = actions.openFavorites,
+            modifier = Modifier.weight(1f),
+        )
+        HomeQuickActionTile(
+            icon = Icons.Filled.FileDownload,
+            label = stringResource(R.string.home_qa_downloads),
+            accent = palette.blueLink,
+            font = font,
+            palette = palette,
+            onClick = actions.openDownloads,
+            modifier = Modifier.weight(1f),
+        )
+        HomeQuickActionTile(
+            icon = Icons.Filled.WorkspacePremium,
+            label = stringResource(R.string.home_qa_upgrade),
+            accent = palette.goldText,
+            font = font,
+            palette = palette,
+            onClick = actions.openPlans,
+            modifier = Modifier.weight(1f),
+        )
+        HomeQuickActionTile(
+            icon = Icons.Filled.PhoneAndroid,
+            label = stringResource(R.string.home_qa_device),
+            accent = Color(0xFF3FBF6A),
+            font = font,
+            palette = palette,
+            onClick = null, // Destination intentionally remains unset until a device action is specified.
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun HomeQuickActionTile(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    accent: Color,
+    font: FontFamily,
+    palette: HomePalette,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier = modifier.heightIn(min = 84.dp).clip(shape)
+            .background(palette.surface).border(1.dp, palette.border, shape)
+            .clickable(enabled = onClick != null) { onClick?.invoke() }.padding(horizontal = 4.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                .background(accent.copy(alpha = 0.15f))
+                .border(1.dp, accent.copy(alpha = 0.33f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+        }
+        Text(
+            label,
+            style = homeTextStyle(font, 12.sp, FontWeight.ExtraBold, 15.sp),
+            color = palette.text,
+            maxLines = 2,
+            minLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun HomeExclusiveCard(
+    item: ContentItem,
+    byName: String?,
+    font: FontFamily,
+    palette: HomePalette,
+    isArabic: Boolean,
+    onClick: () -> Unit,
+) {
+    val container = rememberContainer()
+    val shape = RoundedCornerShape(18.dp)
+    Box(
+        Modifier.width(260.dp).height(150.dp).clip(shape)
+            .border(1.dp, palette.border, shape).clickable(onClick = onClick),
+    ) {
+        HomeContentImage(
+            url = assetUrl(container, item.coverUrl),
+            contentDescription = item.title,
+            modifier = Modifier.fillMaxSize(),
+            radius = 0.dp,
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = 0.30f),
+                    0.35f to Color.Transparent,
+                    1f to Color(0xE00A0F1C),
+                ),
+            ),
+        )
+        homeBadgeFor(item, palette)?.let { (label, color, textColor) ->
+            HomeBadge(
+                text = label,
+                background = color,
+                contentColor = textColor,
+                font = font,
+                modifier = Modifier.align(Alignment.TopStart).padding(10.dp),
+            )
+        }
+        Column(
+            Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                item.title,
+                style = homeTextStyle(font, 16.sp, FontWeight.ExtraBold, 20.sp),
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                byName?.let { stringResource(R.string.item_by, BidiFormatter.getInstance(isArabic).unicodeWrap(it)) }
+                    ?: item.category.orEmpty(),
+                style = homeTextStyle(font, 12.sp, FontWeight.Medium, 16.sp),
+                color = Color(0xFFC4D1E8),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeExclusiveSkeleton(palette: HomePalette, motionEnabled: Boolean) {
+    val color = homeSkeletonColor(palette, motionEnabled)
+    Box(
+        Modifier.width(260.dp).height(150.dp).clip(RoundedCornerShape(18.dp))
+            .background(color).border(1.dp, palette.border, RoundedCornerShape(18.dp)),
+    )
+}
+
+@Composable
+private fun HomeCreatorProgramCard(
+    isCreator: Boolean,
+    font: FontFamily,
+    palette: HomePalette,
+    onBecomeCreator: () -> Unit,
+    onOpenDashboard: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isArabic = appLocaleCode().equals("ar", ignoreCase = true)
+    val shape = RoundedCornerShape(20.dp)
+    val colors = if (palette.isDark) listOf(Color(0xFF102244), Color(0xFF121A2B))
+        else listOf(Color(0xFFE6EEFF), Color.White)
+    Column(
+        modifier.fillMaxWidth().clip(shape)
+            .background(Brush.linearGradient(colors))
+            .border(1.dp, palette.blue.copy(alpha = 0.45f), shape)
+            .padding(16.dp),
+    ) {
+        Text(
+            stringResource(R.string.home_creator_kicker),
+            style = TextStyle(
+                fontFamily = if (isArabic) font else PixelFont,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = if (isArabic) 0.sp else 1.sp,
+            ),
+            color = palette.goldText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(if (isCreator) R.string.home_creator_dashboard else R.string.home_creator_title),
+            style = homeTextStyle(font, 20.sp, FontWeight.ExtraBold, 25.sp),
+            color = palette.text,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            stringResource(R.string.home_creator_text),
+            style = homeTextStyle(font, 13.sp, FontWeight.Medium, 20.sp),
+            color = palette.textMuted,
+        )
+        Spacer(Modifier.height(14.dp))
+        val label = stringResource(if (isCreator) R.string.home_creator_open else R.string.home_creator_cta)
+        val buttonColors = if (isCreator) listOf(palette.goldFill, Color(0xFFFFD873))
+            else listOf(palette.blue, palette.accentBlue)
+        Box(
+            Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(12.dp))
+                .background(Brush.linearGradient(buttonColors)).clickable {
+                    if (isCreator) onOpenDashboard() else onBecomeCreator()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                label,
+                style = homeTextStyle(font, 14.sp, FontWeight.ExtraBold, 19.sp),
+                color = if (isCreator) palette.goldInk else Color.White,
+                maxLines = 2,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

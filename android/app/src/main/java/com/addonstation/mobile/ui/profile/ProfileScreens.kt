@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,13 +30,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -60,12 +64,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.ProfileLoadStatus
 import com.addonstation.mobile.data.model.ContentItem
@@ -147,14 +153,16 @@ fun ProfileScreen(
     onSignedOut: () -> Unit,
     onBack: () -> Unit,
     onOpenEdit: () -> Unit,
-    /** مدخل لوحة الإدارة — يظهر للأدمن/المشرف وحدهما (بند إضافي غير مخالف). */
     onOpenAdmin: () -> Unit,
+    onOpenCreatorStudio: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenWallet: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenOrders: () -> Unit,
+    onOpenPlans: () -> Unit,
     onOpenMyContent: () -> Unit,
-    /** شاشة C: «عرض كما يراني الآخرون». */
+    onOpenItem: (ContentItem) -> Unit,
     onViewAsOthers: () -> Unit,
     scrollToTopRequest: Int = 0,
 ) {
@@ -173,14 +181,25 @@ fun ProfileScreen(
     val dailyAlreadyClaimed = stringResource(R.string.ac_claimed)
     val dailySignInNeeded = stringResource(R.string.msg_sign_in_needed)
     val dailyGenericError = stringResource(R.string.msg_generic_error)
+    val lockedHint = stringResource(R.string.plan_locked_online_plain)
+    val isArabic = com.addonstation.mobile.ui.components.appLocaleCode().equals("ar", ignoreCase = true)
 
     var profileRetryTick by remember { mutableStateOf(0) }
     var statsTick by remember { mutableStateOf(0) }
     var stats by remember { mutableStateOf<ProfileStats?>(null) }
     var claiming by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf(ProfileTab.About) }
+    var myContent by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
+    var favoriteContent by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
+    var creatorNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var contentLoading by remember { mutableStateOf(true) }
+    var contentFailed by remember { mutableStateOf(false) }
+    var favoritesLoading by remember { mutableStateOf(false) }
+    var favoritesFailed by remember { mutableStateOf(false) }
+    var contentReloadTick by remember { mutableStateOf(0) }
+    var accountNote by remember { mutableStateOf<String?>(null) }
 
-    // الجلسة قد تكون صالحة بينما الملف الشخصي لم يكتمل تحميله بعد؛ لا نحوّل
-    // هذه الحالة المؤقتة إلى شاشة تسجيل دخول، بل نجلب الملف ونتيح إعادة المحاولة.
+    // Keep the existing signed-in profile recovery and server-backed stats/wallet requests.
     LaunchedEffect(signedIn, profileRetryTick) {
         if (signedIn && container.state.currentProfile == null) {
             try {
@@ -188,46 +207,63 @@ fun ProfileScreen(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Throwable) {
-                // حالة الفشل محفوظة في AppState ويظهر زر إعادة المحاولة أدناه.
+                // The app state carries the failure and the retry affordance remains visible.
             }
         }
     }
-
-    // الإحصاءات + المحفظة معاً (تُعاد كلّها بعد استلام المكافأة)
     LaunchedEffect(signedIn, profile?.id, statsTick) {
         if (!signedIn) return@LaunchedEffect
         val id = profile?.id ?: return@LaunchedEffect
-        container.profile.refreshWallet()
-        stats = container.profile.stats(id)
+        runCatching { container.profile.refreshWallet() }
+        runCatching { container.profile.stats(id) }.onSuccess { stats = it }
     }
-
-    // goTab يوجّه غير المسجّل إلى شاشة الدخول قبل فتح هذا المسار.
-    if (!signedIn) return
-    if (profile == null) {
-        Column(
-            Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            if (profileLoadStatus == ProfileLoadStatus.IDLE || profileLoadStatus == ProfileLoadStatus.LOADING) {
-                LoadingBox(text = stringResource(R.string.common_loading))
-            } else {
-                com.addonstation.mobile.ui.components.ErrorState(
-                    onRetry = { profileRetryTick += 1 },
-                )
-            }
+    // Load published content up front because its counts are visible on the profile header.
+    LaunchedEffect(signedIn, profile?.id, contentReloadTick) {
+        if (!signedIn || profile?.id == null) return@LaunchedEffect
+        contentLoading = true
+        contentFailed = false
+        try {
+            myContent = withContext(Dispatchers.IO) { container.content.myContent() }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            contentFailed = true
+        } finally {
+            contentLoading = false
         }
-        return
+    }
+    LaunchedEffect(signedIn, profile?.id, selectedTab, contentReloadTick) {
+        if (!signedIn || profile?.id == null || selectedTab != ProfileTab.Favorites) return@LaunchedEffect
+        favoritesLoading = true
+        favoritesFailed = false
+        try {
+            favoriteContent = withContext(Dispatchers.IO) { container.content.favorites() }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            favoritesFailed = true
+        } finally {
+            favoritesLoading = false
+        }
+    }
+    val authorIds = remember(myContent, favoriteContent) {
+        (myContent + favoriteContent).mapNotNull { it.createdBy }.distinct()
+    }
+    LaunchedEffect(authorIds) {
+        if (authorIds.isEmpty()) {
+            creatorNames = emptyMap()
+        } else {
+            creatorNames = runCatching {
+                withContext(Dispatchers.IO) {
+                    container.profile.loadProfiles(authorIds).mapValues { (_, author) ->
+                        author.username ?: author.displayName.orEmpty()
+                    }
+                }
+            }.getOrDefault(emptyMap())
+        }
     }
 
-    val me = profile!!
-    val status = specStatusOf(me, isMe = true)
-    val level = stats?.level ?: me.userLevel
-    val xpInLevel = stats?.xpInLevel ?: 0
-    val balance = wallet?.balance ?: 0
-    val streak = stats?.streak ?: 0
-    val dailyClaimed = stats?.dailyClaimed ?: false
-
+    // Daily claim stays on the compact wallet card; server-side task logic is unchanged.
     fun claimDaily() {
         if (claiming) return
         scope.launch {
@@ -254,7 +290,6 @@ fun ProfileScreen(
                         }
                         snackbarHostState.showSnackbar(message)
                     }
-                // الحالة الحقيقية («هل استُلمت اليوم؟») تُقرأ من الخادم لا من الزرّ
                 statsTick += 1
             } finally {
                 claiming = false
@@ -262,167 +297,532 @@ fun ProfileScreen(
         }
     }
 
+    fun removeFavorite(item: ContentItem) {
+        scope.launch {
+            container.content.toggleFavorite(item.id)
+                .onSuccess { saved ->
+                    if (!saved) favoriteContent = favoriteContent.filterNot { it.id == item.id }
+                    else contentReloadTick += 1
+                    statsTick += 1
+                }
+                .onFailure { accountNote = it.message ?: dailyGenericError }
+        }
+    }
+
+    if (!signedIn) return
+    if (profile == null) {
+        Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            if (profileLoadStatus == ProfileLoadStatus.IDLE || profileLoadStatus == ProfileLoadStatus.LOADING) {
+                LoadingBox(text = stringResource(R.string.common_loading))
+            } else {
+                com.addonstation.mobile.ui.components.ErrorState(onRetry = { profileRetryTick += 1 })
+            }
+        }
+        return
+    }
+
+    val me = profile!!
+    val status = specStatusOf(me, isMe = true)
+    val level = stats?.level ?: me.userLevel
+    val balance = wallet?.balance ?: 0
+    val streak = stats?.streak ?: 0
+    val dailyClaimed = stats?.dailyClaimed ?: false
+    val publishedCount = myContent.count { it.isPublished }
+    val worldCount = myContent.count { it.contentType == "world" }
+
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             Column(
-                Modifier
-                    .fillMaxSize()
-                    .imePadding()
-                    .verticalScroll(scrollState),
-        ) {
-            // ١) البانر — زرّ الرجوع وحده (بلا «المزيد» في هذه الشاشة)
-            SpecProfileBanner(
-                bannerUrl = assetUrl(container, me.bannerUrl),
-                onBack = onBack,
-            )
+                Modifier.fillMaxSize().imePadding().verticalScroll(scrollState),
+            ) {
+                SpecProfileBanner(
+                    bannerUrl = assetUrl(container, me.bannerUrl),
+                    onBack = onBack,
+                    more = {
+                        SpecBannerIconButton(
+                            icon = Icons.Filled.Settings,
+                            description = stringResource(R.string.profile_full_settings),
+                            onClick = onOpenSettings,
+                        )
+                    },
+                )
 
-            // ٢) صفّ الأفاتار: يركب على البانر 46dp، و«تعديل الملف» محاذى لأسفل الأفاتار
-            Box(Modifier.fillMaxWidth().height(Spec.avatarLg - Spec.avatarOverlap)) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = Spec.screenPad),
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
+                // Avatar and identity overlap the banner by 38dp, as in the profile-page spec.
+                Box(Modifier.fillMaxWidth().height(86.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().offset(y = (-38).dp).padding(horizontal = Spec.screenPad),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         SpecProfileAvatar(
                             avatarUrl = assetUrl(container, me.avatarUrl),
                             status = status,
+                            size = 80.dp,
+                            borderWidth = 4.dp,
+                            dotSize = 22.dp,
+                            showHiddenDot = true,
+                        )
+                        Column(Modifier.weight(1f)) {
+                            SpecIdentityCard(profile = me, status = status, level = level)
+                        }
+                    }
+                }
+
+                Column(Modifier.padding(horizontal = Spec.screenPad)) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SpecFillButton(
+                            text = stringResource(R.string.profile_edit_mine_plain),
+                            onClick = onOpenEdit,
+                            buttonHeight = 44.dp,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (me.isCreator || me.role == "admin") {
+                            SpecOutlineButton(
+                                text = stringResource(R.string.profile_dashboard_plain),
+                                onClick = { if (me.role == "admin") onOpenAdmin() else onOpenCreatorStudio() },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    SpecLevelCard(level = level, xpInLevel = stats?.xpInLevel ?: 0)
+                    Spacer(Modifier.height(12.dp))
+                    SpecSmallCaps(stringResource(R.string.profile_statistics))
+                    Spacer(Modifier.height(8.dp))
+                    ProfileStatisticsGrid(
+                        published = publishedCount,
+                        worlds = worldCount,
+                        content = myContent.size,
+                        downloads = stats?.downloads ?: 0,
+                        favorites = stats?.favorites ?: 0,
+                        level = level,
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+                    ProfileTabs(selected = selectedTab, onSelect = { selectedTab = it })
+                    Spacer(Modifier.height(12.dp))
+                    when (selectedTab) {
+                        ProfileTab.About -> ProfileAboutTab(
+                            me = me,
+                            balance = balance,
+                            streak = streak,
+                            dailyClaimed = dailyClaimed,
+                            claiming = claiming,
+                            accountNote = accountNote,
+                            onClaim = ::claimDaily,
+                            onOpenWallet = onOpenWallet,
+                            container = container,
+                            onToggleOnline = { next ->
+                                if (container.profile.planRank(me.effectivePlan) < 3) {
+                                    accountNote = lockedHint
+                                } else {
+                                    scope.launch {
+                                        container.profile.setShowOnline(next)
+                                            .onSuccess { accountNote = null }
+                                            .onFailure { accountNote = it.message ?: dailyGenericError }
+                                    }
+                                }
+                            },
+                        )
+                        ProfileTab.Content -> {
+                            WalletSectionHeader(text = stringResource(R.string.profile_content_section))
+                            ProfileItemsGrid(
+                                items = myContent,
+                                loading = contentLoading,
+                                failed = contentFailed,
+                                favorite = false,
+                                emptyText = stringResource(R.string.profile_my_content_empty_plain),
+                                creatorNames = creatorNames,
+                                onRetry = { contentReloadTick += 1 },
+                                onOpenItem = onOpenItem,
+                                onToggleFavorite = null,
+                            )
+                        }
+                        ProfileTab.Favorites -> {
+                            WalletSectionHeader(text = stringResource(R.string.profile_tab_favorites))
+                            ProfileItemsGrid(
+                                items = favoriteContent,
+                                loading = favoritesLoading,
+                                failed = favoritesFailed,
+                                favorite = true,
+                                emptyText = stringResource(R.string.profile_favorites_empty_plain),
+                                creatorNames = creatorNames,
+                                onRetry = { contentReloadTick += 1 },
+                                onOpenItem = onOpenItem,
+                                onToggleFavorite = ::removeFavorite,
+                            )
+                        }
+                        ProfileTab.Plan -> ProfilePlanTab(
+                            me = me,
+                            onManage = onOpenOrders,
+                            onUpgrade = onOpenPlans,
                         )
                     }
-                    Spacer(Modifier.weight(1f))
-                    SpecFillButton(
-                        text = stringResource(R.string.profile_edit),
-                        onClick = onOpenEdit,
-                        buttonHeight = 44.dp,
-                        horizontalPadding = 20.dp,
-                    )
+
+                    Spacer(Modifier.height(20.dp))
+                    ProfileSettingsFooter(onClick = onOpenSettings)
+                    Spacer(Modifier.height(30.dp))
                 }
             }
-
-            Column(Modifier.padding(horizontal = Spec.screenPad)) {
-                // ٣) بطاقة الهوية
-                Spacer(Modifier.height(12.dp))
-                SpecIdentityCard(profile = me, status = status, level = level)
-
-                // مدخل الشاشة C («عرض كما يراني الآخرون») — بند الوثيقة §5
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    Modifier.fillMaxWidth().clickable(onClick = onViewAsOthers),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Icon(
-                        Icons.Filled.Visibility,
-                        contentDescription = null,
-                        tint = Spec.blueLink,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Text(
-                        stringResource(R.string.profile_view_as_others),
-                        style = Spec.link,
-                        color = Spec.blueLink,
-                    )
-                }
-
-                // ٤) بطاقة المحفظة — تحت بطاقة الهوية مباشرة (ولمسها يفتح شاشة المحفظة)
-                Spacer(Modifier.height(12.dp))
-                SpecWalletCard(
-                    balance = balance,
-                    streak = streak,
-                    dailyClaimed = dailyClaimed,
-                    claiming = claiming,
-                    onOpenWallet = onOpenWallet,
-                    onClaim = { claimDaily() },
-                )
-                // ٥) شريط الإحصاءات
-                Spacer(Modifier.height(12.dp))
-                SpecStatsStrip(
-                    friends = stats?.friends ?: 0,
-                    downloads = stats?.downloads ?: 0,
-                    favorites = stats?.favorites ?: 0,
-                )
-
-                // ٦) بطاقة المستوى
-                Spacer(Modifier.height(12.dp))
-                SpecLevelCard(level = level, xpInLevel = xpInLevel)
-
-                // ٧) بطاقة النبذة («عضو منذ» داخلها)
-                Spacer(Modifier.height(12.dp))
-                SpecAboutCard(bio = me.bio, memberSince = specMemberSince(me.createdAt))
-
-                // ٨) شبكة 2×2 (فراغ 10 · هامش علوي 12)
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SpecGridTile(
-                        stringResource(R.string.profile_tab_favorites),
-                        onClick = onOpenFavorites,
-                        modifier = Modifier.weight(1f),
-                    )
-                    SpecGridTile(
-                        stringResource(R.string.profile_stats_downloads),
-                        onClick = onOpenDownloads,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SpecGridTile(
-                        stringResource(R.string.profile_orders),
-                        onClick = onOpenOrders,
-                        modifier = Modifier.weight(1f),
-                    )
-                    SpecGridTile(
-                        stringResource(R.string.profile_stats_content),
-                        onClick = onOpenMyContent,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-
-                // مدخل لوحة الإدارة للأدمن فقط؛ صلاحيات المشرف تبقى ضمن أدوات غرف الشات.
-                if (me.role == "admin") {
-                    Spacer(Modifier.height(10.dp))
-                    SpecGridTile(
-                        stringResource(R.string.profile_dashboard),
-                        onClick = onOpenAdmin,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
-                // ٩) تسجيل الخروج
-                Spacer(Modifier.height(16.dp))
-                SpecDangerButton(
-                    text = stringResource(R.string.profile_logout),
-                    onClick = {
-                        scope.launch {
-                            container.auth.signOut()
-                            container.state.setSignedIn(false)
-                            // يُلغي توكن الجهاز من الحساب (لا تصله إشعارات حساب آخر)
-                            com.addonstation.mobile.push.PushRegistrar
-                                .onSessionChanged(container.appContext, false)
-                            onSignedOut()
-                        }
-                    },
-                )
-                Spacer(Modifier.height(96.dp))
-            }
-        }
         }
         SnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .imePadding()
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().imePadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) { data ->
-            Snackbar(
-                containerColor = AppColors.AuthSurfaceHigh,
-                contentColor = AppColors.AuthText,
-                shape = RoundedCornerShape(14.dp),
-            ) {
+            Snackbar(containerColor = AppColors.AuthSurfaceHigh, contentColor = AppColors.AuthText, shape = RoundedCornerShape(14.dp)) {
                 Text(data.visuals.message, style = AppText.bodySmall, color = AppColors.AuthText)
             }
         }
     }
+}
+
+private enum class ProfileTab { About, Content, Favorites, Plan }
+
+@Composable
+private fun ProfileTabs(selected: ProfileTab, onSelect: (ProfileTab) -> Unit) {
+    val entries = listOf(
+        ProfileTab.About to R.string.profile_tab_about,
+        ProfileTab.Content to R.string.profile_tab_content,
+        ProfileTab.Favorites to R.string.profile_tab_favorites,
+        ProfileTab.Plan to R.string.profile_tab_plan,
+    )
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Spec.surfaceHigh)
+            .border(1.dp, Spec.border, RoundedCornerShape(14.dp)).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        entries.forEach { (tab, label) ->
+            val isSelected = selected == tab
+            Box(
+                Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(10.dp))
+                    .background(if (isSelected) Spec.blue else Color.Transparent)
+                    .clickable { onSelect(tab) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    stringResource(label),
+                    style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.ExtraBold),
+                    color = if (isSelected) Color.White else Spec.chipLabel,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileStatisticsGrid(
+    published: Int,
+    worlds: Int,
+    content: Int,
+    downloads: Int,
+    favorites: Int,
+    level: Int,
+) {
+    val rows = listOf(
+        listOf(published.toString() to R.string.profile_stat_published, worlds.toString() to R.string.profile_stat_worlds, content.toString() to R.string.profile_stats_content),
+        listOf(downloads.toString() to R.string.profile_stats_downloads, favorites.toString() to R.string.profile_stats_favorites, level.toString() to R.string.profile_stats_level),
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        rows.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { (value, label) ->
+                    SpecCard(modifier = Modifier.weight(1f), padding = 10.dp) {
+                        Column(Modifier.fillMaxWidth().heightIn(min = 52.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                            Text(value, style = Spec.statNumber, color = Spec.text, maxLines = 1)
+                            Text(stringResource(label), style = Spec.statLabel, color = Spec.textMuted, maxLines = 1, textAlign = TextAlign.Center)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileAboutTab(
+    me: Profile,
+    balance: Int,
+    streak: Int,
+    dailyClaimed: Boolean,
+    claiming: Boolean,
+    accountNote: String?,
+    onClaim: () -> Unit,
+    onOpenWallet: () -> Unit,
+    container: com.addonstation.mobile.data.AppContainer,
+    onToggleOnline: (Boolean) -> Unit,
+) {
+    val sessionEmail = container.supabase.session()?.email.orEmpty()
+    val legendary = container.profile.planRank(me.effectivePlan) >= 3
+    val dateLabel = specMemberSince(me.createdAt) ?: "—"
+    WalletSectionHeader(text = stringResource(R.string.profile_about_me))
+    SpecCard {
+        Text(
+            me.bio?.takeIf(String::isNotBlank) ?: stringResource(R.string.profile_about_default),
+            style = Spec.bioText,
+            color = Spec.chipLabel,
+        )
+    }
+
+    Spacer(Modifier.height(12.dp))
+    SpecWalletCard(
+        balance = balance,
+        streak = streak,
+        dailyClaimed = dailyClaimed,
+        claiming = claiming,
+        onOpenWallet = onOpenWallet,
+        onClaim = onClaim,
+    )
+
+    Spacer(Modifier.height(14.dp))
+    WalletSectionHeader(text = stringResource(R.string.profile_account_info_plain))
+    SpecCard(padding = 0.dp) {
+        Column(Modifier.fillMaxWidth()) {
+            ProfileInfoRow(title = stringResource(R.string.profile_email), value = sessionEmail.ifBlank { "—" })
+            ProfileInfoDivider()
+            ProfileInfoRow(title = stringResource(R.string.profile_member_since_label), value = dateLabel)
+            ProfileInfoDivider()
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable {
+                    if (!legendary) onToggleOnline(false)
+                }.padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.profile_online_status), style = Spec.cardTitle, color = Spec.text)
+                    Text(
+                        if (!legendary) stringResource(R.string.plan_locked_online_plain)
+                        else if (me.showOnlineStatus) stringResource(R.string.profile_online)
+                        else stringResource(R.string.profile_offline_plain),
+                        style = Spec.secondary,
+                        color = Spec.textMuted,
+                    )
+                }
+                Switch(
+                    checked = me.showOnlineStatus,
+                    onCheckedChange = onToggleOnline,
+                    enabled = legendary,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Spec.onlineFill,
+                        uncheckedThumbColor = Spec.offlineGrey,
+                        uncheckedTrackColor = Spec.surfaceHigh,
+                    ),
+                )
+            }
+        }
+    }
+    accountNote?.takeIf { it.isNotBlank() }?.let {
+        Spacer(Modifier.height(8.dp))
+        Text(it, style = Spec.secondary, color = Spec.textMuted)
+    }
+
+    Spacer(Modifier.height(14.dp))
+    WalletSectionHeader(text = stringResource(R.string.profile_roles))
+    SpecCard {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            when (me.effectivePlan) {
+                "legendary" -> SpecBadgeChip(stringResource(R.string.grp_legendary_plain), Spec.gold, Spec.goldDeepBg)
+                "epic" -> SpecBadgeChip(stringResource(R.string.grp_epic_plain), Spec.epic, Color.White)
+            }
+            when (me.role) {
+                "creator" -> SpecBadgeChip(stringResource(R.string.role_creator_plain), Spec.blue, Color.White)
+                "admin" -> SpecBadgeChip(stringResource(R.string.badge_admin), Spec.gold, Spec.goldDeepBg)
+                "moderator" -> SpecBadgeChip(stringResource(R.string.badge_mod), Spec.blue, Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileInfoRow(title: String, value: String) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(title, style = Spec.secondary, color = Spec.textMuted, modifier = Modifier.weight(1f))
+        Text(value, style = Spec.secondary.copy(fontWeight = FontWeight.Bold), color = Spec.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun ProfileInfoDivider() {
+    Box(Modifier.fillMaxWidth().padding(start = 14.dp).height(1.dp).background(Spec.border))
+}
+
+@Composable
+private fun ProfilePlanTab(me: Profile, onManage: () -> Unit, onUpgrade: () -> Unit) {
+    val planName = planLabelOf(me.effectivePlan)
+    val planFeatures = when (me.effectivePlan) {
+        "legendary" -> stringResource(R.string.plan_legendary_features_plain)
+        "epic" -> stringResource(R.string.plan_epic_features_plain)
+        else -> stringResource(R.string.plan_free_features_plain)
+    }
+    val planAccent = when (me.effectivePlan) {
+        "legendary" -> Spec.gold
+        "epic" -> Spec.epic
+        else -> Spec.blueLink
+    }
+    WalletSectionHeader(text = stringResource(R.string.profile_current_plan))
+    SpecCard {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(planAccent.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.WorkspacePremium, contentDescription = null, tint = planAccent, modifier = Modifier.size(24.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(planName, style = Spec.profileName.copy(fontSize = 18.sp), color = Spec.text, maxLines = 1)
+                Text(
+                    if (me.planExpiresAt.isNullOrBlank()) stringResource(R.string.home_plan_active_forever)
+                    else stringResource(R.string.home_plan_expires, TimeFormat.expiryLabel(me.planExpiresAt, Locale.forLanguageTag(com.addonstation.mobile.ui.components.appLocaleCode()))),
+                    style = Spec.secondary,
+                    color = Spec.textMuted,
+                )
+            }
+            SpecBadgeChip(stringResource(R.string.plan_status_approved), Spec.green, Spec.bg)
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            planFeatures.split(" · ").forEach { feature ->
+                Box(Modifier.clip(RoundedCornerShape(10.dp)).background(Spec.surfaceHigh).padding(horizontal = 9.dp, vertical = 6.dp)) {
+                    Text(feature, style = Spec.secondary, color = Spec.chipLabel, maxLines = 2)
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SpecFillButton(text = stringResource(R.string.profile_manage), onClick = onManage, modifier = Modifier.weight(1f), buttonHeight = 44.dp)
+            if (me.effectivePlan != "legendary") {
+                SpecOutlineButton(text = stringResource(R.string.profile_upgrade_plain), onClick = onUpgrade, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileItemsGrid(
+    items: List<ContentItem>,
+    loading: Boolean,
+    failed: Boolean,
+    favorite: Boolean,
+    emptyText: String,
+    creatorNames: Map<String, String>,
+    onRetry: () -> Unit,
+    onOpenItem: (ContentItem) -> Unit,
+    onToggleFavorite: ((ContentItem) -> Unit)?,
+) {
+    val container = rememberContainer()
+    when {
+        loading -> LoadingBox(text = stringResource(R.string.common_loading))
+        failed -> com.addonstation.mobile.ui.components.ErrorState(onRetry = onRetry)
+        items.isEmpty() -> ProfileGridEmpty(text = emptyText)
+        else -> LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxWidth().height((((items.size + 1) / 2) * 218).dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            userScrollEnabled = false,
+        ) {
+            items(items, key = { it.id }) { item ->
+                ProfileItemCard(
+                    item = item,
+                    creatorName = item.createdBy?.let(creatorNames::get)?.takeIf(String::isNotBlank) ?: stringResource(R.string.common_guest),
+                    favorite = favorite,
+                    coverUrl = assetUrl(container, item.coverUrl),
+                    onClick = { onOpenItem(item) },
+                    onToggleFavorite = onToggleFavorite?.let { callback -> { callback(item) } },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileItemCard(
+    item: ContentItem,
+    creatorName: String,
+    favorite: Boolean,
+    coverUrl: String?,
+    onClick: () -> Unit,
+    onToggleFavorite: (() -> Unit)?,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        Modifier.fillMaxWidth().clip(shape).background(Spec.surface)
+            .border(1.dp, Spec.border, shape).clickable(onClick = onClick).padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Box(Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(12.dp))) {
+            CoverImage(url = coverUrl, radius = 12.dp, modifier = Modifier.fillMaxSize())
+            Box(
+                Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(8.dp))
+                    .background(when (item.plan.lowercase()) {
+                        "legendary" -> Spec.gold
+                        "epic" -> Spec.epic
+                        else -> Spec.freeGreen
+                    }).padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text(planLabelOf(item.plan), style = Spec.badge, color = if (item.plan == "legendary") Spec.goldDeepBg else Color.White, maxLines = 1)
+            }
+            if (favorite && onToggleFavorite != null) {
+                Box(
+                    Modifier.align(Alignment.BottomEnd).padding(5.dp).size(30.dp).clip(CircleShape)
+                        .background(Spec.gold).clickable(onClick = onToggleFavorite),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.profile_remove_favorite), tint = Spec.goldDeepBg, modifier = Modifier.size(17.dp))
+                }
+            }
+        }
+        Text(item.title, style = Spec.cardTitle, color = Spec.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            stringResource(R.string.item_by, creatorName),
+            style = Spec.secondary,
+            color = Spec.textMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun ProfileGridEmpty(text: String) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(Modifier.size(88.dp).clip(CircleShape).background(Spec.surfaceHigh), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.Inventory2, contentDescription = null, tint = Spec.blueLink, modifier = Modifier.size(36.dp))
+        }
+        Text(text, style = Spec.secondary, color = Spec.textMuted, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+private fun ProfileSettingsFooter(onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(14.dp))
+            .background(Spec.surface).border(1.dp, Spec.border, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(Icons.Filled.Settings, contentDescription = null, tint = Spec.blueLink, modifier = Modifier.size(20.dp))
+        Text(stringResource(R.string.profile_full_settings), style = Spec.cardTitle, color = Spec.text, modifier = Modifier.weight(1f))
+        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Spec.textMuted, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun WalletSectionHeader(text: String) {
+    Text(text.uppercase(Locale.ROOT), style = Spec.smallCaps, color = Spec.gold, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
 }
 
 /**
@@ -666,6 +1066,7 @@ fun EditProfileScreen(
 fun UserProfileScreen(
     userId: String,
     onBack: () -> Unit,
+    onOpenItem: (ContentItem) -> Unit = {},
     /** فتح تعديل الملف — يظهر حين يفتح المستخدم ملفه هو. */
     onEditProfile: () -> Unit = {},
     onBlock: (Profile) -> Unit = {},
@@ -687,6 +1088,9 @@ fun UserProfileScreen(
 
     var profile by remember { mutableStateOf<Profile?>(null) }
     var stats by remember { mutableStateOf<ProfileStats?>(null) }
+    var userContent by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
+    var contentLoading by remember { mutableStateOf(true) }
+    var contentFailed by remember { mutableStateOf(false) }
     var friendEntry by remember { mutableStateOf<com.addonstation.mobile.data.model.FriendEntry?>(null) }
     // الحظر: أنا حاظره (فأُظهر «إلغاء الحظر») · أو بيننا حظر بأي اتجاه (فأُعطّل الأزرار)
     var blockedByMe by remember(userId) { mutableStateOf(false) }
@@ -712,6 +1116,17 @@ fun UserProfileScreen(
     LaunchedEffect(userId, tick) {
         profile = container.profile.loadProfile(userId)
         stats = container.profile.stats(userId)
+        contentLoading = true
+        contentFailed = false
+        try {
+            userContent = container.content.byCreator(userId, 24)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            contentFailed = true
+        } finally {
+            contentLoading = false
+        }
         friendEntry = container.profile.friendshipState(userId)
         blockedByMe = container.chat.iBlockedUser(userId)
         blockedPair = container.chat.blockedPair(userId)
@@ -912,21 +1327,27 @@ fun UserProfileScreen(
 
             // ٥) الإحصاءات
             Spacer(Modifier.height(12.dp))
-            SpecStatsStrip(
-                friends = stats?.friends ?: 0,
+            ProfileMemberStats(
+                published = userContent.size,
                 downloads = stats?.downloads ?: 0,
-                favorites = stats?.favorites ?: 0,
+                level = level,
             )
 
-            // بطاقة المستوى والسمعة
-            Spacer(Modifier.height(12.dp))
-            SpecLevelCard(level = level, xpInLevel = stats?.xpInLevel ?: 0)
-
-            // النبذة + «عضو منذ»
+            // نبذة، ثم عناصر منشورة لهذا العضو.
             Spacer(Modifier.height(12.dp))
             SpecAboutCard(bio = me.bio, memberSince = specMemberSince(me.createdAt))
+            Spacer(Modifier.height(12.dp))
+            SectionHeader(title = stringResource(R.string.profile_content_section))
+            ContentGrid(
+                items = userContent,
+                loading = contentLoading,
+                failed = contentFailed,
+                onRetry = { tick += 1 },
+                emptyText = stringResource(R.string.profile_no_content_published),
+                onClick = onOpenItem,
+            )
 
-            // ٦) بطاقة السلامة (صفوف 52 · فواصل 1dp)
+            // أدوات الحظر/الإبلاغ تبقى ضمن قائمة الشاشة كما في التنفيذ الحالي.
             Spacer(Modifier.height(12.dp))
             SpecCard(padding = 0.dp) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
@@ -1233,6 +1654,24 @@ fun ProfileAsOthersScreen(
             SpecHiddenWalletCard()
 
             Spacer(Modifier.height(96.dp))
+        }
+    }
+}
+
+@Composable
+private fun ProfileMemberStats(published: Int, downloads: Int, level: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(
+            published.toString() to R.string.profile_stat_published,
+            downloads.toString() to R.string.profile_stats_downloads,
+            level.toString() to R.string.profile_stats_level,
+        ).forEach { (value, label) ->
+            SpecCard(modifier = Modifier.weight(1f), padding = 10.dp) {
+                Column(Modifier.fillMaxWidth().heightIn(min = 52.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Text(value, style = Spec.statNumber, color = Spec.text, maxLines = 1)
+                    Text(stringResource(label), style = Spec.statLabel, color = Spec.textMuted, maxLines = 1, textAlign = TextAlign.Center)
+                }
+            }
         }
     }
 }

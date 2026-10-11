@@ -255,6 +255,8 @@ fun SpecProfileAvatar(
     modifier: Modifier = Modifier,
     size: Dp = Spec.avatarLg,
     borderWidth: Dp = 5.dp,
+    dotSize: Dp = Spec.dotSize,
+    showHiddenDot: Boolean = false,
 ) {
     // لا تدع ارتفاع صفّ التداخل (50dp) يسحق صورة 96dp إلى شكل بيضاوي.
     Box(modifier = modifier.requiredSize(size)) {
@@ -277,11 +279,11 @@ fun SpecProfileAvatar(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        if (status != SpecStatus.HIDDEN) {
+        if (status != SpecStatus.HIDDEN || showHiddenDot) {
             Box(
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .size(Spec.dotSize)
+                    .size(dotSize)
                     .specStatusDot(status),
             )
         }
@@ -371,11 +373,12 @@ fun SpecIdentityCard(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            if (profile.effectivePlan != "free") {
-                SpecBadgeChip(stringResource(R.string.badge_premium), Spec.gold, Spec.goldDeepBg)
+            when (profile.effectivePlan) {
+                "legendary" -> SpecBadgeChip(stringResource(R.string.grp_legendary_plain), Spec.gold, Spec.goldDeepBg)
+                "epic" -> SpecBadgeChip(stringResource(R.string.grp_epic_plain), Spec.epic, Color.White)
             }
             if (profile.role == "creator") {
-                SpecBadgeChip(stringResource(R.string.badge_creator), Spec.blue, Color.White)
+                SpecBadgeChip(stringResource(R.string.role_creator_plain), Spec.blue, Color.White)
             }
             SpecBadgeChip(stringResource(R.string.badge_level, level), Spec.surfaceHigh, Spec.chipLabel)
             if (profile.role == "admin") {

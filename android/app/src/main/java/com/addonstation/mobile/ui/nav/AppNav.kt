@@ -71,6 +71,9 @@ object Routes {
     const val COMMUNITY = "community"
     const val SETTINGS = "settings"
     const val PROFILE = "profile"
+    const val APP_ABOUT = "about-app"
+    const val PRIVACY = "privacy-policy"
+    const val TERMS = "terms-of-use"
 
     const val LOGIN = "login"
     const val SIGNUP = "signup"
@@ -112,6 +115,7 @@ object Routes {
     fun adminContentEdit(id: String) = "admin-content/$id"
     const val ADMIN_ASSETS = "admin-assets"
     const val ADMIN_CREATORS = "admin-creators"
+    const val ADMIN_CREATOR_TIPS = "admin-creator-tips"
     const val ADMIN_AC = "admin-ac"
     /** شاشة AC مع مستخدم محدَّد مسبقاً (زر «+AC» في بطاقة المستخدم). */
     const val ADMIN_AC_USER = "admin-ac/user/{userId}"
@@ -572,6 +576,31 @@ private fun MainNavigation(
                         onSignedOut = { goTab(MainTab.Home) },
                         onOpenPlans = { go(Routes.PLANS) },
                         onOpenAdmin = { go(Routes.ADMIN) },
+                        onOpenAbout = { go(Routes.APP_ABOUT) },
+                        onOpenPrivacy = { go(Routes.PRIVACY) },
+                        onOpenTerms = { go(Routes.TERMS) },
+                        onBack = { back() },
+                    )
+                }
+
+                composable(Routes.APP_ABOUT) {
+                    com.addonstation.mobile.ui.settings.AboutAppScreen(
+                        onBack = { back() },
+                        onOpenPrivacy = { go(Routes.PRIVACY) },
+                        onOpenTerms = { go(Routes.TERMS) },
+                    )
+                }
+                composable(Routes.PRIVACY) {
+                    com.addonstation.mobile.ui.settings.LegalDocumentScreen(
+                        title = stringResource(R.string.set_privacy),
+                        document = stringResource(R.string.set_privacy_text),
+                        onBack = { back() },
+                    )
+                }
+                composable(Routes.TERMS) {
+                    com.addonstation.mobile.ui.settings.LegalDocumentScreen(
+                        title = stringResource(R.string.set_terms),
+                        document = stringResource(R.string.set_terms_text),
                         onBack = { back() },
                     )
                 }
@@ -586,11 +615,15 @@ private fun MainNavigation(
                         onBack = { back() },
                         onOpenEdit = { go(Routes.EDIT_PROFILE) },
                         onOpenAdmin = { go(Routes.ADMIN) },
+                        onOpenCreatorStudio = { go(Routes.CREATOR_STUDIO) },
+                        onOpenSettings = { goTab(MainTab.Settings) },
                         onOpenWallet = { go(Routes.WALLET) },
                         onOpenFavorites = { go(Routes.FAVORITES) },
                         onOpenDownloads = { go(Routes.DOWNLOADS) },
                         onOpenOrders = { go(Routes.ORDERS) },
+                        onOpenPlans = { go(Routes.PLANS) },
                         onOpenMyContent = { go(Routes.MY_CONTENT) },
+                        onOpenItem = { item -> go(Routes.item(item.id)) },
                         onViewAsOthers = { go(Routes.PROFILE_AS_OTHERS) },
                     )
                 }
@@ -845,6 +878,7 @@ private fun MainNavigation(
                     com.addonstation.mobile.ui.profile.UserProfileScreen(
                         userId = entry.arguments?.getString("userId").orEmpty(),
                         onBack = { back() },
+                        onOpenItem = { item -> go(Routes.item(item.id)) },
                         // ملفي أنا: الزرّ الوحيد هو «تعديل الملف الشخصي»
                         onEditProfile = { go(Routes.EDIT_PROFILE) },
                         // الحظر (سياسة UGC): يُنفَّذ على الخادم، والواجهة تُعيد
@@ -871,7 +905,7 @@ private fun MainNavigation(
                         onOpenModeration = { },
                         onOpenAssets = { go(Routes.ADMIN_ASSETS) },
                         onOpenCreatorApps = { go(Routes.ADMIN_CREATORS) },
-                        onOpenTips = { go(Routes.ADMIN_CREATORS) },
+                        onOpenTips = { go(Routes.ADMIN_CREATOR_TIPS) },
                         onOpenAc = { userId ->
                             go(if (userId.isNullOrBlank()) Routes.ADMIN_AC else Routes.adminAcUser(userId))
                         },
@@ -881,7 +915,16 @@ private fun MainNavigation(
                     }
                 }
                 composable(Routes.ADMIN_CONTENT) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = 3,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminContentEditorScreen(onBack = { back() })
                     }
                 }
@@ -889,7 +932,16 @@ private fun MainNavigation(
                     Routes.ADMIN_CONTENT_EDIT,
                     arguments = listOf(navArgument("contentId") { type = NavType.StringType }),
                 ) { entry ->
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = 3,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminContentEditorScreen(
                             itemId = entry.arguments?.getString("contentId"),
                             onBack = { back() },
@@ -897,17 +949,58 @@ private fun MainNavigation(
                     }
                 }
                 composable(Routes.ADMIN_ASSETS) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminAssetsScreen(onBack = { back() })
                     }
                 }
                 composable(Routes.ADMIN_CREATORS) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminCreatorReviewScreen(onBack = { back() })
                     }
                 }
+                composable(Routes.ADMIN_CREATOR_TIPS) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
+                        com.addonstation.mobile.ui.admin.AdminCreatorReviewScreen(onBack = { back() }, initialTab = 2)
+                    }
+                }
                 composable(Routes.ADMIN_AC) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminAcScreen(onBack = { back() })
                     }
                 }
@@ -916,7 +1009,16 @@ private fun MainNavigation(
                     Routes.ADMIN_AC_USER,
                     arguments = listOf(navArgument("userId") { type = NavType.StringType }),
                 ) { entry ->
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = 1,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminAcScreen(
                             onBack = { back() },
                             preselectUserId = entry.arguments?.getString("userId"),
@@ -924,17 +1026,44 @@ private fun MainNavigation(
                     }
                 }
                 composable(Routes.ADMIN_SETTINGS) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminSettingsScreen(onBack = { back() })
                     }
                 }
                 composable(Routes.ADMIN_AUDIT) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminAuditScreen(onBack = { back() })
                     }
                 }
                 composable(Routes.ADMIN_CHAT) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminChatScreen(onBack = { back() })
                     }
                 }

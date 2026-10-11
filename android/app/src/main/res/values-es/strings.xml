@@ -759,4 +759,69 @@ CRÉALO.</string>
     <string name="crash_report_copy">Copiar informe de cierre</string>
     <string name="crash_report_copied">Informe copiado. Pégalo en este chat.</string>
     <string name="crash_report_continue">Intentar abrir la aplicación</string>
+
+    <!-- Home v2 sections -->
+
+    <!-- Imported missing localized resources from AddonStation_chat_panels_store -->
+
+    <!-- Imported missing localized resources from AddonStation_profile_wallet_admin -->
+
+    <!-- Imported missing localized resources from AddonStation_creators_pages -->
+    <string name="profile_remove_favorite">Quitar de favoritos</string>
+
+    <!-- Creator form labels -->
+    <string name="creator_file_types">Cualquier tipo de archivo (*/*)</string>
+    <string name="creator_optional_details">Detalles opcionales</string>
+    <string name="creator_required_fields">Completa los campos obligatorios y acepta ambas confirmaciones.</string>
+    <string name="creator_category_adventure">Aventura</string>
+    <string name="creator_category_survival">Supervivencia</string>
+    <string name="creator_category_pvp">JcJ</string>
+    <string name="creator_category_building">Construcción</string>
+    <string name="creator_category_skins">Aspectos</string>
+    <string name="creator_category_other">Otro</string>
+
+    <!-- Admin asset confirmations and progress -->
+    <string name="admin_delete_asset">Eliminar recurso</string>
+    <string name="admin_asset_reading">Preparando imagen…</string>
+    <string name="admin_asset_read_failed">No se pudo leer el archivo seleccionado.</string>
+    <string name="admin_asset_uploading">Subiendo imagen… (%1$d KB)</string>
+    <string name="admin_asset_uploaded">Se subió %1$s (%2$d KB)</string>
+    <string name="admin_asset_upload_failed">Error al subir: %1$s</string>
+    <string name="admin_asset_resize_running">Redimensionando imágenes… No cierres esta pantalla.</string>
+    <string name="admin_asset_resize_done">Se redimensionaron %1$d imágenes.</string>
+    <string name="admin_asset_resize_failed">Error al redimensionar: %1$s</string>
+
+    <!-- Plain plan feature labels -->
+    <string name="plan_free_features_plain">Contenido gratis · Descargas básicas · Sin suscripción</string>
+    <string name="creator_confirm_required">Acepta ambas confirmaciones antes de enviar.</string>
+
+    <!-- Admin creator tip review -->
+    <string name="admin_tip_from_to">%1$s → %2$s</string>
+    <string name="admin_tip_approve_confirm">¿Aprobar el apoyo de %1$s LYD de %2$s para %3$s?</string>
+    <string name="admin_tip_reject_confirm">¿Rechazar el apoyo de %1$s LYD de %2$s para %3$s?</string>
+    <string name="admin_tip_reject_reason">El recibo no se pudo verificar</string>
+    <string name="admin_tip_approved">Apoyo aprobado.</string>
+    <string name="admin_tip_rejected">Apoyo rechazado.</string>
+    <string name="admin_tip_review_failed">No se pudo actualizar el apoyo: %1$s</string>
+    <string name="admin_tip_receipt_missing">Este apoyo no tiene un recibo adjunto.</string>
+    <string name="admin_tip_status_pending">Pendiente</string>
+    <string name="admin_tip_status_approved">Aprobado</string>
+    <string name="admin_tip_status_rejected">Rechazado</string>
+
+    <!-- Creator moderation copy -->
+    <string name="creator_status_pending">Pendiente</string>
+    <string name="creator_status_approved">Aprobado</string>
+    <string name="creator_status_rejected">Rechazado</string>
+    <string name="admin_creator_more_info">Pedir más información</string>
+    <string name="admin_creator_more_info_note">Envía más detalles, por favor.</string>
+    <string name="admin_creator_approved">Solicitud de creador aprobada.</string>
+    <string name="admin_creator_rejected">Solicitud de creador rechazada.</string>
+    <string name="admin_creator_more_info_sent">Se solicitó más información.</string>
+    <string name="admin_creator_review_failed">No se pudo actualizar la solicitud: %1$s</string>
+    <string name="admin_submission_approved">Contenido aprobado.</string>
+    <string name="admin_submission_rejected">Contenido rechazado.</string>
+    <string name="admin_submission_review_failed">No se pudo actualizar el contenido: %1$s</string>
+    <string name="admin_creator_reject_reason">Aún no cumple los requisitos.</string>
+    <string name="admin_submission_reject_reason">El contenido necesita cambios.</string>
+    <string name="creator_status_more_info">Se solicitó más información.</string>
 </resources>

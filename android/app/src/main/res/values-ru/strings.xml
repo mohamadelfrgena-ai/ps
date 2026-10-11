@@ -759,4 +759,69 @@
     <string name="crash_report_copy">Скопировать отчёт о сбое</string>
     <string name="crash_report_copied">Отчёт скопирован. Вставьте его в этот чат.</string>
     <string name="crash_report_continue">Попробовать открыть приложение</string>
+
+    <!-- Home v2 sections -->
+
+    <!-- Imported missing localized resources from AddonStation_chat_panels_store -->
+
+    <!-- Imported missing localized resources from AddonStation_profile_wallet_admin -->
+
+    <!-- Imported missing localized resources from AddonStation_creators_pages -->
+    <string name="profile_remove_favorite">Убрать из избранного</string>
+
+    <!-- Creator form labels -->
+    <string name="creator_file_types">Любой тип файла (*/*)</string>
+    <string name="creator_optional_details">Дополнительные сведения</string>
+    <string name="creator_required_fields">Заполните обязательные поля и подтвердите оба пункта.</string>
+    <string name="creator_category_adventure">Приключение</string>
+    <string name="creator_category_survival">Выживание</string>
+    <string name="creator_category_pvp">PvP</string>
+    <string name="creator_category_building">Строительство</string>
+    <string name="creator_category_skins">Облики</string>
+    <string name="creator_category_other">Другое</string>
+
+    <!-- Admin asset confirmations and progress -->
+    <string name="admin_delete_asset">Удалить ресурс</string>
+    <string name="admin_asset_reading">Подготовка изображения…</string>
+    <string name="admin_asset_read_failed">Не удалось прочитать выбранный файл.</string>
+    <string name="admin_asset_uploading">Загрузка изображения… (%1$d КБ)</string>
+    <string name="admin_asset_uploaded">Загружено %1$s (%2$d КБ)</string>
+    <string name="admin_asset_upload_failed">Ошибка загрузки: %1$s</string>
+    <string name="admin_asset_resize_running">Изменение размера изображений… Не закрывайте экран.</string>
+    <string name="admin_asset_resize_done">Обработано изображений: %1$d.</string>
+    <string name="admin_asset_resize_failed">Ошибка обработки: %1$s</string>
+
+    <!-- Plain plan feature labels -->
+    <string name="plan_free_features_plain">Бесплатный контент · Базовые загрузки · Без подписки</string>
+    <string name="creator_confirm_required">Подтвердите оба пункта перед отправкой.</string>
+
+    <!-- Admin creator tip review -->
+    <string name="admin_tip_from_to">%1$s → %2$s</string>
+    <string name="admin_tip_approve_confirm">Одобрить поддержку на %1$s LYD от %2$s для %3$s?</string>
+    <string name="admin_tip_reject_confirm">Отклонить поддержку на %1$s LYD от %2$s для %3$s?</string>
+    <string name="admin_tip_reject_reason">Чек не проверен</string>
+    <string name="admin_tip_approved">Поддержка одобрена.</string>
+    <string name="admin_tip_rejected">Поддержка отклонена.</string>
+    <string name="admin_tip_review_failed">Не удалось обновить поддержку: %1$s</string>
+    <string name="admin_tip_receipt_missing">К этой поддержке не приложен чек.</string>
+    <string name="admin_tip_status_pending">Ожидает</string>
+    <string name="admin_tip_status_approved">Одобрено</string>
+    <string name="admin_tip_status_rejected">Отклонено</string>
+
+    <!-- Creator moderation copy -->
+    <string name="creator_status_pending">На рассмотрении</string>
+    <string name="creator_status_approved">Одобрено</string>
+    <string name="creator_status_rejected">Отклонено</string>
+    <string name="admin_creator_more_info">Запросить сведения</string>
+    <string name="admin_creator_more_info_note">Пожалуйста, пришлите дополнительные сведения.</string>
+    <string name="admin_creator_approved">Заявка автора одобрена.</string>
+    <string name="admin_creator_rejected">Заявка автора отклонена.</string>
+    <string name="admin_creator_more_info_sent">Запрошены дополнительные сведения.</string>
+    <string name="admin_creator_review_failed">Не удалось обновить заявку: %1$s</string>
+    <string name="admin_submission_approved">Материал одобрен.</string>
+    <string name="admin_submission_rejected">Материал отклонён.</string>
+    <string name="admin_submission_review_failed">Не удалось обновить материал: %1$s</string>
+    <string name="admin_creator_reject_reason">Пока не соответствует требованиям.</string>
+    <string name="admin_submission_reject_reason">Материал требует изменений.</string>
+    <string name="creator_status_more_info">Запрошены дополнительные сведения.</string>
 </resources>

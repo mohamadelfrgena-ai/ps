@@ -63,10 +63,13 @@ import com.addonstation.mobile.ui.theme.Spec
 /** المكوّنات المشتركة لشاشات SPEC_AUTH_SETTINGS.md. */
 
 @Composable
-fun AuthSettingsHeader(onBack: () -> Unit) {
+fun AuthSettingsHeader(
+    onBack: () -> Unit,
+    backgroundRes: Int = R.drawable.login_bg,
+) {
     Box(Modifier.fillMaxWidth().height(Spec.authHeaderH)) {
         Image(
-            painter = painterResource(R.drawable.login_bg),
+            painter = painterResource(backgroundRes),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),

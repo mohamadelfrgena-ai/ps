@@ -3,6 +3,7 @@ package com.addonstation.mobile.ui.account
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CardGiftcard
 import androidx.compose.material.icons.outlined.History
@@ -44,6 +46,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,12 +60,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
@@ -75,10 +81,8 @@ import com.addonstation.mobile.ui.components.appLocaleCode
 import com.addonstation.mobile.ui.components.EmptyState
 import com.addonstation.mobile.ui.components.ErrorState
 import com.addonstation.mobile.ui.components.LoadingBox
-import com.addonstation.mobile.ui.components.WalletHeroCard
 import com.addonstation.mobile.ui.components.WalletIconTile
 import com.addonstation.mobile.ui.components.WalletLoadingSkeleton
-import com.addonstation.mobile.ui.components.WalletQuickAction
 import com.addonstation.mobile.ui.components.WalletSectionLabel
 import com.addonstation.mobile.ui.components.WalletTransactionRow
 import com.addonstation.mobile.ui.rememberContainer
@@ -239,7 +243,7 @@ fun AcWalletScreen(
     }
 
     fun redeemCode() {
-        if (redeeming || codeInput.length < 4) return
+        if (redeeming || codeInput.length != 8) return
         scope.launch {
             redeeming = true
             redeemMessage = null
@@ -288,48 +292,18 @@ fun AcWalletScreen(
                 } else if (failed) {
                     ErrorState(onRetry = { reloadTick += 1 })
                 } else {
-                    WalletHeroCard(
-                        balance = animatedBalance,
-                        streak = dailyStats?.streak ?: 0,
-                        dailyClaimed = dailyStats?.dailyClaimed == true,
-                        claiming = claimingDaily,
-                        onClaim = { claimDaily() },
-                    )
+                    WalletBalanceCard(balance = animatedBalance)
 
                     Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        WalletQuickAction(
-                            icon = Icons.Outlined.CardGiftcard,
-                            label = androidx.compose.ui.res.stringResource(R.string.ac_redeem_action),
-                            accent = AppColors.AuthPurple,
-                            onClick = { scope.launch { redeemRequester.bringIntoView() } },
-                            modifier = Modifier.weight(1f),
-                        )
-                        WalletQuickAction(
-                            icon = Icons.Outlined.AutoAwesome,
-                            label = androidx.compose.ui.res.stringResource(R.string.ac_tasks),
-                            accent = AppColors.AuthGreen,
-                            onClick = { showTasks = true },
-                            modifier = Modifier.weight(1f),
-                        )
-                        WalletQuickAction(
-                            icon = Icons.Outlined.History,
-                            label = androidx.compose.ui.res.stringResource(R.string.ac_history),
-                            accent = AppColors.AuthAccentBlue,
-                            onClick = onOpenHistory,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-
                     Column(Modifier.bringIntoViewRequester(redeemRequester)) {
                         WalletSectionLabel(
-                            text = androidx.compose.ui.res.stringResource(R.string.ac_kind_code),
+                            text = androidx.compose.ui.res.stringResource(R.string.ac_redeem_title),
                             accent = AppColors.AuthPurple,
                         )
                         GiftCodeCard(
                             value = codeInput,
                             onValueChange = {
-                                codeInput = it.uppercase(Locale.ROOT).filterNot { char -> char.isWhitespace() }.take(12)
+                                codeInput = it.uppercase(Locale.ROOT).filterNot { char -> char.isWhitespace() }.take(8)
                                 redeemMessage = null
                                 detectedTier = null
                             },
@@ -342,26 +316,25 @@ fun AcWalletScreen(
                     }
 
                     WalletSectionLabel(
-                        text = androidx.compose.ui.res.stringResource(R.string.admin_give_ac_history),
-                        accent = AppColors.AuthAccentBlue,
+                        text = androidx.compose.ui.res.stringResource(R.string.ac_tasks),
+                        accent = AppColors.AuthGreen,
                         trailing = {
-                            Box(
-                                Modifier
-                                    .heightIn(min = 44.dp)
-                                    .clickable(onClick = onOpenHistory)
-                                    .padding(horizontal = 4.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    androidx.compose.ui.res.stringResource(R.string.ac_history),
-                                    style = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.ExtraBold),
-                                    color = AppColors.AuthBlueLight,
-                                    maxLines = 1,
-                                )
-                            }
+                            WalletViewAllLink(onClick = { showTasks = true })
                         },
                     )
-                    WalletTransactionsCard(transactions = transactions.take(5))
+                    WalletTasksPreviewCard(
+                        tasks = tasks.take(3),
+                        arabic = isArabic,
+                        claimingTaskId = claimingTaskId,
+                        onClaim = { task -> claimTask(task) },
+                    )
+
+                    WalletSectionLabel(
+                        text = androidx.compose.ui.res.stringResource(R.string.ac_history),
+                        accent = AppColors.AuthAccentBlue,
+                        trailing = { WalletViewAllLink(onClick = onOpenHistory) },
+                    )
+                    WalletTransactionsCard(transactions = transactions.take(3))
                     InfoCard()
                 }
             }
@@ -409,6 +382,152 @@ fun AcWalletScreen(
 }
 
 @Composable
+private fun WalletBalanceCard(balance: Int) {
+    val shape = RoundedCornerShape(18.dp)
+    Row(
+        Modifier.fillMaxWidth().clip(shape)
+            .background(Brush.linearGradient(listOf(Color(0xFF3E2D0C), Color(0xFF1B1405))))
+            .border(1.dp, Color(0xFF8A6A22), shape)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Image(
+            painter = painterResource(R.drawable.coin_ac),
+            contentDescription = null,
+            modifier = Modifier.size(56.dp),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                "${androidx.compose.ui.res.stringResource(R.string.ac_title)} · ${androidx.compose.ui.res.stringResource(R.string.ac_balance)}",
+                style = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold),
+                color = Color(0xFFE8D5A3),
+                maxLines = 1,
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                NumberFormat.getIntegerInstance(Locale.US).format(balance),
+                style = TextStyle(fontSize = 34.sp, lineHeight = 38.sp, fontWeight = FontWeight.ExtraBold),
+                color = Color(0xFFFFD66B),
+                maxLines = 1,
+            )
+        }
+        Text(
+            "AC",
+            style = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold),
+            color = Color(0xFFE8D5A3),
+        )
+    }
+}
+
+@Composable
+private fun CodeSlotsField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onDone: () -> Unit,
+) {
+    val borderColor = AppColors.AuthBorder
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Box(Modifier.fillMaxWidth().height(48.dp)) {
+            Row(
+                Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                repeat(8) { index ->
+                    val char = value.getOrNull(index)?.toString().orEmpty()
+                    val highlighted = index < value.length || index == value.length
+                    val slotShape = RoundedCornerShape(10.dp)
+                    Box(
+                        Modifier.weight(1f).fillMaxSize().clip(slotShape)
+                            .background(AppColors.AuthBg)
+                            .border(1.dp, if (highlighted) AppColors.AuthBlueLight else borderColor, slotShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            char,
+                            style = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.ExtraBold),
+                            color = AppColors.AuthText,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier.fillMaxSize(),
+                singleLine = true,
+                textStyle = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, color = Color.Transparent),
+                cursorBrush = SolidColor(Color.Transparent),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Characters,
+                    keyboardType = KeyboardType.Ascii,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(onDone = { onDone() }),
+                decorationBox = { innerTextField ->
+                    Box(Modifier.fillMaxSize()) { innerTextField() }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun WalletViewAllLink(onClick: () -> Unit) {
+    Box(
+        Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick).padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            androidx.compose.ui.res.stringResource(R.string.view_all),
+            style = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.ExtraBold),
+            color = AppColors.AuthBlueLight,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun WalletTasksPreviewCard(
+    tasks: List<AcTask>,
+    arabic: Boolean,
+    claimingTaskId: String?,
+    onClaim: (AcTask) -> Unit,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        Modifier.fillMaxWidth().clip(shape).background(AppColors.AuthSurface)
+            .border(1.dp, AppColors.AuthBorder, shape),
+    ) {
+        if (tasks.isEmpty()) {
+            Box(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    androidx.compose.ui.res.stringResource(R.string.common_none),
+                    style = TextStyle(fontSize = 13.sp, lineHeight = 18.sp),
+                    color = AppColors.AuthMuted,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        } else {
+            tasks.forEachIndexed { index, task ->
+                TaskClaimRow(
+                    task = task,
+                    arabic = arabic,
+                    claiming = claimingTaskId == task.id,
+                    anyClaiming = claimingTaskId != null,
+                    onClaim = { onClaim(task) },
+                )
+                if (index < tasks.lastIndex) {
+                    Box(Modifier.fillMaxWidth().padding(start = 66.dp).height(1.dp).background(AppColors.AuthDivider))
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun GiftCodeCard(
     value: String,
     onValueChange: (String) -> Unit,
@@ -419,7 +538,7 @@ private fun GiftCodeCard(
     onRedeem: () -> Unit,
 ) {
     val shape = RoundedCornerShape(18.dp)
-    val helper = oncePerMemberText(androidx.compose.ui.res.stringResource(R.string.admin_codes_hint))
+    val helper = androidx.compose.ui.res.stringResource(R.string.ac_redeem_hint)
     Column(
         Modifier
             .fillMaxWidth()
@@ -432,7 +551,7 @@ private fun GiftCodeCard(
             WalletIconTile(Icons.Outlined.CardGiftcard, AppColors.AuthPurple)
             Column(Modifier.weight(1f)) {
                 Text(
-                    androidx.compose.ui.res.stringResource(R.string.ac_kind_code),
+                    androidx.compose.ui.res.stringResource(R.string.ac_redeem_title),
                     style = TextStyle(fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.ExtraBold),
                     color = AppColors.AuthText,
                 )
@@ -445,57 +564,25 @@ private fun GiftCodeCard(
             }
         }
 
+        Spacer(Modifier.height(14.dp))
+        CodeSlotsField(value = value, onValueChange = onValueChange, onDone = onRedeem)
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(AppColors.AuthBg)
-                    .border(1.dp, AppColors.AuthBorder, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 14.dp),
-                singleLine = true,
-                textStyle = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, color = AppColors.AuthText),
-                cursorBrush = SolidColor(AppColors.AuthAccentBlue),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Characters,
-                    keyboardType = KeyboardType.Ascii,
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(onDone = { onRedeem() }),
-                decorationBox = { innerTextField ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (value.isEmpty()) {
-                            Text(
-                                androidx.compose.ui.res.stringResource(R.string.admin_method_code_label),
-                                style = TextStyle(fontSize = 14.sp, lineHeight = 18.sp),
-                                color = AppColors.AuthMuted,
-                            )
-                        }
-                        innerTextField()
-                    }
-                },
+        val enabled = !redeeming && value.length == 8
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (enabled) AppColors.AuthBlue else AppColors.AuthBlue.copy(alpha = 0.45f))
+                .clickable(enabled = enabled, onClick = onRedeem),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                androidx.compose.ui.res.stringResource(if (redeeming) R.string.common_loading else R.string.ac_redeem_action),
+                style = TextStyle(fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.ExtraBold),
+                color = AppColors.AuthWhite,
+                maxLines = 1,
             )
-            val enabled = !redeeming && value.length >= 4
-            Box(
-                Modifier
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (enabled) AppColors.AuthBlue else AppColors.AuthBlue.copy(alpha = 0.45f))
-                    .clickable(enabled = enabled, onClick = onRedeem)
-                    .padding(horizontal = 16.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    androidx.compose.ui.res.stringResource(R.string.ac_redeem_action),
-                    style = TextStyle(fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.ExtraBold),
-                    color = AppColors.AuthWhite,
-                    maxLines = 1,
-                )
-            }
         }
         redeemMessage?.let { message ->
             Spacer(Modifier.height(8.dp))
@@ -506,15 +593,25 @@ private fun GiftCodeCard(
             )
         }
         detectedTier?.let { tier ->
-            Spacer(Modifier.height(6.dp))
-            Text(
-                androidx.compose.ui.res.stringResource(
-                    R.string.ac_redeem_detected,
-                    NumberFormat.getIntegerInstance(Locale.US).format(tier),
-                ),
-                style = TextStyle(fontSize = 11.sp, lineHeight = 15.sp, fontWeight = FontWeight.Bold),
-                color = AppColors.AuthGold,
-            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                    .background(AppColors.AuthBlue.copy(alpha = 0.12f))
+                    .border(1.dp, AppColors.AuthBlueLight.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = AppColors.AuthBlueLight, modifier = Modifier.size(18.dp))
+                Text(
+                    androidx.compose.ui.res.stringResource(
+                        R.string.ac_redeem_detected,
+                        NumberFormat.getIntegerInstance(Locale.US).format(tier),
+                    ),
+                    style = TextStyle(fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.ExtraBold),
+                    color = AppColors.AuthBlueLight,
+                )
+            }
         }
     }
 }
@@ -643,14 +740,21 @@ private fun WalletTasksSheet(
             loading -> LoadingBox(text = androidx.compose.ui.res.stringResource(R.string.common_loading))
             failed -> ErrorState(onRetry = onRetry)
             tasks.isEmpty() -> EmptyState(androidx.compose.ui.res.stringResource(R.string.common_none))
-            else -> tasks.forEach { task ->
-                TaskClaimRow(
-                    task = task,
-                    arabic = arabic,
-                    claiming = claimingTaskId == task.id,
-                    anyClaiming = claimingTaskId != null,
-                    onClaim = { onClaim(task) },
-                )
+            else -> {
+                val shape = RoundedCornerShape(18.dp)
+                Column(Modifier.fillMaxWidth().clip(shape).background(AppColors.AuthSurface)
+                    .border(1.dp, AppColors.AuthBorder, shape)) {
+                    tasks.forEachIndexed { index, task ->
+                        TaskClaimRow(
+                            task = task,
+                            arabic = arabic,
+                            claiming = claimingTaskId == task.id,
+                            anyClaiming = claimingTaskId != null,
+                            onClaim = { onClaim(task) },
+                        )
+                        if (index < tasks.lastIndex) Box(Modifier.fillMaxWidth().padding(start = 66.dp).height(1.dp).background(AppColors.AuthDivider))
+                    }
+                }
             }
         }
     }
@@ -664,47 +768,55 @@ private fun TaskClaimRow(
     anyClaiming: Boolean,
     onClaim: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(16.dp)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
-            .clip(shape)
-            .background(AppColors.AuthSurfaceHigh)
-            .border(1.dp, AppColors.AuthBorder, shape)
-            .padding(14.dp),
+    val manual = task.frequency == "manual"
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Column(Modifier.weight(1f)) {
+        WalletIconTile(Icons.Outlined.AutoAwesome, AppColors.AuthBlueLight, size = 40.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                if (arabic) task.titleAr else (task.titleEn ?: task.titleAr),
+                style = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold),
+                color = AppColors.AuthText,
+                maxLines = 2,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    if (arabic) task.titleAr else (task.titleEn ?: task.titleAr),
-                    style = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold),
-                    color = AppColors.AuthText,
+                    acFrequencyLabel(task.frequency),
+                    modifier = Modifier.clip(RoundedCornerShape(11.dp)).background(AppColors.AuthSurfaceHigh)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                    style = TextStyle(fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.ExtraBold),
+                    color = AppColors.AuthChipLabel,
+                    maxLines = 1,
                 )
-                if (arabic) {
-                    task.description?.let {
-                        Text(it, style = TextStyle(fontSize = 12.sp, lineHeight = 16.sp), color = AppColors.AuthMuted)
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
                 Text(
-                    "+${task.reward} AC · ${acFrequencyLabel(task.frequency)}",
+                    "+${task.reward} AC",
                     style = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold),
-                    color = AppColors.AuthGold,
+                    color = AppColors.AuthMuted,
+                    maxLines = 1,
                 )
             }
+        }
+        if (manual) {
             Box(
-                Modifier
-                    .heightIn(min = 44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (anyClaiming) AppColors.AuthSurface else AppColors.AuthBlue)
+                Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(AppColors.AuthSurfaceHigh),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Lock, contentDescription = null, tint = AppColors.AuthMuted, modifier = Modifier.size(18.dp))
+            }
+        } else {
+            Box(
+                Modifier.height(40.dp).clip(RoundedCornerShape(10.dp))
+                    .background(if (anyClaiming) AppColors.AuthSurfaceHigh else AppColors.AuthBlue)
                     .clickable(enabled = !anyClaiming, onClick = onClaim)
-                    .padding(horizontal = 14.dp),
+                    .padding(horizontal = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     androidx.compose.ui.res.stringResource(if (claiming) R.string.common_loading else R.string.ac_claim),
-                    style = TextStyle(fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.ExtraBold),
+                    style = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.ExtraBold),
                     color = if (anyClaiming) AppColors.AuthMuted else AppColors.AuthWhite,
                     maxLines = 1,
                 )

@@ -4,8 +4,8 @@
 فاحص: الأصول والخلفيات بعد اعتماد SPEC_AUTH_SETTINGS.md.
 
 القواعد:
-  ١) صورة الدخول المحددة في المواصفة (`login_bg.jpg`) هي الرأس المشترك للدخول
-     وإنشاء الحساب، وتُرسم مع أيقونة التطبيق والقصّ المركزي والتلاشي الداكن؛
+  ١) شاشة الدخول تستخدم `login_bg.jpg`، وإنشاء الحساب يستخدم `signup_bg.jpg`؛
+     كلاهما يشتركان برأس واحد يقبل الصورة كـ resource، مع أيقونة التطبيق والقصّ المركزي والتلاشي الداكن؛
   ٢) ارتفاع الرأس 210dp كما في §1/§2، والأصل الكامل موجود في drawable-nodpi؛
   ٣) مقاسات الكثافات القديمة تبقى صالحة للأماكن التي تستخدم `login_bg` و`signup_bg`؛
   ٤) شاشة الترحيب تستخدم خلفية وتسلسل الأصول المرفقة، مع الاحتفاظ
@@ -134,11 +134,13 @@ def main() -> int:
     # ── ٢) ترويسة §1/§2: صورة واحدة login_bg بارتفاع 210dp ────────────────
     nodpi_header = RES / "drawable-nodpi/login_bg.jpg"
     rows.append(("login_bg موجودة في drawable-nodpi (الأصل الكامل)", bool(size_of(nodpi_header))))
-    rows.append(("ترويسة AuthSettingsHeader مشتركة بين الدخول والإنشاء",
+    rows.append(("رأس تسجيل الدخول يستخدم login_bg الافتراضية",
                  bool(header) and "AuthSettingsHeader(onBack = onBack)" in login
-                 and "AuthSettingsHeader(onBack = onBack)" in signup))
-    rows.append(("الترويسة تستخدم login_bg + app_icon من المواصفة",
-                 "R.drawable.login_bg" in header and "R.drawable.app_icon" in header))
+                 and "backgroundRes: Int = R.drawable.login_bg" in auth_ui))
+    rows.append(("رأس إنشاء الحساب يختار signup_bg صراحةً",
+                 "AuthSettingsHeader(onBack = onBack, backgroundRes = R.drawable.signup_bg)" in signup))
+    rows.append(("الترويسة ترسم الصورة المحددة وتستخدم app_icon",
+                 "painterResource(backgroundRes)" in header and "R.drawable.app_icon" in header))
     rows.append(("قصّ مركزي بلا مطّ (ContentScale.Crop)", "ContentScale.Crop" in header))
     rows.append(("تلاشٍ إلى خلفية المصادقة عند 25% ثم 96%",
                  "0.0f to AppColors.AuthBg.copy(alpha = 0.25f)" in header
