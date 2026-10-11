@@ -1,0 +1,99 @@
+# 🧹 مُحسِّن صور الأصول — تشغيل يدوي فقط (لا يُبنى شيء، ولا يُغيَّر .build-request)
+#
+# المكتبة كانت ~176 ميجابايت وفيها صور حتى 4.8 ميجابايت، فصارت شبكة الأصول
+# وبانرات الملف الشخصي بطيئة. هذا السير يُصلحها **مرة واحدة** من الخادم:
+#
+#   • كل GIF ⇒ تُولَّد بجانبه لقطة ثابتة خفيفة `<المسار>.thumb.jpg` (384px)
+#     تعرضها الشبكات تلقائياً، ويبقى الأصل المتحرّك للمعاينات المفردة.
+#   • كل صورة ثابتة أكبر من 120KB ⇒ تُصغَّر (أدوات/أغلفة 1280 · ملصقات/بروفايل 512)
+#     وتُعاد ترميزها (PNG بلا شفافية ⇒ JPEG) وتُرفع فوق نفس المسار **إن صغرت فقط**.
+#   • الـSVG واللقطات الموجودة ⇒ تُترك كما هي. لا تتغيّر المسارات ولا قاعدة البيانات.
+#
+# التشغيل: تبويب Actions → «Optimize media» → Run workflow
+#          الوضع: dry-run (تقرير بلا كتابة) أو run (تنفيذ فعلي).
+#
+# السرّان المطلوبان (نفس سرّي رفع الأصول — Settings → Secrets and variables → Actions):
+#   ADDONSTATION_SUPABASE_URL          = https://xxxx.supabase.co
+#   ADDONSTATION_SUPABASE_SECRET_KEY   = sb_secret_…   (يبقى هنا فقط ولا يدخل التطبيق أبداً)
+
+name: Optimize media
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run = تقرير فقط بلا كتابة · run = تنفيذ فعلي"
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - run
+      limit:
+        description: "أقصى عدد ملفات (اتركه فارغاً للكل)"
+        required: false
+        default: ""
+        type: string
+      thumbs_only:
+        description: "لقطات الـGIF فقط (بلا تصغير الصور الثابتة)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: تنزيل المودع
+        uses: actions/checkout@v4
+
+      - name: تنصيب Python وأدوات الصور
+        run: |
+          python3 -m pip install --quiet --break-system-packages pillow
+
+      - name: التحقق من السرّين
+        env:
+          URL_OK: ${{ secrets.ADDONSTATION_SUPABASE_URL != '' }}
+          KEY_OK: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY != '' }}
+        run: |
+          if [ "$URL_OK" != "true" ] || [ "$KEY_OK" != "true" ]; then
+            echo "::error::ناقص سرّ: أضف ADDONSTATION_SUPABASE_URL و ADDONSTATION_SUPABASE_SECRET_KEY (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          echo "✓ السرّان موجودان."
+
+      - name: فحص ذاتي لمنطق التصغير (بلا شبكة)
+        run: python3 tools/optimize_site_assets.py --selftest
+
+      - name: تشغيل المُحسِّن
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY }}
+          MODE: ${{ inputs.mode }}
+          LIMIT: ${{ inputs.limit }}
+          THUMBS_ONLY: ${{ inputs.thumbs_only }}
+        run: |
+          ARGS=""
+          [ "$MODE" = "dry-run" ] && ARGS="$ARGS --dry-run"
+          [ -n "$LIMIT" ] && ARGS="$ARGS --limit $LIMIT"
+          [ "$THUMBS_ONLY" = "true" ] && ARGS="$ARGS --thumbs-only"
+          echo "الوضع: $MODE · الخيارات: ${ARGS:-بلا}"
+          python3 tools/optimize_site_assets.py $ARGS | tee report.txt
+          # الملخّص يظهر أعلى صفحة التشغيل مباشرة (لسهولة القراءة من الهاتف)
+          {
+            echo "## تحسين صور الأصول"
+            echo ""
+            echo '```'
+            cat report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: تحقّق بعد التنفيذ (عيّنة من الرابط العام)
+        if: ${{ inputs.mode == 'run' }}
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL }}
+        run: |
+          python3 tools/verify_media_optimize.py "$SUPABASE_URL"

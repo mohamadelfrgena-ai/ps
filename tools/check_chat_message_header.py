@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""فحص ترويسة رسالة الشات (طلب المالك): صورة · اسم · لقب تحته · أداة بجانبهما.
+"""فحص ترويسة الرسائل (ومنها رسائل المالك) ومحاذاة الفقاعة وأداة الشات.
 
 الترتيب المطلوب (اختاره المالك):
     • الصورة (40dp) جنبها الاسم كما هو.
@@ -48,19 +48,27 @@ def branch(text: str, marker: str) -> str:
     return text[start:]
 
 
-header = branch(chat, "if (!grouped) {")
+header = branch(chat, "if (showAuthorHeader) {")
 name_col = branch(header, "Column(modifier = Modifier.weight(1f, fill = false))")
 
 AVATAR_DP, ITEM_DP, OLD_ITEM_DP = 40, 32, 16
 
 if not header:
-    problems.append("لا كتلة ترويسة (!grouped) في ChatScreen.kt")
+    problems.append("لا كتلة ترويسة الرسائل (if showAuthorHeader) في ChatScreen.kt")
+
+# المالك طلب إظهار بيانات المرسل لنفسه أيضاً، حتى في الرسائل المتتابعة المجمّعة.
+if "val showAuthorHeader = !grouped || isMine" not in chat:
+    problems.append("ترويسة المالك ليست ظاهرة لكل رسالة صادرة")
+if "currentProfile = profile" not in chat or \
+        "currentProfile?.takeIf { isMine && it.id == myId }" not in chat:
+    problems.append("رسالة المالك لا تستخدم ملف الجلسة كبديل إذا غاب المؤلف من الخريطة")
 
 # 1) الاسم واللقب في عمود واحد: الاسم فوق، واللقب تحته
 if not name_col:
     problems.append("الاسم واللقب ليسا في عمود واحد (اللقب يجب أن يكون تحت الاسم)")
 else:
-    if "AppText.chatName" not in name_col:
+    # الخط: وثيقة التصميم تعتمد Spec.msgAuthor (14sp/800) — والقديم AppText.chatName
+    if "AppText.chatName" not in name_col and "Spec.msgAuthor" not in name_col:
         problems.append("اسم صاحب الرسالة ليس داخل عمود الترويسة")
     if "RankBadge(" not in name_col:
         problems.append("اللقب (RankBadge) ليس تحت الاسم داخل العمود نفسه")
@@ -119,7 +127,7 @@ print("-" * 60)
 rows = [
     ("الصورة بمقاسها 40dp", "size = 40.dp" in (header or "")),
     ("الاسم فوق · اللقب تحته (عمود واحد)",
-     bool(name_col) and "AppText.chatName" in name_col and "RankBadge(" in name_col),
+     bool(name_col) and "Spec.msgAuthor" in name_col and "RankBadge(" in name_col),
     ("الأداة بجانبهما لا داخلهما",
      bool(name_col) and "equippedItemUrl" not in name_col and "equippedItemUrl" in (header or "")),
     ("حجم الأداة 32dp (كان 16dp)", bool(re.search(r"size\(\s*32\.dp\s*\)", header or ""))),
@@ -128,6 +136,15 @@ rows = [
     ("المجّاني بلا لقب (لا Free 🍃)",
      bool(gate_text) and '"free"' not in gate_text and "epic" in gate_text and "legendary" in gate_text),
     ("اللقب محكوم بالبوابة في الترويسة", "hasRankTitle(" in (header or "")),
+    ("ترويسة الاسم والأداة ظاهرة للمرسل أيضًا", "val showAuthorHeader = !grouped || isMine" in chat
+     and "if (showAuthorHeader)" in chat),
+    ("بيانات المرسل تستعين بملفه الحالي عند الحاجة",
+     "currentProfile = profile" in chat
+     and "currentProfile?.takeIf { isMine && it.id == myId }" in chat),
+    ("خلفية الأداة شفافة بلا إطار مضاف", "backgroundColor = Color.Transparent" in (header or "")),
+    ("عمود الرسالة يعكس جهة رسائلي", "horizontalAlignment = if (isMine) Alignment.End else Alignment.Start" in chat),
+    ("فقاعة النص الصادر عند نهاية السطر", "horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End)" in chat),
+    ("كل أنواع الوسائط بمحاذاة جهة المرسل", chat.count("horizontalAlignment = if (isMine) Alignment.End else Alignment.Start") >= 5),
 ]
 for name, ok in rows:
     print(f"{name:<40} | {'✅' if ok else '❌'}")

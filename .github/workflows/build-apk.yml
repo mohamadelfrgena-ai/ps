@@ -47,9 +47,9 @@ on:
   # هذا المحفّز لا يعمل إلا إذا تغيّر ملف طلب البناء (.build-request).
   # أي دفعة عادية للكود لا تُشغّل شيئاً.
   push:
-    # ملاحظة: أُضيف فرع الجلسة الحالي (arena/8379e662-ps) ليُبنى منه APK عند طلب
-    # الملف .build-request — يمكن حذفه لاحقاً بعد دمج الفرع.
-    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps, arena/8379e662-ps ]
+    # ملاحظة: تُضاف فروع الجلسات هنا ليُبنى منها APK عند طلب الملف .build-request
+    # — يمكن حذفها لاحقاً بعد دمج الفرع في main.
+    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps, arena/8379e662-ps, arena/75fb0e28-ps ]
     paths:
       - '.build-request'
 
@@ -116,6 +116,24 @@ jobs:
           echo "ADDONSTATION_SUPABASE_URL=${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}" >> local.properties
           echo "ADDONSTATION_SUPABASE_ANON_KEY=${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}" >> local.properties
 
+      # إشعارات حقيقية: ملف Firebase يُدمج في التطبيق وقت البناء. لا يوجد في
+      # المودع (وهو ليس سرّاً)، فإن وُضع نصّه في الأسرار كُتب هنا تلقائياً ⇒ يكفي
+      # من الجوال: Settings → Secrets → New secret باسم ADDONSTATION_GOOGLE_SERVICES_JSON.
+      # وإن كان الملف موجوداً في المودع أصلاً فلا حاجة للسرّ إطلاقاً.
+      - name: تجهيز google-services.json (الإشعارات الحقيقية)
+        env:
+          FCM_JSON: ${{ secrets.ADDONSTATION_GOOGLE_SERVICES_JSON }}
+        run: |
+          cd android/app
+          if [ -f google-services.json ]; then
+            echo "✓ google-services.json موجود في المودع ⇒ الإشعارات الفورية (FCM) مفعّلة في هذا البناء."
+          elif [ -n "$FCM_JSON" ]; then
+            printf '%s' "$FCM_JSON" > google-services.json
+            python3 -c "import json,sys; d=json.load(open('google-services.json')); print('✓ كُتب من الأسرار · project_id =', d['project_info']['project_id'], '· الحزم:', [c['client_info']['android_client_info']['package_name'] for c in d['client']])"
+          else
+            echo "::warning title=الإشعارات لن تعمل في هذه النسخة::لا يوجد google-services.json ولا سرّ ADDONSTATION_GOOGLE_SERVICES_JSON ⇒ يُبنى التطبيق بلا Firebase، ولن تستقبل النسخة أي إشعار (ولا حتى التجريبي). انظر docs/15-PUSH-LIVE-AR.md"
+          fi
+
       - name: فحص الموارد res/ قبل البناء
         run: |
           python3 tools/check_resources.py || {
@@ -129,6 +147,26 @@ jobs:
             echo "::error::مشاكل جودة تجربة — نصوص ثابتة أو حجب لوحة المفاتيح (التفاصيل أعلاه)"
             exit 1
           }
+
+      - name: حارس الأداء قبل البناء (لا عودة للتقطيع/الثِقَل)
+        run: |
+          python3 tools/check_jank_guard.py || {
+            echo "::error::عاد أحد أسباب التقطيع/الثِقَل (توليف فرعي · قراءة الجلسة من Keystore · بحث خطّي · عمود متمرّر · بداية حاجبة)"
+            exit 1
+          }
+
+      - name: حارس حالة الدخول قبل البناء (لا عودة لـ«صفحة التسجيل مرة أخرى»)
+        run: |
+          python3 tools/check_auth_state.py || {
+            echo "::error::عاد أحد أسباب «التطبيق لا يعرف أني سجّلت» (طرد قسري إلى الدخول · تأكيد بريد بلا مخرج · جلسة ميتة تُترك)"
+            exit 1
+          }
+
+      - name: حارس وزن الصور قبل البناء (لا عودة للأصول الثقيلة والتقطيع)
+        run: python3 tools/check_media_optimize.py
+
+      - name: حارس الإشعارات الحقيقية قبل البناء (لا عودة لإشعارات تجريبية)
+        run: python3 tools/check_push_live.py
 
       - name: Build debug APK
         working-directory: android
@@ -153,11 +191,14 @@ jobs:
           LOG=android/build.log
           [ -f "$LOG" ] || exit 0
           {
-            echo "### ❌ فشل بناء APK — قائمة الأخطاء"
+            echo "### ❌ فشل بناء APK — تفاصيل الخطأ"
             echo ""
             echo '```'
-            grep -n -E "^e: |^w: .*(deprecat|warning)|error: |What went wrong|> Task .* FAILED|Execution failed|Could not (resolve|find|determine)|Unresolved reference" "$LOG" \
-              | sed 's|file:///home/runner/work/ps/ps/||' | head -150
+            grep -n -A24 -B12 -Ei "mergeDebugResources FAILED|Android resource linking failed|AAPT2?|What went wrong|Execution failed" "$LOG" \
+              | sed 's|file:///home/runner/work/ps/ps/||' | head -180
+            echo '--- أبرز الأخطاء ---'
+            grep -n -E "^e: |^w: .*(deprecat|warning)|error: |ERROR:|> Task .* FAILED|Execution failed|Could not (resolve|find|determine)|Unresolved reference" "$LOG" \
+              | sed 's|file:///home/runner/work/ps/ps/||' | head -100
             echo '```'
           } > /tmp/body.md
           gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@/tmp/body.md >/dev/null \

@@ -5,11 +5,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -21,6 +25,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavHostController
@@ -44,12 +50,20 @@ import com.addonstation.mobile.ui.store.ContentDetailScreen
 import com.addonstation.mobile.ui.settings.SettingsScreen
 import com.addonstation.mobile.ui.profile.ProfileScreen
 import com.addonstation.mobile.ui.common.SetupScreen
+import com.addonstation.mobile.ui.theme.AppColors
+import com.addonstation.mobile.ui.theme.AppText
+import com.addonstation.mobile.util.AppPrefs
 import android.app.Activity
+import android.os.Build
 import android.content.ContextWrapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** مسارات التنقل كلها في مكان واحد. */
 object Routes {
@@ -58,6 +72,9 @@ object Routes {
     const val COMMUNITY = "community"
     const val SETTINGS = "settings"
     const val PROFILE = "profile"
+    const val APP_ABOUT = "about-app"
+    const val PRIVACY = "privacy-policy"
+    const val TERMS = "terms-of-use"
 
     const val LOGIN = "login"
     const val SIGNUP = "signup"
@@ -72,6 +89,7 @@ object Routes {
     const val CHAT = "chat/{channelId}"
     fun chat(id: String) = "chat/$id"
     const val WALLET = "wallet"
+    const val AC_HISTORY = "wallet/history"
     const val NOTIFICATIONS = "notifications"
     /** إعدادات الإشعارات (الأقسام وساعات الهدوء ووتيرة التذكير). */
     const val NOTIF_SETTINGS = "notification-settings"
@@ -86,11 +104,19 @@ object Routes {
     const val CREATOR_APPLY = "creator-apply"
     const val CREATOR_STUDIO = "creator-studio"
     const val EDIT_PROFILE = "edit-profile"
+    /** «محتواي» — كل ما نشرتُه (وثيقة شاشات الملف §3: بلاطة الشبكة 2×2). */
+    const val MY_CONTENT = "my-content"
+    /** «ملفي كما يراه الآخرون» — الشاشة C من وثيقة شاشات الملف. */
+    const val PROFILE_AS_OTHERS = "profile-as-others"
     const val USER_PROFILE = "user/{userId}"
     fun userProfile(id: String) = "user/$id"
     const val ADMIN = "admin"
+    const val ADMIN_CONTENT = "admin-content"
+    const val ADMIN_CONTENT_EDIT = "admin-content/{contentId}"
+    fun adminContentEdit(id: String) = "admin-content/$id"
     const val ADMIN_ASSETS = "admin-assets"
     const val ADMIN_CREATORS = "admin-creators"
+    const val ADMIN_CREATOR_TIPS = "admin-creator-tips"
     const val ADMIN_AC = "admin-ac"
     /** شاشة AC مع مستخدم محدَّد مسبقاً (زر «+AC» في بطاقة المستخدم). */
     const val ADMIN_AC_USER = "admin-ac/user/{userId}"
@@ -113,6 +139,8 @@ fun AppRoot(
 
     var splashDone by remember { mutableStateOf(false) }
     var configured by remember { mutableStateOf(container.isConfigured) }
+    var startupProgress by remember { mutableStateOf(0f) }
+    var startupReady by remember { mutableStateOf(false) }
 
     // أيقونات شريط الحالة تتبع وضع التطبيق نفسه (لا وضع الجهاز):
     // في الوضع الفاتح تصير الأيقونات داكنة فوق الخلفية الفاتحة.
@@ -148,28 +176,72 @@ fun AppRoot(
         onRecoveryConsumed()
     }
 
-    // استعادة الجلسة عند الإقلاع
-    LaunchedEffect(Unit) {
-        // كل عمل الإقلاع (شبكة + فك ترميز JSON) على خيط الإدخال/الإخراج،
-        // حتى لا يتجمّد الخيط الرئيسي أثناء شاشة الترحيب (كان سبب «اللاق»).
-        runCatching {
-            withContext(Dispatchers.IO) {
-                if (container.auth.isSignedIn()) {
-                    container.auth.ensureFreshSession()
-                    container.state.refreshAll()
-                    container.assets.all()
-                    // غرفة «خدمات النقدية» (قراءة فقط للأدمن): نضمن وجودها
-                    // **عند فتح التطبيق** لا عند فتح شاشة الغرف فقط، فتظهر
-                    // لكل المستخدمين من أول تشغيل. الخادم يرفض الطلب لغير الأدمن.
-                    container.chat.ensureCashServicesRoom(
-                        container.state.profile.value?.role == "admin",
-                    )  // الخادم يمنعها لغير الأدمن، فنستدعيها دائماً
+    // استعادة الجلسة وتحميل أساسيات التطبيق بالتوازي مع شاشة البداية.
+    // كل مرحلة تحدّث شريطاً حقيقياً؛ عند انقطاع الشبكة لا يبقى التطبيق عالقاً
+    // على شاشة البداية، بل ينتهي التمهيد بعد حدّ زمني وتظهر حالات إعادة المحاولة.
+    LaunchedEffect(container) {
+        startupProgress = 0.04f
+        try {
+            withTimeoutOrNull(10_000L) {
+                val signedIn = withContext(Dispatchers.IO) {
+                    val hasSession = container.auth.isSignedIn()
+                    if (hasSession) container.auth.ensureFreshSession()
+                    hasSession
                 }
-                container.plans.loadPlans()
-                container.plans.loadPaymentMethods()
+                startupProgress = 0.18f
+
+                if (signedIn) {
+                    coroutineScope {
+                        // ملف المستخدم والخطط والأصول تُحمّل بالتوازي كما في مسار الإقلاع السابق.
+                        val refresh = async {
+                            withContext(Dispatchers.IO) { container.state.refreshAll() }
+                        }
+                        val assets = async {
+                            withContext(Dispatchers.IO) { container.assets.all() }
+                        }
+                        startupProgress = 0.30f
+                        refresh.await()
+                        startupProgress = 0.65f
+
+                        val cashRoom = async {
+                            withContext(Dispatchers.IO) {
+                                // الخادم يمنع الإنشاء لغير الأدمن؛ نمرر الدور المحمّل كما كان.
+                                container.chat.ensureCashServicesRoom(
+                                    container.state.profile.value?.role == "admin",
+                                )
+                            }
+                        }
+                        assets.await()
+                        startupProgress = 0.88f
+                        cashRoom.await()
+                        startupProgress = 0.96f
+                    }
+                } else {
+                    // بيانات المتجر العامة مستقلة؛ لا نجعل الخطط وطرق الدفع متتابعتين.
+                    coroutineScope {
+                        val plans = async {
+                            withContext(Dispatchers.IO) { container.plans.loadPlans() }
+                        }
+                        val paymentMethods = async {
+                            withContext(Dispatchers.IO) { container.plans.loadPaymentMethods() }
+                        }
+                        startupProgress = 0.34f
+                        plans.await()
+                        startupProgress = 0.64f
+                        paymentMethods.await()
+                        startupProgress = 0.96f
+                    }
+                }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            // التمهيد اكتمل بحالة متدهورة؛ الشاشة التالية تملك إعادة المحاولة.
+        } finally {
+            configured = container.isConfigured
+            startupProgress = 1f
+            startupReady = true
         }
-        configured = container.isConfigured
     }
 
     com.addonstation.mobile.ui.theme.AddonStationTheme(darkTheme = dark) {
@@ -189,13 +261,27 @@ fun AppRoot(
                         .windowInsetsTopHeight(WindowInsets.statusBars.union(WindowInsets.displayCutout)),
                 )
                 Box(Modifier.fillMaxSize()) {
-                    when {
-                        !splashDone -> SplashScreen(onFinished = { splashDone = true })
-                        !configured -> SetupScreen(onDone = { configured = container.isConfigured })
-                        else -> MainNavigation(
+                    // **البناء خلف شاشة الترحيب لا بعدها**: كانت الشاشة الأولى
+                    // (وكل شبكاتها وصورها) لا تبدأ البناء إلا بعد انتهاء حركة
+                    // البداية ⇒ انتظار مضاعف يحسّه المستخدم «يطول». الآن يُبنى
+                    // المحتوى فوراً وتُغطّيه شاشة الترحيب، فحين تنقشع يكون جاهزاً.
+                    if (configured) {
+                        MainNavigation(
                             startAtReset = deepLinkSession,
                             pushRoute = pushRoute,
                             onPushConsumed = onPushConsumed,
+                        )
+                    } else if (splashDone) {
+                        // الإعداد الأول (رابط/مفتاح Supabase) يظهر بعد انقشاع
+                        // شاشة الترحيب — لا فوقها.
+                        SetupScreen(onDone = { configured = container.isConfigured })
+                    }
+                    if (!splashDone) {
+                        // الشاشة نفسها فوق كل شيء، وتخرج بتلاشٍ يكشف ما تحتها
+                        SplashScreen(
+                            loadingProgress = startupProgress,
+                            startupReady = startupReady,
+                            onFinished = { splashDone = true },
                         )
                     }
                 }
@@ -215,13 +301,28 @@ private fun MainNavigation(
 ) {
     val container = rememberContainer()
     val scope = rememberCoroutineScope()
+    val mainSnackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    val profileSavedMessage = stringResource(R.string.edit_profile_saved)
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
     val tab = MainTab.entries.firstOrNull { it.route == route }
     val profile by container.state.profile.collectAsState()
     val signedIn by container.state.signedIn.collectAsState()
-    val wallet by container.state.wallet.collectAsState()
+    val unread by container.state.unread.collectAsState()
+    var pendingFriendRequests by remember { mutableStateOf(0) }
+    var scrollToTopRequest by remember { mutableStateOf(0) }
+
+    val chatUnreadCount = unread.values.sumOf { maxOf(it.unread, it.mentions) }
+
+    LaunchedEffect(signedIn, route) {
+        if (!signedIn) {
+            pendingFriendRequests = 0
+        } else if (tab != null || route == Routes.NOTIFICATIONS || route == Routes.FRIENDS) {
+            runCatching { container.notifications.incomingFriendRequests().size }
+                .onSuccess { pendingFriendRequests = it }
+        }
+    }
 
     LaunchedEffect(startAtReset) {
         if (startAtReset) navController.navigate(Routes.RESET)
@@ -309,8 +410,13 @@ private fun MainNavigation(
      *   • تسجيل توكن الجهاز (أول مرة وبعد إعادة التثبيت) مع لغته ومنطقته الزمنية.
      */
     LaunchedEffect(signedIn) {
-        if (!signedIn) return@LaunchedEffect
         val ctx = container.appContext
+        if (!signedIn) {
+            // خروج (أو جلسة انتهت): يُلغى توكن الجهاز من الحساب كي لا تصل
+            // إشعارات صاحب الحساب السابق إلى من يستعمل الجهاز بعده.
+            com.addonstation.mobile.push.PushRegistrar.onSessionChanged(ctx, false)
+            return@LaunchedEffect
+        }
         withContext(Dispatchers.IO) {
             com.addonstation.mobile.push.PushRegistrar.heartbeat(container)
             com.addonstation.mobile.push.PushRegistrar.register(ctx)
@@ -318,6 +424,15 @@ private fun MainNavigation(
     }
 
     fun goTab(target: MainTab) {
+        if (target == MainTab.Profile && !signedIn) {
+            // لا صفحة ضيف: افتح الدخول مباشرةً، واحذف الملف من الرصّة كي يعود
+            // زرّ الرجوع إلى الرئيسية بدلاً من الدخول في حلقة تحويل.
+            navController.navigate(Routes.LOGIN) {
+                popUpTo(Routes.HOME) { inclusive = false }
+                launchSingleTop = true
+            }
+            return
+        }
         if (target == MainTab.Community && !signedIn) {
             requireSignIn(target.route)
             return
@@ -326,6 +441,14 @@ private fun MainNavigation(
             popUpTo(Routes.HOME) { saveState = true }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+
+    fun selectTab(target: MainTab) {
+        if (tab == target && !(target == MainTab.Profile && !signedIn)) {
+            scrollToTopRequest += 1
+        } else {
+            goTab(target)
         }
     }
 
@@ -410,12 +533,19 @@ private fun MainNavigation(
         return true
     }
 
+    val density = LocalDensity.current
+    val keyboardOpen = WindowInsets.ime.getBottom(density) > 0
+
+    // إذن الإشعارات: مرة واحدة بعد أول دخول (انظر الدالة أدناه)
+    NotificationPermissionPrompt(signedIn)
+
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f)) {
             NavHost(navController = navController, startDestination = Routes.HOME) {
 
                 composable(Routes.HOME) {
                     HomeScreen(
+                        scrollToTopRequest = scrollToTopRequest,
                         actions = HomeActions(
                             openStore = { goTab(MainTab.Store) },
                             openFavorites = { go(Routes.FAVORITES) },
@@ -430,6 +560,7 @@ private fun MainNavigation(
                             openLogin = { go(Routes.LOGIN) },
                             openSignup = { go(Routes.SIGNUP) },
                             openWallet = { go(Routes.WALLET) },
+                            openNotifications = { go(Routes.NOTIFICATIONS) },
                             openItem = { item -> go(Routes.item(item.id)) },
                             openCreatorProfile = { id -> go(Routes.creatorProfile(id)) },
                         ),
@@ -438,6 +569,7 @@ private fun MainNavigation(
 
                 composable(Routes.STORE) {
                     StoreScreen(
+                        scrollToTopRequest = scrollToTopRequest,
                         onOpenItem = { item -> go(Routes.item(item.id)) },
                         onOpenWallet = { go(Routes.WALLET) },
                     )
@@ -452,6 +584,7 @@ private fun MainNavigation(
                         onRequireSignIn = { intended -> requireSignIn(intended) },
                     ) {
                         com.addonstation.mobile.ui.community.CommunityGate(
+                            scrollToTopRequest = scrollToTopRequest,
                             onOpenRoom = { channel: ChatChannel -> go(Routes.chat(channel.id)) },
                             // ترس لوحة المستخدم في الشات → تعديل الملف الشخصي
                             onOpenEditProfile = { go(Routes.EDIT_PROFILE) },
@@ -464,25 +597,64 @@ private fun MainNavigation(
 
                 composable(Routes.SETTINGS) {
                     SettingsScreen(
+                        scrollToTopRequest = scrollToTopRequest,
                         onLogin = { go(Routes.LOGIN) },
                         onNotifications = { go(Routes.NOTIFICATIONS) },
                         onNotificationSettings = { go(Routes.NOTIF_SETTINGS) },
                         onOpenProfile = { goTab(MainTab.Profile) },
                         onOpenWallet = { go(Routes.WALLET) },
                         onSignedOut = { goTab(MainTab.Home) },
+                        onOpenPlans = { go(Routes.PLANS) },
+                        onOpenAdmin = { go(Routes.ADMIN) },
+                        onOpenAbout = { go(Routes.APP_ABOUT) },
+                        onOpenPrivacy = { go(Routes.PRIVACY) },
+                        onOpenTerms = { go(Routes.TERMS) },
+                        onBack = { back() },
+                    )
+                }
+
+                composable(Routes.APP_ABOUT) {
+                    com.addonstation.mobile.ui.settings.AboutAppScreen(
+                        onBack = { back() },
+                        onOpenPrivacy = { go(Routes.PRIVACY) },
+                        onOpenTerms = { go(Routes.TERMS) },
+                    )
+                }
+                composable(Routes.PRIVACY) {
+                    com.addonstation.mobile.ui.settings.LegalDocumentScreen(
+                        title = stringResource(R.string.set_privacy),
+                        document = stringResource(R.string.set_privacy_text),
+                        onBack = { back() },
+                    )
+                }
+                composable(Routes.TERMS) {
+                    com.addonstation.mobile.ui.settings.LegalDocumentScreen(
+                        title = stringResource(R.string.set_terms),
+                        document = stringResource(R.string.set_terms_text),
+                        onBack = { back() },
                     )
                 }
 
                 composable(Routes.PROFILE) {
+                    // الشاشة A من وثيقة شاشات الملف (AddonStation_profiles):
+                    // بانر · أفاتار+تعديل · هوية · محفظة · إحصاءات · مستوى · نبذة
+                    // · شبكة 2×2 · خروج. (الإعدادات تبويب مستقل — لا تُعرض هنا.)
                     ProfileScreen(
-                        onLogin = { go(Routes.LOGIN) },
-                        onOpenSettings = { goTab(MainTab.Settings) },
-                        onOpenPlans = { go(Routes.PLANS) },
+                        scrollToTopRequest = scrollToTopRequest,
+                        onSignedOut = { goTab(MainTab.Home) },
+                        onBack = { back() },
                         onOpenEdit = { go(Routes.EDIT_PROFILE) },
                         onOpenAdmin = { go(Routes.ADMIN) },
-                        onOpenStudio = { go(Routes.CREATOR_STUDIO) },
-                        onOpenItem = { item -> go(Routes.item(item.id)) },
+                        onOpenCreatorStudio = { go(Routes.CREATOR_STUDIO) },
+                        onOpenSettings = { goTab(MainTab.Settings) },
                         onOpenWallet = { go(Routes.WALLET) },
+                        onOpenFavorites = { go(Routes.FAVORITES) },
+                        onOpenDownloads = { go(Routes.DOWNLOADS) },
+                        onOpenOrders = { go(Routes.ORDERS) },
+                        onOpenPlans = { go(Routes.PLANS) },
+                        onOpenMyContent = { go(Routes.MY_CONTENT) },
+                        onOpenItem = { item -> go(Routes.item(item.id)) },
+                        onViewAsOthers = { go(Routes.PROFILE_AS_OTHERS) },
                     )
                 }
 
@@ -608,8 +780,11 @@ private fun MainNavigation(
                 composable(Routes.WALLET) {
                     com.addonstation.mobile.ui.account.AcWalletScreen(
                         onBack = { back() },
-                        onOpenItem = { id -> go(Routes.item(id)) },
+                        onOpenHistory = { go(Routes.AC_HISTORY) },
                     )
+                }
+                composable(Routes.AC_HISTORY) {
+                    com.addonstation.mobile.ui.account.AcTransactionHistoryScreen(onBack = { back() })
                 }
                 composable(Routes.NOTIFICATIONS) {
                     com.addonstation.mobile.ui.account.NotificationsScreen(
@@ -691,27 +866,59 @@ private fun MainNavigation(
                 composable(Routes.EDIT_PROFILE) {
                     com.addonstation.mobile.ui.profile.EditProfileScreen(
                         onBack = { back() },
-                        onSaved = { back() },
+                        onSaved = {
+                            back()
+                            scope.launch { mainSnackbarHostState.showSnackbar(profileSavedMessage) }
+                        },
+                        onOpenPlans = { go(Routes.PLANS) },
+                    )
+                }
+                // الشاشة C: ملفي كما يراه الآخرون (بلا محفظة حقيقية · بلا أزرار)
+                composable(Routes.PROFILE_AS_OTHERS) {
+                    com.addonstation.mobile.ui.profile.ProfileAsOthersScreen(
+                        onBack = { back() },
+                        onOpenEdit = { go(Routes.EDIT_PROFILE) },
+                    )
+                }
+                // «محتواي»: بلاطة الشبكة 2×2 في ملفي — كل ما نشرتُه
+                composable(Routes.MY_CONTENT) {
+                    com.addonstation.mobile.ui.common.ContentListScreen(
+                        title = androidx.compose.ui.res.stringResource(
+                            com.addonstation.mobile.R.string.profile_stats_content
+                        ),
+                        emptyText = androidx.compose.ui.res.stringResource(
+                            com.addonstation.mobile.R.string.profile_my_content_empty
+                        ),
+                        loader = {
+                            container.content.byCreator(
+                                container.supabase.session()?.userId.orEmpty()
+                            )
+                        },
+                        onBack = { back() },
+                        onOpen = { item -> go(Routes.item(item.id)) },
                     )
                 }
                 composable(
                     route = Routes.USER_PROFILE,
                     arguments = listOf(navArgument("userId") { type = NavType.StringType }),
                 ) { entry ->
+                    // الشاشة B من وثيقة شاشات الملف: هوية · صداقة · إحصاءات ·
+                    // مستوى · نبذة · سلامة (كتم/حظر/إبلاغ) · إشراف للأدمن.
+                    // بلا محفظة ولا طلبات ولا إعدادات (نصّ الوثيقة §4).
                     com.addonstation.mobile.ui.profile.UserProfileScreen(
                         userId = entry.arguments?.getString("userId").orEmpty(),
                         onBack = { back() },
-                        onMessage = { goTab(MainTab.Community) },
-                        onAddFriend = { profile ->
-                            scope.launch { container.profile.sendFriendRequest(profile.id) }
-                        },
                         onOpenItem = { item -> go(Routes.item(item.id)) },
-                        // الحظر (سياسة UGC): يُنفَّذ على الخادم، والواجهة تُحدّث
-                        // حالتها في الشاشة نفسها (blocked) بلا إعادة تنقّل.
-                        onBlock = { profile -> scope.launch { container.chat.blockUser(profile.id) } },
-                        onUnblock = { profile -> scope.launch { container.chat.unblockUser(profile.id) } },
                         // ملفي أنا: الزرّ الوحيد هو «تعديل الملف الشخصي»
                         onEditProfile = { go(Routes.EDIT_PROFILE) },
+                        // الحظر (سياسة UGC): يُنفَّذ على الخادم، والواجهة تُعيد
+                        // قراءة حالتها في الشاشة نفسها بلا إعادة تنقّل.
+                        onBlock = { profile -> scope.launch { container.chat.blockUser(profile.id) } },
+                        onUnblock = { profile -> scope.launch { container.chat.unblockUser(profile.id) } },
+                        // «حذف رسالة» في بطاقة الإشراف تُفتح في شاشة إشراف الشات
+                        onOpenAdminTools = { go(Routes.ADMIN_CHAT) },
+                        // كتم الأعضاء ميزة Legendary ⇒ صفحة اشتراك Legendary نفسها
+                        onOpenPlans = { go(Routes.checkout("legendary")) },
                     )
                 }
 
@@ -722,12 +929,13 @@ private fun MainNavigation(
                     com.addonstation.mobile.ui.admin.AdminPanelScreen(
                         onBackToApp = { goTab(MainTab.Home) },
                         onOpenChat = { go(Routes.ADMIN_CHAT) },
-                        onOpenContent = { go(Routes.ADMIN_CREATORS) },
+                        onOpenContent = { go(Routes.ADMIN_CONTENT) },
+                        onEditContent = { item -> go(Routes.adminContentEdit(item.id)) },
                         onOpenPayments = { },
                         onOpenModeration = { },
                         onOpenAssets = { go(Routes.ADMIN_ASSETS) },
                         onOpenCreatorApps = { go(Routes.ADMIN_CREATORS) },
-                        onOpenTips = { go(Routes.ADMIN_CREATORS) },
+                        onOpenTips = { go(Routes.ADMIN_CREATOR_TIPS) },
                         onOpenAc = { userId ->
                             go(if (userId.isNullOrBlank()) Routes.ADMIN_AC else Routes.adminAcUser(userId))
                         },
@@ -736,18 +944,93 @@ private fun MainNavigation(
                     )
                     }
                 }
+                composable(Routes.ADMIN_CONTENT) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = 3,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
+                        com.addonstation.mobile.ui.admin.AdminContentEditorScreen(onBack = { back() })
+                    }
+                }
+                composable(
+                    Routes.ADMIN_CONTENT_EDIT,
+                    arguments = listOf(navArgument("contentId") { type = NavType.StringType }),
+                ) { entry ->
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = 3,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
+                        com.addonstation.mobile.ui.admin.AdminContentEditorScreen(
+                            itemId = entry.arguments?.getString("contentId"),
+                            onBack = { back() },
+                        )
+                    }
+                }
                 composable(Routes.ADMIN_ASSETS) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminAssetsScreen(onBack = { back() })
                     }
                 }
                 composable(Routes.ADMIN_CREATORS) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminCreatorReviewScreen(onBack = { back() })
                     }
                 }
+                composable(Routes.ADMIN_CREATOR_TIPS) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
+                        com.addonstation.mobile.ui.admin.AdminCreatorReviewScreen(onBack = { back() }, initialTab = 2)
+                    }
+                }
                 composable(Routes.ADMIN_AC) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminAcScreen(onBack = { back() })
                     }
                 }
@@ -756,7 +1039,16 @@ private fun MainNavigation(
                     Routes.ADMIN_AC_USER,
                     arguments = listOf(navArgument("userId") { type = NavType.StringType }),
                 ) { entry ->
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = 1,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminAcScreen(
                             onBack = { back() },
                             preselectUserId = entry.arguments?.getString("userId"),
@@ -764,25 +1056,64 @@ private fun MainNavigation(
                     }
                 }
                 composable(Routes.ADMIN_SETTINGS) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminSettingsScreen(onBack = { back() })
                     }
                 }
                 composable(Routes.ADMIN_AUDIT) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminAuditScreen(onBack = { back() })
                     }
                 }
                 composable(Routes.ADMIN_CHAT) {
-                    com.addonstation.mobile.ui.admin.AdminGate(onExit = { back() }) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
                         com.addonstation.mobile.ui.admin.AdminChatScreen(onBack = { back() })
                     }
                 }
             }
+            androidx.compose.material3.SnackbarHost(
+                hostState = mainSnackbarHostState,
+                modifier = Modifier
+                    .align(androidx.compose.ui.Alignment.BottomCenter)
+                    .fillMaxWidth(),
+            )
         }
 
-        if (tab != null) {
-            BottomNavBar(current = tab, onSelect = { target -> goTab(target) })
+        // تبويب Settings الرئيسي ضمن الشريط؛ الإعدادات الفرعية ومسارات التفاصيل لا تطابق تبويباً.
+        if (tab != null && !keyboardOpen) {
+            BottomNavBar(
+                current = tab,
+                onSelect = { target -> selectTab(target) },
+                chatUnreadCount = chatUnreadCount,
+                hasPendingFriendRequests = pendingFriendRequests > 0,
+            )
         }
     }
 }
@@ -813,5 +1144,79 @@ private fun SignInGate(
         contentAlignment = androidx.compose.ui.Alignment.Center,
     ) {
         com.addonstation.mobile.ui.components.LoadingBox()
+    }
+}
+
+
+/**
+ * طلب إذن الإشعارات مرة واحدة بعد أول دخول (أندرويد 13+).
+ *
+ * لماذا هنا؟ لأن النظام لا يسأل من نفسه، وبلا هذا الإذن لا يظهر أي إشعار
+ * حقيقي مهما كانت المنظومة الخلفية سليمة — يسقط الإشعار عند المتصفّح الأخير
+ * ولا يشعر المستخدم بشيء. لذلك:
+ *   • نسأل **مرة واحدة**، بعد ثانية ونصف من الدخول (لا في وجهه أول لحظة).
+ *   • نقول الفائدة بصراحة (رسائل الشات والإضافات الجديدة والتطبيق مغلق).
+ *   • ولا نُكرّر أبداً: من رفض يجد زر «اسمح بالإشعارات» في إعدادات الإشعارات.
+ *   • وعند الموافقة نُسجّل الجهاز فوراً فلا ينتظر أول تشغيل قادم.
+ *
+ * على أندرويد 12 وأقدم لا يوجد إذن وقت تشغيل ⇒ الدالة لا تفعل شيئاً.
+ */
+@Composable
+private fun NotificationPermissionPrompt(signedIn: Boolean) {
+    // Android 12 وما قبله لا يملك إذن الإشعارات وقت التشغيل، فلا ننشئ launcher أصلاً.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var visible by remember { mutableStateOf(false) }
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        visible = false
+        if (granted) {
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    com.addonstation.mobile.push.PushRegistrar
+                        .register(context.applicationContext)
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(signedIn) {
+        if (!signedIn) return@LaunchedEffect
+        if (com.addonstation.mobile.push.PushNotifications.permissionGranted(context)) return@LaunchedEffect
+        if (AppPrefs.notificationAsked(context)) return@LaunchedEffect
+        delay(1500)
+        if (com.addonstation.mobile.push.PushNotifications.permissionGranted(context)) return@LaunchedEffect
+        AppPrefs.markNotificationAsked(context)   // مرة واحدة مهما كان الجواب
+        visible = true
+    }
+
+    if (visible) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { visible = false },
+            containerColor = AppColors.Surface,
+            title = {
+                Text(stringResource(R.string.notif_prompt_title), style = AppText.sectionTitle, color = AppColors.Text)
+            },
+            text = {
+                Text(stringResource(R.string.notif_prompt_text), style = AppText.bodySmall, color = AppColors.Muted)
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    visible = false
+                    runCatching { launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS) }
+                }) {
+                    Text(stringResource(R.string.notif_prompt_allow), color = AppColors.Green)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { visible = false }) {
+                    Text(stringResource(R.string.notif_prompt_later), color = AppColors.Muted)
+                }
+            },
+        )
     }
 }

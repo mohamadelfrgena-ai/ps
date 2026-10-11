@@ -152,6 +152,19 @@ data class AcWallet(
 )
 
 @Serializable
+data class ProfileStats(
+    val friends: Int = 0,
+    val downloads: Int = 0,
+    val favorites: Int = 0,
+    val level: Int = 1,
+    @SerialName("xp_in_level") val xpInLevel: Int = 0,
+    @SerialName("xp_to_next") val xpToNext: Int = 100,
+    val streak: Int = 0,
+    @SerialName("daily_claimed") val dailyClaimed: Boolean = false,
+    @SerialName("daily_reward") val dailyReward: Int = 0,
+)
+
+@Serializable
 data class AcTransaction(
     val id: Long = 0,
     @SerialName("user_id") val userId: String = "",
@@ -234,13 +247,23 @@ data class ChatMessageUi(
      * فوراً من الجهاز قبل أن يوقّع الخادم رابطها — فلا تبقى الصورة بيضاء.
      */
     val localPreview: String? = null,
-)
+) {
+    /**
+     * مفتاح اليوم (بالتوقيت المحلي) — يُحسب **مرة واحدة** عند أول عرض ويُخزَّن.
+     * تقارنه شاشة الشات نصّياً لرسم فاصل التاريخ، فلا يُحسب نصّ التاريخ مرّتين
+     * لكل رسالة في كل إطار (سبب تقطيع أثناء التمرير — انظر [TimeFormat.dayLabel]).
+     */
+    val dayKey: String by lazy(LazyThreadSafetyMode.NONE) {
+        com.addonstation.mobile.util.TimeFormat.localDayKey(message.createdAt)
+    }
+}
 
 @Serializable
 data class ChatReport(
     val id: Long,
     @SerialName("message_id") val messageId: Long? = null,
     @SerialName("reporter_id") val reporterId: String = "",
+    @SerialName("target_user_id") val targetUserId: String? = null,
     val reason: String = "other",
     val note: String? = null,
     val status: String = "open",
@@ -287,6 +310,11 @@ data class PushTestResult(val ok: Boolean = false, val message: String? = null)
 data class BlockedUser(
     @SerialName("blocked_id") val blockedId: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class MutedUser(
+    @SerialName("muted_id") val mutedId: String? = null,
 )
 
 @Serializable

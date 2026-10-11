@@ -194,7 +194,7 @@ private fun PlanCard(plan: SubscriptionPlan, isCurrent: Boolean, onSelect: () ->
         )
         if (!plan.isFree) {
             GradientButton(
-                text = if (plan.id == "legendary") stringResource(R.string.plan_join_legendary)
+                text = if (plan.id == "legendary") stringResource(R.string.plan_join_legendary_plain)
                 else stringResource(R.string.plan_choose),
                 onClick = onSelect,
                 colors = listOf(accent, accent.copy(alpha = 0.7f)),
@@ -240,7 +240,7 @@ fun CheckoutScreen(
     var status by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val sentMsg = stringResource(R.string.plan_order_sent)
+    val sentMsg = stringResource(R.string.plan_order_sent_plain)
     val chooseReceipt = stringResource(R.string.plan_choose_receipt)
     val unavailable = stringResource(R.string.plan_unavailable)
 

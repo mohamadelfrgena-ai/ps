@@ -27,6 +27,71 @@ data class AppPalette(
     val dangerBg: Color, val onGreen: Color,
 )
 
+/** ألوان شاشة Home v2 والشريط المشترك؛ تُحقن بالـ CompositionLocal من الثيم الحالي. */
+@Immutable
+data class HomePalette(
+    val isDark: Boolean,
+    val bg: Color,
+    val surface: Color,
+    val surfaceHigh: Color,
+    val barSurface: Color,
+    val border: Color,
+    val text: Color,
+    val textMuted: Color,
+    val chipText: Color,
+    val blue: Color,
+    val accentBlue: Color,
+    val blueLink: Color,
+    val goldFill: Color,
+    val goldText: Color,
+    val planStart: Color,
+    val planEnd: Color,
+    val planBorder: Color,
+    val planSecondary: Color,
+    val epic: Color,
+    val inactive: Color,
+    val homeInactiveBg: Color,
+    val homeInactiveIcon: Color,
+    val notificationBadge: Color,
+    val heroOverlay: Color,
+    val heroSubtitle: Color,
+    val buttonText: Color,
+    val goldInk: Color,
+    val cardShadow: Color,
+    val barShadow: Color,
+)
+
+object HomePalettes {
+    val Dark = HomePalette(
+        isDark = true,
+        bg = Color(0xFF0A0F1C), surface = Color(0xFF121A2B), surfaceHigh = Color(0xFF1A2438),
+        barSurface = Color(0xFF0E1526), border = Color(0xFF223049), text = Color(0xFFEAF0FA),
+        textMuted = Color(0xFF9DB0CF), chipText = Color(0xFFC4D1E8), blue = Color(0xFF2E7BEF), accentBlue = Color(0xFF4C9AFF),
+        blueLink = Color(0xFF6FA8FF), goldFill = Color(0xFFF0C25E), goldText = Color(0xFFF0C25E),
+        planStart = Color(0xFF3A2A0B), planEnd = Color(0xFF1B1405), planBorder = Color(0xFF8A6A22),
+        planSecondary = Color(0xFFE8D5A3), epic = Color(0xFF9B6BFF), inactive = Color(0xFF8EA0BF),
+        homeInactiveBg = Color(0xFF1A2438), homeInactiveIcon = Color(0xFFC4D1E8),
+        notificationBadge = Color(0xFFFF6B78), heroOverlay = Color(0xFF0A0F1C),
+        heroSubtitle = Color(0xFFD3DDF0), buttonText = Color.White, goldInk = Color(0xFF1B1405),
+        cardShadow = Color.Transparent, barShadow = Color.Black.copy(alpha = 0.50f),
+    )
+    val Light = HomePalette(
+        isDark = false,
+        bg = Color(0xFFF4F7FC), surface = Color(0xFFFFFFFF), surfaceHigh = Color(0xFFE8EEF8),
+        barSurface = Color(0xFFFFFFFF), border = Color(0xFFD5DEEC), text = Color(0xFF0E1526),
+        textMuted = Color(0xFF53627F), chipText = Color(0xFF33425F), blue = Color(0xFF2563D6), accentBlue = Color(0xFF4C9AFF),
+        blueLink = Color(0xFF1D4FB8), goldFill = Color(0xFFF0C25E), goldText = Color(0xFF7A5600),
+        planStart = Color(0xFFFFF3D2), planEnd = Color(0xFFFFE7A8), planBorder = Color(0xFFE0B24A),
+        planSecondary = Color(0xFF5C4300), epic = Color(0xFF9B6BFF), inactive = Color(0xFF53627F),
+        homeInactiveBg = Color(0xFFE8EEF8), homeInactiveIcon = Color(0xFF33425F),
+        notificationBadge = Color(0xFFE5484D), heroOverlay = Color(0xFF0A0F1C),
+        heroSubtitle = Color(0xFFD3DDF0), buttonText = Color.White, goldInk = Color(0xFF1B1405),
+        cardShadow = Color(0x140E1526), barShadow = Color(0x2E0E1526),
+    )
+}
+
+val LocalHomePalette = androidx.compose.runtime.staticCompositionLocalOf { HomePalettes.Dark }
+
 /**
  * ألوان التطبيق — تُقرأ من اللوحة النشطة (داكنة أو فاتحة).
  *
@@ -137,6 +202,52 @@ object AppColors {
     val LightElevated: Color get() = LightPalette.elevated2
     val LightBorder: Color get() = LightPalette.border
     val LightText: Color get() = LightPalette.text
+
+    /**
+     * لوحة ثابتة لشاشات المصادقة والإعدادات وفق SPEC_AUTH_SETTINGS.md.
+     * هذه الشاشات داكنة كما يحدّد التصميم؛ تفضيل الوضع العام يبقى محفوظاً
+     * ويستمر تأثيره في بقية التطبيق.
+     */
+    val AuthWhite = Color(0xFFFFFFFF)
+    val AuthBg = Color(0xFF0A0F1C)
+    val AuthSurface = Color(0xFF121A2B)
+    val AuthSurfaceHigh = Color(0xFF1A2438)
+    val AuthBarSurface = Color(0xFF0E1526)
+    val AuthBorder = Color(0xFF223049)
+    val AuthDivider = Color(0xFF1D2940)
+    val AuthText = Color(0xFFEAF0FA)
+    val AuthMuted = Color(0xFF9DB0CF)
+    val AuthChipLabel = Color(0xFFC4D1E8)
+    val AuthBlue = Color(0xFF2E7BEF)
+    val AuthBlueLight = Color(0xFF6FA8FF)
+    val AuthGold = Color(0xFFF0C25E)
+    val AuthGoldDark = Color(0xFF1B1405)
+    val AuthGoldBorder = Color(0xFF8A6A22)
+    val AuthGoldLine = Color(0xFF5A4416)
+    val AuthGoldSoft = Color(0xFFE8D5A3)
+    val AuthWalletTop = Color(0xFF3E2D0C)
+    val AuthStreakBg = Color(0xFF1A1710)
+    val AuthStreakBorder = Color(0xFF4A3A18)
+    val AuthStreakMuted = Color(0xFF8A7A52)
+    val AuthClaimDisabled = Color(0xFF3A3220)
+    val AuthNavInactive = Color(0xFF8EA0BF)
+    val AuthGreen = Color(0xFF3FBF6A)
+    val AuthGreenText = Color(0xFF7FD99A)
+    val AuthPurple = Color(0xFF9B6BFF)
+    val AuthTeal = Color(0xFF2DD4BF)
+    val AuthAccentBlue = Color(0xFF4C9AFF)
+    val AuthRed = Color(0xFFFF6B78)
+    val AuthRedText = Color(0xFFFF8791)
+    val AuthRedButton = Color(0xFFB3414B)
+    val AuthRedBorder = Color(0xFF5A2830)
+    val AuthRedBorderStrong = Color(0xFF6B2D36)
+    val AuthRedTextSoft = Color(0xFFE6B3B8)
+    val AuthRedTop = Color(0xFF22121A)
+    val AuthRedBottom = Color(0xFF150B10)
+    val AuthPlanTop = Color(0xFF3A2A0B)
+    val AuthPlanButton = Color(0xFF2A2210)
+    val AuthMasterTop = Color(0xFF102244)
+    val AuthPermissionBorder = Color(0xFF5A4416)
 }
 
 /** ألوان شارات الرتب حسب الوثيقة. */

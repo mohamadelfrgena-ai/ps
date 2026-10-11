@@ -11,10 +11,16 @@ import com.addonstation.mobile.data.SupabaseClient
 import com.addonstation.mobile.data.model.AcWallet
 import com.addonstation.mobile.data.model.FriendEntry
 import com.addonstation.mobile.data.model.Profile
+import com.addonstation.mobile.data.model.ProfileStats
 import com.addonstation.mobile.data.model.SiteAsset
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * الملفات الشخصية: القراءة، التعديل، المحفظة، الأصدقاء، والأصول المتاحة حسب الخطة.
@@ -82,6 +88,25 @@ class ProfileRepository(
         list.associateBy { it.id }
     }
 
+    /**
+     * إحصاءات أي عضو — أرقام فقط: أصدقاء · تنزيلات · مفضّلة · المستوى ·
+     * سلسلة الأيام · مكافأة اليوم.
+     *
+     * لماذا دالة خادم ولا استعلامات مباشرة؟ لأن المفضّلة والتنزيلات والمحفظة
+     * محميّة بسياسات «لصاحبها فقط»، فملف عضو آخر لا يستطيع قراءتها. الدالة
+     * `profile_stats` (36_profile_stats.sql) تعمل بـ security definer وتُرجع
+     * **أعداداً لا بيانات**. وإن لم تكن مُنفَّذة على الخادم بعد (404) تُرجع
+     * `null` فتُخفي الواجهة الأرقام بلا كسر الشاشة.
+     *
+     * قاعدة المستوى: كل 100 AC مكتسَبة = مستوى (والأعلى بينها وبين تعديل الإدارة).
+     */
+    suspend fun stats(userId: String? = null): ProfileStats? = withContext(Dispatchers.IO) {
+        runCatching {
+            val body = supabase.rpc("profile_stats", params("p_user_id" to p(userId)))
+            body?.let { supabase.decodeOne<ProfileStats>(it) }
+        }.getOrNull()
+    }
+
     suspend fun searchUsers(query: String, limit: Int = 30): List<Profile> {
         val q = query.trim()
         val filter = if (q.isBlank()) "" else "&or=(username.ilike.*$q*,display_name.ilike.*$q*)"
@@ -125,16 +150,18 @@ class ProfileRepository(
         showOnline: Boolean? = null,
         country: String? = null,
     ): Result<Profile?> = runCatching {
-        supabase.rpc(
-            "update_my_profile",
-            params(
-                "p_username" to p(username.trim()),
-                "p_bio" to p(bio),
-                "p_custom_status" to p(customStatus),
-                "p_show_online" to p(showOnline),
-                "p_country" to p(country),
+        requireRpcSuccess(
+            supabase.rpc(
+                "update_my_profile",
+                params(
+                    "p_username" to p(username.trim()),
+                    "p_bio" to p(bio),
+                    "p_custom_status" to p(customStatus),
+                    "p_show_online" to p(showOnline),
+                    "p_country" to p(country),
+                ),
+                signedOnly = true,
             ),
-            signedOnly = true,
         )
         refreshProfile()
     }
@@ -145,24 +172,29 @@ class ProfileRepository(
      */
     suspend fun setShowOnline(value: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            supabase.rpc(
-                "update_my_profile",
-                params("p_show_online" to p(value)),
-                signedOnly = true,
+            requireRpcSuccess(
+                supabase.rpc(
+                    "update_my_profile",
+                    params("p_show_online" to p(value)),
+                    signedOnly = true,
+                ),
             )
             refreshProfile()
             Unit
         }
     }
 
-    /** اختيار أفاتار أو بانر من أصول الموقع (kind = avatar | banner). */
+    /** اختيار أفاتار أو غلاف أو أداة من أصول الموقع. */
     suspend fun setProfileAsset(kind: String, value: String?): Result<Unit> = runCatching {
-        supabase.rpc(
-            "set_profile_asset",
-            params("p_kind" to p(kind), "p_value" to p(value)),
-            signedOnly = true,
+        requireRpcSuccess(
+            supabase.rpc(
+                "set_profile_asset",
+                params("p_kind" to p(kind), "p_value" to p(value)),
+                signedOnly = true,
+            ),
         )
         refreshProfile()
+        Unit
     }
 
     suspend fun setEquippedItem(itemId: String?): Result<Unit> = runCatching {
@@ -173,6 +205,16 @@ class ProfileRepository(
             buildJsonObject { put("equipped_item_id", itemId?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull) },
         )
         Unit
+    }
+
+    /** RPCs return HTTP 200 for business-rule failures, so turn `{ ok: false }` into a Result failure. */
+    private fun requireRpcSuccess(response: JsonElement?) {
+        val body = response as? JsonObject ?: return
+        val ok = body["ok"]?.jsonPrimitive?.booleanOrNull ?: return
+        if (!ok) {
+            val message = body["message"]?.jsonPrimitive?.contentOrNull
+            throw IllegalStateException(message ?: "profile_update_failed")
+        }
     }
 
     // ------------------------------------------------------------------ الأصدقاء

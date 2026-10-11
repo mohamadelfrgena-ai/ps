@@ -1,304 +1,806 @@
 package com.addonstation.mobile.ui.splash
 
+import android.os.SystemClock
+import android.provider.Settings
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
-import com.addonstation.mobile.ui.theme.AppColors
-import com.addonstation.mobile.ui.theme.AppText
+import com.addonstation.mobile.ui.components.appLocaleCode
+import com.addonstation.mobile.ui.theme.NotoSansScBlackFont
+import com.addonstation.mobile.ui.theme.NotoSansScRegularFont
+import com.addonstation.mobile.ui.theme.NunitoFont
 import com.addonstation.mobile.ui.theme.PixelFont
-import kotlinx.coroutines.coroutineScope
+import com.addonstation.mobile.ui.theme.PixelifyCyrillicFont
+import com.addonstation.mobile.ui.theme.TajawalFont
+import com.addonstation.mobile.ui.theme.displayStyle
+import com.addonstation.mobile.util.AppPrefs
+import java.util.Locale
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.random.Random
+
+private const val FULL_TIMELINE_END = 0.9429f
+private const val FULL_TIMELINE_MS = 6_600
+private const val COMPACT_LOOP_MS = 1_500
+private const val MIN_SPLASH_MS = 1_500L
+
+private val SplashBackground = Color(0xFF0A0F1C)
+private val SplashText = Color(0xFFEAF0FA)
+private val SplashBlue = Color(0xFF6FA8FF)
+private val SplashGold = Color(0xFFF0C25E)
+private val SplashMuted = Color(0xFFC4D1E8)
 
 /**
- * الإطلاق السينمائي: صورة البداية (splash_bg — لقطة من إعلان Minecraft الرسمي)
- * مع تعتيم متدرّج، ثم خطوط مسح، 7 جسيمات، شعار التطبيق (صورة)،
- * ثم الكلمات DREAM IT. (0.4s) · BUILD IT. (1.3s) · CREATE IT. (2.2s) والعلامة التجارية (3.0s)،
- * ثم خروج بتلاشي/انزلاق 0.5s مع كشف الشاشة الرئيسية.
+ * شاشة البداية المطابقة للجدول الزمني المرفق:
+ * خلفية Minecraft تتلاشى وتبتعد، شعار Minecraft يهبط بارتداد، ثم العبارات
+ * الثلاث، وبعدها شعار التطبيق والوصف وشريط تحميل من 10 شرائح.
  *
- * الأداء: الخطوط والجسيمات تُرسم في Canvas واحد لكل طبقة (بدل ~100 عنصر Compose)،
- * وكل الحركات داخل LaunchedEffect واحد بمهام متوازية — فلا «لاق» ولا تقطيع.
- * تُعرض مرة واحدة في كل تشغيل للتطبيق.
- *
- * الخلفية: `drawable-{mdpi..xxhdpi}/splash_bg.jpg` — نسخة مضبوطة لكل كثافة
- * (360×780 · 540×1170 · 720×1560 · 1080×2340)، وهي **قصّ طولي من منتصف الصورة
- * الأصلية** بمقاس شاشة الهاتف تماماً (9:19.5) — طلب المالك: «صورة شاشة الترحيب
- * قصّها حتى تناسب مقاسات شاشة الهاتف».
- * نافذة القص 498×1080 من (711،0) — منتصف الأصل 1920×1080، وهي التي تضمّ
- * المجموعة كاملةً (الأريكة والطاولة · الشخصيات · البطل ذو القبعة يمين-وسط)
- * بلا تغبيش ولا خطّ فاصل ولا فراغ أسود؛ والارتفاع كامل (1080 من 1080) فلا
- * يُقتطع من اللقطة شيء.
- * تُولَّد بـ`tools/make_auth_backgrounds.py` من `design/splash/splash_bg_master.jpg`.
- *
- * ↩️ الصورة القديمة (قرية ماينكرافت عند الغروب) محفوظة كما هي في
- * `drawable-nodpi/splash_bg_legacy.jpg`: للإرجاع إليها بدّل السطر أدناه إلى
- * `painterResource(R.drawable.splash_bg_legacy)`.
+ * تعرض المقدمة الطويلة مرة واحدة فقط. في التشغيلات اللاحقة تستمر حركة مختصرة
+ * مدتها 1.5 ثانية، مع إبقاء العبارات المترجمة ظاهرة في كل تشغيل. يجري تحميل
+ * الجلسة والبيانات خلف الشاشة بالتوازي؛ لا تكتمل الشاشة حتى تجهز البيانات أو
+ * تنتهي مهلة الإقلاع، ويمكن للمستخدم تخطي الانتظار صراحةً.
+ * الخلفية السابقة `splash_bg_legacy.jpg` بقيت محفوظة ولم تُحذف.
  */
 @Composable
-fun SplashScreen(onFinished: () -> Unit) {
-    val alphaSky = remember { Animatable(0f) }
-    val scaleSky = remember { Animatable(0.94f) }
-    val logo = remember { Animatable(0f) }
-    val line1 = remember { Animatable(0f) }
-    val line2 = remember { Animatable(0f) }
-    val line3 = remember { Animatable(0f) }
-    val brand = remember { Animatable(0f) }
-    val exit = remember { Animatable(1f) }
+fun SplashScreen(
+    loadingProgress: Float = 0f,
+    startupReady: Boolean = true,
+    onFinished: () -> Unit,
+) {
+    val context = LocalContext.current
+    val isFirstLaunch = remember(context) { !AppPrefs.splashCompleted(context) }
+    val reduceMotion = remember(context) {
+        runCatching {
+            val scales = listOf(
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                Settings.Global.TRANSITION_ANIMATION_SCALE,
+                Settings.Global.WINDOW_ANIMATION_SCALE,
+            )
+            scales.any { key ->
+                Settings.Global.getFloat(context.contentResolver, key, 1f) <= 0f
+            }
+        }.getOrDefault(false)
+    }
+    val startedAt = remember { SystemClock.elapsedRealtime() }
+    val skipText = stringResource(R.string.splash_skip)
+    val loadingText = stringResource(R.string.common_loading)
+    val introProgress = remember(isFirstLaunch, reduceMotion) {
+        Animatable(if (isFirstLaunch && reduceMotion) FULL_TIMELINE_END else 0f)
+    }
+    val compactProgress = remember { Animatable(0f) }
+    val exitProgress = remember { Animatable(0f) }
+    var compactMode by remember(isFirstLaunch) { mutableStateOf(!isFirstLaunch) }
+    var introComplete by remember(isFirstLaunch, reduceMotion) {
+        mutableStateOf(!isFirstLaunch || reduceMotion)
+    }
+    var skipRequested by remember { mutableStateOf(false) }
+    var skipEnabled by remember { mutableStateOf(false) }
+    var completionHandled by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        coroutineScope {
-            launch { alphaSky.animateTo(0.38f, tween(900, easing = FastOutSlowInEasing)) }
-            launch { scaleSky.animateTo(1.05f, tween(900, easing = FastOutSlowInEasing)) }
-            launch { logo.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
-            launch { delay(400); line1.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
-            launch { delay(1300); line2.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
-            launch { delay(2200); line3.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
-            launch { delay(3000); brand.animateTo(1f, tween(480, easing = FastOutSlowInEasing)) }
-            launch { delay(3600); exit.animateTo(0f, tween(500, easing = FastOutSlowInEasing)) }
-        }
-        onFinished()
+        delay(1_000L)
+        skipEnabled = true
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF020406))
-            .graphicsLayer {
-                // تُقرأ في مرحلة الرسم — بلا إعادة تركيب (recomposition) لكل إطار.
-                alpha = exit.value
-                translationY = (1f - exit.value) * -70f
-            },
-    ) {
-        // الطبقة 1: صورة البداية (splash_bg) — تتلاشى وتكبر قليلاً. الصورة
-        // مقصوصة مسبقاً إلى نسبة شاشة الهاتف (9:19.5) في ملفات كل كثافة، فيرى
-        // المالك الكادر الطولي الصحيح بلا تغبيش ولا فراغ. و`Crop` هنا للتكيّف
-        // مع الأجهزة التي تختلف نسبتها قليلاً (9:16 · 9:21) — يقتطع أطرافاً
-        // صغيرة (سماء/عشب) لا تُخلّ بالمجموعة.
-        Image(
-            painter = painterResource(R.drawable.splash_bg),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.Center,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    alpha = alphaSky.value
-                    scaleX = scaleSky.value
-                    scaleY = scaleSky.value
-                },
-        )
-        // الطبقة 1ب: تعتيم متدرّج يحفظ وضوح الشعار والكلمات البيضاء فوق الصورة
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = alphaSky.value }
-                .background(
-                    Brush.verticalGradient(
-                        0.00f to Color(0x8C000000),
-                        0.26f to Color(0x45000000),
-                        0.45f to Color(0x50000000),
-                        0.65f to Color(0x5E000000),
-                        0.85f to Color(0x6B000000),
-                        1.00f to Color(0x86000000),
-                    )
+    // المقدمة الكاملة (6.6 ثوانٍ) تنتهي على الإطار النهائي؛ لا ننتقل بعدها
+    // حتى تصبح البيانات جاهزة، إلا إذا اختار المستخدم التخطي صراحةً.
+    LaunchedEffect(isFirstLaunch, reduceMotion, skipRequested) {
+        if (isFirstLaunch && !reduceMotion) {
+            introProgress.animateTo(
+                targetValue = FULL_TIMELINE_END,
+                animationSpec = tween(
+                    durationMillis = if (skipRequested) 180 else FULL_TIMELINE_MS,
+                    easing = LinearEasing,
                 ),
-        )
-        // الطبقة 2: خطوط مسح أفقية (Canvas واحد بدل 90 عنصراً)
-        ScanLines()
-        // الطبقة 3: جسيمات صاعدة (Canvas واحد)
-        Particles(count = 7)
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            // شعار التطبيق (صورة) فوق أول كلمة
-            Image(
-                painter = painterResource(R.drawable.splash_logo),
-                contentDescription = stringResource(R.string.app_name),
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxWidth(0.92f)
-                    .graphicsLayer {
-                        alpha = logo.value
-                        translationY = (1f - logo.value) * 16f
-                    },
             )
-            Spacer(Modifier.height(10.dp))
-            Box(
-                Modifier
-                    .width(120.dp)
-                    .height(2.dp)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(AppColors.Blue.copy(alpha = 0.6f))
-                    .graphicsLayer { alpha = logo.value },
-            )
-            Spacer(Modifier.height(34.dp))
+            introComplete = true
+        }
+    }
 
-            SplashLine(stringResource(R.string.splash_dream_it)) { line1.value }
-            Spacer(Modifier.height(16.dp))
-            SplashLine(stringResource(R.string.splash_build_it)) { line2.value }
-            Spacer(Modifier.height(16.dp))
-            SplashLine(stringResource(R.string.splash_create_it)) { line3.value }
-
-            Spacer(Modifier.height(44.dp))
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .graphicsLayer {
-                        alpha = brand.value
-                        translationY = (1f - brand.value) * 18.dp.toPx()
-                    },
-            ) {
-                Text(
-                    text = stringResource(R.string.brand_wordmark),
-                    style = AppText.brand.copy(fontSize = 22.sp),
-                    color = Color.White,
-                )
-                Box(
-                    Modifier
-                        .padding(top = 4.dp)
-                        .width(180.dp)
-                        .height(2.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(Color.Transparent, Color(0xFF0070CC), Color.Transparent),
-                            )
-                        ),
+    // في التشغيلات اللاحقة تُعاد حركة الشعار والتحميل كل 1.5 ثانية فقط
+    // أثناء انتظار الإقلاع؛ لا تُعاد المقدمة الطويلة.
+    LaunchedEffect(compactMode, reduceMotion, skipRequested) {
+        if (compactMode && !reduceMotion && !skipRequested) {
+            while (true) {
+                compactProgress.snapTo(0f)
+                compactProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(COMPACT_LOOP_MS, easing = LinearEasing),
                 )
             }
         }
     }
+
+    // تخرج الشاشة عند اكتمال الحركة وجاهزية الإقلاع. AppRoot يضع حداً أقصى
+    // للتحميل الأولي، لذلك يبقى التخطي متاحاً للشبكات المتعثرة أو بطيئة الاستجابة.
+    // في التشغيل اللاحق تكفي 1.5 ثانية، ويمكن التخطي بعد الثانية الأولى.
+    LaunchedEffect(introComplete, skipRequested, startupReady) {
+        if (!introComplete || completionHandled || (!startupReady && !skipRequested)) return@LaunchedEffect
+        if (!isFirstLaunch && !reduceMotion && !skipRequested) {
+            val elapsed = SystemClock.elapsedRealtime() - startedAt
+            val remaining = (MIN_SPLASH_MS - elapsed).coerceAtLeast(0L)
+            if (remaining > 0L) delay(remaining)
+        }
+        completionHandled = true
+        if (reduceMotion) {
+            exitProgress.snapTo(1f)
+        } else {
+            exitProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = if (isFirstLaunch) 400 else 240),
+            )
+        }
+        AppPrefs.markSplashCompleted(context)
+        onFinished()
+    }
+
+    val timelinePhase: () -> Float = {
+        if (reduceMotion) FULL_TIMELINE_END else introProgress.value
+    }
+    val compactPhase: () -> Float = {
+        if (reduceMotion || skipRequested) 0.90f else compactProgress.value
+    }
+    val activePhase: () -> Float = if (compactMode) compactPhase else timelinePhase
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val languageCode = appLocaleCode().substringBefore('-').lowercase(Locale.ROOT)
+    val arabic = languageCode == "ar"
+    val russian = languageCode == "ru"
+    val chinese = languageCode == "zh"
+    val brandName = stringResource(R.string.brand_wordmark).uppercase(Locale.ROOT)
+    val platformTagline = stringResource(R.string.home_guest_card_title_plain)
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val interactionSource = remember { MutableInteractionSource() }
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = 1f - exitProgress.value }
+            .background(SplashBackground)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = skipEnabled && !completionHandled,
+                onClickLabel = skipText,
+            ) { skipRequested = true }
+            .semantics { contentDescription = skipText },
+    ) {
+        val screenHeight = maxHeight
+        val shortScreen = screenHeight < 760.dp
+        val veryShortScreen = screenHeight < 600.dp
+        val sloganOffset = when {
+            compactMode && veryShortScreen -> screenHeight * 0.21f
+            compactMode -> screenHeight * 0.17f
+            veryShortScreen -> screenHeight * 0.30f
+            shortScreen -> screenHeight * 0.34f
+            else -> screenHeight * 0.39f
+        }
+        val brandOffset = when {
+            compactMode && veryShortScreen -> screenHeight * 0.47f
+            compactMode -> screenHeight * 0.43f
+            veryShortScreen -> screenHeight * 0.56f
+            shortScreen -> screenHeight * 0.60f
+            else -> screenHeight * 0.72f
+        }
+        val taglineOffset = when {
+            compactMode && veryShortScreen -> screenHeight * 0.68f
+            compactMode && shortScreen -> screenHeight * 0.61f
+            compactMode -> screenHeight * 0.60f
+            veryShortScreen -> screenHeight * 0.78f
+            shortScreen -> screenHeight * 0.79f
+            else -> screenHeight * 0.855f
+        }
+        val designSize = when {
+            arabic || chinese -> 38f
+            russian -> 32f
+            else -> 30f
+        }
+        val scaleForHeight = if (shortScreen) 0.84f else 1f
+        val sloganSize = (designSize * scaleForHeight).sp
+        val lineRatio = if (arabic || russian || chinese) 1.3f else 1.4f
+        val sloganLineHeight = (designSize * scaleForHeight * lineRatio).sp
+        val imageHeight = screenHeight * 0.71f
+
+        // الخلفية والصبغة العمودية كما في النموذج: صورة في الأعلى، ثم تذوب
+        // تدريجياً إلى #0A0F1C أسفل العبارات والعلامة التجارية.
+        Image(
+            painter = painterResource(R.drawable.splash_bg_original),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(imageHeight)
+                .align(Alignment.TopCenter)
+                .graphicsLayer {
+                    val p = activePhase()
+                    alpha = if (compactMode) ramp(p, 0f, 0.18f) else ramp(p, 0f, 0.10f)
+                    val zoomOut = if (compactMode) ramp(p, 0f, 0.38f) else ramp(p, 0f, 0.5714f)
+                    scaleX = if (compactMode) lerp(1.06f, 1f, zoomOut) else lerp(1.15f, 1f, zoomOut)
+                    scaleY = scaleX
+                },
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0f to Color(0x400A0F1C),
+                            0.25f to Color(0x260A0F1C),
+                            0.50f to Color(0xCC0A0F1C),
+                            0.66f to SplashBackground,
+                            1f to SplashBackground,
+                        ),
+                    ),
+                ),
+        )
+
+        // شعار Minecraft — سقوط قصير مع ارتداد، ثم يبقى أثناء المقدمة.
+        Image(
+            painter = painterResource(R.drawable.splash_logo),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = minOf(84.dp, screenHeight * 0.10f))
+                .width(230.dp)
+                .aspectRatio(1200f / 238f)
+                .graphicsLayer {
+                    val p = activePhase()
+                    if (compactMode) {
+                        val enter = ramp(p, 0.08f, 0.34f)
+                        alpha = enter * fadeOut(p, 0.94f, 1f)
+                        translationY = (1f - enter) * -22.dp.toPx()
+                    } else {
+                        alpha = phaseWindow(p, 0.0429f, 0.1143f)
+                        translationY = when {
+                            p < 0.0429f -> -100.dp.toPx()
+                            p < 0.1143f -> lerp(-100f, 10f, ramp(p, 0.0429f, 0.1143f)) * density
+                            p < 0.15f -> lerp(10f, -4f, ramp(p, 0.1143f, 0.15f)) * density
+                            p < 0.1786f -> lerp(-4f, 0f, ramp(p, 0.15f, 0.1786f)) * density
+                            else -> 0f
+                        }
+                    }
+                },
+        )
+
+        // العبارات المترجمة تبقى ظاهرة في كل تشغيل؛ في الحلقة المختصرة تدخل
+        // أسرع بدلاً من حذفها كما كان يحدث بعد أول فتح للتطبيق.
+        val dreamStart = if (compactMode) 0.10f else 0.1714f
+        val dreamEnd = if (compactMode) 0.18f else 0.2357f
+        val buildStart = if (compactMode) 0.20f else 0.2714f
+        val buildEnd = if (compactMode) 0.28f else 0.3357f
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(y = sloganOffset)
+                .padding(horizontal = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            SplashSloganLine(
+                text = stringResource(R.string.splash_dream_it),
+                color = SplashText,
+                phase = activePhase,
+                fromX = if (rtl) 30f else -30f,
+                languageCode = languageCode,
+                fontSize = sloganSize,
+                lineHeight = sloganLineHeight,
+                startAt = dreamStart,
+                endAt = dreamEnd,
+            )
+            SplashSloganLine(
+                text = stringResource(R.string.splash_build_it),
+                color = SplashBlue,
+                phase = activePhase,
+                fromX = if (rtl) -30f else 30f,
+                languageCode = languageCode,
+                fontSize = sloganSize,
+                lineHeight = sloganLineHeight,
+                startAt = buildStart,
+                endAt = buildEnd,
+            )
+            SplashSparkleLine(
+                text = stringResource(R.string.splash_create_it),
+                phase = activePhase,
+                languageCode = languageCode,
+                fontSize = sloganSize,
+                lineHeight = sloganLineHeight,
+            )
+        }
+
+        SplashBrand(
+            name = brandName,
+            compactMode = compactMode,
+            phase = activePhase,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = brandOffset),
+        )
+
+        Text(
+            text = platformTagline,
+            style = TextStyle(
+                fontFamily = when {
+                    arabic -> TajawalFont
+                    chinese -> NotoSansScRegularFont
+                    else -> NunitoFont
+                },
+                fontSize = if (shortScreen) 11.sp else 13.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 18.sp,
+                color = SplashMuted,
+                textAlign = TextAlign.Center,
+            ),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .offset(y = taglineOffset)
+                .padding(horizontal = 18.dp)
+                .graphicsLayer {
+                    val p = activePhase()
+                    val startAt = if (compactMode) 0.42f else 0.60f
+                    val endAt = if (compactMode) 0.50f else 0.6714f
+                    alpha = phaseWindow(p, startAt, endAt)
+                    translationY = (1f - ramp(p, startAt, endAt)) * 8.dp.toPx()
+                },
+        )
+
+        SplashLoadingBar(
+            phase = activePhase,
+            compactMode = compactMode,
+            loadingProgress = loadingProgress,
+            startupReady = startupReady,
+            skipRequested = skipRequested,
+            reduceMotion = reduceMotion,
+            loadingDescription = loadingText,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 56.dp + bottomInset),
+        )
+
+        Text(
+            text = skipText,
+            style = TextStyle(
+                fontFamily = if (arabic) TajawalFont else NunitoFont,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = SplashMuted.copy(alpha = 0.62f),
+                textAlign = TextAlign.Center,
+            ),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 18.dp + bottomInset)
+                .graphicsLayer {
+                    alpha = if (skipEnabled && !completionHandled) {
+                        if (compactMode) 1f else 0.72f
+                    } else 0f
+                },
+        )
+    }
 }
 
 @Composable
-private fun SplashLine(text: String, progress: () -> Float) {
+private fun SplashSloganLine(
+    text: String,
+    color: Color,
+    phase: () -> Float,
+    fromX: Float,
+    languageCode: String,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    lineHeight: androidx.compose.ui.unit.TextUnit,
+    startAt: Float = 0.1714f,
+    endAt: Float = 0.2357f,
+) {
+    val style = splashSloganStyle(text, languageCode, fontSize, lineHeight)
+    val lineHeightDp = with(LocalDensity.current) { lineHeight.toDp() }
     Text(
         text = text,
-        // كلمات الشاشة **عريضة في كل اللغات**: خط البكسل للاتيني، وخط النظام العريض
-        // للعربية والروسية والصينية — فلا تظهر رفيعة في لغة دون أخرى (انظر displayStyle).
-        style = com.addonstation.mobile.ui.theme.displayStyle(
-            text = text,
-            sizeSp = 24f,
-            color = Color.White,
-            latinLetterSpacingSp = 2f,
-        ).copy(
-            textAlign = TextAlign.Center,
-            shadow = androidx.compose.ui.graphics.Shadow(
-                color = Color.Black,
-                offset = androidx.compose.ui.geometry.Offset(2f, 2f),
-                blurRadius = 6f,
-            ),
-        ),
+        style = style.copy(color = color, textAlign = TextAlign.Center),
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier
+            .fillMaxWidth()
+            .height(lineHeightDp)
             .graphicsLayer {
-                val p = progress()
-                alpha = p
-                translationX = (1f - p) * -60.dp.toPx()
+                val p = phase()
+                val enter = ramp(p, startAt, endAt)
+                alpha = phaseWindow(p, startAt, endAt)
+                translationX = (1f - enter) * fromX.dp.toPx()
             },
     )
 }
 
-/** خطوط المسح: Canvas واحد يرسم ~46 خطاً شفافاً مع تحرّك بطيء. */
 @Composable
-private fun ScanLines() {
-    val transition = rememberInfiniteTransition(label = "scan")
-    val shift by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Restart),
-        label = "scanShift",
-    )
-    Canvas(Modifier.fillMaxSize()) {
-        val lines = 46
-        val step = size.height / lines
-        val offset = shift * step
-        for (i in 0 until lines) {
-            val y = i * step + offset
-            if (y > size.height) continue
-            val even = (i + (shift * lines).toInt()) % 3 == 0
-            drawLine(
-                color = Color.White.copy(alpha = if (even) 0.035f else 0.012f),
-                start = Offset(0f, y),
-                end = Offset(size.width, y),
-                strokeWidth = 1f,
-                cap = StrokeCap.Butt,
+private fun SplashSparkleLine(
+    text: String,
+    phase: () -> Float,
+    languageCode: String,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    lineHeight: androidx.compose.ui.unit.TextUnit,
+) {
+    val baseStyle = splashSloganStyle(text, languageCode, fontSize, lineHeight)
+    val density = LocalDensity.current
+    val lineHeightDp = with(density) { lineHeight.toDp() }
+    val wideGlowRadius = with(density) { 22.dp.toPx() }
+    val tightGlowRadius = with(density) { 10.dp.toPx() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(lineHeightDp)
+            .graphicsLayer {
+                val p = phase()
+                val scale = when {
+                    p < 0.3714f -> 0.85f
+                    p < 0.4357f -> lerp(0.85f, 1.04f, ramp(p, 0.3714f, 0.4357f))
+                    p < 0.50f -> lerp(1.04f, 1f, ramp(p, 0.4357f, 0.50f))
+                    else -> 1f
+                }
+                scaleX = scale
+                scaleY = scale
+                alpha = phaseWindow(p, 0.3714f, 0.4357f)
+            },
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                style = baseStyle.copy(
+                    color = SplashGold.copy(alpha = 0.01f),
+                    textAlign = TextAlign.Center,
+                    shadow = Shadow(color = SplashGold.copy(alpha = 0.90f), blurRadius = wideGlowRadius),
+                ),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.graphicsLayer {
+                    val p = phase()
+                    val peak = 0.4643f
+                    alpha = if (p < peak) {
+                        ramp(p, 0.4357f, peak)
+                    } else {
+                        1f - ramp(p, peak, 0.50f)
+                    }
+                },
+            )
+            Text(
+                text = text,
+                style = baseStyle.copy(
+                    color = SplashGold.copy(alpha = 0.01f),
+                    textAlign = TextAlign.Center,
+                    shadow = Shadow(color = SplashGold.copy(alpha = 0.40f), blurRadius = tightGlowRadius),
+                ),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.graphicsLayer {
+                    alpha = 0.40f * ramp(phase(), 0.4357f, 0.50f)
+                },
+            )
+            Text(
+                text = text,
+                style = baseStyle.copy(color = SplashGold, textAlign = TextAlign.Center),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Canvas(
+            Modifier
+                .padding(start = 6.dp)
+                .size(30.dp)
+                .offset(x = (-34).dp, y = (-10).dp)
+                .graphicsLayer {
+                    val p = phase()
+                    val inProgress = ramp(p, 0.4286f, 0.4857f)
+                    val outProgress = ramp(p, 0.4857f, 0.5714f)
+                    alpha = if (p < 0.4857f) inProgress else 1f - outProgress
+                    val starScale = if (p < 0.4857f) {
+                        lerp(0f, 1.2f, inProgress)
+                    } else {
+                        lerp(1.2f, 0.6f, outProgress)
+                    }
+                    scaleX = starScale
+                    scaleY = starScale
+                    rotationZ = if (p < 0.4857f) {
+                        45f * inProgress
+                    } else {
+                        lerp(45f, 90f, outProgress)
+                    }
+                },
+        ) {
+            drawFourPointSparkle(SplashGold)
+        }
+    }
+}
+
+@Composable
+private fun SplashBrand(
+    name: String,
+    compactMode: Boolean,
+    phase: () -> Float,
+    modifier: Modifier = Modifier,
+) {
+    val appName = stringResource(R.string.app_name)
+    Column(
+        modifier = modifier
+            .graphicsLayer {
+                val p = phase()
+                if (compactMode) {
+                    val enter = ramp(p, 0.16f, 0.39f)
+                    val scale = when {
+                        p < 0.16f -> 0.60f
+                        p < 0.39f -> lerp(0.60f, 1.08f, enter)
+                        p < 0.50f -> lerp(1.08f, 1f, ramp(p, 0.39f, 0.50f))
+                        else -> 1f
+                    }
+                    alpha = enter * fadeOut(p, 0.94f, 1f)
+                    scaleX = scale
+                    scaleY = scale
+                } else {
+                    val enter = ramp(p, 0.50f, 0.5714f)
+                    val scale = when {
+                        p < 0.50f -> 0.60f
+                        p < 0.5714f -> lerp(0.60f, 1.08f, enter)
+                        p < 0.6071f -> lerp(1.08f, 1f, ramp(p, 0.5714f, 0.6071f))
+                        else -> 1f
+                    }
+                    alpha = phaseWindow(p, 0.50f, 0.5714f)
+                    scaleX = scale
+                    scaleY = scale
+                }
+            },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        val iconShape = RoundedCornerShape(18.dp)
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .shadow(
+                    elevation = 24.dp,
+                    shape = iconShape,
+                    ambientColor = SplashGold.copy(alpha = 0.35f),
+                    spotColor = SplashGold.copy(alpha = 0.35f),
+                )
+                .clip(iconShape)
+                .background(SplashBackground)
+                .border(2.dp, SplashGold, iconShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = painterResource(R.drawable.app_icon),
+                contentDescription = appName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(2.dp)
+                    .clip(iconShape),
+            )
+        }
+        Text(
+            text = name,
+            style = TextStyle(
+                fontFamily = PixelFont,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp,
+                color = SplashText,
+                textAlign = TextAlign.Center,
+            ),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 10.dp),
+        )
+    }
+}
+
+@Composable
+private fun SplashLoadingBar(
+    phase: () -> Float,
+    compactMode: Boolean,
+    loadingProgress: Float,
+    startupReady: Boolean,
+    skipRequested: Boolean,
+    reduceMotion: Boolean,
+    loadingDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    val waitingPulse = remember { Animatable(0f) }
+    LaunchedEffect(startupReady, skipRequested, reduceMotion) {
+        if (!startupReady && !skipRequested && !reduceMotion) {
+            while (true) {
+                waitingPulse.snapTo(0f)
+                waitingPulse.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(900, easing = LinearEasing),
+                )
+            }
+        }
+    }
+
+    val safeProgress = loadingProgress.coerceIn(0f, 1f)
+    // The timeline is a minimum, while staged bootstrap is the measured progress.
+    // Read the animated phase inside graphicsLayer to avoid recomposition per frame.
+    // Hold the final two segments until boot is ready; a moving pulse marks the pending work.
+    val semanticProgress = when {
+        reduceMotion || startupReady || skipRequested -> 1f
+        else -> safeProgress.coerceAtMost(0.80f)
+    }
+
+    Row(
+        modifier = modifier
+            .semantics {
+                contentDescription = loadingDescription
+                progressBarRangeInfo = ProgressBarRangeInfo(semanticProgress, 0f..1f)
+            }
+            .graphicsLayer {
+                val p = phase()
+                alpha = if (compactMode) {
+                    phaseWindow(p, 0.08f, 0.22f)
+                } else {
+                    phaseWindow(p, 0.5714f, 0.6143f)
+                }
+            },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(10) { index ->
+            Box(
+                modifier = Modifier
+                    .width(22.dp)
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(SplashGold)
+                    .graphicsLayer {
+                        val p = phase()
+                        val timeMinimum = if (compactMode) 0f else ramp(p, 0.6143f, 0.8714f) * 0.80f
+                        val visibleProgress = when {
+                            reduceMotion || startupReady || skipRequested -> 1f
+                            else -> maxOf(safeProgress, timeMinimum).coerceAtMost(0.80f)
+                        }
+                        val fill = (visibleProgress * 10f - index).coerceIn(0f, 1f)
+                        val pulsePhase = (visibleProgress + waitingPulse.value * 0.20f).coerceIn(0f, 1f)
+                        val pulseDistance = kotlin.math.abs(pulsePhase * 10f - (index + 0.5f))
+                        val pulse = if (!startupReady && !skipRequested && !reduceMotion) {
+                            (1f - pulseDistance).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
+                        alpha = maxOf(lerp(0.18f, 1f, fill), lerp(0.18f, 1f, pulse))
+                        scaleY = when {
+                            pulse > 0f -> lerp(1f, 1.35f, pulse)
+                            fill > 0f && fill < 1f -> lerp(1f, 1.35f, fill)
+                            else -> 1f
+                        }
+                    },
             )
         }
     }
 }
 
-/** جسيمات صاعدة: Canvas واحد بدل عنصر لكل جسيم. */
 @Composable
-private fun Particles(count: Int) {
-    val transition = rememberInfiniteTransition(label = "particles")
-    val rise by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Restart),
-        label = "rise",
+private fun splashSloganStyle(
+    text: String,
+    languageCode: String,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    lineHeight: androidx.compose.ui.unit.TextUnit,
+): TextStyle = when (languageCode) {
+    "ar" -> TextStyle(
+        fontFamily = TajawalFont,
+        fontSize = fontSize,
+        fontWeight = FontWeight.ExtraBold,
+        lineHeight = lineHeight,
     )
-    val seeds = remember {
-        val random = Random(7)
-        List(count) { random.nextFloat() to random.nextFloat() }
-    }
-    Canvas(Modifier.fillMaxSize()) {
-        seeds.forEachIndexed { index, seed ->
-            val progress = (rise + seed.second) % 1f
-            val x = seed.first * size.width + progress * 24f
-            val y = size.height - progress * (size.height * 0.92f)
-            drawCircle(
-                color = AppColors.Green.copy(alpha = 0.8f),
-                radius = if (index % 2 == 0) 3f else 2f,
-                center = Offset(x, y),
-                alpha = 0.55f * (1f - progress),
-            )
-        }
-    }
+    "ru" -> TextStyle(
+        fontFamily = PixelifyCyrillicFont,
+        fontSize = fontSize,
+        fontWeight = FontWeight.Bold,
+        lineHeight = lineHeight,
+    )
+    "zh" -> TextStyle(
+        fontFamily = NotoSansScBlackFont,
+        fontSize = fontSize,
+        fontWeight = FontWeight.Black,
+        letterSpacing = 4.sp,
+        lineHeight = lineHeight,
+    )
+    else -> displayStyle(
+        text = text,
+        sizeSp = fontSize.value,
+        color = Color.Unspecified,
+        latinLetterSpacingSp = 2f,
+    ).copy(fontWeight = FontWeight.ExtraBold, lineHeight = lineHeight)
 }
+
+private fun DrawScope.drawFourPointSparkle(color: Color) {
+    val centerX = size.width / 2f
+    val centerY = size.height / 2f
+    val path = Path().apply {
+        moveTo(centerX, 0f)
+        lineTo(centerX + centerX * 0.28f, centerY - centerY * 0.28f)
+        lineTo(size.width, centerY)
+        lineTo(centerX + centerX * 0.28f, centerY + centerY * 0.28f)
+        lineTo(centerX, size.height)
+        lineTo(centerX - centerX * 0.28f, centerY + centerY * 0.28f)
+        lineTo(0f, centerY)
+        lineTo(centerX - centerX * 0.28f, centerY - centerY * 0.28f)
+        close()
+    }
+    drawPath(path = path, color = color)
+}
+
+private fun phaseWindow(value: Float, start: Float, fullAt: Float): Float =
+    ramp(value, start, fullAt) * fadeOut(value, FULL_TIMELINE_END, 1f)
+
+private fun ramp(value: Float, start: Float, end: Float): Float {
+    if (end <= start) return if (value >= end) 1f else 0f
+    return ((value - start) / (end - start)).coerceIn(0f, 1f)
+}
+
+private fun fadeOut(value: Float, start: Float, end: Float): Float =
+    1f - ramp(value, start, end)
+
+private fun lerp(start: Float, end: Float, progress: Float): Float =
+    start + (end - start) * progress

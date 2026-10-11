@@ -9,7 +9,8 @@
     <string name="brand_rights">© 2026 AddonStation — Все права защищены</string>
     <string name="splash_dream_it">МЕЧТАЙ.</string>
     <string name="splash_build_it">СТРОЙ.</string>
-    <string name="splash_create_it">СОЗДАВАЙ.</string>
+    <string name="splash_create_it">ТВОРИ.</string>
+    <string name="splash_skip">Нажмите, чтобы пропустить</string>
 
     <string name="nav_home">Главная</string>
     <string name="nav_store">Магазин</string>
@@ -114,7 +115,7 @@
     <string name="common_none">Нет</string>
     <string name="common_yes">Да</string>
     <string name="common_no">Нет</string>
-    <string name="common_guest">Гость</string>
+    <string name="common_guest">Пользователь</string>
     <string name="common_soon">Скоро</string>
     <string name="common_log_out">Выйти</string>
     <string name="common_sign_in">Войти</string>
@@ -631,4 +632,200 @@
     <string name="profile_item_equipped">Надето</string>
     <string name="profile_content_section">Контент</string>
     <string name="profile_no_content_published">Пока нет опубликованного контента</string>
+    <string name="auth_confirm_title">Аккаунт создан ✓</string>
+    <string name="auth_confirm_text">Мы отправили ссылку для подтверждения на вашу почту. Откройте её и нажмите кнопку ниже.</string>
+    <string name="auth_confirm_retry">Я подтвердил — войти</string>
+    <string name="auth_confirm_resend">Отправить ссылку снова</string>
+    <string name="auth_confirm_resent">Ссылка отправлена повторно ✓</string>
+    <string name="auth_confirm_hint">Нет письма? Проверьте также папку «Спам».</string>
+    <string name="notif_prompt_title">Включить уведомления</string>
+    <string name="notif_prompt_text">Получайте сообщения чата, упоминания и новые аддоны даже при закрытом приложении. Каждую категорию можно настроить позже.</string>
+    <string name="notif_prompt_allow">Включить сейчас</string>
+    <string name="notif_prompt_later">Позже</string>
+    <string name="home_hero_slogan">МЕЧТАЙ.
+СТРОЙ.
+СОЗДАВАЙ.</string>
+    <string name="home_hero_subtitle">Аддоны и миры готовы к твоему приключению</string>
+    <string name="home_hero_start">Начать сейчас</string>
+    <string name="home_hero_family">Вступить в семью</string>
+    <string name="home_plan_current">Ваш текущий план</string>
+    <string name="home_plan_free_desc">Бесплатный контент · Базовый доступ · Без подписки</string>
+    <string name="home_legend_title">ВСТУПИТЬ В LEGENDARY</string>
+    <string name="home_legend_text">Легендарные аддоны · Легендарные миры · Приоритетный доступ</string>
+    <string name="home_legend_view">Открыть</string>
+    <string name="home_chip_all">Все</string>
+    <string name="home_chip_addons">Аддоны</string>
+    <string name="home_chip_worlds">Миры</string>
+    <string name="home_chip_favorites">Избранное</string>
+    <string name="home_latest_addons">Новые аддоны</string>
+    <string name="home_most_downloaded">Самые скачиваемые</string>
+    <string name="home_featured_creators">Избранные авторы</string>
+    <string name="home_creators_caption">Особый выбор AddonStation</string>
+    <string name="home_no_content">Пока нет опубликованного контента</string>
+    <string name="home_error">Что-то пошло не так</string>
+    <string name="home_error_tap">Нажмите, чтобы повторить</string>
+    <string name="comm_all_rooms">Все комнаты</string>
+    <string name="comm_rules_banner">⚠️ Правила сообщества · Нарушения могут привести к мьюту или бану</string>
+    <string name="comm_members_only">Чат только для участников — войдите, чтобы открыть комнаты</string>
+    <string name="chat_online">%1$d онлайн</string>
+    <string name="chat_pinned_strip">Закреплённые · %1$s</string>
+    <string name="home_by_creator">От %1$s</string>
+    <string name="chat_nobody_online">Сейчас никого нет онлайн</string>
+    <string name="badge_premium">Премиум-участник</string>
+    <string name="badge_creator">Создатель</string>
+    <string name="badge_admin">АДМИН</string>
+    <string name="badge_mod">МОД</string>
+    <string name="badge_level">Уровень %1$d</string>
+    <string name="profile_no_bio">Этот участник ещё не добавил описание.</string>
+    <string name="profile_stats_friends">Друзья</string>
+    <string name="profile_wallet_title">Кошелёк AC</string>
+    <string name="profile_daily_reward">Ежедневная награда</string>
+    <string name="profile_daily_claimed">Получено сегодня</string>
+    <string name="profile_day_streak">%1$d дней подряд</string>
+    <string name="profile_logout">Выйти</string>
+    <string name="profile_orders">Мои заказы</string>
+    <string name="profile_view_as_others">Как видят другие</string>
+    <string name="profile_hidden_from_others">Скрыто от других пользователей</string>
+    <string name="profile_safety">Безопасность</string>
+    <string name="profile_moderation">Модерация</string>
+    <string name="profile_msg_user">Написать %1$s</string>
+    <string name="profile_friend_request">Запрос в друзья</string>
+    <string name="profile_request_sent">Запрос отправлен</string>
+    <string name="profile_friends_state">Друзья ✓</string>
+    <string name="profile_accept">Принять</string>
+    <string name="profile_reject">Отклонить</string>
+    <string name="profile_status_online">В сети</string>
+    <string name="profile_status_away">Отошёл</string>
+    <string name="profile_status_offline">Не в сети</string>
+    <string name="profile_ban_user">Забанить</string>
+    <string name="profile_delete_message">Удалить сообщение</string>
+    <string name="profile_as_others_title">Мой профиль глазами других</string>
+    <string name="profile_member_since_label">УЧАСТНИК С</string>
+    <string name="chat_unmute_user">Снять заглушение</string>
+    <string name="profile_action_done">Готово ✓</string>
+    <string name="profile_action_failed">Не удалось — попробуйте снова.</string>
+    <string name="profile_mute_done">Заглушено — сообщения скрыты.</string>
+    <string name="profile_unmute_done">Заглушение снято — сообщения снова видны.</string>
+    <string name="common_more">Ещё</string>
+    <string name="profile_blocked_state">Взаимодействие с этим участником недоступно</string>
+    <string name="profile_unfriend">Удалить из друзей</string>
+    <string name="profile_unfriend_confirm">Удалить этого участника из друзей?</string>
+    <string name="mute_member_locked">Legendary</string>
+    <string name="mute_member_needs_plan">Заглушение участников — функция Legendary. Открываем подписку.</string>
+
+    <!-- AddonStation auth/settings redesign -->
+    <string name="auth_email_placeholder">name@example.com</string>
+    <string name="auth_password_placeholder">••••••••</string>
+    <string name="settings_my_plan">Мой план</string>
+    <string name="settings_your_plan">Ваш план: %1$s</string>
+    <string name="settings_expires_on">Действует до %1$s</string>
+    <string name="settings_upgrade">Улучшить план</string>
+    <string name="settings_sections_five">5 РАЗДЕЛОВ</string>
+    <string name="settings_admin_tools">Инструменты администратора</string>
+    <string name="settings_admin_visible">Видно только администраторам</string>
+    <string name="settings_open_dashboard">Открыть панель</string>
+    <string name="settings_account_actions">Действия с аккаунтом</string>
+    <string name="settings_footer">© 2026 AddonStation — Все права защищены</string>
+    <string name="auth_username_placeholder">имя_пользователя</string>
+
+    <!-- Edit profile detail screen -->
+    <string name="profile_edit_plain">Редактировать профиль</string>
+    <string name="edit_profile_preview">Предпросмотр</string>
+    <string name="edit_profile_counter">%1$d/%2$d</string>
+    <string name="edit_profile_discard_title">Отменить изменения?</string>
+    <string name="edit_profile_discard_body">Все изменения будут потеряны.</string>
+    <string name="edit_profile_discard">Отбросить</string>
+    <string name="edit_profile_keep_editing">Продолжить редактирование</string>
+    <string name="edit_profile_saved">Профиль сохранён</string>
+    <string name="edit_profile_status_hint">О чём вы думаете?</string>
+    <string name="edit_profile_avatar_label">Аватар</string>
+    <string name="edit_profile_epic_item">Предмет Epic</string>
+    <string name="edit_profile_golden_item">Золотой предмет</string>
+    <string name="edit_profile_no_items">В этом разделе пока нет доступных предметов.</string>
+    <string name="edit_profile_no_results">Подходящие изображения не найдены.</string>
+    <string name="cd_avatar_selected">%1$s, выбран</string>
+    <string name="cd_avatar_locked">%1$s, заблокирован. Требуется %2$s</string>
+    <string name="plan_locked_avatars_plain">Заблокированные аватары доступны с планом Epic или Legendary.</string>
+    <string name="plan_locked_items_plain">Для заблокированных предметов чата нужен подходящий план.</string>
+    <string name="plan_locked_online_plain">Статус «в сети» доступен подписчикам Legendary.</string>
+    <string name="plan_locked_banner_note_plain">Все обложки заблокированы — они доступны с подпиской Epic или Legendary.</string>
+    <string name="profile_banner_none_plain">Обложки пока нет — выберите одну из разделов ниже</string>
+    <string name="profile_about_plain">О себе</string>
+    <string name="msg_username_taken">Это имя пользователя уже занято.</string>
+
+    <!-- Crash report -->
+    <string name="crash_report_title">Отчёт о сбое приложения</string>
+    <string name="crash_report_body">При предыдущем запуске приложение неожиданно завершило работу. Скопируйте этот отчёт и отправьте его в службу поддержки, чтобы мы могли определить причину.</string>
+    <string name="crash_report_copy">Скопировать отчёт о сбое</string>
+    <string name="crash_report_copied">Отчёт скопирован. Вставьте его в этот чат.</string>
+    <string name="crash_report_continue">Попробовать открыть приложение</string>
+
+    <!-- Home v2 sections -->
+
+    <!-- Imported missing localized resources from AddonStation_chat_panels_store -->
+
+    <!-- Imported missing localized resources from AddonStation_profile_wallet_admin -->
+
+    <!-- Imported missing localized resources from AddonStation_creators_pages -->
+    <string name="profile_remove_favorite">Убрать из избранного</string>
+
+    <!-- Creator form labels -->
+    <string name="creator_file_types">Любой тип файла (*/*)</string>
+    <string name="creator_optional_details">Дополнительные сведения</string>
+    <string name="creator_required_fields">Заполните обязательные поля и подтвердите оба пункта.</string>
+    <string name="creator_category_adventure">Приключение</string>
+    <string name="creator_category_survival">Выживание</string>
+    <string name="creator_category_pvp">PvP</string>
+    <string name="creator_category_building">Строительство</string>
+    <string name="creator_category_skins">Облики</string>
+    <string name="creator_category_other">Другое</string>
+
+    <!-- Admin asset confirmations and progress -->
+    <string name="admin_delete_asset">Удалить ресурс</string>
+    <string name="admin_asset_reading">Подготовка изображения…</string>
+    <string name="admin_asset_read_failed">Не удалось прочитать выбранный файл.</string>
+    <string name="admin_asset_uploading">Загрузка изображения… (%1$d КБ)</string>
+    <string name="admin_asset_uploaded">Загружено %1$s (%2$d КБ)</string>
+    <string name="admin_asset_upload_failed">Ошибка загрузки: %1$s</string>
+    <string name="admin_asset_resize_running">Изменение размера изображений… Не закрывайте экран.</string>
+    <string name="admin_asset_resize_done">Обработано изображений: %1$d.</string>
+    <string name="admin_asset_resize_failed">Ошибка обработки: %1$s</string>
+
+    <!-- Plain plan feature labels -->
+    <string name="plan_free_features_plain">Бесплатный контент · Базовые загрузки · Без подписки</string>
+    <string name="creator_confirm_required">Подтвердите оба пункта перед отправкой.</string>
+
+    <!-- Admin creator tip review -->
+    <string name="admin_tip_from_to">%1$s → %2$s</string>
+    <string name="admin_tip_approve_confirm">Одобрить поддержку на %1$s LYD от %2$s для %3$s?</string>
+    <string name="admin_tip_reject_confirm">Отклонить поддержку на %1$s LYD от %2$s для %3$s?</string>
+    <string name="admin_tip_reject_reason">Чек не проверен</string>
+    <string name="admin_tip_approved">Поддержка одобрена.</string>
+    <string name="admin_tip_rejected">Поддержка отклонена.</string>
+    <string name="admin_tip_review_failed">Не удалось обновить поддержку: %1$s</string>
+    <string name="admin_tip_receipt_missing">К этой поддержке не приложен чек.</string>
+    <string name="admin_tip_status_pending">Ожидает</string>
+    <string name="admin_tip_status_approved">Одобрено</string>
+    <string name="admin_tip_status_rejected">Отклонено</string>
+
+    <!-- Creator moderation copy -->
+    <string name="creator_status_pending">На рассмотрении</string>
+    <string name="creator_status_approved">Одобрено</string>
+    <string name="creator_status_rejected">Отклонено</string>
+    <string name="admin_creator_more_info">Запросить сведения</string>
+    <string name="admin_creator_more_info_note">Пожалуйста, пришлите дополнительные сведения.</string>
+    <string name="admin_creator_approved">Заявка автора одобрена.</string>
+    <string name="admin_creator_rejected">Заявка автора отклонена.</string>
+    <string name="admin_creator_more_info_sent">Запрошены дополнительные сведения.</string>
+    <string name="admin_creator_review_failed">Не удалось обновить заявку: %1$s</string>
+    <string name="admin_submission_approved">Материал одобрен.</string>
+    <string name="admin_submission_rejected">Материал отклонён.</string>
+    <string name="admin_submission_review_failed">Не удалось обновить материал: %1$s</string>
+    <string name="admin_creator_reject_reason">Пока не соответствует требованиям.</string>
+    <string name="admin_submission_reject_reason">Материал требует изменений.</string>
+    <string name="creator_status_more_info">Запрошены дополнительные сведения.</string>
+    <string name="chat_admin_only_short">Только админ</string>
+    <string name="edit_profile_tab_item">Предмет</string>
+    <string name="edit_profile_tab_about">О себе</string>
+    <string name="edit_profile_message_preview">[Текст сообщения]</string>
 </resources>

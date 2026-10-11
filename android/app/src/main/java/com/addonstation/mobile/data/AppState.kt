@@ -61,6 +61,27 @@ class AppState(private val container: AppContainer) {
     private val _siteAssets = MutableStateFlow<List<SiteAsset>>(emptyList())
     val siteAssets: StateFlow<List<SiteAsset>> = _siteAssets.asStateFlow()
 
+    /**
+     * فهرس «اسم الأداة ⇒ رابطها» يُبنى **مرة واحدة** عند وصول الأصول.
+     *
+     * **لماذا؟** عرض الأداة المجهّزة كان يبحث في قائمة الأصول كلها (٤٩٢ أصلاً)
+     * عند **كل رسالة** في الشات وعند كل إعادة تركيب: ١٥٠٠+ مقارنة نصية في
+     * الإطار الواحد أثناء التمرير ⇒ تقطيع واضح. الآن البحث O(1).
+     */
+    private val _itemUrlIndex = MutableStateFlow<Map<String, String>>(emptyMap())
+    val itemUrlIndex: StateFlow<Map<String, String>> = _itemUrlIndex.asStateFlow()
+
+    private fun buildItemUrlIndex(assets: List<SiteAsset>): Map<String, String> {
+        val out = HashMap<String, String>(assets.size)
+        assets.forEach { asset ->
+            if (asset.assetType != "item") return@forEach
+            val name = asset.name.trim()
+            if (name.isEmpty() || out.containsKey(name)) return@forEach
+            container.siteAssetUrl(asset.fileUrl)?.let { out[name] = it }
+        }
+        return out
+    }
+
     private val _stickerPacks = MutableStateFlow<List<StickerPack>>(emptyList())
     val stickerPacks: StateFlow<List<StickerPack>> = _stickerPacks.asStateFlow()
 
@@ -130,6 +151,7 @@ class AppState(private val container: AppContainer) {
 
     fun setSiteAssets(value: List<SiteAsset>) {
         _siteAssets.value = value
+        _itemUrlIndex.value = buildItemUrlIndex(value)
     }
 
     fun setStickerPacks(value: List<StickerPack>) {

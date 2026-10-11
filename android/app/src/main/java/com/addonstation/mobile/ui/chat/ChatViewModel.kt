@@ -75,6 +75,17 @@ class ChatViewModel(private val container: AppContainer) {
     private val _typing = MutableStateFlow<List<String>>(emptyList())
     val typing: StateFlow<List<String>> = _typing.asStateFlow()
 
+    /** عدد الحاضرين في الغرفة الآن (Realtime presence) — «[N] online» في الشريط. */
+    private val _online = MutableStateFlow(0)
+    val online: StateFlow<Int> = _online.asStateFlow()
+
+    /**
+     * المثبّتات — تُجلب عند **دخول الغرفة** لا عند ضغط الزر فقط، لأن وثيقة
+     * التصميم تعرض شريطاً ذهبياً أعلى الرسائل حين يوجد شيء مثبَّت.
+     */
+    private val _pinned = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val pinned: StateFlow<List<ChatMessage>> = _pinned.asStateFlow()
+
     /**
      * من حظرتُهم (من قاعدة البيانات). الفلترة الأصلية في الخادم (RLS)، وهذه
      * نسخة محلية للفلترة الفورية: يُخفى المحظور من اللحظة نفسها بلا انتظار
@@ -82,6 +93,15 @@ class ChatViewModel(private val container: AppContainer) {
      */
     private val _blockedIds = MutableStateFlow<Set<String>>(emptySet())
     val blockedIds: StateFlow<Set<String>> = _blockedIds.asStateFlow()
+
+    /**
+     * مكتومون عندي (كتم **محلي** من ملف العضو: «Mute this user»). أثره مثل
+     * الحظر في العرض — تُخفى رسائلهم — لكنه قرار شخصيّ على هذا الجهاز وحده،
+     * ولا يُبلَّغ به أحد. يُقرأ من إعدادات الجهاز ويُتابَع حيّاً، فبمجرّد
+     * الكتم من ملف العضو تختفي رسائله في الشات المفتوح بلا إعادة فتح.
+     */
+    private val _mutedIds = MutableStateFlow<Set<String>>(emptySet())
+    val mutedIds: StateFlow<Set<String>> = _mutedIds.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
@@ -96,12 +116,31 @@ class ChatViewModel(private val container: AppContainer) {
         private set
 
     fun open(channel: ChatChannel) {
+        if (_channel.value?.id != channel.id) {
+            _pinned.value = emptyList()
+            _online.value = 0
+            _newMessagesBelow.value = false
+            _newDividerId.value = null
+        }
         _channel.value = channel
         scope.launch {
             _loading.value = true
             // فشل أول جلب لا يجوز أن يُبقي الشات على «جارٍ التحميل» للأبد:
             // الاستطلاع (كل ثانيتين) يجلب الرسائل بعده في أي حال.
             runCatching { _blockedIds.value = container.chat.blockedIds() }
+            // المكتومون: نُحدّث القائمة المحلية من الخادم (الكتم ميزة Legendary
+            // وقد يكون مُنفَّذاً من جهاز آخر) ثم نُبقي المتابعة الحيّة أعلاه.
+            runCatching {
+                val ids = container.chat.mutedMemberIds()
+                if (ids.isNotEmpty()) {
+                    container.prefs.setMutedUsers(ids)
+                    _mutedIds.value = ids
+                }
+            }
+            // الكتم المحلي: متابعة مستمرّة (تتحدّث لحظة الكتم من ملف العضو)
+            scope.launch {
+                container.prefs.mutedUsers.collect { ids -> _mutedIds.value = ids }
+            }
             runCatching { loadInitial(channel.id) }
             _loading.value = false
             startRealtime(channel.id)
@@ -124,6 +163,10 @@ class ChatViewModel(private val container: AppContainer) {
         }
         val byId = list.associateBy { it.id }
         _authors.value = profiles
+        // وقت آخر رسالة يُسجَّل لقائمة الغرف (تصميم ٣: وقت في كل صف)
+        list.maxByOrNull { it.createdAt ?: "" }?.let { last ->
+            ChatPeek.note(last.channelId, last.createdAt, last.content, last.messageType)
+        }
         _messages.value = list.map { message ->
             val reply = message.replyToId?.let { byId[it] }
             ChatMessageUi(
@@ -154,6 +197,11 @@ class ChatViewModel(private val container: AppContainer) {
                 // اتصال سليم ⇒ الاستطلاع يصير نسخةً احتياطية خفيفة (كل ٤ ثوانٍ)
                 realtimeHealthy = status == "joined"
                 if (status == "failed") scope.launch { refreshTails() }
+            },
+            // عدّاد الحضور: من نفس المقبس، وبلا أي طلب إضافي
+            onPresence = { count ->
+                if (count != _online.value) _online.value = count
+                ChatPeek.noteOnline(channelId, count)
             },
         )
         container.realtime.replace(sub)
@@ -200,11 +248,14 @@ class ChatViewModel(private val container: AppContainer) {
         }.getOrNull() ?: return
         if (_messages.value.any { it.message.id == message.id }) return
         if (message.userId in _blockedIds.value) return          // محظور: لا يظهر
+        if (message.userId in _mutedIds.value) return            // مكتوم عندي: لا يظهر
         _messages.value = _messages.value + toUi(message)
+        ChatPeek.note(message.channelId, message.createdAt, message.content, message.messageType)
         if (message.userId != container.supabase.session()?.userId &&
             !_newMessagesBelow.value
         ) {
-            // تظهر شارة «↓ New messages» ويمسحها المستخدم بالتمرير للأسفل
+            // يعرض الفاصل عند أول رسالة جديدة، وتبقى الشارة حتى يمرّر المستخدم للأسفل.
+            _newDividerId.value = message.id
             _newMessagesBelow.value = true
         }
     }
@@ -234,16 +285,23 @@ class ChatViewModel(private val container: AppContainer) {
                                 it
                             }
                         }
+                        ChatPeek.note(message.channelId, message.createdAt, message.content, message.messageType)
                     } else if (message.userId !in _blockedIds.value &&
+                        message.userId !in _mutedIds.value &&
                         list.none { it.message.id == message.id }
                     ) {
                         mapped += toUi(message)
                     }
                 }
                 if (mapped.isNotEmpty() || list !== current) _messages.value = list + mapped
+                mapped.lastOrNull()?.message?.let { last ->
+                    ChatPeek.note(last.channelId, last.createdAt, last.content, last.messageType)
+                }
                 // رسائل الآخرين فقط ترفع شارة «رسائل بالأسفل» — لا رسائلي أنا
                 // (ولا نُسنِد القيمة إن كانت مرفوعة أصلاً: كل إسناد = إعادة تركيب)
-                if (mapped.any { it.message.userId != myId } && !_newMessagesBelow.value) {
+                val firstIncoming = mapped.firstOrNull { it.message.userId != myId }
+                if (firstIncoming != null && !_newMessagesBelow.value) {
+                    _newDividerId.value = firstIncoming.message.id
                     _newMessagesBelow.value = true
                 }
             }
@@ -341,6 +399,7 @@ class ChatViewModel(private val container: AppContainer) {
         // رسالتي أنا: تظهر دائماً وتُمرَّر إليها، والشارة «رسائل بالأسفل» تُصفَّر
         _newMessagesBelow.value = false
         _scrollTick.value += 1
+        _newDividerId.value = null
 
         scope.launch {
             val members = _authors.value.values.toList()
@@ -591,9 +650,19 @@ class ChatViewModel(private val container: AppContainer) {
         val last = _messages.value.lastOrNull()?.message?.id ?: return
         lastReadId = maxOf(lastReadId, last)
         _newMessagesBelow.value = false
+        _newDividerId.value = null
         scope.launch {
             container.chat.markRead(channel.id, lastReadId)
             container.chat.refreshUnread()
+        }
+    }
+
+    fun loadPinned(channelId: String) {
+        scope.launch {
+            val pinned = container.chat.pinned(channelId)
+            if (_channel.value?.id == channelId && _pinned.value != pinned) {
+                _pinned.value = pinned
+            }
         }
     }
 
@@ -610,6 +679,7 @@ class ChatViewModel(private val container: AppContainer) {
     fun close() {
         pollJob?.cancel()
         container.realtime.close()
+        _online.value = 0
         scope.cancel()
     }
 }

@@ -1,8 +1,8 @@
 package com.addonstation.mobile.ui.auth
 
+import android.util.Patterns
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,25 +12,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActionScope
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,151 +32,35 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.toApiError
 import com.addonstation.mobile.ui.apiErrorText
-import com.addonstation.mobile.ui.components.GhostButton
-import com.addonstation.mobile.ui.components.GradientButton
-import com.addonstation.mobile.ui.components.SubScreenHeader
+import com.addonstation.mobile.ui.components.AuthSettingsField
+import com.addonstation.mobile.ui.components.AuthSettingsFooter
+import com.addonstation.mobile.ui.components.AuthSettingsGroupCard
+import com.addonstation.mobile.ui.components.AuthSettingsHeader
+import com.addonstation.mobile.ui.components.AuthSettingsPrimaryButton
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
-import com.addonstation.mobile.ui.theme.AppText
+import com.addonstation.mobile.ui.theme.Spec
 import kotlinx.coroutines.launch
 
-/**
- * نسبة العرض إلى الارتفاع لخلفيتَي الدخول وإنشاء الحساب (الصورتان
- * ‏1920×1080 ⇒ 16:9) — يُحسب منها ارتفاع اللوحة على أي هاتف، فتظهر الصورة
- * كاملة وواضحة على كل الكثافات (من mdpi إلى xxhdpi) بلا تمديد ولا تشويه.
- */
-private const val AUTH_BG_ASPECT = 1.778f
-
-/**
- * ما يقبله الخادم في اسم المستخدم (نفس القاعدة في AuthRepository):
- * حروف إنجليزية وأرقام وشرطة سفلية فقط. نتحقّق منه **قبل** الإرسال لنُظهر
- * سبباً واضحاً بدل رسالة عامّة — لأن المستخدم العربي يكتب اسمه بالعربية
- * غالباً، فكان يرى «حدث خطأ ما» بلا تفسير.
- */
 private val USERNAME_RE = Regex("^[A-Za-z0-9_]+$")
 private const val USERNAME_MIN = 3
 private const val USERNAME_MAX = 24
 
-/**
- * لوحة خلفية أعلى شاشات الدخول وإنشاء الحساب — **مكوّن واحد للشاشتين**
- * فيبقى المقاس والإحساس واحداً مهما تغيّرت الصور.
- *
- * المقاس: عرض الشاشة كاملاً وارتفاع = العرض ÷ نسبة الصورة (16:9)، بحدٍّ أقصى
- * ‏34% من ارتفاع الشاشة للأجهزة العريضة. لماذا لا ملء الشاشة؟ لأن الصورة
- * عريضة والهاتف طولي، فملء الشاشة بها يكبّرها ~٣.٩ مرة ⇒ تُمسح تفاصيلها.
- *
- * البناء ثلاث طبقات:
- *   ١) الصورة (ContentScale.Crop ⇒ قصّ من المنتصف لا مطّ ولا تشويه)؛
- *   ٢) تعتيم خفيف يحفظ وضوح أي نص يُوضع فوقها لاحقاً؛
- *   ٣) تلاشٍ متدرّج إلى `AppColors.Bg` ⇒ تنتهي اللوحة في خلفية التطبيق
- *      كانسياب واحد، **بلا أي لون جديد** (شفافيات من لون الخلفية فقط).
- */
-@androidx.annotation.DrawableRes
-@Composable
-private fun AuthBackdrop(res: Int) {
-    val width = LocalConfiguration.current.screenWidthDp.dp
-    val bandHeight = (width / AUTH_BG_ASPECT)
-        .coerceAtMost(LocalConfiguration.current.screenHeightDp.dp * 0.34f)
-
-    Box(Modifier.fillMaxWidth().height(bandHeight)) {
-        // الطبقة ١: الصورة — عرض الهاتف كاملاً بلا حواف
-        Image(
-            painter = painterResource(res),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize(),
-        )
-        // الطبقة ٢ + ٣: تعتيم متدرّج ثم تلاشٍ إلى خلفية التطبيق (بلا لون جديد)
-        Box(
-            Modifier
-                .matchParentSize()
-                .background(
-                    Brush.verticalGradient(
-                        0.0f to AppColors.Bg.copy(alpha = 0.18f),
-                        0.45f to AppColors.Bg.copy(alpha = 0.30f),
-                        1.0f to AppColors.Bg,
-                    ),
-                ),
-        )
-    }
-}
-
-/**
- * حقل كلمة مرور **بعين 👁 داخل الحقل**: لمسة واحدة تُظهر كلمة المرور كما
- * كتبها المستخدم وتُخفيها ثانيةً.
- *
- * لماذا داخل الحقل؟ لأن المستخدم — خاصّة على الجوال وبكتابة عربية/لاتينية
- * مختلطة — ينسى هل كتب الحرف كبيراً أم صغيراً، فكان يضطر للحذف وإعادة
- * الكتابة. العين تمنع ذلك، وتظهر في **كل** شاشات كلمة المرور: الدخول،
- * إنشاء الحساب (الحقل وحقل التأكيد)، وكلمة المرور الجديدة.
- */
-@Composable
-private fun PasswordField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    imeAction: ImeAction = ImeAction.Done,
-    supportingText: String? = null,
-    onDone: (KeyboardActionScope.() -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    var visible by remember { mutableStateOf(false) }
-    val hint = supportingText
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label, style = AppText.bodySmall) },
-        supportingText = hint?.let { text ->
-            @Composable { Text(text, style = AppText.tiny, color = AppColors.Muted) }
-        },
-        keyboardActions = KeyboardActions(onDone = onDone),
-        leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = AppColors.Muted) },
-        trailingIcon = {
-            IconButton(onClick = { visible = !visible }) {
-                Icon(
-                    imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                    contentDescription = stringResource(
-                        if (visible) R.string.auth_hide_password else R.string.auth_show_password,
-                    ),
-                    tint = if (visible) AppColors.Green else AppColors.Muted,
-                )
-            }
-        },
-        singleLine = true,
-        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = imeAction),
-        modifier = modifier.fillMaxWidth(),
-    )
-}
-
-/** تسجيل الدخول — كما في الوثيقة §7: العنوان، الحقلان، «نسيت كلمة المرور؟»، ورابط إنشاء حساب. */
+/** Sign in — مطابق لـ SPEC_AUTH_SETTINGS.md §1. */
 @Composable
 fun LoginScreen(
     onBack: () -> Unit,
     onSuccess: () -> Unit,
     onOpenSignup: () -> Unit,
-    /**
-     * سطر توضيحي أعلى الشاشة يُبيّن سبب فتحها — مثلاً حين يُنقل المستخدم
-     * إلى الدخول لأنه حاول فتح الشات (الشات للمسجّلين فقط).
-     */
     notice: String? = null,
 ) {
     val container = rememberContainer()
@@ -192,189 +68,213 @@ fun LoginScreen(
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var status by remember { mutableStateOf<String?>(null) }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
     var errorKind by remember { mutableStateOf<ApiErrorKind?>(null) }
     var busy by remember { mutableStateOf(false) }
-    var showRecovery by remember { mutableStateOf(false) }
+    var recoveryOpen by remember { mutableStateOf(false) }
     var recoveryEmail by remember { mutableStateOf("") }
-    var recoveryStatus by remember { mutableStateOf<String?>(null) }
+    var recoveryMessage by remember { mutableStateOf<String?>(null) }
+    var recoveryError by remember { mutableStateOf<String?>(null) }
+    var recoveryBusy by remember { mutableStateOf(false) }
 
+    val enterEmail = stringResource(R.string.msg_enter_email_first)
     val enterBoth = stringResource(R.string.msg_enter_email_password)
+    val invalidEmail = stringResource(R.string.msg_invalid_email)
     val signingIn = stringResource(R.string.msg_signing_in)
-    val checkEmail = stringResource(R.string.msg_check_email)
-    val enterEmailFirst = stringResource(R.string.msg_enter_email_first)
     val sending = stringResource(R.string.msg_sending)
+    val checkEmail = stringResource(R.string.msg_check_email)
 
-    // عملية دخول واحدة يستدعيها كلاهما: زر «تسجيل الدخول» وزر «تم» ✓
-    // على لوحة المفاتيح — فلا يضطر المستخدم للمس الشاشة مرّتين.
     fun submit() {
-        if (email.isBlank() || password.isBlank()) {
-            status = enterBoth
-            return
+        emailError = null
+        passwordError = null
+        errorKind = null
+        when {
+            email.isBlank() -> {
+                emailError = enterEmail
+                if (password.isBlank()) passwordError = enterBoth
+                return
+            }
+            !Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() -> {
+                emailError = invalidEmail
+                return
+            }
+            password.isBlank() -> {
+                passwordError = enterBoth
+                return
+            }
         }
         scope.launch {
             busy = true
-            status = signingIn
-            errorKind = null
-            container.auth.signIn(email, password)
+            container.auth.signIn(email.trim(), password)
                 .onSuccess {
                     container.state.setSignedIn(true)
                     container.state.refreshAll()
-                    status = null
                     onSuccess()
                 }
-                .onFailure { e ->
-                    status = null
-                    errorKind = e.toApiError().kind
-                }
+                .onFailure { errorKind = it.toApiError().kind }
             busy = false
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.auth_sign_in), onBack = onBack)
+    Column(
+        Modifier.fillMaxSize().background(AppColors.AuthBg).imePadding(),
+    ) {
+        AuthSettingsHeader(onBack = onBack)
         Column(
             Modifier
-                .fillMaxSize()
-                .imePadding()
-                .verticalScroll(rememberScrollState()),
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            AuthBackdrop(R.drawable.login_bg)
-            Column(
-                Modifier.padding(horizontal = 18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Spacer(Modifier.height(6.dp))
-                // صورة البروفايل الافتراضية (صورة المالك) تركب الحافة السفلية
-                // للوحة — نفس لغة شاشة الملف الشخصي (أفاتار فوق الغلاف)
-                Box(Modifier.offset(y = (-34).dp)) {
-                    com.addonstation.mobile.ui.components.DefaultProfileAvatar(size = 92.dp)
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(stringResource(R.string.brand_wordmark), style = AppText.pageTitle, color = AppColors.Text)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    stringResource(R.string.auth_login_subtitle),
-                    style = AppText.bodySmall,
-                    color = AppColors.Muted,
-                    textAlign = TextAlign.Center,
-                )
-                if (notice != null) {
-                    // لماذا فُتحت شاشة الدخول؟ (مثال: الشات لا يُفتح لغير مسجّل)
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        "🔒 $notice",
-                        style = AppText.bodySmall,
-                        color = AppColors.Gold,
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold,
+            Spacer(Modifier.height(7.dp))
+            Text(
+                stringResource(R.string.auth_sign_in),
+                style = Spec.authTitle,
+                color = AppColors.AuthText,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.auth_login_subtitle),
+                style = Spec.authSubtitle,
+                color = AppColors.AuthMuted,
+                textAlign = TextAlign.Center,
+            )
+            if (notice != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(notice, style = Spec.rowSub, color = AppColors.AuthGold, textAlign = TextAlign.Center)
+            }
+            Spacer(Modifier.height(14.dp))
+            AuthSettingsField(
+                label = stringResource(R.string.auth_email),
+                value = email,
+                onValueChange = { email = it; emailError = null; errorKind = null },
+                placeholder = stringResource(R.string.auth_email_placeholder),
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
+                imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                error = emailError ?: errorKind
+                    ?.takeIf { it == ApiErrorKind.INVALID_EMAIL || it == ApiErrorKind.EMAIL_NOT_CONFIRMED || it == ApiErrorKind.ALREADY_REGISTERED }
+                    ?.let { apiErrorText(it) },
+            )
+            Spacer(Modifier.height(14.dp))
+            AuthSettingsField(
+                label = stringResource(R.string.auth_password),
+                value = password,
+                onValueChange = { password = it; passwordError = null; errorKind = null },
+                placeholder = stringResource(R.string.auth_password_placeholder),
+                password = true,
+                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                onDone = { submit() },
+                error = passwordError ?: errorKind
+                    ?.takeIf { it == ApiErrorKind.INVALID_CREDENTIALS || it == ApiErrorKind.PASSWORD_TOO_SHORT }
+                    ?.let { apiErrorText(it) },
+            )
+            val generalError = errorKind?.takeUnless {
+                it == ApiErrorKind.INVALID_EMAIL || it == ApiErrorKind.EMAIL_NOT_CONFIRMED ||
+                    it == ApiErrorKind.ALREADY_REGISTERED || it == ApiErrorKind.INVALID_CREDENTIALS ||
+                    it == ApiErrorKind.PASSWORD_TOO_SHORT
+            }
+            if (generalError != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(apiErrorText(generalError), style = Spec.rowSub, color = AppColors.AuthRed)
+            }
+            if (recoveryOpen) {
+                Spacer(Modifier.height(14.dp))
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(AppColors.AuthSurface)
+                        .border(1.dp, AppColors.AuthBorder, RoundedCornerShape(14.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    Text(stringResource(R.string.auth_recovery_title), style = Spec.rowTitle, color = AppColors.AuthText)
+                    Text(stringResource(R.string.auth_recovery_text), style = Spec.rowSub, color = AppColors.AuthMuted)
+                    AuthSettingsField(
+                        label = stringResource(R.string.auth_email),
+                        value = recoveryEmail,
+                        onValueChange = { recoveryEmail = it; recoveryError = null; recoveryMessage = null },
+                        placeholder = stringResource(R.string.auth_email_placeholder),
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                        onDone = {
+                            if (recoveryEmail.isBlank()) recoveryError = enterEmail
+                            else scope.launch {
+                                recoveryBusy = true
+                                container.auth.sendRecovery(recoveryEmail.trim())
+                                    .onSuccess { recoveryMessage = checkEmail; recoveryError = null }
+                                    .onFailure { errorKind = it.toApiError().kind }
+                                recoveryBusy = false
+                            }
+                        },
+                        error = recoveryError,
                     )
-                }
-
-                Spacer(Modifier.height(22.dp))
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text(stringResource(R.string.auth_email)) },
-                    leadingIcon = { Icon(Icons.Filled.Mail, contentDescription = null, tint = AppColors.Muted) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(10.dp))
-                PasswordField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = stringResource(R.string.auth_password),
-                    onDone = { submit() },
-                )
-
-                errorKind?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text(apiErrorText(it), style = AppText.bodySmall, color = AppColors.Red)
-                }
-                status?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text(it, style = AppText.bodySmall, color = AppColors.Green)
-                }
-
-                Spacer(Modifier.height(18.dp))
-                GradientButton(
-                    text = "🔑 " + stringResource(R.string.auth_sign_in),
-                    onClick = { submit() },
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = stringResource(R.string.auth_forgot),
-                    style = AppText.bodySmall,
-                    color = AppColors.Blue,
-                    modifier = Modifier.clickable { showRecovery = !showRecovery },
-                )
-
-                if (showRecovery) {
-                    Spacer(Modifier.height(14.dp))
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(AppColors.Surface)
-                            .border(1.dp, AppColors.Border, RoundedCornerShape(16.dp))
-                            .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text(stringResource(R.string.auth_recovery_title), style = AppText.sectionTitle, color = AppColors.Text)
-                        Text(stringResource(R.string.auth_recovery_text), style = AppText.bodySmall, color = AppColors.Muted)
-                        OutlinedTextField(
-                            value = recoveryEmail,
-                            onValueChange = { recoveryEmail = it },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                            label = { Text(stringResource(R.string.auth_email)) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        GradientButton(
-                            text = stringResource(R.string.auth_send_recovery),
-                            onClick = {
-                                if (recoveryEmail.isBlank()) {
-                                    recoveryStatus = enterEmailFirst
-                                    return@GradientButton
-                                }
+                    AuthSettingsPrimaryButton(
+                        text = if (recoveryBusy) sending else stringResource(R.string.auth_send_recovery),
+                        onClick = {
+                            if (recoveryEmail.isBlank()) {
+                                recoveryError = enterEmail
+                            } else {
                                 scope.launch {
-                                    recoveryStatus = sending
-                                    container.auth.sendRecovery(recoveryEmail)
-                                        .onSuccess { recoveryStatus = checkEmail }
-                                        .onFailure { recoveryStatus = null; errorKind = it.toApiError().kind }
+                                    recoveryBusy = true
+                                    recoveryMessage = null
+                                    container.auth.sendRecovery(recoveryEmail.trim())
+                                        .onSuccess { recoveryMessage = checkEmail; recoveryError = null }
+                                        .onFailure { errorKind = it.toApiError().kind }
+                                    recoveryBusy = false
                                 }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        recoveryStatus?.let {
-                            Text(it, style = AppText.bodySmall, color = AppColors.Green)
-                        }
+                            }
+                        },
+                        enabled = !recoveryBusy,
+                        loading = recoveryBusy,
+                    )
+                    recoveryMessage?.let {
+                        Text(it, style = Spec.rowSub, color = AppColors.AuthGreenText)
                     }
                 }
-
-                Spacer(Modifier.height(24.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.auth_no_account), style = AppText.bodySmall, color = AppColors.Muted)
-                    Spacer(Modifier.size(6.dp))
-                    Text(
-                        stringResource(R.string.auth_create_account),
-                        style = AppText.bodySmall,
-                        color = AppColors.Green,
-                        modifier = Modifier.clickable { onOpenSignup() },
-                    )
-                }
-                Spacer(Modifier.height(40.dp))
             }
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 44.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier
+                        .heightIn(min = 44.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            recoveryOpen = !recoveryOpen
+                            recoveryError = null
+                            recoveryMessage = null
+                            if (recoveryEmail.isBlank()) recoveryEmail = email
+                        }
+                        .padding(horizontal = 8.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(stringResource(R.string.auth_forgot), style = Spec.rowValue, color = AppColors.AuthBlueLight)
+                }
+            }
+            AuthSettingsPrimaryButton(
+                text = if (busy) signingIn else stringResource(R.string.auth_sign_in),
+                onClick = { submit() },
+                enabled = !busy,
+                loading = busy,
+            )
+            Spacer(Modifier.height(20.dp))
         }
+        AuthSettingsFooter(
+            prompt = stringResource(R.string.auth_no_account),
+            action = stringResource(R.string.auth_create_account),
+            onClick = onOpenSignup,
+        )
     }
 }
 
-/** إنشاء حساب — الوثيقة §7: اسم المستخدم (٣ أحرف+)، البريد، كلمة المرور (٦+). */
+/** Create account — مطابق لـ SPEC_AUTH_SETTINGS.md §2. */
 @Composable
 fun SignUpScreen(
     onBack: () -> Unit,
@@ -388,173 +288,273 @@ fun SignUpScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
+    var usernameError by remember { mutableStateOf<String?>(null) }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var confirmError by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
     var errorKind by remember { mutableStateOf<ApiErrorKind?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var pendingConfirm by remember { mutableStateOf(false) }
+    var resendMessage by remember { mutableStateOf<String?>(null) }
+    var resendErrorKind by remember { mutableStateOf<ApiErrorKind?>(null) }
+    var resendOk by remember { mutableStateOf(false) }
 
     val creating = stringResource(R.string.msg_creating_account)
     val shortUsername = stringResource(R.string.msg_username_too_short)
+    val longUsername = stringResource(R.string.msg_username_too_long)
+    val invalidUsername = stringResource(R.string.msg_username_invalid)
+    val invalidEmail = stringResource(R.string.msg_invalid_email)
     val shortPassword = stringResource(R.string.msg_password_too_short)
     val noMatch = stringResource(R.string.msg_passwords_no_match)
-    val invalidUsername = stringResource(R.string.msg_username_invalid)
-    val longUsername = stringResource(R.string.msg_username_too_long)
-    val invalidEmail = stringResource(R.string.msg_invalid_email)
     val createdMsg = stringResource(R.string.msg_account_created)
+    val signingIn = stringResource(R.string.msg_signing_in)
+    val resentMsg = stringResource(R.string.auth_confirm_resent)
+    val resendFailedMsg = stringResource(R.string.msg_network_error)
 
-    // عملية إنشاء واحدة: من زر «إنشاء حساب» أو من زر «تم» ✓ بلوحة المفاتيح.
+    fun clearErrors() {
+        usernameError = null
+        emailError = null
+        passwordError = null
+        confirmError = null
+        errorKind = null
+    }
+
     fun submit() {
+        clearErrors()
         val name = username.trim()
         when {
-            name.length < USERNAME_MIN -> status = shortUsername
-            name.length > USERNAME_MAX -> status = longUsername
-            !USERNAME_RE.matches(name) -> status = invalidUsername
-            !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() -> status = invalidEmail
-            password.length < 6 -> status = shortPassword
-            password != confirm -> status = noMatch
-            else -> scope.launch {
-                busy = true
-                errorKind = null
-                status = creating
-                container.auth.signUp(username, email, password)
-                    .onSuccess {
-                        if (container.supabase.session() != null) {
-                            container.state.setSignedIn(true)
-                            container.state.refreshAll()
-                            status = null
-                            onSuccess()
-                        } else {
-                            // تأكيد البريد مفعّل: لا جلسة حتى يفتح المستخدم الرابط
-                            status = createdMsg
-                        }
-                    }
-                    .onFailure { e ->
+            name.length < USERNAME_MIN -> { usernameError = shortUsername; return }
+            name.length > USERNAME_MAX -> { usernameError = longUsername; return }
+            !USERNAME_RE.matches(name) -> { usernameError = invalidUsername; return }
+            !Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() -> { emailError = invalidEmail; return }
+            password.length < 6 -> { passwordError = shortPassword; return }
+            password != confirm -> { confirmError = noMatch; return }
+        }
+        scope.launch {
+            busy = true
+            status = creating
+            container.auth.signUp(name, email.trim(), password)
+                .onSuccess {
+                    if (container.supabase.session() != null) {
+                        container.state.setSignedIn(true)
+                        container.state.refreshAll()
                         status = null
-                        errorKind = e.toApiError().kind
+                        onSuccess()
+                    } else {
+                        status = createdMsg
+                        pendingConfirm = true
                     }
-                busy = false
-            }
+                }
+                .onFailure { errorKind = it.toApiError().kind; status = null }
+            busy = false
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.auth_create_account), onBack = onBack)
+    fun confirmAndSignIn() {
+        if (busy) return
+        scope.launch {
+            busy = true
+            resendOk = false
+            resendErrorKind = null
+            resendMessage = signingIn
+            container.auth.signIn(email.trim(), password)
+                .onSuccess {
+                    container.state.setSignedIn(true)
+                    container.state.refreshAll()
+                    resendMessage = null
+                    onSuccess()
+                }
+                .onFailure { resendErrorKind = it.toApiError().kind; resendMessage = null }
+            busy = false
+        }
+    }
+
+    fun resend() {
+        if (busy) return
+        scope.launch {
+            busy = true
+            resendMessage = null
+            resendErrorKind = null
+            container.auth.resendConfirmation(email.trim())
+                .onSuccess { resendOk = true; resendMessage = resentMsg }
+                .onFailure { resendOk = false; resendMessage = resendFailedMsg }
+            busy = false
+        }
+    }
+
+    Column(Modifier.fillMaxSize().background(AppColors.AuthBg).imePadding()) {
+        AuthSettingsHeader(onBack = onBack, backgroundRes = R.drawable.signup_bg)
         Column(
             Modifier
-                .fillMaxSize()
-                .imePadding()
-                .verticalScroll(rememberScrollState()),
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            AuthBackdrop(R.drawable.signup_bg)
-            Column(
-                Modifier.padding(horizontal = 18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            Spacer(Modifier.height(7.dp))
+            Text(
+                stringResource(R.string.auth_create_account),
+                style = Spec.authTitle,
+                color = AppColors.AuthText,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.auth_signup_title),
+                style = Spec.authSubtitle,
+                color = AppColors.AuthMuted,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(14.dp))
+            AuthSettingsField(
+                label = stringResource(R.string.auth_username),
+                value = username,
+                onValueChange = { username = it; usernameError = null; status = null },
+                placeholder = stringResource(R.string.auth_username_placeholder),
+                helper = stringResource(R.string.auth_username_hint),
+                imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                error = usernameError,
+            )
+            Spacer(Modifier.height(12.dp))
+            AuthSettingsField(
+                label = stringResource(R.string.auth_email),
+                value = email,
+                onValueChange = { email = it; emailError = null; status = null },
+                placeholder = stringResource(R.string.auth_email_placeholder),
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
+                imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                error = emailError ?: errorKind
+                    ?.takeIf { it == ApiErrorKind.INVALID_EMAIL || it == ApiErrorKind.ALREADY_REGISTERED }
+                    ?.let { apiErrorText(it) },
+            )
+            Spacer(Modifier.height(12.dp))
+            AuthSettingsField(
+                label = stringResource(R.string.auth_password),
+                value = password,
+                onValueChange = { password = it; passwordError = null; status = null },
+                placeholder = stringResource(R.string.auth_password_placeholder),
+                password = true,
+                helper = stringResource(R.string.auth_password_hint),
+                imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                error = passwordError ?: errorKind
+                    ?.takeIf { it == ApiErrorKind.PASSWORD_TOO_SHORT }
+                    ?.let { apiErrorText(it) },
+            )
+            Spacer(Modifier.height(12.dp))
+            AuthSettingsField(
+                label = stringResource(R.string.auth_confirm_password),
+                value = confirm,
+                onValueChange = { confirm = it; confirmError = null; status = null },
+                placeholder = stringResource(R.string.auth_password_placeholder),
+                password = true,
+                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                onDone = { submit() },
+                error = confirmError,
+            )
+            val generalError = errorKind?.takeUnless {
+                it == ApiErrorKind.INVALID_EMAIL || it == ApiErrorKind.ALREADY_REGISTERED || it == ApiErrorKind.PASSWORD_TOO_SHORT
+            }
+            if (generalError != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(apiErrorText(generalError), style = Spec.rowSub, color = AppColors.AuthRed)
+            }
+
+            Spacer(Modifier.height(14.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AppColors.AuthSurface)
+                    .border(1.dp, AppColors.AuthBorder, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Spacer(Modifier.height(6.dp))
-                // صورة البروفايل الافتراضية (صورة المالك) تركب الحافة السفلية
-                // للوحة — نفس لغة شاشة الدخول (أفاتار فوق الخلفية)
-                Box(Modifier.offset(y = (-34).dp)) {
-                    com.addonstation.mobile.ui.components.DefaultProfileAvatar(size = 92.dp)
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape).background(AppColors.AuthSurfaceHigh),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.Person, contentDescription = null, tint = AppColors.AuthChipLabel, modifier = Modifier.size(20.dp))
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(stringResource(R.string.auth_signup_title), style = AppText.pageTitle, color = AppColors.Text)
-                Spacer(Modifier.height(6.dp))
                 Text(
                     stringResource(R.string.auth_signup_subtitle),
-                    style = AppText.bodySmall,
-                    color = AppColors.Muted,
-                    textAlign = TextAlign.Center,
+                    style = Spec.rowSub,
+                    color = AppColors.AuthChipLabel,
+                    modifier = Modifier.weight(1f),
                 )
+            }
 
-                Spacer(Modifier.height(20.dp))
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                    label = { Text(stringResource(R.string.auth_username)) },
-                    leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null, tint = AppColors.Muted) },
-                    supportingText = {
-                        Text(
-                            stringResource(R.string.auth_username_hint),
-                            style = AppText.tiny,
-                            color = AppColors.Muted,
+            Spacer(Modifier.height(14.dp))
+            Text(
+                stringResource(R.string.auth_terms_note),
+                style = Spec.rowSub.copy(fontSize = 11.sp, lineHeight = 16.5.sp),
+                color = AppColors.AuthMuted,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(14.dp))
+            if (pendingConfirm) {
+                AuthSettingsGroupCard(
+                    modifier = Modifier.padding(horizontal = 0.dp),
+                    radius = 14.dp,
+                    background = AppColors.AuthSurface,
+                    borderColor = AppColors.AuthGoldBorder,
+                ) {
+                    Column(
+                        Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(stringResource(R.string.auth_confirm_title), style = Spec.rowTitle, color = AppColors.AuthGold)
+                        Text(stringResource(R.string.auth_confirm_text), style = Spec.rowSub, color = AppColors.AuthMuted)
+                        Text(email.trim(), style = Spec.rowSub, color = AppColors.AuthText)
+                        AuthSettingsPrimaryButton(
+                            text = stringResource(R.string.auth_confirm_retry),
+                            onClick = { confirmAndSignIn() },
+                            enabled = !busy,
+                            loading = busy,
                         )
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text(stringResource(R.string.auth_email)) },
-                    leadingIcon = { Icon(Icons.Filled.Mail, contentDescription = null, tint = AppColors.Muted) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(10.dp))
-                PasswordField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = stringResource(R.string.auth_password),
-                    imeAction = ImeAction.Next,
-                    supportingText = stringResource(R.string.auth_password_hint),
-                )
-                Spacer(Modifier.height(10.dp))
-                // **حقل التأكيد**: إن اختلف الحقلان لا نُنشئ الحساب ونُظهر
-                // السبب، بدل أن يكتشف المستخدم الخطأ بعد التسجيل.
-                PasswordField(
-                    value = confirm,
-                    onValueChange = { confirm = it },
-                    label = stringResource(R.string.auth_confirm_password),
-                    onDone = { submit() },
-                )
-
-                errorKind?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text(apiErrorText(it), style = AppText.bodySmall, color = AppColors.Red)
+                        AuthSettingsPrimaryButton(
+                            text = stringResource(R.string.auth_confirm_resend),
+                            onClick = { resend() },
+                            enabled = !busy,
+                        )
+                        resendMessage?.let {
+                            Text(
+                                it,
+                                style = Spec.rowSub,
+                                color = if (resendOk) AppColors.AuthGreenText else AppColors.AuthRed,
+                            )
+                        }
+                        resendErrorKind?.let {
+                            Text(apiErrorText(it), style = Spec.rowSub, color = AppColors.AuthRed)
+                        }
+                        Text(stringResource(R.string.auth_confirm_hint), style = Spec.rowSub, color = AppColors.AuthMuted)
+                    }
                 }
-                status?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text(it, style = AppText.bodySmall, color = AppColors.Green, textAlign = TextAlign.Center)
-                }
-
-                Spacer(Modifier.height(18.dp))
-                GradientButton(
-                    text = stringResource(R.string.auth_create_account),
+            } else {
+                AuthSettingsPrimaryButton(
+                    text = if (busy) creating else stringResource(R.string.auth_create_account),
                     onClick = { submit() },
                     enabled = !busy,
-                    modifier = Modifier.fillMaxWidth(),
+                    loading = busy,
                 )
-
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    stringResource(R.string.auth_terms_note),
-                    style = AppText.tiny,
-                    color = AppColors.Dim,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.auth_have_account), style = AppText.bodySmall, color = AppColors.Muted)
-                    Spacer(Modifier.size(6.dp))
-                    Text(
-                        stringResource(R.string.auth_sign_in),
-                        style = AppText.bodySmall,
-                        color = AppColors.Green,
-                        modifier = Modifier.clickable { onOpenLogin() },
-                    )
-                }
-                Spacer(Modifier.height(40.dp))
             }
+            status?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = Spec.rowSub, color = AppColors.AuthGreenText, textAlign = TextAlign.Center)
+            }
+            Spacer(Modifier.height(16.dp))
         }
+        AuthSettingsFooter(
+            prompt = stringResource(R.string.auth_have_account),
+            action = stringResource(R.string.auth_sign_in),
+            onClick = onOpenLogin,
+        )
     }
 }
 
-/**
- * شاشة كلمة المرور الجديدة — تُفتح بعد رابط الاستعادة addonstation://recovery
- * (الرسائل والأخطاء كما في الوثيقة §7).
- */
+/** Password recovery result screen: same field language, preserving existing behavior. */
 @Composable
 fun ResetPasswordScreen(
     onBack: () -> Unit,
@@ -562,97 +562,81 @@ fun ResetPasswordScreen(
 ) {
     val container = rememberContainer()
     val scope = rememberCoroutineScope()
-
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     var isError by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var confirmError by remember { mutableStateOf<String?>(null) }
 
     val tooShort = stringResource(R.string.msg_password_too_short)
     val noMatch = stringResource(R.string.msg_passwords_no_match)
     val saving = stringResource(R.string.msg_saving)
     val saved = stringResource(R.string.msg_password_saved)
+    val genericError = stringResource(R.string.msg_generic_error)
 
-    // حفظ كلمة المرور: من زر «حفظ» أو من «تم» ✓ في لوحة المفاتيح.
     fun save() {
+        passwordError = null
+        confirmError = null
         when {
-            password.length < 6 -> {
-                status = tooShort; isError = true
-            }
-            password != confirm -> {
-                status = noMatch; isError = true
-            }
-            else -> scope.launch {
-                busy = true
-                status = saving
-                container.auth.updatePassword(password)
-                    .onSuccess {
-                        status = saved
-                        isError = false
-                        onDone()
-                    }
-                    .onFailure {
-                        status = it.message
-                        isError = true
-                    }
-                busy = false
-            }
+            password.length < 6 -> { passwordError = tooShort; return }
+            password != confirm -> { confirmError = noMatch; return }
+        }
+        scope.launch {
+            busy = true
+            status = saving
+            isError = false
+            container.auth.updatePassword(password)
+                .onSuccess { status = saved; onDone() }
+                .onFailure { status = it.message ?: genericError; isError = true }
+            busy = false
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.auth_new_password), onBack = onBack)
+    Column(Modifier.fillMaxSize().background(AppColors.AuthBg).imePadding()) {
+        com.addonstation.mobile.ui.components.AuthSettingsTopBar(
+            title = stringResource(R.string.auth_new_password),
+            onBack = onBack,
+        )
         Column(
             Modifier
-                .fillMaxSize()
-                .imePadding()
+                .weight(1f)
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(horizontal = 24.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Spacer(Modifier.height(24.dp))
-            Text("🔑", style = AppText.pageTitle)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.auth_new_password),
-                style = AppText.pageTitle,
-                color = AppColors.Text,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(20.dp))
-            PasswordField(
-                value = password,
-                onValueChange = { password = it },
+            Text(stringResource(R.string.auth_new_password), style = Spec.authTitle, color = AppColors.AuthText)
+            AuthSettingsField(
                 label = stringResource(R.string.auth_new_password),
-                imeAction = ImeAction.Next,
-                supportingText = stringResource(R.string.auth_password_hint),
+                value = password,
+                onValueChange = { password = it; passwordError = null },
+                placeholder = stringResource(R.string.auth_password_placeholder),
+                password = true,
+                helper = stringResource(R.string.auth_password_hint),
+                imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                error = passwordError,
             )
-            Spacer(Modifier.height(10.dp))
-            PasswordField(
-                value = confirm,
-                onValueChange = { confirm = it },
+            AuthSettingsField(
                 label = stringResource(R.string.auth_confirm_password),
+                value = confirm,
+                onValueChange = { confirm = it; confirmError = null },
+                placeholder = stringResource(R.string.auth_password_placeholder),
+                password = true,
+                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
                 onDone = { save() },
+                error = confirmError,
             )
             status?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, style = AppText.bodySmall, color = if (isError) AppColors.Red else AppColors.Green)
+                Text(it, style = Spec.rowSub, color = if (isError) AppColors.AuthRed else AppColors.AuthGreenText)
             }
-            Spacer(Modifier.height(18.dp))
-            GradientButton(
-                text = stringResource(R.string.auth_save_password),
+            AuthSettingsPrimaryButton(
+                text = if (busy) saving else stringResource(R.string.auth_save_password),
                 onClick = { save() },
                 enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
+                loading = busy,
             )
-            Spacer(Modifier.height(24.dp))
-            GhostButton(
-                text = stringResource(R.string.auth_sign_in),
-                onClick = onDone,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(40.dp))
         }
     }
 }

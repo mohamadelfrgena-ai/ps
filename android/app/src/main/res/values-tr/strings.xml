@@ -10,6 +10,7 @@
     <string name="splash_dream_it">HAYAL ET.</string>
     <string name="splash_build_it">İNŞA ET.</string>
     <string name="splash_create_it">YARAT.</string>
+    <string name="splash_skip">Atlamak için dokun</string>
 
     <string name="nav_home">Ana Sayfa</string>
     <string name="nav_store">Mağaza</string>
@@ -114,7 +115,7 @@
     <string name="common_none">Yok</string>
     <string name="common_yes">Evet</string>
     <string name="common_no">Hayır</string>
-    <string name="common_guest">Misafir</string>
+    <string name="common_guest">Kullanıcı</string>
     <string name="common_soon">Yakında</string>
     <string name="common_log_out">Çıkış Yap</string>
     <string name="common_sign_in">Giriş yap</string>
@@ -631,4 +632,200 @@
     <string name="profile_item_equipped">Takılı</string>
     <string name="profile_content_section">İçerik</string>
     <string name="profile_no_content_published">Henüz yayınlanmış içerik yok</string>
+    <string name="auth_confirm_title">Hesabın oluşturuldu ✓</string>
+    <string name="auth_confirm_text">E-postana bir doğrulama bağlantısı gönderdik. Aç ve aşağıdaki düğmeye dokun.</string>
+    <string name="auth_confirm_retry">Onayladım — giriş yap</string>
+    <string name="auth_confirm_resend">Doğrulama bağlantısını yeniden gönder</string>
+    <string name="auth_confirm_resent">Doğrulama bağlantısı yeniden gönderildi ✓</string>
+    <string name="auth_confirm_hint">Mesaj gelmedi mi? Spam klasörüne de bak.</string>
+    <string name="notif_prompt_title">Bildirimleri aç</string>
+    <string name="notif_prompt_text">Uygulama kapalıyken bile sohbet mesajlarını, bahsetmeleri ve yeni eklentileri al. Her bölümü sonradan Ayarlar\'dan değiştirebilirsin.</string>
+    <string name="notif_prompt_allow">Şimdi aç</string>
+    <string name="notif_prompt_later">Sonra</string>
+    <string name="home_hero_slogan">HAYAL ET.
+İNŞA ET.
+YARAT.</string>
+    <string name="home_hero_subtitle">Macera için hazır eklentiler ve dünyalar</string>
+    <string name="home_hero_start">Şimdi başla</string>
+    <string name="home_hero_family">Aileye katıl</string>
+    <string name="home_plan_current">Mevcut planın</string>
+    <string name="home_plan_free_desc">Ücretsiz içerik · Temel erişim · Abonelik yok</string>
+    <string name="home_legend_title">LEGENDARY\'E KATIL</string>
+    <string name="home_legend_text">Efsanevi eklentiler · Efsanevi dünyalar · Öncelikli erişim</string>
+    <string name="home_legend_view">Gör</string>
+    <string name="home_chip_all">Tümü</string>
+    <string name="home_chip_addons">Eklentiler</string>
+    <string name="home_chip_worlds">Dünyalar</string>
+    <string name="home_chip_favorites">Favoriler</string>
+    <string name="home_latest_addons">En yeni eklentiler</string>
+    <string name="home_most_downloaded">En çok indirilen</string>
+    <string name="home_featured_creators">Öne çıkan üreticiler</string>
+    <string name="home_creators_caption">AddonStation özel seçkisi</string>
+    <string name="home_no_content">Henüz içerik yayınlanmadı</string>
+    <string name="home_error">Bir şeyler ters gitti</string>
+    <string name="home_error_tap">Yeniden denemek için dokun</string>
+    <string name="comm_all_rooms">Tüm odalar</string>
+    <string name="comm_rules_banner">⚠️ Topluluk kuralları · İhlaller susturma veya yasak getirebilir</string>
+    <string name="comm_members_only">Sohbet yalnızca üyelere — odalara girmek için giriş yap</string>
+    <string name="chat_online">%1$d çevrimiçi</string>
+    <string name="chat_pinned_strip">Sabitlenenler · %1$s</string>
+    <string name="home_by_creator">%1$s tarafından</string>
+    <string name="chat_nobody_online">Şu anda kimse çevrimiçi değil</string>
+    <string name="badge_premium">Premium üye</string>
+    <string name="badge_creator">Üretici</string>
+    <string name="badge_admin">YÖNETİCİ</string>
+    <string name="badge_mod">MOD</string>
+    <string name="badge_level">Seviye %1$d</string>
+    <string name="profile_no_bio">Bu üye henüz bir biyografi eklemedi.</string>
+    <string name="profile_stats_friends">Arkadaşlar</string>
+    <string name="profile_wallet_title">AC cüzdanı</string>
+    <string name="profile_daily_reward">Günlük ödül</string>
+    <string name="profile_daily_claimed">Bugün alındı</string>
+    <string name="profile_day_streak">%1$d gün üst üste</string>
+    <string name="profile_logout">Çıkış yap</string>
+    <string name="profile_orders">Siparişlerim</string>
+    <string name="profile_view_as_others">Başkaları nasıl görür</string>
+    <string name="profile_hidden_from_others">Diğer kullanıcılardan gizli</string>
+    <string name="profile_safety">Güvenlik</string>
+    <string name="profile_moderation">Moderasyon</string>
+    <string name="profile_msg_user">%1$s kişisine mesaj</string>
+    <string name="profile_friend_request">Arkadaşlık isteği</string>
+    <string name="profile_request_sent">İstek gönderildi</string>
+    <string name="profile_friends_state">Arkadaşlar ✓</string>
+    <string name="profile_accept">Kabul et</string>
+    <string name="profile_reject">Reddet</string>
+    <string name="profile_status_online">Çevrimiçi</string>
+    <string name="profile_status_away">Uzakta</string>
+    <string name="profile_status_offline">Çevrimdışı</string>
+    <string name="profile_ban_user">Kullanıcıyı yasakla</string>
+    <string name="profile_delete_message">Mesajı sil</string>
+    <string name="profile_as_others_title">Profilim başkalarının gözüyle</string>
+    <string name="profile_member_since_label">ÜYELİK TARİHİ</string>
+    <string name="chat_unmute_user">Sesi aç</string>
+    <string name="profile_action_done">Tamam ✓</string>
+    <string name="profile_action_failed">Tamamlanamadı — tekrar deneyin.</string>
+    <string name="profile_mute_done">Sessiz — mesajları artık görünmüyor.</string>
+    <string name="profile_unmute_done">Sesi açıldı — mesajları yeniden görünüyor.</string>
+    <string name="common_more">Daha fazla</string>
+    <string name="profile_blocked_state">Bu üyeyle etkileşime geçemezsiniz</string>
+    <string name="profile_unfriend">Arkadaşlıktan çıkar</string>
+    <string name="profile_unfriend_confirm">Bu üyeyi arkadaşlarınızdan çıkaralım mı?</string>
+    <string name="mute_member_locked">Legendary</string>
+    <string name="mute_member_needs_plan">Üye sessize alma Legendary özelliğidir — abonelik açılıyor.</string>
+
+    <!-- AddonStation auth/settings redesign -->
+    <string name="auth_email_placeholder">name@example.com</string>
+    <string name="auth_password_placeholder">••••••••</string>
+    <string name="settings_my_plan">Planım</string>
+    <string name="settings_your_plan">Planınız: %1$s</string>
+    <string name="settings_expires_on">Son kullanma tarihi: %1$s</string>
+    <string name="settings_upgrade">Yükselt</string>
+    <string name="settings_sections_five">5 BÖLÜM</string>
+    <string name="settings_admin_tools">Yönetici araçları</string>
+    <string name="settings_admin_visible">Yalnızca yönetici hesaplarına görünür</string>
+    <string name="settings_open_dashboard">Kontrol panelini aç</string>
+    <string name="settings_account_actions">Hesap işlemleri</string>
+    <string name="settings_footer">© 2026 AddonStation — Tüm hakları saklıdır</string>
+    <string name="auth_username_placeholder">kullanici_adi</string>
+
+    <!-- Edit profile detail screen -->
+    <string name="profile_edit_plain">Profili düzenle</string>
+    <string name="edit_profile_preview">Önizleme</string>
+    <string name="edit_profile_counter">%1$d/%2$d</string>
+    <string name="edit_profile_discard_title">Değişiklikler silinsin mi?</string>
+    <string name="edit_profile_discard_body">Değişiklikleriniz kaybolacak.</string>
+    <string name="edit_profile_discard">Vazgeç</string>
+    <string name="edit_profile_keep_editing">Düzenlemeye devam et</string>
+    <string name="edit_profile_saved">Profil kaydedildi</string>
+    <string name="edit_profile_status_hint">Aklınızdan ne geçiyor?</string>
+    <string name="edit_profile_avatar_label">Avatar</string>
+    <string name="edit_profile_epic_item">Epic eşyası</string>
+    <string name="edit_profile_golden_item">Altın eşya</string>
+    <string name="edit_profile_no_items">Bu bölümde henüz kullanılabilir eşya yok.</string>
+    <string name="edit_profile_no_results">Eşleşen görsel bulunamadı.</string>
+    <string name="cd_avatar_selected">%1$s, seçildi</string>
+    <string name="cd_avatar_locked">%1$s, kilitli. Gerekli plan: %2$s</string>
+    <string name="plan_locked_avatars_plain">Kilitli avatarların kilidi Epic veya Legendary ile açılır.</string>
+    <string name="plan_locked_items_plain">Kilitli sohbet eşyaları için uygun plan gerekir.</string>
+    <string name="plan_locked_online_plain">Çevrimiçi durumu yalnızca Legendary abonelerine açıktır.</string>
+    <string name="plan_locked_banner_note_plain">Tüm kapaklar kilitli — Epic veya Legendary aboneliğiyle açabilirsiniz.</string>
+    <string name="profile_banner_none_plain">Henüz bir kapak yok — aşağıdaki bölümlerden birini seçin</string>
+    <string name="profile_about_plain">Hakkımda</string>
+    <string name="msg_username_taken">Bu kullanıcı adı zaten kullanılıyor.</string>
+
+    <!-- Crash report -->
+    <string name="crash_report_title">Uygulama çökme raporu</string>
+    <string name="crash_report_body">Uygulama önceki açılışında beklenmedik şekilde durdu. Nedeni belirleyebilmemiz için bu raporu kopyalayıp desteğe gönderin.</string>
+    <string name="crash_report_copy">Çökme raporunu kopyala</string>
+    <string name="crash_report_copied">Rapor kopyalandı. Bu sohbete yapıştırın.</string>
+    <string name="crash_report_continue">Uygulamayı açmayı dene</string>
+
+    <!-- Home v2 sections -->
+
+    <!-- Imported missing localized resources from AddonStation_chat_panels_store -->
+
+    <!-- Imported missing localized resources from AddonStation_profile_wallet_admin -->
+
+    <!-- Imported missing localized resources from AddonStation_creators_pages -->
+    <string name="profile_remove_favorite">Favorilerden kaldır</string>
+
+    <!-- Creator form labels -->
+    <string name="creator_file_types">Herhangi bir dosya türü (*/*)</string>
+    <string name="creator_optional_details">İsteğe bağlı ayrıntılar</string>
+    <string name="creator_required_fields">Gerekli alanları doldurup iki onayı da kabul edin.</string>
+    <string name="creator_category_adventure">Macera</string>
+    <string name="creator_category_survival">Hayatta kalma</string>
+    <string name="creator_category_pvp">PvP</string>
+    <string name="creator_category_building">İnşa</string>
+    <string name="creator_category_skins">Görünümler</string>
+    <string name="creator_category_other">Diğer</string>
+
+    <!-- Admin asset confirmations and progress -->
+    <string name="admin_delete_asset">Varlığı sil</string>
+    <string name="admin_asset_reading">Görsel hazırlanıyor…</string>
+    <string name="admin_asset_read_failed">Seçilen dosya okunamadı.</string>
+    <string name="admin_asset_uploading">Görsel yükleniyor… (%1$d KB)</string>
+    <string name="admin_asset_uploaded">%1$s yüklendi (%2$d KB)</string>
+    <string name="admin_asset_upload_failed">Yükleme başarısız: %1$s</string>
+    <string name="admin_asset_resize_running">Görseller yeniden boyutlandırılıyor… Bu ekranı kapatmayın.</string>
+    <string name="admin_asset_resize_done">%1$d görsel yeniden boyutlandırıldı.</string>
+    <string name="admin_asset_resize_failed">Boyutlandırma başarısız: %1$s</string>
+
+    <!-- Plain plan feature labels -->
+    <string name="plan_free_features_plain">Ücretsiz içerik · Temel indirmeler · Abonelik yok</string>
+    <string name="creator_confirm_required">Göndermeden önce iki onayı da kabul edin.</string>
+
+    <!-- Admin creator tip review -->
+    <string name="admin_tip_from_to">%1$s → %2$s</string>
+    <string name="admin_tip_approve_confirm">%2$s tarafından %3$s için gönderilen %1$s LYD desteği onaylansın mı?</string>
+    <string name="admin_tip_reject_confirm">%2$s tarafından %3$s için gönderilen %1$s LYD desteği reddedilsin mi?</string>
+    <string name="admin_tip_reject_reason">Makbuz doğrulanmadı</string>
+    <string name="admin_tip_approved">Destek onaylandı.</string>
+    <string name="admin_tip_rejected">Destek reddedildi.</string>
+    <string name="admin_tip_review_failed">Destek güncellenemedi: %1$s</string>
+    <string name="admin_tip_receipt_missing">Bu destek için makbuz eklenmemiş.</string>
+    <string name="admin_tip_status_pending">Beklemede</string>
+    <string name="admin_tip_status_approved">Onaylandı</string>
+    <string name="admin_tip_status_rejected">Reddedildi</string>
+
+    <!-- Creator moderation copy -->
+    <string name="creator_status_pending">Beklemede</string>
+    <string name="creator_status_approved">Onaylandı</string>
+    <string name="creator_status_rejected">Reddedildi</string>
+    <string name="admin_creator_more_info">Daha fazla bilgi iste</string>
+    <string name="admin_creator_more_info_note">Lütfen daha fazla ayrıntı gönderin.</string>
+    <string name="admin_creator_approved">İçerik üreticisi başvurusu onaylandı.</string>
+    <string name="admin_creator_rejected">İçerik üreticisi başvurusu reddedildi.</string>
+    <string name="admin_creator_more_info_sent">Ek bilgi istendi.</string>
+    <string name="admin_creator_review_failed">Başvuru güncellenemedi: %1$s</string>
+    <string name="admin_submission_approved">İçerik gönderisi onaylandı.</string>
+    <string name="admin_submission_rejected">İçerik gönderisi reddedildi.</string>
+    <string name="admin_submission_review_failed">İçerik gönderisi güncellenemedi: %1$s</string>
+    <string name="admin_creator_reject_reason">Henüz koşulları karşılamıyor.</string>
+    <string name="admin_submission_reject_reason">İçeriğin değiştirilmesi gerekiyor.</string>
+    <string name="creator_status_more_info">Ek bilgi istendi.</string>
+    <string name="chat_admin_only_short">Yalnızca yönetici</string>
+    <string name="edit_profile_tab_item">Eşya</string>
+    <string name="edit_profile_tab_about">Hakkında</string>
+    <string name="edit_profile_message_preview">[Mesaj metni]</string>
 </resources>

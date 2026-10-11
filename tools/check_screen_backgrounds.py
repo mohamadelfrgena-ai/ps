@@ -1,31 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-فاحص: **خلفيات الشاشات** — الدخول · إنشاء الحساب · الترحيب (طلب المالك).
+فاحص: الأصول والخلفيات بعد اعتماد SPEC_AUTH_SETTINGS.md.
 
-طلب المالك (حرفياً):
-    «هذي خلفية تسجيل الدخول [New_Horizons_still_16x9_v7.jpg] وهذي خلفية إنشاء
-     حساب [Minecraft LIVE — frame at 0m8s.jpg] — خذ مقاسات بشكل جمالي للهاتف
-     وخذ المقاسات المتناسبة.»
-    «وهذه شاشة الترحيب غيرها وخذ المقاسات الجمالية والمناسبة وأيضاً حافظ على
-     الصورة القديمة ربما أقوم بإرجاعها.»
-    «صورة شاشة الترحيب قصّها حتى تناسب مقاسات شاشة الهاتف»
+القواعد:
+  ١) شاشة الدخول تستخدم `login_bg.jpg`، وإنشاء الحساب يستخدم `signup_bg.jpg`؛
+     كلاهما يشتركان برأس واحد يقبل الصورة كـ resource، مع أيقونة التطبيق والقصّ المركزي والتلاشي الداكن؛
+  ٢) ارتفاع الرأس 210dp كما في §1/§2، والأصل الكامل موجود في drawable-nodpi؛
+  ٣) مقاسات الكثافات القديمة تبقى صالحة للأماكن التي تستخدم `login_bg` و`signup_bg`؛
+  ٤) شاشة الترحيب تستخدم خلفية وتسلسل الأصول المرفقة، مع الاحتفاظ
+     بخلفية القصّ القديمة كما هي للتوافق والإرجاع.
 
-القواعد التي يحرسها الفاحص:
-  ١) **لوحات المصادقة** (الدخول · إنشاء الحساب): نسخة لكل كثافة بمقاس الهاتف
-     (360/540/720/1080 عرضاً) بنسبة الصورة (16:9)؛
-  ٢) شاشة الدخول وشاشة إنشاء الحساب **بصورتين مختلفتين** عبر مكوّن واحد
-     مشترك `AuthBackdrop`؛
-  ٣) **خلفية الترحيب** (splash): **قصّ طولي من منتصف الأصل** بنسبة شاشة الهاتف
-     9:19.5، بنسخة لكل كثافة — لا صورة واحدة تُكبَّر، ولا تغبيش ولا تركيب
-     بطبقتين (المولّد يقتطع العمود الأوسط بكامل ارتفاع الأصل)؛
-  ٤) الصور الأصلية (1920×1080) محفوظة في `design/` والمولّد محفوظ؛
-  ٥) **الصورة القديمة لشاشة الترحيب محفوظة كما هي** (`splash_bg_legacy.jpg`
-     + أصلها في `design/splash/`) والإرجاع إليها موثّق في الكود — الشرط
-     الصريح «ربما أقوم بإرجاعها»؛
-  ٦) لا لون ثابت (hex) في شاشات المصادقة، والتلاشي من `AppColors.Bg`.
-
-الاستخدام:  python3 tools/check_screen_backgrounds.py
+الاستخدام: python3 tools/check_screen_backgrounds.py
 """
 import re
 import sys
@@ -35,6 +21,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / "android/app/src/main/res"
 AUTH = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/auth/AuthScreens.kt"
+AUTH_UI = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/components/AuthSettingsUi.kt"
+SPEC = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/theme/Spec.kt"
 SPLASH = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/splash/SplashScreen.kt"
 DESIGN = ROOT / "design"
 GENERATOR = ROOT / "tools/make_auth_backgrounds.py"
@@ -44,6 +32,10 @@ BANDS = {"login_bg": "auth/login_bg_master.jpg", "signup_bg": "auth/signup_bg_ma
 SPLASH_MASTER = DESIGN / "splash/splash_bg_master.jpg"
 SPLASH_OLD_MASTER = DESIGN / "splash/splash_bg_old_852x1356.jpg"
 SPLASH_LEGACY = RES / "drawable-nodpi/splash_bg_legacy.jpg"
+SPLASH_ORIGINAL = RES / "drawable-nodpi/splash_bg_original.jpg"
+SPLASH_LOGO = RES / "drawable-nodpi/splash_logo.png"
+APP_ICON = RES / "drawable-nodpi/app_icon.png"
+PNG_SIGNATURE = bytes((137, 80, 78, 71))
 PHONE_ASPECT = 9 / 19.5
 
 
@@ -114,8 +106,10 @@ size_of = jpeg_size
 
 def main() -> int:
     auth = AUTH.read_text(encoding="utf-8") if AUTH.exists() else ""
+    auth_ui = AUTH_UI.read_text(encoding="utf-8") if AUTH_UI.exists() else ""
+    spec = SPEC.read_text(encoding="utf-8") if SPEC.exists() else ""
     splash = SPLASH.read_text(encoding="utf-8") if SPLASH.exists() else ""
-    backdrop = func_body(auth, "private fun AuthBackdrop(")
+    header = func_body(auth_ui, "fun AuthSettingsHeader(")
     login = func_body(auth, "fun LoginScreen(")
     signup = func_body(auth, "fun SignUpScreen(")
     rows = []
@@ -137,20 +131,24 @@ def main() -> int:
             rows.append((f"{density}/{name}: {got[0]}×{got[1]} (المطلوب {want_w}×{want_h})",
                          got[0] == want_w and abs(got[1] - want_h) <= 2))
 
-    # ── ٢) مكوّن مشترك وصورتان مختلفتان ───────────────────────────────────
-    rows.append(("مكوّن AuthBackdrop مشترك", bool(backdrop)))
-    rows.append(("الدخول → login_bg · الإنشاء → signup_bg (صورتان مختلفتان)",
-                 "AuthBackdrop(R.drawable.login_bg)" in login
-                 and "AuthBackdrop(R.drawable.signup_bg)" in signup
-                 and "login_bg" not in signup))
-    rows.append(("قصّ من المنتصف بلا مطّ (Crop · Center)",
-                 "ContentScale.Crop" in backdrop and "Alignment.Center" in backdrop))
-    rows.append(("تلاشٍ متدرّج إلى AppColors.Bg",
-                 bool(re.search(r"Brush\.verticalGradient\([\s\S]{0,400}?AppColors\.Bg", backdrop))))
-    rows.append(("ارتفاع اللوحة محسوب من النسبة (بلا رقم ثابت)",
-                 "AUTH_BG_ASPECT" in backdrop and "coerceAtMost" in backdrop))
+    # ── ٢) ترويسة §1/§2: صورة واحدة login_bg بارتفاع 210dp ────────────────
+    nodpi_header = RES / "drawable-nodpi/login_bg.jpg"
+    rows.append(("login_bg موجودة في drawable-nodpi (الأصل الكامل)", bool(size_of(nodpi_header))))
+    rows.append(("رأس تسجيل الدخول يستخدم login_bg الافتراضية",
+                 bool(header) and "AuthSettingsHeader(onBack = onBack)" in login
+                 and "backgroundRes: Int = R.drawable.login_bg" in auth_ui))
+    rows.append(("رأس إنشاء الحساب يختار signup_bg صراحةً",
+                 "AuthSettingsHeader(onBack = onBack, backgroundRes = R.drawable.signup_bg)" in signup))
+    rows.append(("الترويسة ترسم الصورة المحددة وتستخدم app_icon",
+                 "painterResource(backgroundRes)" in header and "R.drawable.app_icon" in header))
+    rows.append(("قصّ مركزي بلا مطّ (ContentScale.Crop)", "ContentScale.Crop" in header))
+    rows.append(("تلاشٍ إلى خلفية المصادقة عند 25% ثم 96%",
+                 "0.0f to AppColors.AuthBg.copy(alpha = 0.25f)" in header
+                 and "0.96f to AppColors.AuthBg" in header))
+    rows.append(("ارتفاع الترويسة 210dp من رمز الوثيقة",
+                 "Spec.authHeaderH" in header and "val authHeaderH = 210.dp" in spec))
     rows.append(("لا لون ثابت (hex) في شاشات المصادقة",
-                 not re.findall(r"Color\(0x[0-9A-Fa-f]{6,8}\)", login + signup + backdrop)))
+                 not re.findall(r"Color\(0x[0-9A-Fa-f]{6,8}\)", login + signup + header)))
 
     # ── ٣) خلفية الترحيب: ملء شاشة طولي بمقاس كل كثافة ────────────────────
     smaster = size_of(SPLASH_MASTER)
@@ -197,8 +195,19 @@ def main() -> int:
                      legacy == (852, 1356)))
     rows.append(("الإرجاع موثّق في الكود (splash_bg_legacy)",
                  "splash_bg_legacy" in splash))
-    rows.append(("شاشة الترحيب ما زالت تعرض splash_bg",
-                 "R.drawable.splash_bg" in splash))
+    original_size = size_of(SPLASH_ORIGINAL)
+    rows.append(("صورة المشهد المعتمدة موجودة (540×750)",
+                 original_size == (540, 750)))
+    rows.append(("شعار Minecraft المرفق موجود كـ PNG",
+                 SPLASH_LOGO.exists()
+                 and SPLASH_LOGO.read_bytes()[:4] == PNG_SIGNATURE))
+    rows.append(("أيقونة التطبيق المرفقة موجودة كـ PNG",
+                 APP_ICON.exists()
+                 and APP_ICON.read_bytes()[:4] == PNG_SIGNATURE))
+    rows.append(("SplashScreen تستخدم صورة المشهد المعتمدة",
+                 "R.drawable.splash_bg_original" in splash))
+    rows.append(("SplashScreen تستخدم شعار Minecraft المرفق",
+                 "R.drawable.splash_logo" in splash))
 
     # ── ٥) المولّد + اللوحات بلا صورة واحدة مكبَّرة ──────────────────────
     rows.append(("مولّد المقاسات محفوظ (tools/make_auth_backgrounds.py)",
@@ -218,9 +227,8 @@ def main() -> int:
             print("✗", n)
         print(f"\n✗ عدد المشاكل: {len(failed)}")
         return 1
-    print("🟢 خلفيات الشاشات الثلاث بمقاس كل كثافة هاتف · خلفية الترحيب مقصوصة "
-          "من منتصف الأصل بنسبة شاشة الهاتف بلا تغبيش · الصورة القديمة محفوظة "
-          "كما هي والإرجاع إليها موثّق.")
+    print("🟢 خلفيات المصادقة بمقاس كل كثافة · شاشة البداية تستخدم صورة المشهد "
+          "وشعار Minecraft وأيقونة التطبيق من المواصفة المعتمدة · الخلفية القديمة محفوظة للإرجاع.")
     return 0
 
 

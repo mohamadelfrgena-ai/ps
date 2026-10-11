@@ -12,15 +12,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
@@ -36,77 +39,94 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.addonstation.mobile.R
 import com.addonstation.mobile.ui.nav.MainTab
-import com.addonstation.mobile.ui.theme.AppColors
-import com.addonstation.mobile.ui.theme.AppText
+import com.addonstation.mobile.ui.theme.HomePalette
+import com.addonstation.mobile.ui.theme.HomePalettes
+import com.addonstation.mobile.ui.theme.LocalHomePalette
+import com.addonstation.mobile.ui.theme.NunitoFont
+import com.addonstation.mobile.ui.theme.TajawalFont
 
 /**
- * منطقة النظام التي يجب أن يحجزها **أي شريط سفلي** قبل أن يرسم نفسه:
- *
- *   • أزرار التنقّل الثلاثة (رجوع · المنزل · التطبيقات)
- *       ⇒ `WindowInsets.navigationBars` هو الشريط نفسه (نحو 48dp).
- *   • التنقّل بالإيماءات (شريط رفيع أسفل الشاشة)
- *       ⇒ `navigationBars` قد يكون 0، والمنطقة الفعليّة هي
- *         `WindowInsets.systemGestures` (شريط سحب «المنزل»).
- *
- * نأخذ **اتحاد** الاثنين (أكبر قيمة لكل جهة) — وبجهة **السفلى فقط** من
- * الإيماءات حتى لا نضيف حاشية من حواف الرجوع يميناً ويساراً. النتيجة: الشريط
- * يبقى فوق شريط الهاتف في **كل الأجهزة وكل أوضاع التنقّل** بلا فراغ زائد.
+ * System area reserved below floating navigation, for both gesture and 3-button navigation.
+ * Only the bottom gesture inset is included so the bar never gains side padding in portrait.
  */
 @Composable
 fun bottomBarInsets(): WindowInsets = WindowInsets.navigationBars.union(
     WindowInsets.systemGestures.only(WindowInsetsSides.Bottom),
 )
 
-/**
- * الشريط السفلي (5 عناصر) مع زر «المنزل» المرتفع في المنتصف:
- * 58×58dp، نصف قطر 19، تدرّج أخضر، إطار أخضر فاتح، توهّج، مرتفع 18dp فوق الشريط.
- */
+/** Five-tab floating navigation, in logical start-to-end order (automatically mirrored in RTL). */
 @Composable
 fun BottomNavBar(
     current: MainTab,
     onSelect: (MainTab) -> Unit,
+    chatUnreadCount: Int = 0,
+    hasPendingFriendRequests: Boolean = false,
 ) {
-    // الحاوية تحجز مساحة شريط التنقّل (Navigation Bar) وتلوّنها بلون التطبيق،
-    // والشريط نفسه (62dp) يبقى **فوق** تلك المنطقة — فلا يتداخل مع أزرار النظام.
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(AppColors.Bg)
-            .windowInsetsPadding(bottomBarInsets()),
-    ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
+    val palette = if (current == MainTab.Settings || current == MainTab.Community || current == MainTab.Profile) {
+        HomePalettes.Dark
+    } else {
+        LocalHomePalette.current
+    }
+    Box(Modifier.fillMaxWidth().background(palette.bg)) {
+        Column(
+            Modifier
                 .fillMaxWidth()
-                .height(62.dp)
-                .shadow(14.dp, RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-                .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-                .background(AppColors.Bg.copy(alpha = 0.96f))
-                .border(
-                    1.dp,
-                    AppColors.Blue.copy(alpha = 0.16f),
-                    RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
-                ),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(62.dp)
-                .padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly,
+                .windowInsetsPadding(bottomBarInsets()),
         ) {
-            MainTab.entries.forEach { tab ->
-                NavItem(
-                    tab = tab,
-                    selected = current == tab,
-                    onClick = { onSelect(tab) },
-                    modifier = Modifier.weight(1f),
+            // Twenty dp of reserved overflow lets the center Home control rise above the bar.
+            Box(Modifier.fillMaxWidth().height(92.dp)) {
+                val shape = RoundedCornerShape(26.dp)
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .height(72.dp)
+                        .shadow(
+                            elevation = 30.dp,
+                            shape = shape,
+                            clip = false,
+                            ambientColor = palette.barShadow,
+                            spotColor = palette.barShadow,
+                        )
+                        .clip(shape)
+                        .background(palette.barSurface.copy(alpha = 0.96f))
+                        .border(1.dp, palette.border, shape),
                 )
+                Row(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .height(72.dp)
+                        .padding(horizontal = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    MainTab.entries.forEach { tab ->
+                        NavItem(
+                            tab = tab,
+                            selected = current == tab,
+                            palette = palette,
+                            chatUnreadCount = if (tab == MainTab.Community) chatUnreadCount else 0,
+                            showProfileDot = tab == MainTab.Profile && hasPendingFriendRequests,
+                            onClick = { onSelect(tab) },
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                    }
+                }
             }
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -115,67 +135,173 @@ fun BottomNavBar(
 private fun NavItem(
     tab: MainTab,
     selected: Boolean,
+    palette: HomePalette,
+    chatUnreadCount: Int,
+    showProfileDot: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val label = stringResource(tab.labelRes)
+    val font = if (appLocaleCode().equals("ar", ignoreCase = true)) TajawalFont else NunitoFont
+    val unreadDescription = if (tab == MainTab.Community && chatUnreadCount > 0) {
+        pluralStringResource(R.plurals.cd_chat_unread, chatUnreadCount, chatUnreadCount)
+    } else null
+    val newActivityDescription = if (showProfileDot) stringResource(R.string.cd_new_activity) else null
+    val tabDescription = listOfNotNull(label, unreadDescription, newActivityDescription).joinToString(", ")
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "navScale")
+    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, label = "navScale")
 
-    Column(
+    Box(
         modifier = modifier
             .scale(scale)
-            .clickable(interaction, null) { onClick() },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+            .semantics { contentDescription = tabDescription }
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
         if (tab.isCenter) {
-            // زر المنزل المرتفع — **بلا كلمة تحته** (الأيقونة وحدها كما طلب المالك)
-            Box(
-                modifier = Modifier
-                    .offset(y = (-20).dp)
-                    .size(58.dp)
-                    .shadow(18.dp, RoundedCornerShape(19.dp))
-                    .clip(RoundedCornerShape(19.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(AppColors.GreenLight, AppColors.Green2, AppColors.GreenDark),
+            Box(Modifier.fillMaxSize()) {
+                Box(
+                    Modifier
+                        .align(Alignment.Center)
+                        .offset(y = (-20).dp)
+                        .size(60.dp)
+                        .then(
+                            if (selected) {
+                                Modifier.shadow(
+                                    elevation = 22.dp,
+                                    shape = CircleShape,
+                                    clip = false,
+                                    ambientColor = palette.blue.copy(alpha = 0.55f),
+                                    spotColor = palette.blue.copy(alpha = 0.55f),
+                                )
+                            } else {
+                                Modifier.shadow(
+                                    elevation = 18.dp,
+                                    shape = CircleShape,
+                                    clip = false,
+                                    ambientColor = Color.Black.copy(alpha = 0.50f),
+                                    spotColor = Color.Black.copy(alpha = 0.50f),
+                                )
+                            },
                         )
+                        .clip(CircleShape)
+                        .background(
+                            if (selected) {
+                                Brush.linearGradient(listOf(palette.blue, palette.accentBlue))
+                            } else {
+                                Brush.linearGradient(listOf(palette.homeInactiveBg, palette.homeInactiveBg))
+                            },
+                        )
+                        .border(3.dp, palette.bg, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (selected) tab.filledIcon else tab.outlinedIcon,
+                        contentDescription = null,
+                        tint = if (selected) Color.White else palette.homeInactiveIcon,
+                        modifier = Modifier.size(28.dp),
                     )
-                    .border(1.5.dp, AppColors.GreenLight, RoundedCornerShape(19.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = tab.icon,
-                    contentDescription = stringResource(tab.labelRes),
-                    tint = AppColors.OnGreen,
-                    modifier = Modifier.size(26.dp),
+                }
+                Text(
+                    text = label,
+                    modifier = Modifier.align(Alignment.BottomCenter).offset(y = (-10).dp),
+                    color = if (selected) palette.blueLink else palette.inactive,
+                    fontSize = 11.sp,
+                    fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Bold,
+                    fontFamily = font,
+                    maxLines = 1,
                 )
             }
-            // لا نصّ تحت زر المنزل: الكلمة (Home) أُزيلت بالكامل من الشريط السفلي
         } else {
-            Spacer(Modifier.height(4.dp))
-            Box(
-                modifier = Modifier
-                    .height(3.dp)
-                    .size(width = 26.dp, height = 3.dp)
-                    .clip(CircleShape)
-                    .background(if (selected) AppColors.Green else androidx.compose.ui.graphics.Color.Transparent),
-            )
-            Spacer(Modifier.height(4.dp))
-            Icon(
-                imageVector = tab.icon,
-                contentDescription = stringResource(tab.labelRes),
-                tint = if (selected) AppColors.Green else AppColors.Dim.copy(alpha = 0.75f),
-                modifier = Modifier.size(22.dp),
-            )
-            Spacer(Modifier.height(3.dp))
-            Text(
-                text = stringResource(tab.labelRes),
-                style = AppText.small.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Default),
-                color = if (selected) AppColors.Green else AppColors.Dim,
-                maxLines = 1,
-            )
+            Column(
+                Modifier.height(64.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Box(
+                    Modifier.size(width = 52.dp, height = 34.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val pillShape = RoundedCornerShape(17.dp)
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .then(
+                                if (selected) {
+                                    Modifier.shadow(
+                                        elevation = 14.dp,
+                                        shape = pillShape,
+                                        clip = false,
+                                        ambientColor = palette.blue.copy(alpha = 0.45f),
+                                        spotColor = palette.blue.copy(alpha = 0.45f),
+                                    )
+                                } else Modifier
+                            )
+                            .clip(pillShape)
+                            .then(
+                                if (selected) {
+                                    Modifier.background(
+                                        Brush.linearGradient(listOf(palette.blue, palette.accentBlue)),
+                                    )
+                                } else Modifier
+                            ),
+                    )
+                    Icon(
+                        imageVector = if (selected) tab.filledIcon else tab.outlinedIcon,
+                        contentDescription = null,
+                        tint = if (selected) Color.White else palette.inactive,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    if (chatUnreadCount > 0) {
+                        val badgeText = if (chatUnreadCount > 99) "99+" else chatUnreadCount.toString()
+                        Box(
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = 2.dp, y = (-4).dp)
+                                .sizeIn(minWidth = 18.dp, minHeight = 18.dp)
+                                .clip(CircleShape)
+                                .background(palette.notificationBadge)
+                                .border(2.dp, palette.barSurface, CircleShape)
+                                .padding(horizontal = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = badgeText,
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontFamily = font,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                    if (showProfileDot) {
+                        Box(
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = (-5).dp, y = (-1).dp)
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(palette.notificationBadge)
+                                .border(2.dp, palette.barSurface, CircleShape),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = label,
+                    color = if (selected) palette.blueLink else palette.inactive,
+                    fontSize = 11.sp,
+                    fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Bold,
+                    fontFamily = font,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }

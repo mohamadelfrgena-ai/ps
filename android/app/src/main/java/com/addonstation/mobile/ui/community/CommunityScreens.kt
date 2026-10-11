@@ -1,5 +1,6 @@
 package com.addonstation.mobile.ui.community
 
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,23 +9,25 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,19 +51,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.ChatChannel
-import com.addonstation.mobile.ui.assetUrl
-import com.addonstation.mobile.ui.components.AvatarImage
-import com.addonstation.mobile.ui.components.CountPill
-import com.addonstation.mobile.ui.components.GhostButton
-import com.addonstation.mobile.ui.components.GlassCard
-import com.addonstation.mobile.ui.components.GradientButton
-import com.addonstation.mobile.ui.components.LoadingBox
 import com.addonstation.mobile.ui.components.RoomIcon
-import com.addonstation.mobile.ui.components.PixelTopBar
-import com.addonstation.mobile.ui.components.RankBadge
+import com.addonstation.mobile.ui.components.appLocaleCode
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
+import com.addonstation.mobile.ui.theme.Spec
 import com.addonstation.mobile.util.LocaleManager
 import kotlinx.coroutines.launch
 
@@ -68,6 +64,7 @@ import kotlinx.coroutines.launch
  * بوابة المجتمع: قواعد المجتمع قبل الدخول الأول (مرة واحدة لكل مستخدم)،
  * ثم قائمة الغرف بأسلوب Discord.
  */
+@Suppress("UNUSED_PARAMETER") // Profile and wallet remain available through the app's existing navigation.
 @Composable
 fun CommunityGate(
     onOpenRoom: (ChatChannel) -> Unit,
@@ -75,6 +72,7 @@ fun CommunityGate(
     onOpenWallet: () -> Unit,
     onLogin: () -> Unit,
     onDeclineToHome: () -> Unit,
+    scrollToTopRequest: Int = 0,
 ) {
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
@@ -108,115 +106,47 @@ fun CommunityGate(
 
     RoomListScreen(
         onOpenRoom = onOpenRoom,
-        onOpenEditProfile = onOpenEditProfile,
-        onOpenWallet = onOpenWallet,
-        onLogin = onLogin,
+        scrollToTopRequest = scrollToTopRequest,
     )
 }
 
-/** شاشة ⚠️ قواعد المجتمع (النصوص تُقرأ من موارد اللغة، ويمكن للأدمن تعديلها من الخادم). */
+/** شاشة قواعد المجتمع المُعاد تصميمها؛ منطق القبول والتنقّل يبقى في CommunityGate. */
 @Composable
 fun RulesScreen(onAccepted: () -> Unit, onDecline: () -> Unit) {
-    val container = rememberContainer()
-    var serverRules by remember { mutableStateOf<List<String>>(emptyList()) }
-
-    LaunchedEffect(Unit) {
-        serverRules = runCatching { container.chat.rules(container.prefs.readLocale()) }
-            .getOrElse { emptyList() }
-    }
-
-    val fallback = listOf(
-        stringResource(R.string.chat_rule_1),
-        stringResource(R.string.chat_rule_2),
-        stringResource(R.string.chat_rule_3),
-        stringResource(R.string.chat_rule_4),
-        stringResource(R.string.chat_rule_5),
-        stringResource(R.string.chat_rule_6),
-        stringResource(R.string.chat_rule_7),
-        stringResource(R.string.chat_rule_8),
-    )
-    val rules = if (serverRules.isNotEmpty()) serverRules else fallback
-
-    // المقاسات تتبع الشاشة: العنوان فوق، وبطاقة القواعد تأخذ المساحة المتبقية
-    // وتتمرّر إن زادت عنها، والزرّان ثابتان في الأسفل ظاهران دائماً — فلا يخرج
-    // شيء عن حدود الشاشة على الهاتف الصغير ولا على الكبير.
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 18.dp, vertical = 14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.chat_rules_title),
-            style = AppText.pageTitle,
-            color = AppColors.Text,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(12.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = false)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            GlassCard(modifier = Modifier.fillMaxWidth(), padding = 12.dp) {
-                rules.forEach { rule ->
-                    Text("• $rule", style = AppText.bodySmall, color = AppColors.Muted)
-                }
-            }
-        }
-        Spacer(Modifier.height(14.dp))
-        GradientButton(
-            text = stringResource(R.string.chat_accept_enter),
-            onClick = onAccepted,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(10.dp))
-        GhostButton(
-            text = stringResource(R.string.chat_decline_home),
-            onClick = onDecline,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(6.dp))
-    }
+    CommunityRulesScreen(onAccepted = onAccepted, onDecline = onDecline)
 }
 
-/** قائمة الغرف: تصنيفان قابلان للطي + مؤشرات غير المقروء والمنشن + لوحة المستخدم أسفل الشاشة. */
+/** قائمة الغرف ذات المعاينات الحقيقية؛ شريط التنقل الرئيسي يبقى في مستوى التطبيق. */
 @Composable
 fun RoomListScreen(
     onOpenRoom: (ChatChannel) -> Unit,
-    onOpenEditProfile: () -> Unit,
-    onOpenWallet: () -> Unit,
-    onLogin: () -> Unit,
+    scrollToTopRequest: Int = 0,
 ) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(scrollToTopRequest) {
+        if (scrollToTopRequest > 0) listState.animateScrollToItem(0)
+    }
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
     val signedIn by container.state.signedIn.collectAsState()
     val unread by container.state.unread.collectAsState()
-    val wallet by container.state.wallet.collectAsState()
+    val roomPeeks by com.addonstation.mobile.ui.chat.ChatPeek.rooms.collectAsState()
 
-    // **لا مؤقّت تحميل عند الرجوع**: القائمة تُبذر من الذاكرة المحفوظة فوراً،
-    // فلا فراغ ولا وميض ولا انتظار شبكة بعد الرجوع من غرفة.
+    // Seed from memory so returning from a room never flashes an empty list.
     var channels by remember { mutableStateOf(container.chat.cachedChannels()) }
     var loading by remember { mutableStateOf(channels.isEmpty()) }
     var mainOpen by rememberSaveable { mutableStateOf(true) }
     var langOpen by rememberSaveable { mutableStateOf(true) }
-    // لغة الواجهة الحالية (طبّقناها في MainActivity) — لتظليل غرفة اللغة المناسبة
-    val appLanguage = LocaleManager.byCode(java.util.Locale.getDefault().language).code
-
+    val appLanguage = LocaleManager.byCode(appLocaleCode()).code
     var failed by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableStateOf(0) }
 
     LaunchedEffect(reloadTick) {
-        // قائمة محفوظة ⇒ نُحدّث في الخلفية بلا أن نُفرغ الشاشة (لا يظهر مؤقّت)
         loading = channels.isEmpty()
         failed = false
         try {
-            // الأدمن: نضمن وجود غرفة «خدمات النقدية» وضبطها للقراءة فقط،
-            // فلا يحتاج إلى إنشاءها يدوياً ولا إلى تشغيل أي SQL.
-            // (مرة واحدة في الجلسة — لا رحلة شبكة مع كل رجوع.)
-            container.chat.ensureCashServicesRoom(profile?.role == "admin") // الخادم يمنعها لغير الأدمن
+            // Only the admin may create/repair the Cash services room; the server remains authoritative.
+            container.chat.ensureCashServicesRoom(profile?.role == "admin")
             channels = container.chat.channels()
             container.chat.refreshUnread()
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -228,28 +158,64 @@ fun RoomListScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        PixelTopBar(
-            title = stringResource(R.string.nav_community),
-            walletBalance = wallet?.balance,
-            onWalletClick = { onOpenWallet() },
-            icon = Icons.Filled.Group,
-        )
-        if (loading && channels.isEmpty()) {
-            LoadingBox(text = stringResource(R.string.common_loading))
-        } else if (failed && channels.isEmpty()) {
-            com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
-        } else {
-            LazyColumn(
+    Column(Modifier.fillMaxSize().background(Spec.bg)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = Spec.screenPad, end = Spec.screenPad, top = 16.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.comm_title),
+                style = Spec.screenTitle,
+                color = Spec.gold,
+                maxLines = 1,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                stringResource(R.string.comm_all_rooms),
+                style = Spec.secondary.copy(fontWeight = FontWeight.Bold),
+                color = Spec.textMuted,
+                maxLines = 1,
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .padding(horizontal = Spec.screenPad, vertical = 8.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Spec.cardRadius))
+                .background(Spec.surface)
+                .border(1.dp, Spec.border, RoundedCornerShape(Spec.cardRadius))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.comm_rules_banner),
+                style = Spec.roomPreview,
+                color = Spec.chipLabel,
+            )
+        }
+
+        when {
+            loading && channels.isEmpty() -> RoomsLoadingSkeleton()
+            failed && channels.isEmpty() -> com.addonstation.mobile.ui.components.ErrorState(
+                onRetry = { reloadTick += 1 },
+            )
+            else -> LazyColumn(
+                state = listState,
                 modifier = Modifier.weight(1f),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
-                    top = 10.dp,
+                    start = Spec.chatListPad,
+                    end = Spec.chatListPad,
+                    top = 4.dp,
                     bottom = 12.dp,
                 ),
             ) {
-                item {
+                if (channels.isEmpty()) {
+                    item(key = "rooms-empty") { RoomsEmpty() }
+                }
+                item(key = "rooms-main-heading") {
                     CategoryHeader(
                         title = stringResource(R.string.comm_main_rooms),
                         open = mainOpen,
@@ -257,9 +223,13 @@ fun RoomListScreen(
                     )
                 }
                 if (mainOpen) {
-                    items(channels.filter { it.category == "main" }, key = { it.id }) { channel ->
+                    items(
+                        channels.filter { it.category.equals("main", ignoreCase = true) && !isLanguageRoom(it.id, it.name) },
+                        key = { it.id },
+                    ) { channel ->
                         RoomRow(
                             channel = channel,
+                            peek = roomPeeks[channel.id],
                             unread = unread[channel.id]?.unread ?: 0,
                             mentions = unread[channel.id]?.mentions ?: 0,
                             selected = false,
@@ -268,7 +238,7 @@ fun RoomListScreen(
                         )
                     }
                 }
-                item {
+                item(key = "rooms-language-heading") {
                     CategoryHeader(
                         title = stringResource(R.string.comm_lang_rooms),
                         open = langOpen,
@@ -276,9 +246,13 @@ fun RoomListScreen(
                     )
                 }
                 if (langOpen) {
-                    items(channels.filter { it.category == "lang" }, key = { it.id }) { channel ->
+                    items(
+                        channels.filter { it.category.equals("lang", ignoreCase = true) || isLanguageRoom(it.id, it.name) },
+                        key = { it.id },
+                    ) { channel ->
                         RoomRow(
                             channel = channel,
+                            peek = roomPeeks[channel.id],
                             unread = unread[channel.id]?.unread ?: 0,
                             mentions = unread[channel.id]?.mentions ?: 0,
                             selected = false,
@@ -288,67 +262,44 @@ fun RoomListScreen(
                     }
                 }
             }
+        }
+    }
+}
 
-            // لوحة المستخدم أسفل الشاشة (كما في Discord)
+@Composable
+private fun RoomsLoadingSkeleton() {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "rooms-skeleton")
+    val alpha by transition.animateFloat(
+        initialValue = 0.32f,
+        targetValue = 0.82f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(1200),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "rooms-skeleton-alpha",
+    )
+    val shimmer = Spec.surfaceHigh.copy(alpha = alpha)
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        repeat(6) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(AppColors.Bg.copy(alpha = 0.96f))
-                    .border(1.dp, AppColors.Border)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .height(72.dp)
+                    .clip(RoundedCornerShape(Spec.cardRadius))
+                    .background(Spec.surface)
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Box {
-                    // الزائر ⇒ صورة المجهول، والمسجّل ⇒ صورته مع نقطة الاتصال
-                    if (profile == null) {
-                        com.addonstation.mobile.ui.components.AnonymousAvatarImage(size = 40.dp)
-                    } else {
-                        AvatarImage(
-                            url = assetUrl(container, profile?.avatarUrl),
-                            size = 40.dp,
-                            online = profile?.showOnlineStatus == true,
-                            borderColor = AppColors.Green,
-                        )
-                    }
+                Box(Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(shimmer))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.fillMaxWidth(0.62f).height(14.dp).clip(CircleShape).background(shimmer))
+                    Box(Modifier.fillMaxWidth(0.82f).height(10.dp).clip(CircleShape).background(shimmer))
                 }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        profile?.displayName ?: profile?.username ?: stringResource(
-                            if (signedIn) R.string.common_loading else R.string.common_guest,
-                        ),
-                        style = AppText.chatName,
-                        color = AppColors.Text,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (profile != null) {
-                        RankBadge(role = profile!!.role, plan = profile!!.effectivePlan)
-                    } else if (!signedIn) {
-                        Text(
-                            stringResource(R.string.msg_sign_in_to_participate),
-                            style = AppText.tiny,
-                            color = AppColors.Muted,
-                            modifier = Modifier.clickable { onLogin() },
-                        )
-                    }
-                }
-                // ترس لوحة المستخدم: ينقل إلى تعديل الملف الشخصي (لا إلى إعدادات التطبيق)
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(AppColors.Elevated2)
-                        .clickable { onOpenEditProfile() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.Settings,
-                        contentDescription = stringResource(R.string.profile_edit),
-                        tint = AppColors.Muted,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
+                Box(Modifier.size(width = 28.dp, height = 12.dp).clip(CircleShape).background(shimmer))
             }
         }
     }
@@ -378,74 +329,143 @@ private fun CategoryHeader(title: String, open: Boolean, onToggle: () -> Unit) {
     }
 }
 
-/** صف غرفة 48dp بنصف قطر 10 مع مؤشرات غير المقروء والمنشن والقفل. */
+/** One room row: cached last message/time and presence are shown only when observed. */
 @Composable
 private fun RoomRow(
     channel: ChatChannel,
+    peek: com.addonstation.mobile.ui.chat.ChatRoomPeek?,
     unread: Int,
     mentions: Int,
     selected: Boolean,
     highlighted: Boolean,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                when {
-                    selected -> AppColors.Elevated
-                    highlighted -> AppColors.GreenGlow
-                    else -> androidx.compose.ui.graphics.Color.Transparent
+    val preview = peek?.preview?.takeIf { it.isNotBlank() } ?: when (peek?.messageType) {
+        "image" -> stringResource(R.string.chat_attach_photo)
+        "sticker" -> stringResource(R.string.chat_stickers)
+        "video" -> stringResource(R.string.chat_video_label)
+        "audio" -> stringResource(R.string.chat_audio_label)
+        "announcement" -> stringResource(R.string.chat_announcement)
+        else -> channelDisplayDescription(channel).orEmpty()
+    }
+    val time = lastTimeOf(peek?.createdAt)
+
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp)
+                .clip(RoundedCornerShape(Spec.cardRadius))
+                .background(
+                    when {
+                        selected -> Spec.surfaceHigh
+                        highlighted -> Spec.blue.copy(alpha = 0.12f)
+                        else -> androidx.compose.ui.graphics.Color.Transparent
+                    }
+                )
+                .clickable { onClick() }
+                .heightIn(min = 68.dp)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            RoomIcon(channelId = channel.id, size = 48.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = channelDisplayName(channel),
+                        style = Spec.roomName,
+                        color = Spec.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (channel.isLocked || channel.postPermission == "admin_only" || channel.postPermission == "creators_admin") {
+                        Icon(
+                            Icons.Filled.Lock,
+                            contentDescription = null,
+                            tint = Spec.textMuted,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
-            )
-            .clickable { onClick() }
-            .height(48.dp)
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        if (selected) {
-            Box(
-                Modifier
-                    .size(width = 3.dp, height = 22.dp)
-                    .clip(CircleShape)
-                    .background(AppColors.Green),
-            )
+                Text(
+                    text = preview,
+                    style = Spec.roomPreview,
+                    color = Spec.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                peek?.onlineCount?.let { count ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.Group,
+                            contentDescription = null,
+                            tint = Spec.green,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Text(
+                            stringResource(R.string.chat_online, count),
+                            style = Spec.roomTime,
+                            color = Spec.green,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                if (time.isNotBlank()) {
+                    Text(
+                        text = time,
+                        style = Spec.roomTime,
+                        color = Spec.textMuted,
+                        maxLines = 1,
+                    )
+                }
+                val badgeCount = mentions.takeIf { it > 0 } ?: unread
+                if (badgeCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .defaultMinSize(minWidth = 22.dp, minHeight = 22.dp)
+                            .clip(CircleShape)
+                            .background(Spec.blue)
+                            .padding(horizontal = 6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            badgeCount.toString(),
+                            style = Spec.badge,
+                            color = androidx.compose.ui.graphics.Color.White,
+                        )
+                    }
+                }
+            }
         }
-        RoomIcon(channelId = channel.id, size = 22.dp)
-        Text(
-            // غرف اللغات باسمها بلغتها (العربية · Русский · 中文 …) كما في ChannelNames.kt
-            text = channelDisplayName(channel),
-            style = AppText.body.copy(fontWeight = if (unread > 0 || mentions > 0) FontWeight.Bold else FontWeight.Normal),
-            color = if (unread > 0 || mentions > 0) AppColors.Text else AppColors.Muted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 70.dp)
+                .height(1.dp)
+                .background(Spec.border.copy(alpha = 0.7f)),
         )
-        // قفل ظاهر لكل غرفة لا يملك صاحبُها حق الكتابة فيها (قراءة فقط)
-        if (channel.isLocked || channel.postPermission == "admin_only" || channel.postPermission == "creators_admin") {
-            Icon(Icons.Filled.Lock, contentDescription = null, tint = AppColors.Dim, modifier = Modifier.size(15.dp))
-        }
-        if (mentions > 0) {
-            CountPill(mentions)
-        } else if (unread > 0) {
-            Box(
-                Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(androidx.compose.ui.graphics.Color.White),
-            )
-        }
     }
 }
+
+/** Returns a time only for a timestamp already observed from a real chat message. */
+private fun lastTimeOf(iso: String?): String =
+    iso?.let { com.addonstation.mobile.util.TimeFormat.timeOnly(it, java.util.Locale.getDefault()) }.orEmpty()
 
 /** نص ترحيبي لقائمة الغرف الفارغة. */
 @Composable
 fun RoomsEmpty() {
     Text(
-        stringResource(R.string.chat_no_messages),
+        stringResource(R.string.chat_no_messages_plain),
         style = AppText.bodySmall,
         color = AppColors.Muted,
         textAlign = TextAlign.Center,

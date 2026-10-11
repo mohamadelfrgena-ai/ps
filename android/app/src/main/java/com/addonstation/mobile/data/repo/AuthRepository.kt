@@ -61,6 +61,17 @@ class AuthRepository(
 
     suspend fun signOut() {
         supabase.signOut()
+        // أوقات آخر رسالة في قائمة الغرف = ذاكرة جلسة: تُفرَّغ مع الخروج
+        com.addonstation.mobile.ui.chat.ChatPeek.clear()
+    }
+
+    /**
+     * إعادة إرسال رابط تأكيد البريد (بعد إنشاء حساب بتأكيد بريد مفعّل).
+     * تُرجع `Result` لتُعرَض رسالة نجاح/فشل صريحة في الشاشة.
+     */
+    suspend fun resendConfirmation(email: String): Result<Unit> = runCatching {
+        validateEmail(email)
+        supabase.resendConfirmation(email.trim())
     }
 
     suspend fun sendRecovery(email: String): Result<Unit> = runCatching {
