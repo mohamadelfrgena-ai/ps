@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
@@ -335,10 +336,10 @@ fun RoomListScreen(
                 modifier = Modifier.weight(1f),
             )
             Icon(
-                androidx.compose.material.icons.filled.KeyboardArrowRight,
+                Icons.Filled.KeyboardArrowDown,
                 contentDescription = null,
                 tint = Spec.textMuted,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(16.dp).rotate(-90f),
             )
         }
 
