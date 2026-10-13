@@ -28,6 +28,10 @@ OBJ_DIR     := build/obj
 ELF_FILE    := build/addonstation-ps4.elf
 OELF_FILE   := build/addonstation-ps4.oelf
 PKG_FILE    := $(CONTENT_ID).pkg
+OO_SDL_SAMPLE := $(TOOLCHAIN)/samples/SDL2
+RUNTIME_FILES := sce_module/libc.prx sce_module/libSceFios2.prx \
+                 sce_sys/about/right.sprx
+PKG_CONTENTS := eboot.bin sce_sys/param.sfo sce_sys/icon0.png $(RUNTIME_FILES)
 SOURCES     := $(wildcard src/*.cpp)
 OBJECTS     := $(patsubst src/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
 
@@ -42,7 +46,7 @@ CXXFLAGS    := $(COMMONFLAGS) -std=c++17 -fexceptions -D_POSIX_C_SOURCE=200809L 
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr \
                -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
 
-.PHONY: all pkg clean check-toolchain host-test
+.PHONY: all pkg clean check-toolchain prepare-runtime host-test
 all: pkg
 
 pkg: check-toolchain $(PKG_FILE)
@@ -80,8 +84,19 @@ sce_sys/param.sfo: Makefile | check-toolchain
 	$(PKG_TOOL) sfo_setentry $@ TITLE_ID --type Utf8 --maxsize 12 --value '$(TITLE_ID)'
 	$(PKG_TOOL) sfo_setentry $@ VERSION --type Utf8 --maxsize 8 --value '$(VERSION)'
 
-$(PKG_FILE): eboot.bin sce_sys/param.sfo sce_sys/icon0.png
-	$(CREATE_GP4) -out pkg.gp4 --content-id=$(CONTENT_ID) --files "eboot.bin sce_sys/param.sfo sce_sys/icon0.png"
+prepare-runtime: check-toolchain
+	@set -e; \
+	  sample="$(OO_SDL_SAMPLE)"; \
+	  for file in sce_module/libc.prx sce_module/libSceFios2.prx sce_sys/about/right.sprx; do \
+	    test -s "$$sample/$$file" || { echo "Missing OpenOrbis SDL2 runtime file: $$sample/$$file"; exit 1; }; \
+	  done; \
+	  mkdir -p sce_module sce_sys/about; \
+	  cp "$$sample/sce_module/libc.prx" sce_module/libc.prx; \
+	  cp "$$sample/sce_module/libSceFios2.prx" sce_module/libSceFios2.prx; \
+	  cp "$$sample/sce_sys/about/right.sprx" sce_sys/about/right.sprx
+
+$(PKG_FILE): eboot.bin sce_sys/param.sfo sce_sys/icon0.png | prepare-runtime
+	$(CREATE_GP4) -out pkg.gp4 --content-id=$(CONTENT_ID) --files "$(PKG_CONTENTS)"
 	$(PKG_TOOL) pkg_build pkg.gp4 .
 
 host-test:
@@ -92,3 +107,4 @@ host-test:
 
 clean:
 	rm -rf build build-host pkg.gp4 eboot.bin $(PKG_FILE) sce_sys/param.sfo
+	rm -f $(RUNTIME_FILES)
