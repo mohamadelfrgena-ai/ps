@@ -4,6 +4,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,11 +26,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,9 +50,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -117,6 +129,7 @@ fun RulesScreen(onAccepted: () -> Unit, onDecline: () -> Unit) {
 }
 
 /** قائمة الغرف ذات المعاينات الحقيقية؛ شريط التنقل الرئيسي يبقى في مستوى التطبيق. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RoomListScreen(
     onOpenRoom: (ChatChannel) -> Unit,
@@ -137,7 +150,14 @@ fun RoomListScreen(
     var loading by remember { mutableStateOf(channels.isEmpty()) }
     var mainOpen by rememberSaveable { mutableStateOf(true) }
     var langOpen by rememberSaveable { mutableStateOf(true) }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var selectedFilter by rememberSaveable { mutableStateOf(RoomsFilter.ALL) }
+    var showRules by rememberSaveable { mutableStateOf(false) }
+    var serverRules by remember { mutableStateOf<List<String>>(emptyList()) }
     val appLanguage = LocaleManager.byCode(appLocaleCode()).code
+    val isArabic = appLanguage == "ar"
+    val isCjk = appLanguage == "zh"
     var failed by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableStateOf(0) }
 
@@ -157,44 +177,187 @@ fun RoomListScreen(
             loading = false
         }
     }
+    LaunchedEffect(showRules, appLanguage) {
+        if (showRules) serverRules = container.chat.rules(appLanguage)
+    }
+
+    val defaultRules = listOf(
+        stringResource(R.string.chat_rule_1),
+        stringResource(R.string.chat_rule_2),
+        stringResource(R.string.chat_rule_3),
+        stringResource(R.string.chat_rule_4),
+        stringResource(R.string.chat_rule_5),
+        stringResource(R.string.chat_rule_6),
+        stringResource(R.string.chat_rule_7),
+        stringResource(R.string.chat_rule_8),
+    )
+    val totalUnread = unread.values.sumOf { it.unread }
+    val filterItems = listOf(
+        RoomsFilter.ALL to stringResource(R.string.common_all),
+        RoomsFilter.UNREAD to stringResource(R.string.chat_filter_unread),
+        RoomsFilter.MAIN to stringResource(R.string.comm_main_rooms),
+        RoomsFilter.LANG to stringResource(R.string.comm_lang_rooms),
+    )
+    val sortedChannels = remember(channels, roomPeeks) {
+        channels.sortedWith(
+            compareByDescending<ChatChannel> { roomPeeks[it.id]?.createdAt != null }
+                .thenByDescending { roomPeeks[it.id]?.createdAt.orEmpty() }
+                .thenBy { it.sortOrder },
+        )
+    }
+    val normalizedQuery = query.trim()
+    val visibleChannels = remember(sortedChannels, roomPeeks, unread, normalizedQuery, selectedFilter) {
+        sortedChannels.filter { channel ->
+            val languageRoom = isLanguageRoom(channel.id, channel.name)
+            val peek = roomPeeks[channel.id]
+            val matchingQuery = normalizedQuery.isEmpty() || listOfNotNull(
+                channelDisplayName(channel),
+                channelDisplayDescription(channel),
+                peek?.senderName,
+                peek?.preview,
+            ).any { it.contains(normalizedQuery, ignoreCase = true) }
+            val matchingFilter = when (selectedFilter) {
+                RoomsFilter.ALL -> true
+                RoomsFilter.UNREAD -> (unread[channel.id]?.unread ?: 0) > 0
+                RoomsFilter.MAIN -> !languageRoom && channel.category.equals("main", ignoreCase = true)
+                RoomsFilter.LANG -> languageRoom || channel.category.equals("lang", ignoreCase = true)
+            }
+            matchingQuery && matchingFilter
+        }
+    }
+    val mainChannels = visibleChannels.filter { it.category.equals("main", ignoreCase = true) && !isLanguageRoom(it.id, it.name) }
+    val languageChannels = visibleChannels.filter { it.category.equals("lang", ignoreCase = true) || isLanguageRoom(it.id, it.name) }
+    val showMainSection = selectedFilter != RoomsFilter.LANG
+    val showLanguageSection = selectedFilter != RoomsFilter.MAIN
+    val titleFont = when {
+        isArabic -> com.addonstation.mobile.ui.theme.TajawalFont
+        isCjk || appLanguage == "ru" -> com.addonstation.mobile.ui.theme.NunitoFont
+        else -> com.addonstation.mobile.ui.theme.PixelFont
+    }
 
     Column(Modifier.fillMaxSize().background(Spec.bg)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = Spec.screenPad, end = Spec.screenPad, top = 16.dp, bottom = 8.dp),
+                .padding(start = Spec.screenPad, end = Spec.screenPad, top = 12.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 stringResource(R.string.comm_title),
-                style = Spec.screenTitle,
+                style = Spec.screenTitle.copy(
+                    fontFamily = titleFont,
+                    fontSize = 20.sp,
+                    letterSpacing = if (isArabic || isCjk) 0.sp else 0.3.sp,
+                ),
                 color = Spec.gold,
                 maxLines = 1,
             )
             Spacer(Modifier.weight(1f))
+            Box(
+                modifier = Modifier
+                    .size(Spec.touch)
+                    .clip(CircleShape)
+                    .background(if (searchOpen) Spec.blue.copy(alpha = 0.16f) else Spec.surface)
+                    .border(1.dp, if (searchOpen) Spec.blue.copy(alpha = 0.45f) else Spec.border, CircleShape)
+                    .clickable {
+                        searchOpen = !searchOpen
+                        if (!searchOpen) query = ""
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (searchOpen) androidx.compose.material.icons.Icons.Filled.Close else androidx.compose.material.icons.Icons.Filled.Search,
+                    contentDescription = stringResource(R.string.cd_search_rooms),
+                    tint = if (searchOpen) Spec.blueLink else Spec.textMuted,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+
+        if (searchOpen) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = Spec.screenPad, vertical = 4.dp)
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Spec.surface)
+                    .border(1.dp, Spec.border, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(androidx.compose.material.icons.Icons.Filled.Search, contentDescription = null, tint = Spec.textMuted, modifier = Modifier.size(18.dp))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    if (query.isEmpty()) {
+                        Text(stringResource(R.string.cd_search_rooms), style = Spec.secondary, color = Spec.textMuted, maxLines = 1)
+                    }
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        textStyle = Spec.secondary.copy(color = Spec.text, fontSize = 14.sp),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(Spec.blue),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (query.isNotEmpty()) {
+                    Icon(
+                        androidx.compose.material.icons.Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.common_close),
+                        tint = Spec.textMuted,
+                        modifier = Modifier.size(18.dp).clickable { query = "" },
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .padding(horizontal = Spec.screenPad, vertical = 5.dp)
+                .fillMaxWidth()
+                .height(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Spec.gold.copy(alpha = 0.10f))
+                .border(1.dp, Spec.gold.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                .clickable { showRules = true }
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(androidx.compose.material.icons.Icons.Filled.Shield, contentDescription = null, tint = Spec.gold, modifier = Modifier.size(16.dp))
             Text(
-                stringResource(R.string.comm_all_rooms),
-                style = Spec.secondary.copy(fontWeight = FontWeight.Bold),
-                color = Spec.textMuted,
+                stringResource(R.string.comm_rules_banner_plain),
+                style = Spec.secondary.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                color = Spec.chipLabel,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                androidx.compose.material.icons.automirrored.filled.ArrowForward,
+                contentDescription = null,
+                tint = Spec.textMuted,
+                modifier = Modifier.size(16.dp),
             )
         }
 
         Row(
             modifier = Modifier
-                .padding(horizontal = Spec.screenPad, vertical = 8.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Spec.cardRadius))
-                .background(Spec.surface)
-                .border(1.dp, Spec.border, RoundedCornerShape(Spec.cardRadius))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = Spec.screenPad, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                stringResource(R.string.comm_rules_banner),
-                style = Spec.roomPreview,
-                color = Spec.chipLabel,
-            )
+            filterItems.forEach { (filter, label) ->
+                val badge = if (filter == RoomsFilter.UNREAD) totalUnread else 0
+                RoomsFilterChip(
+                    label = label,
+                    selected = selectedFilter == filter,
+                    count = badge,
+                    onClick = { selectedFilter = filter },
+                )
+            }
         }
 
         when {
@@ -212,56 +375,115 @@ fun RoomListScreen(
                     bottom = 12.dp,
                 ),
             ) {
-                if (channels.isEmpty()) {
+                if (visibleChannels.isEmpty()) {
                     item(key = "rooms-empty") { RoomsEmpty() }
                 }
-                item(key = "rooms-main-heading") {
-                    CategoryHeader(
-                        title = stringResource(R.string.comm_main_rooms),
-                        open = mainOpen,
-                        onToggle = { mainOpen = !mainOpen },
-                    )
-                }
-                if (mainOpen) {
-                    items(
-                        channels.filter { it.category.equals("main", ignoreCase = true) && !isLanguageRoom(it.id, it.name) },
-                        key = { it.id },
-                    ) { channel ->
-                        RoomRow(
-                            channel = channel,
-                            peek = roomPeeks[channel.id],
-                            unread = unread[channel.id]?.unread ?: 0,
-                            mentions = unread[channel.id]?.mentions ?: 0,
-                            selected = false,
-                            highlighted = false,
-                            onClick = { onOpenRoom(channel) },
+                if (showMainSection) {
+                    item(key = "rooms-main-heading") {
+                        CategoryHeader(
+                            title = stringResource(R.string.comm_main_rooms),
+                            open = mainOpen,
+                            onToggle = { mainOpen = !mainOpen },
                         )
                     }
+                    if (mainOpen) {
+                        items(mainChannels, key = { it.id }) { channel ->
+                            RoomRow(
+                                channel = channel,
+                                peek = roomPeeks[channel.id],
+                                unread = unread[channel.id]?.unread ?: 0,
+                                mentions = unread[channel.id]?.mentions ?: 0,
+                                readOnly = com.addonstation.mobile.ui.community.isReadOnlyFor(channel, profile?.role),
+                                onClick = { onOpenRoom(channel) },
+                            )
+                        }
+                    }
                 }
-                item(key = "rooms-language-heading") {
-                    CategoryHeader(
-                        title = stringResource(R.string.comm_lang_rooms),
-                        open = langOpen,
-                        onToggle = { langOpen = !langOpen },
-                    )
-                }
-                if (langOpen) {
-                    items(
-                        channels.filter { it.category.equals("lang", ignoreCase = true) || isLanguageRoom(it.id, it.name) },
-                        key = { it.id },
-                    ) { channel ->
-                        RoomRow(
-                            channel = channel,
-                            peek = roomPeeks[channel.id],
-                            unread = unread[channel.id]?.unread ?: 0,
-                            mentions = unread[channel.id]?.mentions ?: 0,
-                            selected = false,
-                            highlighted = channel.id == "lang-$appLanguage" && !signedIn,
-                            onClick = { onOpenRoom(channel) },
+                if (showLanguageSection) {
+                    item(key = "rooms-language-heading") {
+                        CategoryHeader(
+                            title = stringResource(R.string.comm_lang_rooms),
+                            open = langOpen,
+                            onToggle = { langOpen = !langOpen },
                         )
+                    }
+                    if (langOpen) {
+                        items(languageChannels, key = { it.id }) { channel ->
+                            RoomRow(
+                                channel = channel,
+                                peek = roomPeeks[channel.id],
+                                unread = unread[channel.id]?.unread ?: 0,
+                                mentions = unread[channel.id]?.mentions ?: 0,
+                                readOnly = com.addonstation.mobile.ui.community.isReadOnlyFor(channel, profile?.role),
+                                onClick = { onOpenRoom(channel) },
+                            )
+                        }
                     }
                 }
             }
+        }
+    }
+
+    if (showRules) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showRules = false },
+            sheetState = sheetState,
+            containerColor = Spec.barSurface,
+        ) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                Text(stringResource(R.string.chat_rules_title), style = Spec.sectionTitle.copy(fontSize = 18.sp), color = Spec.gold)
+                Spacer(Modifier.height(12.dp))
+                LazyColumn(Modifier.heightIn(max = 460.dp)) {
+                    items(serverRules.ifEmpty { defaultRules }) { rule ->
+                        Text(
+                            rule,
+                            style = Spec.secondary.copy(fontSize = 14.sp, lineHeight = 21.sp),
+                            color = Spec.text,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        )
+                    }
+                }
+                androidx.compose.material3.TextButton(onClick = { showRules = false }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.common_close), color = Spec.blueLink)
+                }
+            }
+        }
+    }
+}
+
+private enum class RoomsFilter { ALL, UNREAD, MAIN, LANG }
+
+@Composable
+private fun RoomsFilterChip(label: String, selected: Boolean, count: Int = 0, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .height(36.dp)
+            .clip(CircleShape)
+            .background(if (selected) Spec.blue else Spec.surface)
+            .border(1.dp, if (selected) Spec.blue else Spec.border, CircleShape)
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            label,
+            style = Spec.chip.copy(fontWeight = FontWeight.ExtraBold),
+            color = if (selected) androidx.compose.ui.graphics.Color.White else Spec.chipLabel,
+            maxLines = 1,
+        )
+        if (count > 0) {
+            Text(
+                if (count > 99) "99+" else count.toString(),
+                style = Spec.badge.copy(fontSize = 10.sp),
+                color = if (selected) Spec.blue else androidx.compose.ui.graphics.Color.White,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(if (selected) androidx.compose.ui.graphics.Color.White else Spec.blue)
+                    .padding(horizontal = 5.dp, vertical = 2.dp),
+                maxLines = 1,
+            )
         }
     }
 }
@@ -336,8 +558,7 @@ private fun RoomRow(
     peek: com.addonstation.mobile.ui.chat.ChatRoomPeek?,
     unread: Int,
     mentions: Int,
-    selected: Boolean,
-    highlighted: Boolean,
+    readOnly: Boolean,
     onClick: () -> Unit,
 ) {
     val preview = peek?.preview?.takeIf { it.isNotBlank() } ?: when (peek?.messageType) {
@@ -348,101 +569,98 @@ private fun RoomRow(
         "announcement" -> stringResource(R.string.chat_announcement)
         else -> channelDisplayDescription(channel).orEmpty()
     }
+    val sender = peek?.senderName?.takeIf { it.isNotBlank() }
     val time = lastTimeOf(peek?.createdAt)
+    val badgeCount = mentions.takeIf { it > 0 } ?: unread
+    val roomName = if (channel.id == "cash-services") {
+        stringResource(R.string.comm_room_cash)
+    } else {
+        channelDisplayName(channel)
+    }
 
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 2.dp)
-                .clip(RoundedCornerShape(Spec.cardRadius))
-                .background(
-                    when {
-                        selected -> Spec.surfaceHigh
-                        highlighted -> Spec.blue.copy(alpha = 0.12f)
-                        else -> androidx.compose.ui.graphics.Color.Transparent
-                    }
-                )
+                .padding(vertical = 1.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(androidx.compose.ui.graphics.Color.Transparent)
+                .alpha(if (readOnly) 0.80f else 1f)
                 .clickable { onClick() }
-                .heightIn(min = 68.dp)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .heightIn(min = 72.dp)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            RoomIcon(channelId = channel.id, size = 48.dp)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            RoomAvatarPresence(
+                channelId = channel.id,
+                online = (peek?.onlineCount ?: 0) > 0,
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     Text(
-                        text = channelDisplayName(channel),
-                        style = Spec.roomName,
+                        text = roomName,
+                        style = Spec.roomName.copy(fontSize = 16.sp),
                         color = Spec.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    if (channel.isLocked || channel.postPermission == "admin_only" || channel.postPermission == "creators_admin") {
+                    if (readOnly) {
                         Icon(
                             Icons.Filled.Lock,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.comm_locked),
                             tint = Spec.textMuted,
                             modifier = Modifier.size(14.dp),
                         )
                     }
-                }
-                Text(
-                    text = preview,
-                    style = Spec.roomPreview,
-                    color = Spec.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                peek?.onlineCount?.let { count ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Icon(
-                            Icons.Filled.Group,
-                            contentDescription = null,
-                            tint = Spec.green,
-                            modifier = Modifier.size(12.dp),
-                        )
+                    Spacer(Modifier.weight(1f))
+                    if (time.isNotBlank()) {
                         Text(
-                            stringResource(R.string.chat_online, count),
+                            text = time,
                             style = Spec.roomTime,
-                            color = Spec.green,
+                            color = Spec.textMuted,
                             maxLines = 1,
                         )
                     }
                 }
-            }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                if (time.isNotBlank()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Text(
-                        text = time,
-                        style = Spec.roomTime,
-                        color = Spec.textMuted,
+                        text = buildAnnotatedString {
+                            if (sender != null) {
+                                withStyle(SpanStyle(color = Spec.chipLabel, fontWeight = FontWeight.Bold)) {
+                                    append("$sender: ")
+                                }
+                            }
+                            withStyle(SpanStyle(color = Spec.textMuted)) { append(preview) }
+                        },
+                        style = Spec.roomPreview.copy(fontSize = 13.sp),
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
                     )
-                }
-                val badgeCount = mentions.takeIf { it > 0 } ?: unread
-                if (badgeCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .defaultMinSize(minWidth = 22.dp, minHeight = 22.dp)
-                            .clip(CircleShape)
-                            .background(Spec.blue)
-                            .padding(horizontal = 6.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            badgeCount.toString(),
-                            style = Spec.badge,
-                            color = androidx.compose.ui.graphics.Color.White,
-                        )
+                    if (badgeCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = 22.dp, minHeight = 22.dp)
+                                .clip(CircleShape)
+                                .background(Spec.blue)
+                                .padding(horizontal = 6.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                if (badgeCount > 99) "99+" else badgeCount.toString(),
+                                style = Spec.badge.copy(fontSize = 11.sp),
+                                color = androidx.compose.ui.graphics.Color.White,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
@@ -450,10 +668,33 @@ private fun RoomRow(
         Box(
             Modifier
                 .fillMaxWidth()
-                .padding(start = 70.dp)
+                .padding(start = 76.dp)
                 .height(1.dp)
                 .background(Spec.border.copy(alpha = 0.7f)),
         )
+    }
+}
+
+@Composable
+private fun RoomAvatarPresence(channelId: String, online: Boolean) {
+    Box(Modifier.size(60.dp), contentAlignment = Alignment.Center) {
+        if (online) {
+            Box(
+                Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .background(Spec.onlineFill)
+                    .padding(2.dp)
+                    .clip(CircleShape)
+                    .background(Spec.bg)
+                    .padding(2.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                RoomIcon(channelId = channelId, size = 52.dp)
+            }
+        } else {
+            RoomIcon(channelId = channelId, size = 52.dp)
+        }
     }
 }
 

@@ -698,6 +698,7 @@
     <string name="profile_status_away">Отошёл</string>
     <string name="profile_status_offline">Не в сети</string>
     <string name="profile_ban_user">Забанить</string>
+    <string name="profile_ban_confirm">Заблокировать %1$s? Пользователь больше не сможет пользоваться чатом.</string>
     <string name="profile_delete_message">Удалить сообщение</string>
     <string name="profile_as_others_title">Мой профиль глазами других</string>
     <string name="profile_member_since_label">УЧАСТНИК С</string>

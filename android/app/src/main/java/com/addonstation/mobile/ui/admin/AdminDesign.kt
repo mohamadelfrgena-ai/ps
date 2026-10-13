@@ -81,6 +81,7 @@ internal fun AdminHeader(
     onBack: () -> Unit,
     onMore: () -> Unit,
     onLock: () -> Unit,
+    trailing: (@Composable () -> Unit)? = null,
     palette: HomePalette = LocalHomePalette.current,
 ) {
     val isArabic = appLocaleCode().equals("ar", ignoreCase = true)
@@ -136,6 +137,7 @@ internal fun AdminHeader(
                 palette = palette,
                 tint = palette.goldText,
             )
+            trailing?.invoke()
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(palette.border))
     }
@@ -146,6 +148,7 @@ internal fun AdminSubscreenHeader(
     kicker: String,
     title: String,
     onBack: () -> Unit,
+    trailing: (@Composable () -> Unit)? = null,
     palette: HomePalette = LocalHomePalette.current,
 ) {
     AdminHeader(
@@ -160,6 +163,7 @@ internal fun AdminSubscreenHeader(
             AdminSession.lock()
             onBack()
         },
+        trailing = trailing,
         palette = palette,
     )
 }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
@@ -46,6 +48,7 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
@@ -76,12 +79,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -208,6 +218,7 @@ fun ChatScreen(
     var memberCardRefresh by remember { mutableIntStateOf(0) }
     var showPinned by remember { mutableStateOf(false) }
     var actionsFor by remember { mutableStateOf<ChatMessageUi?>(null) }
+    var actionAnchor by remember { mutableStateOf<Rect?>(null) }
     var mediaSheet by remember { mutableStateOf(false) }
     var imageViewerUrl by remember { mutableStateOf<String?>(null) }
     // فتح صورة/ملصق بالحجم الكامل — دالة واحدة يستعملها كل نداء (لا يُشار إليها من
@@ -228,7 +239,7 @@ fun ChatScreen(
     BackHandler(enabled = showAttach) { showAttach = false }
     BackHandler(enabled = showMembers) { showMembers = false }
     BackHandler(enabled = showPinned) { showPinned = false }
-    BackHandler(enabled = actionsFor != null) { actionsFor = null }
+    BackHandler(enabled = actionsFor != null) { actionsFor = null; actionAnchor = null }
     BackHandler(enabled = showEmoji) { showEmoji = false }
     BackHandler(enabled = imageViewerUrl != null) { imageViewerUrl = null }
 
@@ -283,6 +294,21 @@ fun ChatScreen(
 
     // هل العرض ملتصق بالأسفل؟ (= المستخدم يقرأ آخر الرسائل)
     var atBottom by remember { mutableStateOf(true) }
+    val farFromBottom by remember(listState, messages.size) {
+        derivedStateOf {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            val lastVisible = visible.lastOrNull()?.index ?: messages.lastIndex
+            messages.isNotEmpty() && messages.lastIndex - lastVisible > visible.size.coerceAtLeast(1)
+        }
+    }
+    val unreadBelowCount = remember(messages, newDividerId, newBelow) {
+        val dividerIndex = newDividerId?.let { id -> messages.indexOfFirst { it.message.id == id } } ?: -1
+        when {
+            dividerIndex >= 0 -> (messages.size - dividerIndex).coerceAtLeast(1)
+            newBelow -> 1
+            else -> 0
+        }
+    }
 
     // تمرير تلقائي للأسفل: دائماً إن كان ملتصقاً بالأسفل، أو لم تُرفع شارة «رسائل بالأسفل» بعد
     LaunchedEffect(messages.size) {
@@ -529,6 +555,7 @@ fun ChatScreen(
     val roomLocked = channel.isLocked
     val canPost = signedIn && !isMuted && !isBanned && !roomLocked
 
+    BoxWithConstraints(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
@@ -599,7 +626,10 @@ fun ChatScreen(
                             isNewDivider = newDividerId == ui.message.id,
                             myId = myId,
                             currentProfile = profile,
-                            onLongPress = { actionsFor = ui },
+                            onLongPress = { bounds ->
+                                actionsFor = ui
+                                actionAnchor = bounds.takeIf { it.width > 0f && it.height > 0f }
+                            },
                             onReply = { replyTo = ui.message },
                             onOpenImage = openFullSize,
                             onStickerTap = {
@@ -636,23 +666,52 @@ fun ChatScreen(
                 }
             }
 
-            if (newBelow) {
-                // «↓ رسائل جديدة» (§٤٫٣): ارتفاع 32 · نصف قطر 16 · أزرق · أبيض 12sp/800
+            if (farFromBottom || newBelow) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 8.dp)
-                        .height(32.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Spec.blue)
-                        .clickable {
-                            vm.markReadUpToBottom()
-                            scope.launch { messages.lastOrNull()?.let { listState.animateScrollToItem(messages.lastIndex) } }
-                        }
-                        .padding(horizontal = 14.dp),
-                    contentAlignment = Alignment.Center,
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 12.dp, bottom = 12.dp),
                 ) {
-                    Text(stringResource(R.string.chat_new_messages), style = Spec.msgQuote.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold), color = Color.White)
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .shadow(6.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.35f), spotColor = Color.Black.copy(alpha = 0.35f))
+                            .clip(CircleShape)
+                            .background(Spec.surface)
+                            .border(1.dp, Spec.border, CircleShape)
+                            .clickable {
+                                vm.markReadUpToBottom()
+                                scope.launch { messages.lastOrNull()?.let { listState.animateScrollToItem(messages.lastIndex) } }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.cd_scroll_to_bottom),
+                            tint = Spec.text,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    if (unreadBelowCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = 6.dp, y = (-6).dp)
+                                .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
+                                .clip(CircleShape)
+                                .background(Spec.blue)
+                                .border(2.dp, Spec.bg, CircleShape)
+                                .padding(horizontal = 5.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                if (unreadBelowCount > 99) "99+" else unreadBelowCount.toString(),
+                                style = Spec.badge.copy(fontSize = 10.sp),
+                                color = Color.White,
+                                maxLines = 1,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -846,6 +905,87 @@ fun ChatScreen(
         }
     }
 
+    actionsFor?.let { ui ->
+        // مدة الحذف: ٣ دقائق من وقت الإرسال — يُخفى الخيار بعدها ويُعلَّل السبب.
+        val deleteLeftMinutes = deleteWindowRemainingMinutes(ui.message.createdAt)
+        MessageActionsSheet(
+            ui = ui,
+            anchorBounds = actionAnchor,
+            myId = container.supabase.session()?.userId,
+            isStaff = canModerateRoom,
+            canDeleteMine = canDeleteOwnMessage(ui.message.createdAt),
+            deleteLeftText = if (deleteLeftMinutes > 0) {
+                stringResource(R.string.chat_delete_left, deleteLeftMinutes)
+            } else null,
+            onDismiss = { actionsFor = null },
+            onReply = {
+                replyTo = ui.message
+                actionsFor = null
+            },
+            onCopy = { copyText(context, ui.message.content.orEmpty()) },
+            onReport = { reason ->
+                vm.report(ui.message.id, reason, null)
+                statusMessage = reportSentMsg
+                actionsFor = null
+            },
+            onDeleteMine = {
+                // داخل المدة فقط (القاعدة ترفض ما بعدها) — والنتيجة تُعرض في الشريط السفلي
+                if (canDeleteOwnMessage(ui.message.createdAt)) {
+                    vm.deleteMine(ui.message.id) { ok ->
+                        if (!ok) statusMessage = deleteExpiredMsg // رفض الخادم: انتهت المدة
+                    }
+                } else {
+                    statusMessage = deleteExpiredMsg
+                }
+                actionsFor = null
+            },
+            onDeleteStaff = {
+                // حذف إشرافي: أي رسالة في هذه الغرفة مهما كان عمرها
+                // (الأدمن في كل الغرف · المشرف في غرفه فقط — والخادم يحسم)
+                vm.deleteAsStaff(ui.message.id) { ok ->
+                    statusMessage = if (ok) null else deleteStaffFailedMsg
+                    statusError = null
+                }
+                actionsFor = null
+            },
+            onModerate = {
+                vm.moderate(ui.message.id, hide = ui.message.status != "hidden")
+                actionsFor = null
+            },
+            onPin = {
+                vm.pin(ui.message.id) { ok -> statusMessage = if (ok) pinMsg else unpinMsg }
+                actionsFor = null
+            },
+            onMute = { minutes ->
+                vm.mute(ui.message.userId, minutes)
+                actionsFor = null
+            },
+            isBlocked = ui.message.userId in blockedIds,
+            onBlockUser = {
+                vm.block(ui.message.userId) { ok -> statusMessage = if (ok) blockedMsg else blockFailedMsg }
+                actionsFor = null
+            },
+            onUnblockUser = {
+                vm.unblock(ui.message.userId) { ok -> statusMessage = if (ok) unblockedMsg else null }
+                actionsFor = null
+            },
+            onOpenProfile = {
+                memberCardProfile = authors[ui.message.userId]
+                actionsFor = null
+            },
+            onReact = { emoji ->
+                vm.toggleReaction(ui.message.id, emoji)
+                actionsFor = null
+            },
+            onMoreReactions = {
+                showEmoji = true
+                actionsFor = null
+            },
+        )
+    }
+    }
+
+
     // لوحة الإيموجي/الملصقات مثبتة أسفل المحرر؛ قائمة الرسائل تنكمش بدلاً من تغطية حقل الكتابة.
     if (showEmoji) {
         EmojiStickerPanel(
@@ -916,80 +1056,6 @@ fun ChatScreen(
         )
     }
 
-    actionsFor?.let { ui ->
-        // مدة الحذف: ٣ دقائق من وقت الإرسال — يُخفى الخيار بعدها ويُعلَّل السبب.
-        val deleteLeftMinutes = deleteWindowRemainingMinutes(ui.message.createdAt)
-        MessageActionsSheet(
-            ui = ui,
-            myId = container.supabase.session()?.userId,
-            isStaff = canModerateRoom,
-            canDeleteMine = canDeleteOwnMessage(ui.message.createdAt),
-            deleteLeftText = if (deleteLeftMinutes > 0) {
-                stringResource(R.string.chat_delete_left, deleteLeftMinutes)
-            } else null,
-            onDismiss = { actionsFor = null },
-            onReply = {
-                replyTo = ui.message
-                actionsFor = null
-            },
-            onCopy = { copyText(context, ui.message.content.orEmpty()) },
-            onReport = { reason ->
-                vm.report(ui.message.id, reason, null)
-                statusMessage = reportSentMsg
-                actionsFor = null
-            },
-            onDeleteMine = {
-                // داخل المدة فقط (القاعدة ترفض ما بعدها) — والنتيجة تُعرض في الشريط السفلي
-                if (canDeleteOwnMessage(ui.message.createdAt)) {
-                    vm.deleteMine(ui.message.id) { ok ->
-                        if (!ok) statusMessage = deleteExpiredMsg // رفض الخادم: انتهت المدة
-                    }
-                } else {
-                    statusMessage = deleteExpiredMsg
-                }
-                actionsFor = null
-            },
-            onDeleteStaff = {
-                // حذف إشرافي: أي رسالة في هذه الغرفة مهما كان عمرها
-                // (الأدمن في كل الغرف · المشرف في غرفه فقط — والخادم يحسم)
-                vm.deleteAsStaff(ui.message.id) { ok ->
-                    statusMessage = if (ok) null else deleteStaffFailedMsg
-                    statusError = null
-                }
-                actionsFor = null
-            },
-            onModerate = {
-                vm.moderate(ui.message.id, hide = ui.message.status != "hidden")
-                actionsFor = null
-            },
-            onPin = {
-                vm.pin(ui.message.id) { ok -> statusMessage = if (ok) pinMsg else unpinMsg }
-                actionsFor = null
-            },
-            onMute = { minutes ->
-                vm.mute(ui.message.userId, minutes)
-                actionsFor = null
-            },
-            isBlocked = ui.message.userId in blockedIds,
-            onBlockUser = {
-                vm.block(ui.message.userId) { ok -> statusMessage = if (ok) blockedMsg else blockFailedMsg }
-                actionsFor = null
-            },
-            onUnblockUser = {
-                vm.unblock(ui.message.userId) { ok -> statusMessage = if (ok) unblockedMsg else null }
-                actionsFor = null
-            },
-            onOpenProfile = {
-                memberCardProfile = authors[ui.message.userId]
-                actionsFor = null
-            },
-            onReact = { emoji ->
-                vm.toggleReaction(ui.message.id, emoji)
-                actionsFor = null
-            },
-        )
-    }
-
     memberCardProfile?.let { member ->
         com.addonstation.mobile.ui.chat.MemberCardHost(
             profile = member,
@@ -1038,9 +1104,9 @@ private fun ChatMessagesLoadingSkeleton() {
     val shimmer = Spec.surfaceHigh.copy(alpha = alpha)
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        repeat(6) { index ->
+        repeat(4) { index ->
             val outgoing = index % 3 == 2
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1059,11 +1125,18 @@ private fun ChatMessagesLoadingSkeleton() {
                         .padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Box(Modifier.fillMaxWidth(0.34f).height(10.dp).clip(CircleShape).background(shimmer))
-                    Box(Modifier.fillMaxWidth(if (index % 2 == 0) 0.88f else 0.64f).height(16.dp).clip(CircleShape).background(shimmer))
+                    Box(Modifier.fillMaxWidth(0.34f).height(12.dp).clip(CircleShape).background(shimmer))
+                    Box(Modifier.fillMaxWidth(if (index % 2 == 0) 0.88f else 0.64f).height(36.dp).clip(RoundedCornerShape(12.dp)).background(shimmer))
                 }
             }
         }
+        Text(
+            stringResource(R.string.chat_loading_messages),
+            style = Spec.secondary,
+            color = Spec.textMuted,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
     }
 }
 
@@ -1468,13 +1541,8 @@ private fun ChatInputBar(
     mentionSuggestions: List<String>,
     onMention: (String) -> Unit,
     slowmodeSeconds: Int,
-    /**
-     * ملصق مختار ينتظر الإرسال: رابط معاينته تظهر **داخل مربع الإرسال** فوق
-     * حقل الكتابة، وزر ✕ الأحمر على أقصى يمينه يُلغيه.
-     */
     pendingStickerUrl: String? = null,
     onRemoveSticker: () -> Unit = {},
-    /** هل يمكن الإرسال الآن؟ (نص مكتوب، أو صورة مرفقة، أو ملصق في الانتظار) */
     canSend: Boolean = text.isNotBlank(),
 ) {
     Column(
@@ -1483,8 +1551,7 @@ private fun ChatInputBar(
             .background(Spec.barSurface),
     ) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(Spec.border))
-        Column(modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 18.dp)) {
-            // معاينة الملصق داخل مربع الإرسال (النص يُكتب تحته إن أراد، ثم إرسال)
+        Column(modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 14.dp)) {
             if (pendingStickerUrl != null) {
                 Row(
                     modifier = Modifier
@@ -1533,72 +1600,89 @@ private fun ChatInputBar(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // صورة (44 دائري · خلفية surface)
-                SpecComposerCircle(
-                    icon = Icons.Filled.Add,
-                    description = stringResource(R.string.chat_add_photo),
-                    onClick = onAttach,
-                )
-                // Toggle emoji panel ↔ keyboard (same 44dp slot, selected state in blue).
-                SpecComposerCircle(
-                    icon = if (panelOpen) Icons.Filled.Keyboard else Icons.Filled.EmojiEmotions,
-                    description = stringResource(
-                        if (panelOpen) R.string.cd_emoji_toggle_keyboard else R.string.cd_emoji_toggle_open,
-                    ),
-                    selected = panelOpen,
-                    onClick = onEmoji,
-                )
-                // الحقل: 44 ارتفاعاً · نصف قطر 22 · خلفية surface · إطار 1dp · 14sp
-                Box(
+                Row(
                     modifier = Modifier
                         .weight(1f)
-                        .height(Spec.composerField)
+                        .heightIn(min = 48.dp)
                         .clip(RoundedCornerShape(Spec.pillRadius))
                         .background(Spec.surface)
-                        .border(1.dp, Spec.border, RoundedCornerShape(Spec.pillRadius)),
-                    contentAlignment = Alignment.CenterStart,
+                        .border(1.dp, Spec.border, RoundedCornerShape(Spec.pillRadius))
+                        .padding(horizontal = 4.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    BasicTextField(
-                        value = text,
-                        onValueChange = { if (it.length <= 500) onTextChange(it) },
-                        singleLine = true,
-                        textStyle = Spec.msgBody.copy(color = Spec.text),
-                        cursorBrush = SolidColor(Spec.blue),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() }),
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .focusRequester(focusRequester)
-                            .onFocusChanged { if (it.isFocused) onInputFocused() },
-                        decorationBox = { inner ->
-                            Box(contentAlignment = Alignment.CenterStart) {
-                                // التلميح يبقى ظاهراً حتى يبدأ الكتابة (أو اختيار ملصق)
-                                if (text.isEmpty()) {
-                                    Text(
-                                        stringResource(
-                                            R.string.chat_hint,
-                                            com.addonstation.mobile.ui.community.channelDisplayName(channel),
-                                        ),
-                                        style = Spec.msgBody,
-                                        color = Spec.textMuted,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                                inner()
-                            }
-                        },
-                    )
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(if (panelOpen) Spec.blue.copy(alpha = 0.18f) else Color.Transparent)
+                            .clickable { onEmoji() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (panelOpen) Icons.Filled.Keyboard else Icons.Filled.EmojiEmotions,
+                            contentDescription = stringResource(
+                                if (panelOpen) R.string.cd_emoji_toggle_keyboard else R.string.cd_emoji_toggle_open,
+                            ),
+                            tint = if (panelOpen) Spec.blueLink else Spec.textMuted,
+                            modifier = Modifier.size(21.dp),
+                        )
+                    }
+                    Box(
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        if (text.isEmpty()) {
+                            Text(
+                                stringResource(
+                                    R.string.chat_hint,
+                                    com.addonstation.mobile.ui.community.channelDisplayName(channel),
+                                ),
+                                style = Spec.msgBody.copy(fontSize = 15.sp),
+                                color = Spec.textMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        BasicTextField(
+                            value = text,
+                            onValueChange = { if (it.length <= 500) onTextChange(it) },
+                            singleLine = true,
+                            textStyle = Spec.msgBody.copy(fontSize = 15.sp, lineHeight = 22.sp, color = Spec.text),
+                            cursorBrush = SolidColor(Spec.blue),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() }),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester)
+                                .onFocusChanged { if (it.isFocused) onInputFocused() },
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .clickable { onAttach() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = stringResource(R.string.chat_add_photo),
+                            tint = Spec.textMuted,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
                 }
-                // زرّ الإرسال: 44 دائري أزرق (رمادي حين لا شيء للإرسال)
                 Box(
                     modifier = Modifier
-                        .size(Spec.touch)
+                        .size(48.dp)
+                        .then(if (canSend) Modifier.shadow(6.dp, CircleShape) else Modifier)
                         .clip(CircleShape)
-                        .background(if (canSend) Spec.blue else Spec.surfaceHigh)
+                        .background(
+                            if (canSend) Brush.linearGradient(listOf(Spec.blue, Color(0xFF4C9AFF)))
+                            else Brush.linearGradient(listOf(Spec.surfaceHigh, Spec.surfaceHigh)),
+                        )
                         .clickable(enabled = canSend) { onSend() },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1610,7 +1694,6 @@ private fun ChatInputBar(
                     )
                 }
             }
-            // مؤشّرات صغيرة أسفل الحقل: العدّ المتبقّي · حدّ المعدّل
             val hintLine = buildString {
                 if (remaining in 1..49) append(remaining)
                 if (slowmodeSeconds > 0) {
@@ -1623,7 +1706,7 @@ private fun ChatInputBar(
                     hintLine,
                     style = Spec.secondary,
                     color = if (remaining in 1..9) Spec.gold else Spec.textMuted,
-                    modifier = Modifier.padding(start = 104.dp, top = 4.dp),
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp),
                     maxLines = 1,
                 )
             }
@@ -1631,7 +1714,6 @@ private fun ChatInputBar(
     }
 }
 
-/** زرّ دائري في شريط الكتابة: 44×44 · خلفية `surface` (رموز الوثيقة). */
 @Composable
 private fun SpecComposerCircle(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1837,7 +1919,7 @@ private fun MessageBlock(
     isNewDivider: Boolean,
     myId: String?,
     currentProfile: Profile?,
-    onLongPress: () -> Unit,
+    onLongPress: (Rect) -> Unit,
     /** ضغطة بسيطة على الرسالة ⇒ الرد عليها مباشرة (الضغط المطوّل = قائمة الإبلاغ/الحذف). */
     onReply: () -> Unit,
     /** ضغطة سريعة على أي ملصق ⇒ لوحة الملصقات تُفتح على مكانه وهو محدَّد. */
@@ -1857,6 +1939,12 @@ private fun MessageBlock(
 ) {
     val container = rememberContainer()
     val message = ui.message
+    var messageBounds by remember(message.id) { mutableStateOf(Rect.Zero) }
+    val haptic = LocalHapticFeedback.current
+    val openActions: () -> Unit = {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        onLongPress(messageBounds)
+    }
     val isMine = myId != null && message.userId == myId
     // رسائلي تستخدم ملف الجلسة المحلي إن لم تكن نسخة المرسل موجودة في قائمة المؤلفين.
     val author = ui.author ?: currentProfile?.takeIf { isMine && it.id == myId }
@@ -1878,8 +1966,8 @@ private fun MessageBlock(
     val grouped = previous != null &&
         previous.message.userId == message.userId &&
         TimeFormat.withinFiveMinutes(previous.message.createdAt, message.createdAt)
-    // Show a profile header on each outgoing message and the first message in an incoming group.
-    val showAuthorHeader = !grouped || isMine
+    // Incoming groups get one sender header; own messages stay anonymous inside their own bubble.
+    val showAuthorHeader = !isMine && !grouped
 
     if (showDate) {
         Row(
@@ -1921,7 +2009,7 @@ private fun MessageBlock(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = if (grouped) 4.dp else 10.dp)
+            .padding(top = if (grouped) 3.dp else 8.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(
                 when {
@@ -1930,7 +2018,8 @@ private fun MessageBlock(
                     else -> Color.Transparent
                 }
             )
-            .combinedClickable(onClick = onReply, onLongClick = onLongPress)
+            .onGloballyPositioned { messageBounds = it.boundsInRoot() }
+            .combinedClickable(onClick = onReply, onLongClick = openActions)
             .alpha(if (ui.pending) 0.55f else 1f)      // قيد الإرسال — تظهر فوراً
             .padding(horizontal = 8.dp, vertical = 2.dp),
         horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
@@ -2069,7 +2158,7 @@ private fun MessageBlock(
                                         val takeBack = onStickerTap
                                         if (takeBack != null) takeBack() else message.stickerUrl?.let(onOpenImage)
                                     },
-                                    onLongClick = onLongPress,
+                                    onLongClick = openActions,
                                 ),
                         ) {
                             com.addonstation.mobile.ui.components.CoverImage(
@@ -2119,7 +2208,7 @@ private fun MessageBlock(
                                 if (imageUrl != null) onOpenImage(imageUrl!!)
                                 else if (path != null) onOpenImage(path)
                             },
-                            onLongPress = onLongPress,
+                            onLongPress = openActions,
                             onRetryUrl = { reloadImageUrl() },
                             statusContent = if (isMine) {
                                 {
@@ -2179,7 +2268,7 @@ private fun MessageBlock(
                                 height = 168.dp,
                             ),
                             onClick = onPlayVideo,
-                            onLongPress = onLongPress,
+                            onLongPress = openActions,
                         )
                         MessageStatus(
                             ui = ui,
@@ -2217,7 +2306,7 @@ private fun MessageBlock(
                             sizeBytes = message.mediaSize,
                             isMine = isMine,
                             onReply = onReply,
-                            onLongPress = onLongPress,
+                            onLongPress = openActions,
                         )
                         MessageStatus(
                             ui = ui,
@@ -2249,7 +2338,7 @@ private fun MessageBlock(
                                     ),
                                 )
                                 .background(Brush.linearGradient(listOf(Spec.blue, Color(0xFF4C9AFF))))
-                                .combinedClickable(onClick = onReply, onLongClick = onLongPress)
+                                .combinedClickable(onClick = onReply, onLongClick = openActions)
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                         ) {
                             Text(
@@ -2297,7 +2386,7 @@ private fun MessageBlock(
                                     Spec.border,
                                     RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 4.dp),
                                 )
-                                .combinedClickable(onClick = onReply, onLongClick = onLongPress)
+                                .combinedClickable(onClick = onReply, onLongClick = openActions)
                                 .padding(horizontal = 12.dp, vertical = 10.dp),
                         ) {
                             Text(
@@ -2336,7 +2425,7 @@ private fun MessageBlock(
                         onClick = { onToggleReaction(emoji) },
                     )
                 }
-                AddReactionPill(onClick = onLongPress)
+                AddReactionPill(onClick = openActions)
             }
         }
     }

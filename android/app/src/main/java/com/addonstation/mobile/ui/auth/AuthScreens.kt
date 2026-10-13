@@ -22,19 +22,28 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
@@ -49,6 +58,7 @@ import com.addonstation.mobile.ui.components.AuthSettingsPrimaryButton
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.Spec
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val USERNAME_RE = Regex("^[A-Za-z0-9_]+$")
@@ -299,6 +309,7 @@ fun SignUpScreen(
     var resendMessage by remember { mutableStateOf<String?>(null) }
     var resendErrorKind by remember { mutableStateOf<ApiErrorKind?>(null) }
     var resendOk by remember { mutableStateOf(false) }
+    var resendCooldown by remember { mutableIntStateOf(0) }
 
     val creating = stringResource(R.string.msg_creating_account)
     val shortUsername = stringResource(R.string.msg_username_too_short)
@@ -371,7 +382,8 @@ fun SignUpScreen(
     }
 
     fun resend() {
-        if (busy) return
+        if (busy || resendCooldown > 0) return
+        resendCooldown = 30
         scope.launch {
             busy = true
             resendMessage = null
@@ -383,6 +395,25 @@ fun SignUpScreen(
         }
     }
 
+    LaunchedEffect(resendCooldown) {
+        if (resendCooldown > 0) {
+            delay(1_000)
+            resendCooldown = (resendCooldown - 1).coerceAtLeast(0)
+        }
+    }
+
+    if (pendingConfirm) {
+        EmailConfirmationScreen(
+            email = email.trim(),
+            busy = busy,
+            resendRemaining = resendCooldown,
+            resendOk = resendOk,
+            resendMessage = resendMessage,
+            resendErrorKind = resendErrorKind,
+            onConfirm = ::confirmAndSignIn,
+            onResend = ::resend,
+        )
+    } else {
     Column(Modifier.fillMaxSize().background(AppColors.AuthBg).imePadding()) {
         AuthSettingsHeader(onBack = onBack, backgroundRes = R.drawable.signup_bg)
         Column(
@@ -494,52 +525,12 @@ fun SignUpScreen(
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(14.dp))
-            if (pendingConfirm) {
-                AuthSettingsGroupCard(
-                    modifier = Modifier.padding(horizontal = 0.dp),
-                    radius = 14.dp,
-                    background = AppColors.AuthSurface,
-                    borderColor = AppColors.AuthGoldBorder,
-                ) {
-                    Column(
-                        Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(stringResource(R.string.auth_confirm_title), style = Spec.rowTitle, color = AppColors.AuthGold)
-                        Text(stringResource(R.string.auth_confirm_text), style = Spec.rowSub, color = AppColors.AuthMuted)
-                        Text(email.trim(), style = Spec.rowSub, color = AppColors.AuthText)
-                        AuthSettingsPrimaryButton(
-                            text = stringResource(R.string.auth_confirm_retry),
-                            onClick = { confirmAndSignIn() },
-                            enabled = !busy,
-                            loading = busy,
-                        )
-                        AuthSettingsPrimaryButton(
-                            text = stringResource(R.string.auth_confirm_resend),
-                            onClick = { resend() },
-                            enabled = !busy,
-                        )
-                        resendMessage?.let {
-                            Text(
-                                it,
-                                style = Spec.rowSub,
-                                color = if (resendOk) AppColors.AuthGreenText else AppColors.AuthRed,
-                            )
-                        }
-                        resendErrorKind?.let {
-                            Text(apiErrorText(it), style = Spec.rowSub, color = AppColors.AuthRed)
-                        }
-                        Text(stringResource(R.string.auth_confirm_hint), style = Spec.rowSub, color = AppColors.AuthMuted)
-                    }
-                }
-            } else {
-                AuthSettingsPrimaryButton(
-                    text = if (busy) creating else stringResource(R.string.auth_create_account),
-                    onClick = { submit() },
-                    enabled = !busy,
-                    loading = busy,
-                )
-            }
+            AuthSettingsPrimaryButton(
+                text = if (busy) creating else stringResource(R.string.auth_create_account),
+                onClick = { submit() },
+                enabled = !busy,
+                loading = busy,
+            )
             status?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(it, style = Spec.rowSub, color = AppColors.AuthGreenText, textAlign = TextAlign.Center)
@@ -551,6 +542,170 @@ fun SignUpScreen(
             action = stringResource(R.string.auth_sign_in),
             onClick = onOpenLogin,
         )
+    }
+    }
+}
+
+/** Full-screen confirmation state after account creation; preserves the existing auth calls. */
+@Composable
+private fun EmailConfirmationScreen(
+    email: String,
+    busy: Boolean,
+    resendRemaining: Int,
+    resendOk: Boolean,
+    resendMessage: String?,
+    resendErrorKind: ApiErrorKind?,
+    onConfirm: () -> Unit,
+    onResend: () -> Unit,
+) {
+    val signingIn = stringResource(R.string.msg_signing_in)
+    val resendLabel = stringResource(R.string.auth_confirm_resend)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AppColors.AuthBg)
+            .verticalScroll(rememberScrollState())
+            .padding(start = 24.dp, end = 24.dp, top = 70.dp, bottom = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.size(112.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.size(112.dp).clip(CircleShape).background(AppColors.AuthGreen.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Email, contentDescription = null, tint = AppColors.AuthGreenText, modifier = Modifier.size(54.dp))
+            }
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(AppColors.AuthGreen)
+                    .border(4.dp, AppColors.AuthBg, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            }
+        }
+        Spacer(Modifier.height(22.dp))
+        Text(
+            stringResource(R.string.auth_confirm_title),
+            style = Spec.authTitle.copy(fontSize = 22.sp, fontWeight = FontWeight.ExtraBold),
+            color = AppColors.AuthText,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.auth_confirm_text),
+            style = Spec.authSubtitle.copy(fontSize = 14.sp, lineHeight = 22.sp),
+            color = AppColors.AuthMuted,
+            textAlign = TextAlign.Center,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp)
+                .heightIn(min = 40.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(AppColors.AuthSurface)
+                .border(1.dp, AppColors.AuthBorder, RoundedCornerShape(20.dp))
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            Icon(Icons.Filled.Email, contentDescription = null, tint = AppColors.AuthMuted, modifier = Modifier.size(16.dp))
+            Text(
+                email,
+                style = Spec.rowTitle.copy(fontSize = 14.sp),
+                color = AppColors.AuthText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (resendOk && !resendMessage.isNullOrBlank()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(Icons.Filled.Check, contentDescription = null, tint = AppColors.AuthGreenText, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(6.dp))
+                Text(resendMessage, style = Spec.rowSub, color = AppColors.AuthGreenText, textAlign = TextAlign.Center)
+            }
+        } else if (resendErrorKind != null) {
+            Text(
+                apiErrorText(resendErrorKind),
+                style = Spec.rowSub,
+                color = AppColors.AuthRed,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                textAlign = TextAlign.Center,
+            )
+        } else if (!resendMessage.isNullOrBlank()) {
+            Text(
+                resendMessage,
+                style = Spec.rowSub,
+                color = AppColors.AuthMuted,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                textAlign = TextAlign.Center,
+            )
+        }
+        Spacer(Modifier.height(22.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(AppColors.AuthBlue)
+                .clickable(enabled = !busy, onClick = onConfirm),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                if (busy) signingIn else stringResource(R.string.auth_confirm_retry),
+                style = Spec.button.copy(fontSize = 15.sp),
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(AppColors.AuthSurface)
+                .border(1.dp, AppColors.AuthBorder, RoundedCornerShape(16.dp))
+                .clickable(enabled = !busy && resendRemaining == 0, onClick = onResend)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Icon(Icons.Filled.Refresh, contentDescription = null, tint = AppColors.AuthBlueLight, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.size(8.dp))
+            Text(
+                if (resendRemaining > 0) "$resendLabel · ${resendRemaining}s" else resendLabel,
+                style = Spec.button.copy(fontSize = 14.sp),
+                color = if (resendRemaining > 0 || busy) AppColors.AuthMuted else AppColors.AuthBlueLight,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Icon(Icons.Filled.Info, contentDescription = null, tint = AppColors.AuthMuted, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.size(8.dp))
+            Text(
+                stringResource(R.string.auth_confirm_hint),
+                style = Spec.rowSub.copy(fontSize = 12.sp, lineHeight = 18.sp),
+                color = AppColors.AuthMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 

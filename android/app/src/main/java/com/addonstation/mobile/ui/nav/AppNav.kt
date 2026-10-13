@@ -1,6 +1,21 @@
 package com.addonstation.mobile.ui.nav
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -12,12 +27,18 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AlternateEmail
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.NewReleases
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -141,6 +162,15 @@ fun AppRoot(
     var configured by remember { mutableStateOf(container.isConfigured) }
     var startupProgress by remember { mutableStateOf(0f) }
     var startupReady by remember { mutableStateOf(false) }
+    var navigationReady by remember { mutableStateOf(false) }
+
+    // Keep the first Compose frame deliberately small: the system launch screen
+    // can hand off to our splash before the complete navigation graph is composed.
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        withFrameNanos { }
+        navigationReady = true
+    }
 
     // أيقونات شريط الحالة تتبع وضع التطبيق نفسه (لا وضع الجهاز):
     // في الوضع الفاتح تصير الأيقونات داكنة فوق الخلفية الفاتحة.
@@ -265,7 +295,7 @@ fun AppRoot(
                     // (وكل شبكاتها وصورها) لا تبدأ البناء إلا بعد انتهاء حركة
                     // البداية ⇒ انتظار مضاعف يحسّه المستخدم «يطول». الآن يُبنى
                     // المحتوى فوراً وتُغطّيه شاشة الترحيب، فحين تنقشع يكون جاهزاً.
-                    if (configured) {
+                    if (configured && navigationReady) {
                         MainNavigation(
                             startAtReset = deepLinkSession,
                             pushRoute = pushRoute,
@@ -1161,6 +1191,7 @@ private fun SignInGate(
  *
  * على أندرويد 12 وأقدم لا يوجد إذن وقت تشغيل ⇒ الدالة لا تفعل شيئاً.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun NotificationPermissionPrompt(signedIn: Boolean) {
     // Android 12 وما قبله لا يملك إذن الإشعارات وقت التشغيل، فلا ننشئ launcher أصلاً.
@@ -1190,33 +1221,125 @@ private fun NotificationPermissionPrompt(signedIn: Boolean) {
         if (AppPrefs.notificationAsked(context)) return@LaunchedEffect
         delay(1500)
         if (com.addonstation.mobile.push.PushNotifications.permissionGranted(context)) return@LaunchedEffect
-        AppPrefs.markNotificationAsked(context)   // مرة واحدة مهما كان الجواب
+        AppPrefs.markNotificationAsked(context)   // сохраняем прежнее поведение: один запрос
         visible = true
     }
 
     if (visible) {
-        androidx.compose.material3.AlertDialog(
+        androidx.compose.material3.ModalBottomSheet(
             onDismissRequest = { visible = false },
-            containerColor = AppColors.Surface,
-            title = {
-                Text(stringResource(R.string.notif_prompt_title), style = AppText.sectionTitle, color = AppColors.Text)
-            },
-            text = {
-                Text(stringResource(R.string.notif_prompt_text), style = AppText.bodySmall, color = AppColors.Muted)
-            },
-            confirmButton = {
-                androidx.compose.material3.TextButton(onClick = {
-                    visible = false
-                    runCatching { launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS) }
-                }) {
-                    Text(stringResource(R.string.notif_prompt_allow), color = AppColors.Green)
+            sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = AppColors.AuthSurface,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 26.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    Modifier.size(72.dp).clip(CircleShape).background(AppColors.AuthBlue.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.material3.Icon(
+                        Icons.Filled.NotificationsActive,
+                        contentDescription = null,
+                        tint = AppColors.AuthBlueLight,
+                        modifier = Modifier.size(34.dp),
+                    )
                 }
-            },
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { visible = false }) {
-                    Text(stringResource(R.string.notif_prompt_later), color = AppColors.Muted)
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    stringResource(R.string.notif_prompt_title),
+                    style = AppText.sectionTitle.copy(fontSize = 20.sp, fontWeight = FontWeight.ExtraBold),
+                    color = AppColors.AuthText,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(R.string.notif_prompt_text),
+                    style = AppText.bodySmall.copy(fontSize = 14.sp, lineHeight = 22.sp),
+                    color = AppColors.AuthMuted,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    NotificationCategoryChip(
+                        icon = Icons.Filled.Chat,
+                        label = stringResource(R.string.notif_cat_chat),
+                        modifier = Modifier.weight(1f),
+                    )
+                    NotificationCategoryChip(
+                        icon = Icons.Filled.AlternateEmail,
+                        label = stringResource(R.string.notif_mention),
+                        modifier = Modifier.weight(1f),
+                    )
+                    NotificationCategoryChip(
+                        icon = Icons.Filled.NewReleases,
+                        label = stringResource(R.string.notif_cat_content),
+                        modifier = Modifier.weight(1f),
+                    )
                 }
-            },
+                Spacer(Modifier.height(18.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AppColors.AuthBlue)
+                        .clickable {
+                            visible = false
+                            runCatching { launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS) }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        stringResource(R.string.notif_prompt_allow),
+                        style = AppText.button.copy(fontSize = 15.sp),
+                        color = androidx.compose.ui.graphics.Color.White,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { visible = false },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(stringResource(R.string.notif_prompt_later), style = AppText.body, color = AppColors.AuthMuted)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationCategoryChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .height(36.dp)
+            .clip(CircleShape)
+            .background(AppColors.AuthSurfaceHigh)
+            .border(1.dp, AppColors.AuthBorder, CircleShape)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        androidx.compose.material3.Icon(icon, contentDescription = null, tint = AppColors.AuthBlueLight, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.size(5.dp))
+        Text(
+            label,
+            style = AppText.small.copy(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold),
+            color = AppColors.AuthChipLabel,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
     }
 }

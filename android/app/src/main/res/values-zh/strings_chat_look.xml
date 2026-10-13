@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_filter_unread">未读</string>
+    <string name="chat_search_members">搜索成员</string>
+    <string name="chat_last_seen">最后在线 %1$s</string>
+    <string name="cd_scroll_to_bottom">滚动到最新消息</string>
+    <string name="cd_search_rooms">搜索房间</string>
+    <string name="chat_members_no_results">没有符合搜索条件的成员。</string>
+</resources>

@@ -5,9 +5,11 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -122,69 +124,185 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** A minimal native view keeps the report accessible even if Compose startup crashed. */
+    /** Native first-launch report view remains usable even if Compose startup crashed. */
     private fun showCrashReport(report: String) {
         val density = resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
+        val dark = AppPrefs.readDark(this)
+        val background = if (dark) Color.rgb(10, 15, 28) else Color.rgb(244, 247, 252)
+        val surface = if (dark) Color.rgb(18, 26, 43) else Color.WHITE
+        val text = if (dark) Color.rgb(234, 240, 250) else Color.rgb(25, 35, 48)
+        val muted = if (dark) Color.rgb(157, 176, 207) else Color.rgb(91, 105, 125)
+        val blue = Color.rgb(46, 123, 239)
+        val border = if (dark) Color.rgb(34, 48, 73) else Color.rgb(215, 223, 234)
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.TOP
-            layoutDirection = View.LAYOUT_DIRECTION_LOCALE
-            setPadding(dp(20), dp(24), dp(20), dp(20))
-            setBackgroundColor(Color.WHITE)
+        fun rounded(fill: Int, stroke: Int? = null, radius: Int = dp(14)): GradientDrawable =
+            GradientDrawable().apply {
+                setColor(fill)
+                cornerRadius = radius.toFloat()
+                if (stroke != null) setStroke(dp(1), stroke)
+            }
+
+        window.statusBarColor = background
+        window.navigationBarColor = background
+        @Suppress("DEPRECATION")
+        run {
+            window.decorView.systemUiVisibility = if (dark) 0 else
+                (View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR)
         }
+
+        val root = ScrollView(this).apply {
+            isFillViewport = true
+            setBackgroundColor(background)
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(20), dp(60), dp(20), dp(28))
+            layoutDirection = View.LAYOUT_DIRECTION_LOCALE
+        }
+        root.addView(content, ScrollView.LayoutParams(
+            ScrollView.LayoutParams.MATCH_PARENT,
+            ScrollView.LayoutParams.WRAP_CONTENT,
+        ))
+
+        val bug = TextView(this).apply {
+            text = "🐛"
+            textSize = 48f
+            gravity = Gravity.CENTER
+            setBackground(rounded(if (dark) Color.rgb(42, 24, 34) else Color.rgb(255, 232, 236), radius = dp(52)))
+        }
+        content.addView(bug, LinearLayout.LayoutParams(dp(104), dp(104)))
+
         val title = TextView(this).apply {
             text = getString(R.string.crash_report_title)
             textSize = 22f
-            setTextColor(Color.rgb(25, 35, 48))
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            setTextColor(text)
+            gravity = Gravity.CENTER
         }
+        content.addView(title, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = dp(22) })
+
         val explanation = TextView(this).apply {
             text = getString(R.string.crash_report_body)
-            textSize = 15f
-            setTextColor(Color.rgb(70, 78, 90))
-            setPadding(0, dp(12), 0, dp(12))
+            textSize = 14f
+            setTextColor(muted)
+            gravity = Gravity.CENTER
+            setLineSpacing(dp(3).toFloat(), 1.2f)
+        }
+        content.addView(explanation, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = dp(8) })
+
+        val logCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(Color.rgb(6, 9, 15), border)
+            clipToOutline = true
+        }
+        content.addView(logCard, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = dp(20) })
+
+        val logHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(4), dp(8), dp(4))
+        }
+        val logLabel = TextView(this).apply {
+            text = "LOG"
+            textSize = 11f
+            letterSpacing = 0.08f
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            setTextColor(Color.rgb(185, 198, 220))
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        logHeader.addView(logLabel, LinearLayout.LayoutParams(0, dp(34), 1f))
+        val smallCopy = TextView(this).apply {
+            text = "⧉"
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setTextColor(Color.rgb(185, 198, 220))
+            contentDescription = getString(R.string.crash_report_copy)
+            setOnClickListener { copyCrashReport(report) }
+        }
+        logHeader.addView(smallCopy, LinearLayout.LayoutParams(dp(40), dp(36)))
+        logCard.addView(logHeader)
+        val separator = View(this).apply { setBackgroundColor(Color.rgb(34, 48, 73)) }
+        logCard.addView(separator, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(1),
+        ))
+
+        val logScroll = ScrollView(this).apply {
+            isFillViewport = false
+            setBackgroundColor(Color.rgb(6, 9, 15))
         }
         val details = TextView(this).apply {
             text = report
-            textSize = 12f
+            textSize = 11f
             typeface = Typeface.MONOSPACE
-            setTextColor(Color.rgb(45, 52, 62))
+            setTextColor(Color.rgb(185, 198, 220))
             setTextIsSelectable(true)
-            setPadding(dp(10), dp(10), dp(10), dp(10))
+            textDirection = View.TEXT_DIRECTION_LTR
+            layoutDirection = View.LAYOUT_DIRECTION_LTR
+            setLineSpacing(dp(2).toFloat(), 1.15f)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
         }
-        val scroll = ScrollView(this).apply {
-            addView(details, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-            ))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f,
-            )
-        }
-        val copy = Button(this).apply {
+        logScroll.addView(details, ScrollView.LayoutParams(
+            ScrollView.LayoutParams.MATCH_PARENT,
+            ScrollView.LayoutParams.WRAP_CONTENT,
+        ))
+        logCard.addView(logScroll, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(160),
+        ))
+
+        val copyButton = TextView(this).apply {
             text = getString(R.string.crash_report_copy)
-            setOnClickListener {
-                val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.crash_report_title), report))
-                Toast.makeText(this@MainActivity, R.string.crash_report_copied, Toast.LENGTH_LONG).show()
-            }
+            textSize = 15f
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(blue, Color.rgb(76, 154, 255)),
+            ).apply { cornerRadius = dp(16).toFloat() }
+            setOnClickListener { copyCrashReport(report) }
         }
-        val retry = Button(this).apply {
+        content.addView(copyButton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(56),
+        ).apply { topMargin = dp(18) })
+
+        val continueButton = TextView(this).apply {
             text = getString(R.string.crash_report_continue)
+            textSize = 14f
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setTextColor(if (dark) text else blue)
+            background = rounded(surface, border, dp(14))
             setOnClickListener {
                 CrashDiagnostics.clear(this@MainActivity)
                 recreate()
             }
         }
-        root.addView(title)
-        root.addView(explanation)
-        root.addView(scroll)
-        root.addView(copy)
-        root.addView(retry)
+        content.addView(continueButton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(52),
+        ).apply { topMargin = dp(10) })
+
         setContentView(root)
+    }
+
+    private fun copyCrashReport(report: String) {
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.crash_report_title), report))
+        Toast.makeText(this, R.string.crash_report_copied, Toast.LENGTH_LONG).show()
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

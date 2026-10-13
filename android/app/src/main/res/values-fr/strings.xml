@@ -698,6 +698,7 @@ CRÉE-LE.</string>
     <string name="profile_status_away">Absent</string>
     <string name="profile_status_offline">Hors ligne</string>
     <string name="profile_ban_user">Bannir l’utilisateur</string>
+    <string name="profile_ban_confirm">Voulez-vous vraiment bannir %1$s ? Cette personne ne pourra plus accéder au chat.</string>
     <string name="profile_delete_message">Supprimer un message</string>
     <string name="profile_as_others_title">Mon profil vu par les autres</string>
     <string name="profile_member_since_label">MEMBRE DEPUIS</string>

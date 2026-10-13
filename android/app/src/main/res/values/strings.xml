@@ -714,6 +714,7 @@ CREATE IT.</string>
     <string name="profile_status_away">Away</string>
     <string name="profile_status_offline">Offline</string>
     <string name="profile_ban_user">Ban user</string>
+    <string name="profile_ban_confirm">Are you sure you want to ban %1$s? They will no longer be able to access chat.</string>
     <string name="profile_delete_message">Delete message</string>
     <string name="profile_as_others_title">My profile as others see it</string>
     <string name="profile_member_since_label">MEMBER SINCE</string>

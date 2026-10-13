@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,8 +25,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -39,16 +42,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.ContentItem
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.common.ConfirmDialog
-import com.addonstation.mobile.ui.components.EmptyState
 import com.addonstation.mobile.ui.components.GhostButton
 import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.LoadingBox
@@ -243,6 +251,23 @@ fun AdminContentEditorScreen(
             kicker = stringResource(R.string.admin_kicker_content),
             title = stringResource(if (isEditing) R.string.common_edit else R.string.admin_add_content_plain),
             onBack = onBack,
+            trailing = if (published) {
+                {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(AppColors.Green.copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 5.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.admin_publish_content),
+                            style = AppText.tiny.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold),
+                            color = AppColors.Green,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            } else null,
         )
         when {
             loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { LoadingBox() }
@@ -254,8 +279,29 @@ fun AdminContentEditorScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                EmptyState(notFoundText)
-                Spacer(Modifier.height(12.dp))
+                Box(
+                    Modifier
+                        .size(88.dp)
+                        .clip(RoundedCornerShape(44.dp))
+                        .background(LocalHomePalette.current.surfaceHigh)
+                        .border(1.dp, LocalHomePalette.current.border, RoundedCornerShape(44.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.material3.Icon(
+                        Icons.Filled.ViewInAr,
+                        contentDescription = null,
+                        tint = LocalHomePalette.current.textMuted,
+                        modifier = Modifier.size(38.dp),
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    notFoundText,
+                    style = AppText.sectionTitle.copy(fontSize = 18.sp),
+                    color = LocalHomePalette.current.text,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                Spacer(Modifier.height(14.dp))
                 GhostButton(
                     text = stringResource(R.string.common_retry),
                     onClick = { reloadKey += 1 },
@@ -274,9 +320,17 @@ fun AdminContentEditorScreen(
 
                 OutlinedTextField(
                     value = title,
-                    onValueChange = { title = it.take(120) },
+                    onValueChange = {
+                        title = it.take(120)
+                        message = null
+                        messageIsError = false
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
                     label = { Text(stringResource(R.string.creator_field_title)) },
+                    isError = message == titleRequiredText && title.isBlank(),
+                    supportingText = if (message == titleRequiredText && title.isBlank()) {
+                        { Text(titleRequiredText, style = AppText.tiny, color = AppColors.Red) }
+                    } else null,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -371,12 +425,15 @@ fun AdminContentEditorScreen(
                         detail = coverName.ifBlank { noneText },
                         icon = Icons.Filled.Image,
                         onClick = { coverPicker.launch("image/*") },
+
                     )
                     UploadZone(
                         modifier = Modifier.weight(1f),
                         title = stringResource(R.string.admin_file_label),
                         detail = selectedFileName.ifBlank { noneText },
                         icon = Icons.Filled.InsertDriveFile,
+                        isError = message == fileRequiredText,
+                        errorText = fileRequiredText.takeIf { message == fileRequiredText },
                         onClick = { filePicker.launch("*/*") },
                     )
                 }
@@ -393,23 +450,40 @@ fun AdminContentEditorScreen(
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                ContentToggle(
-                    label = stringResource(R.string.admin_publish_content),
-                    checked = published,
-                    onCheckedChange = { published = it },
-                )
-                ContentToggle(
-                    label = stringResource(R.string.admin_featured_content),
-                    checked = featured,
-                    onCheckedChange = { featured = it },
-                )
-                ContentToggle(
-                    label = stringResource(R.string.admin_exclusive_content),
-                    checked = exclusive,
-                    onCheckedChange = { exclusive = it },
-                )
+                val toggleShape = RoundedCornerShape(16.dp)
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(toggleShape)
+                        .background(LocalHomePalette.current.surface)
+                        .border(1.dp, LocalHomePalette.current.border, toggleShape)
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                ) {
+                    ContentToggle(
+                        label = stringResource(R.string.admin_featured_content),
+                        description = stringResource(R.string.home_featured_plain),
+                        checked = featured,
+                        onCheckedChange = { featured = it },
+                    )
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(LocalHomePalette.current.border))
+                    ContentToggle(
+                        label = stringResource(R.string.admin_exclusive_content),
+                        description = stringResource(R.string.home_exclusives_plain),
+                        checked = exclusive,
+                        onCheckedChange = { exclusive = it },
+                    )
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(LocalHomePalette.current.border))
+                    ContentToggle(
+                        label = stringResource(R.string.admin_publish_content),
+                        checked = published,
+                        onCheckedChange = {
+                            published = it
+                            if (!it && message == fileRequiredText) message = null
+                        },
+                    )
+                }
 
-                message?.let { text ->
+                message?.takeUnless { it == titleRequiredText || it == fileRequiredText }?.let { text ->
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text,
@@ -470,27 +544,59 @@ private fun UploadZone(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    isError: Boolean = false,
+    errorText: String? = null,
 ) {
-    val shape = RoundedCornerShape(14.dp)
+    val palette = LocalHomePalette.current
+    val shape = RoundedCornerShape(16.dp)
     Column(
         modifier = modifier
-            .height(86.dp)
+            .heightIn(min = 112.dp)
             .clip(shape)
-            .background(AppColors.Elevated)
-            .border(1.dp, AppColors.Border, shape)
+            .background(palette.surface)
+            .drawBehind {
+                val stroke = 2.dp.toPx()
+                val inset = stroke / 2f
+                drawRoundRect(
+                    color = if (isError) AppColors.Red else palette.border,
+                    topLeft = Offset(inset, inset),
+                    size = Size(size.width - stroke, size.height - stroke),
+                    cornerRadius = CornerRadius(16.dp.toPx()),
+                    style = Stroke(
+                        width = stroke,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 5.dp.toPx())),
+                    ),
+                )
+            }
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         androidx.compose.material3.Icon(
             icon,
             contentDescription = null,
-            tint = AppColors.Blue,
+            tint = if (isError) AppColors.Red else AppColors.Blue,
             modifier = Modifier.size(18.dp),
         )
         Text(title, style = AppText.bodySmall, color = AppColors.Text, maxLines = 1)
-        Text(detail, style = AppText.tiny, color = AppColors.Muted, maxLines = 1)
+        Text(
+            detail,
+            style = AppText.tiny,
+            color = if (isError) AppColors.Red else AppColors.Muted,
+            maxLines = 1,
+        )
+        errorText?.let {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                androidx.compose.material3.Icon(
+                    Icons.Filled.ErrorOutline,
+                    contentDescription = null,
+                    tint = AppColors.Red,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(it, style = AppText.tiny, color = AppColors.Red, maxLines = 2)
+            }
+        }
     }
 }
 
@@ -499,15 +605,20 @@ private fun ContentToggle(
     label: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    description: String? = null,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp)
-            .clickable { onCheckedChange(!checked) },
+            .heightIn(min = 56.dp)
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = AppText.bodySmall, color = AppColors.Text, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = AppText.bodySmall, color = LocalHomePalette.current.text)
+            description?.let { Text(it, style = AppText.tiny, color = AppColors.Muted) }
+        }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

@@ -25,10 +25,12 @@ supported = re.findall(r'AppLanguage\("([a-z]{2})",\s*"([^"\n]+)"', locale)
 check("الأسماء الأصلية للغات الثماني موجودة وغير فارغة",
       len(supported) == 8 and {code for code, _ in supported} == set(codes)
       and all(label.strip() for _, label in supported))
-check("القائمة تعرض الاسم كاملًا وتسمح بالالتفاف عند تكبير الخط",
-      "modifier = Modifier.widthIn(min = 180.dp, max = 260.dp)" in settings
+check("منتقي اللغات يعرض الاسم كاملاً ويسمح بالالتفاف عند تكبير الخط",
+      "private fun LanguagePickerSheet(" in settings
+      and "items(order.size)" in settings
       and "maxLines = 2" in settings and "softWrap = true" in settings
-      and "overflow = TextOverflow.Clip" in settings)
+      and "overflow = TextOverflow.Clip" in settings
+      and 'if (code == \"zh\") \"中文\"' in settings)
 check("اسم اللغة المحدد لا يُقصّ بسطر واحد في صف الإعدادات",
       "maxLines = 2" in settings_ui and "softWrap = true" in settings_ui
       and "widthIn(max = 160.dp)" in settings_ui and "TextOverflow.Clip" in settings_ui)

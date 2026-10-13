@@ -698,6 +698,7 @@
     <string name="profile_status_away">بعيد</string>
     <string name="profile_status_offline">غير متصل</string>
     <string name="profile_ban_user">حظر العضو</string>
+    <string name="profile_ban_confirm">هل تريد حظر %1$s؟ لن يتمكن من الوصول إلى الدردشة.</string>
     <string name="profile_delete_message">حذف رسالة</string>
     <string name="profile_as_others_title">ملفي كما يراه الآخرون</string>
     <string name="profile_member_since_label">عضو منذ</string>

@@ -18,6 +18,14 @@ checks = {
             "startupReady = startupReady",
         )
     ),
+    "the first Compose frames hand off to splash before the nav graph is composed": all(
+        token in APP_NAV
+        for token in (
+            "var navigationReady by remember { mutableStateOf(false) }",
+            "withFrameNanos { }",
+            "if (configured && navigationReady)",
+        )
+    ) and APP_NAV.count("withFrameNanos { }") >= 2,
     "bootstrap has a bounded wait and reports completion after its work": all(
         token in APP_NAV
         for token in (

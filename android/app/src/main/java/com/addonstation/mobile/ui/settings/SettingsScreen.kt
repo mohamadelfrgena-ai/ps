@@ -17,10 +17,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,9 +37,10 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -89,7 +90,6 @@ import com.addonstation.mobile.ui.components.AuthSettingsPrimaryButton
 import com.addonstation.mobile.ui.components.AuthSettingsPill
 import com.addonstation.mobile.ui.components.AuthSettingsRow
 import com.addonstation.mobile.ui.components.AuthSettingsSectionLabel
-import com.addonstation.mobile.ui.components.AuthSettingsSegmented
 import com.addonstation.mobile.ui.components.AuthSettingsSwitch
 import com.addonstation.mobile.ui.components.AuthSettingsTopBar
 import com.addonstation.mobile.ui.components.AvatarImage
@@ -186,6 +186,7 @@ fun SettingsScreen(
     var dialogKey by remember { mutableStateOf<String?>(null) }
     var dialogError by remember { mutableStateOf<ApiErrorKind?>(null) }
     var languageMenu by remember { mutableStateOf(false) }
+    var themeSheet by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleteInfo by remember { mutableStateOf(false) }
     var onlineBusy by remember { mutableStateOf(false) }
@@ -333,75 +334,22 @@ fun SettingsScreen(
             // 2 · PREFERENCES
             AuthSettingsSectionLabel(stringResource(R.string.set_prefs), AppColors.AuthGreen)
             AuthSettingsGroupCard {
-                Box {
-                    AuthSettingsRow(
-                        title = stringResource(R.string.set_language),
-                        value = LocaleManager.byCode(currentLocale).label,
-                        clickable = true,
-                        onClick = { languageMenu = true },
-                        chevron = true,
-                        tile = { AuthSettingsImageTile(R.drawable.ic_set_language) },
-                    )
-                    DropdownMenu(
-                        expanded = languageMenu,
-                        onDismissRequest = { languageMenu = false },
-                        modifier = Modifier.widthIn(min = 180.dp, max = 260.dp),
-                        containerColor = AppColors.AuthSurfaceHigh,
-                    ) {
-                        LocaleManager.supported.forEach { language ->
-                            DropdownMenuItem(
-                                leadingIcon = {
-                                    Image(
-                                        painter = painterResource(langFlagRes(language.code)),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(22.dp),
-                                    )
-                                },
-                                text = {
-                                    Text(
-                                        text = language.label,
-                                        color = if (language.code == currentLocale) AppColors.AuthGreenText else AppColors.AuthText,
-                                        style = Spec.rowValue,
-                                        maxLines = 2,
-                                        softWrap = true,
-                                        overflow = TextOverflow.Clip,
-                                    )
-                                },
-                                onClick = {
-                                    languageMenu = false
-                                    scope.launch {
-                                        container.prefs.setLocale(language.code)
-                                        if (hostActivity is MainActivity) {
-                                            hostActivity.applyAppLocale(language.code)
-                                        } else {
-                                            AppPrefs.writeLocale(context, language.code)
-                                        }
-                                    }
-                                },
-                            )
-                        }
-                    }
-                }
+                AuthSettingsRow(
+                    title = stringResource(R.string.set_language),
+                    value = LocaleManager.byCode(currentLocale).label,
+                    clickable = true,
+                    onClick = { languageMenu = true },
+                    chevron = true,
+                    tile = { AuthSettingsImageTile(R.drawable.ic_set_language) },
+                )
                 AuthSettingsDivider()
                 AuthSettingsRow(
                     title = stringResource(R.string.set_theme),
+                    value = stringResource(if (dark) R.string.set_theme_dark else R.string.set_theme_light),
+                    clickable = true,
+                    onClick = { themeSheet = true },
+                    chevron = true,
                     tile = { AuthSettingsImageTile(R.drawable.ic_set_appearance) },
-                    trailing = {
-                        AuthSettingsSegmented(
-                            options = listOf(
-                                stringResource(R.string.set_theme_dark),
-                                stringResource(R.string.set_theme_light),
-                            ),
-                            selectedIndex = if (dark) 0 else 1,
-                            onSelect = { index ->
-                                val nextDark = index == 0
-                                scope.launch {
-                                    container.prefs.setDarkTheme(nextDark)
-                                    AppPrefs.writeDark(context, nextDark)
-                                }
-                            },
-                        )
-                    },
                 )
                 AuthSettingsDivider()
                 val canShowOnline = profile?.effectivePlan == "legendary"
@@ -631,6 +579,37 @@ fun SettingsScreen(
         }
     }
 
+    if (languageMenu) {
+        LanguagePickerSheet(
+            selectedCode = currentLocale,
+            onDismiss = { languageMenu = false },
+            onSelect = { language ->
+                languageMenu = false
+                scope.launch {
+                    container.prefs.setLocale(language.code)
+                    if (hostActivity is MainActivity) {
+                        hostActivity.applyAppLocale(language.code)
+                    } else {
+                        AppPrefs.writeLocale(context, language.code)
+                    }
+                }
+            },
+        )
+    }
+    if (themeSheet) {
+        ThemePickerSheet(
+            dark = dark,
+            onDismiss = { themeSheet = false },
+            onSelect = { nextDark ->
+                themeSheet = false
+                scope.launch {
+                    container.prefs.setDarkTheme(nextDark)
+                    AppPrefs.writeDark(context, nextDark)
+                }
+            },
+        )
+    }
+
     if (editUsername) {
         AlertDialog(
             onDismissRequest = { editUsername = false; usernameError = null },
@@ -689,6 +668,164 @@ fun SettingsScreen(
             else -> { title = stringResource(R.string.set_about); message = "" }
         }
         InfoDialog(title = title, text = message, onClose = { dialogKey = null; dialogError = null })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LanguagePickerSheet(
+    selectedCode: String,
+    onDismiss: () -> Unit,
+    onSelect: (com.addonstation.mobile.util.AppLanguage) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val order = listOf(
+        "en" to "English",
+        "ar" to "Arabic",
+        "fr" to "French",
+        "tr" to "Turkish",
+        "es" to "Spanish",
+        "ru" to "Russian",
+        "pt" to "Portuguese",
+        "zh" to "Chinese",
+    )
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = AppColors.AuthSurface,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 20.dp)) {
+            Text(
+                stringResource(R.string.set_language),
+                style = Spec.rowTitle.copy(fontSize = 18.sp),
+                color = AppColors.AuthText,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+            androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 520.dp)) {
+                items(order.size) { index ->
+                    val (code, englishName) = order[index]
+                    val language = LocaleManager.byCode(code)
+                    val nativeName = if (code == "zh") "中文" else language.label
+                    val selected = code == selectedCode
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 56.dp)
+                            .padding(vertical = 3.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (selected) AppColors.AuthBlue.copy(alpha = 0.12f) else Color.Transparent)
+                            .border(1.dp, if (selected) AppColors.AuthBlue.copy(alpha = 0.35f) else Color.Transparent, RoundedCornerShape(14.dp))
+                            .clickable { onSelect(language) }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        Image(
+                            painter = painterResource(langFlagRes(code)),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(40.dp).clip(CircleShape),
+                        )
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                nativeName,
+                                style = Spec.rowTitle.copy(fontSize = 16.sp),
+                                color = AppColors.AuthText,
+                                maxLines = 2,
+                                softWrap = true,
+                                overflow = TextOverflow.Clip,
+                            )
+                            Text(englishName, style = Spec.rowSub.copy(fontSize = 12.sp), color = AppColors.AuthMuted, maxLines = 1)
+                        }
+                        Box(
+                            Modifier
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .border(2.dp, if (selected) AppColors.AuthBlue else AppColors.AuthBorder, CircleShape)
+                                .padding(5.dp)
+                                .clip(CircleShape)
+                                .background(if (selected) AppColors.AuthBlue else Color.Transparent),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThemePickerSheet(
+    dark: Boolean,
+    onDismiss: () -> Unit,
+    onSelect: (Boolean) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = AppColors.AuthSurface,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 20.dp)) {
+            Text(
+                stringResource(R.string.set_theme),
+                style = Spec.rowTitle.copy(fontSize = 18.sp),
+                color = AppColors.AuthText,
+                modifier = Modifier.padding(bottom = 14.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ThemePreviewCard(
+                    dark = true,
+                    selected = dark,
+                    label = stringResource(R.string.set_theme_dark),
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(true) },
+                )
+                ThemePreviewCard(
+                    dark = false,
+                    selected = !dark,
+                    label = stringResource(R.string.set_theme_light),
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(false) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemePreviewCard(
+    dark: Boolean,
+    selected: Boolean,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    val borderColor = if (selected) AppColors.AuthBlue else AppColors.AuthBorder
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(AppColors.AuthSurfaceHigh)
+            .border(if (selected) 2.dp else 1.dp, borderColor, shape)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(72.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    Brush.linearGradient(
+                        if (dark) listOf(Color(0xFF0A0F1C), Color(0xFF1A2438))
+                        else listOf(Color(0xFFF4F7FC), Color.White),
+                    ),
+                )
+                .then(if (dark) Modifier else Modifier.border(1.dp, Color(0xFFD7DFEA), RoundedCornerShape(12.dp))),
+        )
+        Text(label, style = Spec.rowTitle.copy(fontSize = 15.sp), color = AppColors.AuthText)
     }
 }
 

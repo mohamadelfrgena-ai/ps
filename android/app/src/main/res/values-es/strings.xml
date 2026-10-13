@@ -698,6 +698,7 @@ CRÉALO.</string>
     <string name="profile_status_away">Ausente</string>
     <string name="profile_status_offline">Desconectado</string>
     <string name="profile_ban_user">Banear usuario</string>
+    <string name="profile_ban_confirm">¿Seguro que quieres banear a %1$s? Ya no podrá acceder al chat.</string>
     <string name="profile_delete_message">Eliminar mensaje</string>
     <string name="profile_as_others_title">Mi perfil como lo ven otros</string>
     <string name="profile_member_since_label">MIEMBRO DESDE</string>

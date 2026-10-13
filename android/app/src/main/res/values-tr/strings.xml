@@ -698,6 +698,7 @@ YARAT.</string>
     <string name="profile_status_away">Uzakta</string>
     <string name="profile_status_offline">Çevrimdışı</string>
     <string name="profile_ban_user">Kullanıcıyı yasakla</string>
+    <string name="profile_ban_confirm">%1$s kullanıcısını yasaklamak istediğinizden emin misiniz? Artık sohbete erişemez.</string>
     <string name="profile_delete_message">Mesajı sil</string>
     <string name="profile_as_others_title">Profilim başkalarının gözüyle</string>
     <string name="profile_member_since_label">ÜYELİK TARİHİ</string>

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""فحص ترويسة الرسائل (ومنها رسائل المالك) ومحاذاة الفقاعة وأداة الشات.
+"""فحص ترويسة الرسائل (المجموعة الواردة فقط) ومحاذاة الفقاعة وأداة الشات.
 
 الترتيب المطلوب (اختاره المالك):
     • الصورة (40dp) جنبها الاسم كما هو.
@@ -56,9 +56,9 @@ AVATAR_DP, ITEM_DP, OLD_ITEM_DP = 40, 32, 16
 if not header:
     problems.append("لا كتلة ترويسة الرسائل (if showAuthorHeader) في ChatScreen.kt")
 
-# المالك طلب إظهار بيانات المرسل لنفسه أيضاً، حتى في الرسائل المتتابعة المجمّعة.
-if "val showAuthorHeader = !grouped || isMine" not in chat:
-    problems.append("ترويسة المالك ليست ظاهرة لكل رسالة صادرة")
+# لا نكرر اسم المالك فوق رسائله؛ رؤوس الأعضاء تظهر مرة واحدة عند بداية المجموعة الواردة.
+if "val showAuthorHeader = !isMine && !grouped" not in chat:
+    problems.append("ترويسة المؤلف لا تقتصر على بداية مجموعة الرسائل الواردة")
 if "currentProfile = profile" not in chat or \
         "currentProfile?.takeIf { isMine && it.id == myId }" not in chat:
     problems.append("رسالة المالك لا تستخدم ملف الجلسة كبديل إذا غاب المؤلف من الخريطة")
@@ -136,7 +136,7 @@ rows = [
     ("المجّاني بلا لقب (لا Free 🍃)",
      bool(gate_text) and '"free"' not in gate_text and "epic" in gate_text and "legendary" in gate_text),
     ("اللقب محكوم بالبوابة في الترويسة", "hasRankTitle(" in (header or "")),
-    ("ترويسة الاسم والأداة ظاهرة للمرسل أيضًا", "val showAuthorHeader = !grouped || isMine" in chat
+    ("ترويسة المؤلف تظهر مرة عند بداية مجموعة واردة فقط", "val showAuthorHeader = !isMine && !grouped" in chat
      and "if (showAuthorHeader)" in chat),
     ("بيانات المرسل تستعين بملفه الحالي عند الحاجة",
      "currentProfile = profile" in chat

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -43,6 +44,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -431,32 +434,119 @@ fun WalletCompactCard(
                 )
             }
             Spacer(Modifier.height(14.dp))
+            val streakDay = if (streak <= 0) 1 else ((streak - 1) % 7) + 1
+            val todayDay = if (dailyClaimed) streakDay else (streak % 7) + 1
+            val completedThrough = if (dailyClaimed) streakDay else todayDay - 1
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                WalletStreakChip(
-                    streak = streak,
-                    height = 44.dp,
-                    iconSize = 18.dp,
-                    modifier = Modifier.weight(1f),
-                )
-                val enabled = !dailyClaimed && !claiming
                 Box(
                     Modifier
-                        .weight(1f)
-                        .height(44.dp)
+                        .size(44.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (enabled) AppColors.AuthGold else AppColors.AuthClaimDisabled)
-                        .clickable(enabled = enabled, onClick = onClaim),
+                        .background(AppColors.AuthGold.copy(alpha = 0.16f))
+                        .border(1.dp, AppColors.AuthGoldBorder, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
+                    Icon(Icons.Filled.CardGiftcard, contentDescription = null, tint = AppColors.AuthGold, modifier = Modifier.size(22.dp))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = if (dailyClaimed) stringResource(R.string.ac_claimed) else stringResource(R.string.profile_daily_reward),
-                        style = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold),
-                        color = if (enabled) AppColors.AuthGoldDark else AppColors.AuthGoldSoft.copy(alpha = 0.60f),
+                        stringResource(R.string.profile_daily_reward),
+                        style = TextStyle(fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.ExtraBold),
+                        color = AppColors.AuthText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        stringResource(R.string.profile_day_streak, streak),
+                        style = TextStyle(fontSize = 12.sp, lineHeight = 16.sp),
+                        color = AppColors.AuthMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                val enabled = !dailyClaimed && !claiming
+                if (dailyClaimed) {
+                    Row(
+                        Modifier.height(44.dp).padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Icon(Icons.Filled.Check, contentDescription = null, tint = AppColors.AuthGreen, modifier = Modifier.size(17.dp))
+                        Text(
+                            stringResource(R.string.profile_daily_claimed),
+                            style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold),
+                            color = AppColors.AuthGreen,
+                            maxLines = 1,
+                        )
+                    }
+                } else {
+                    Box(
+                        Modifier
+                            .widthIn(min = 92.dp)
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Brush.linearGradient(listOf(AppColors.AuthGold, Color(0xFFE0A93A))))
+                            .clickable(enabled = enabled, onClick = onClaim)
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            stringResource(R.string.ac_claim),
+                            style = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold),
+                            color = AppColors.AuthGoldDark,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
+            Spacer(Modifier.height(12.dp))
+            StreakProgressSegments(
+                completedThrough = completedThrough,
+                todayDay = todayDay,
+                showToday = !dailyClaimed,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StreakProgressSegments(completedThrough: Int, todayDay: Int, showToday: Boolean) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        (1..7).forEach { day ->
+            val complete = day <= completedThrough
+            val today = showToday && day == todayDay
+            val shape = RoundedCornerShape(4.dp)
+            val description = stringResource(R.string.profile_day_streak, day)
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(8.dp)
+                    .then(
+                        if (today) Modifier.shadow(
+                            elevation = 4.dp,
+                            shape = shape,
+                            ambientColor = AppColors.AuthGold.copy(alpha = 0.35f),
+                            spotColor = AppColors.AuthGold.copy(alpha = 0.35f),
+                        ) else Modifier,
+                    )
+                    .clip(shape)
+                    .background(
+                        when {
+                            complete -> AppColors.AuthGold
+                            day == 7 && !today -> Color.Transparent
+                            else -> AppColors.AuthStreakBg
+                        },
+                    )
+                    .then(
+                        when {
+                            today -> Modifier.border(1.dp, AppColors.AuthGold, shape)
+                            day == 7 && !complete -> Modifier.border(1.5.dp, AppColors.AuthGoldBorder, shape)
+                            else -> Modifier
+                        },
+                    )
+                    .semantics { contentDescription = description },
+            )
         }
     }
 }

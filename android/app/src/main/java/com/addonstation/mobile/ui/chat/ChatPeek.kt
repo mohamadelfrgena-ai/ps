@@ -16,6 +16,7 @@ data class ChatRoomPeek(
     val createdAt: String? = null,
     val preview: String? = null,
     val messageType: String? = null,
+    val senderName: String? = null,
     val onlineCount: Int? = null,
 )
 
@@ -30,6 +31,7 @@ object ChatPeek {
         iso: String?,
         preview: String? = null,
         messageType: String? = null,
+        senderName: String? = null,
     ) {
         if (channelId.isBlank() || iso.isNullOrBlank()) return
         synchronized(lock) {
@@ -39,6 +41,7 @@ object ChatPeek {
                 createdAt = iso,
                 preview = preview?.trim()?.takeIf { it.isNotEmpty() },
                 messageType = messageType?.takeIf { it.isNotBlank() },
+                senderName = senderName?.trim()?.takeIf { it.isNotEmpty() },
             )
             if (next != old) _rooms.value = current + (channelId to next)
         }

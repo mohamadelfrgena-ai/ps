@@ -163,11 +163,12 @@ check("٢٫٥ شريط المستوى: 8 ارتفاع · تدرّج blue ← blu
 check("٢٫٦ النبذة: الفاصل 1dp + «عضو منذ»",
       "SpecAboutCard" in comp and "R.string.profile_member_since_label" in comp)
 compact_wallet = body(wallet_ui, "WalletCompactCard")
-check("٢٫٧ محفظة الملف: عملة 56 · رصيد متحرك · مكافأة يومية 44h",
-      "WalletCoinImage(56.dp)" in compact_wallet and "height = 44.dp" in compact_wallet
-      and "WalletStreakChip" in compact_wallet and "onOpenWallet" in compact_wallet
-      and "animateIntAsState" in compact_wallet and "tween(durationMillis = 700)" in compact_wallet
-      and "R.string.profile_daily_reward" in compact_wallet and "R.string.ac_claimed" in compact_wallet)
+check("٢٫٧ محفظة الملف: عملة 56 · رصيد متحرك · مكافأة وشريط الأيام",
+      "WalletCoinImage(56.dp)" in compact_wallet and ".height(44.dp)" in compact_wallet
+      and "StreakProgressSegments(" in compact_wallet and "R.string.profile_day_streak" in compact_wallet
+      and "onOpenWallet" in compact_wallet and "animateIntAsState" in compact_wallet
+      and "tween(durationMillis = 700)" in compact_wallet and "R.string.profile_daily_reward" in compact_wallet
+      and "R.string.ac_claim" in compact_wallet and "R.string.profile_daily_claimed" in compact_wallet)
 check("محفظة الملف بلا بقعة الضوء الزخرفية بجانب السهم",
       "Brush.radialGradient(" not in compact_wallet
       and "AuthGold.copy(alpha = 0.25f)" not in compact_wallet)
@@ -194,7 +195,12 @@ check("A: شبكة 2×2 بالأربعة (المفضّلة · التنزيلات
       all(k in a for k in ("R.string.profile_tab_favorites", "R.string.profile_stats_downloads",
                            "R.string.profile_orders", "R.string.profile_stats_content")))
 check("A: مدخل «عرض كما يراني الآخرون» (شاشة C §5)",
-      "R.string.profile_view_as_others" in a and "onViewAsOthers" in a)
+      "ProfileAccountActionsCard(" in a and "onViewAsOthers" in a
+      and "R.string.profile_view_as_others" in screens)
+check("A: بطاقة إجراءات الحساب (المحفظة · الطلبات · عرض الآخرين)",
+      "ProfileAccountActionsCard(" in a
+      and all(k in screens for k in ("R.string.settings_account_actions", "R.string.profile_wallet_title",
+                                     "R.string.profile_orders", "R.string.profile_hidden_from_others")))
 check("A: «تسجيل الخروج» بإطار الخطر 48h",
       "SpecDangerButton" in a and "R.string.profile_logout" in a)
 check("A: الأرقام من دالة الخادم (stats) لا من قوائم محجوبة",
@@ -216,7 +222,7 @@ check("B: اختيار سبب الإبلاغ (أربعة أسباب)",
       all(k in b for k in ("chat_reason_spam", "chat_reason_insult",
                            "chat_reason_inappropriate", "chat_reason_other")))
 check("B: بطاقة الإشراف للأدمن/المشرف وحدهما",
-      "if (me.isStaff)" in b and "R.string.profile_moderation" in b
+      "if (myProfile?.isStaff == true)" in b and "R.string.profile_moderation" in b
       and "R.string.profile_delete_message" in b)
 check("B: الحظر يُبدَّل بحالة واحدة معطَّلة/«إلغاء الحظر»",
       "blockedPair" in b and "R.string.profile_blocked_state" in b)

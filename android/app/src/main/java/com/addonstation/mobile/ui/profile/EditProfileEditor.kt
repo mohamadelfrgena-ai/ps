@@ -912,12 +912,56 @@ internal fun ProfileEditorScreen(
                         color = EditDanger,
                     )
                 }
-                SaveProfileButton(
-                    enabled = dirty && profile != null && !saving,
-                    saving = saving,
-                    bodyFont = bodyFont,
-                    onClick = ::saveChanges,
-                )
+                if (dirty) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(EditGold))
+                        Text(
+                            stringResource(R.string.edit_profile_unsaved),
+                            style = TextStyle(fontFamily = bodyFont, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold),
+                            color = EditGold,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(palette.surface)
+                                .border(1.dp, EditDanger.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+                                .clickable(enabled = !saving) { showDiscardDialog = true },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                stringResource(R.string.edit_profile_discard),
+                                style = TextStyle(fontFamily = bodyFont, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold),
+                                color = EditDanger,
+                            )
+                        }
+                        SaveProfileButton(
+                            modifier = Modifier.weight(2f),
+                            enabled = profile != null && !saving,
+                            saving = saving,
+                            bodyFont = bodyFont,
+                            onClick = ::saveChanges,
+                        )
+                    }
+                } else {
+                    SaveProfileButton(
+                        enabled = false,
+                        saving = false,
+                        bodyFont = bodyFont,
+                        onClick = ::saveChanges,
+                    )
+                }
             }
         }
     }
@@ -2078,14 +2122,14 @@ private fun SaveProfileButton(
     enabled: Boolean,
     saving: Boolean,
     bodyFont: FontFamily,
+    modifier: Modifier = Modifier.fillMaxWidth(),
     onClick: () -> Unit,
 ) {
     val palette = LocalHomePalette.current
     val shape = RoundedCornerShape(16.dp)
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
+        modifier = modifier
+            .height(48.dp)
             .then(
                 if (enabled) Modifier.shadow(
                     elevation = 8.dp,

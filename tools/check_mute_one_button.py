@@ -99,7 +99,7 @@ def check(name, ok, why=""):
 screen_b = body(profile, "UserProfileScreen")
 # بطاقة السلامة وحدها: من أول بطاقة (حشو 0) إلى بطاقة الإشراف (للمشرفين)
 start = screen_b.find("SpecCard(padding = 0.dp)")
-stop = screen_b.find("if (me.isStaff)")
+stop = screen_b.find("if (myProfile?.isStaff == true)")
 safety = screen_b[start:stop] if start >= 0 and stop > start else ""
 # صفّ الكتم = صفّ واحد مكتوب بـ SpecActionRow ونصّه يتبدّل (كتم ↔ إلغاء الكتم)
 mute_rows = len(re.findall(
@@ -137,7 +137,7 @@ check("② 39 يُعيد push_set_prefs بعشرة وسائط (كما في 34)",
 check("② التطبيق يُخفي رسائل المكتوم في الشات (فلترة قائمة المكتومين)",
       "_mutedIds" in vm and "mutedMemberIds()" in vm)
 check("② قائمة المكتومين تُحدَّث محلياً من الخادم (فتُخفى الرسائل فوراً)",
-      "container.prefs.setMutedUsers(ids)" in vm and "_mutedIds.value = ids" in vm)
+      "container.prefs.setMutedUsers(muted)" in vm and "_mutedIds.value = muted" in vm)
 others = [f for f in sorted(os.listdir(SUPABASE))
           if f.endswith(".sql") and f not in ("39_notif_revert.sql", "00_ALL_IN_ONE.sql")]
 check("② دالة is_muted_by لم تبقَ إلا في ملف التنظيف 39",

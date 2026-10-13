@@ -31,9 +31,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Settings
@@ -354,28 +356,15 @@ fun ProfileScreen(
                     )
                 }
 
-                // The profile preview is an explicit entry on A (also available from Edit Profile).
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onViewAsOthers)
-                        .padding(vertical = 14.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Filled.Visibility,
-                        contentDescription = null,
-                        tint = Spec.blueLink,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.size(8.dp))
-                    Text(
-                        stringResource(R.string.profile_view_as_others),
-                        style = Spec.link,
-                        color = Spec.blueLink,
-                    )
-                }
+                Spacer(Modifier.height(16.dp))
+                SpecSmallCaps(stringResource(R.string.settings_account_actions))
+                Spacer(Modifier.height(8.dp))
+                ProfileAccountActionsCard(
+                    balance = balance,
+                    onOpenWallet = onOpenWallet,
+                    onOpenOrders = onOpenOrders,
+                    onViewAsOthers = onViewAsOthers,
+                )
             }
 
             SpecDangerButton(
@@ -418,6 +407,88 @@ fun ProfileScreen(
                 Text(data.visuals.message, style = AppText.bodySmall, color = AppColors.AuthText)
             }
         }
+    }
+}
+
+@Composable
+private fun ProfileAccountActionsCard(
+    balance: Int,
+    onOpenWallet: () -> Unit,
+    onOpenOrders: () -> Unit,
+    onViewAsOthers: () -> Unit,
+) {
+    val balanceText = NumberFormat.getIntegerInstance(Locale.US).format(balance)
+    SpecCard(padding = 0.dp) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            ProfileAccountActionRow(
+                icon = Icons.Filled.AccountBalanceWallet,
+                accent = Spec.gold,
+                title = stringResource(R.string.profile_wallet_title),
+                value = "$balanceText AC",
+                onClick = onOpenWallet,
+            )
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Spec.border))
+            ProfileAccountActionRow(
+                icon = Icons.Filled.ReceiptLong,
+                accent = Spec.blueLink,
+                title = stringResource(R.string.profile_orders),
+                onClick = onOpenOrders,
+            )
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Spec.border))
+            ProfileAccountActionRow(
+                icon = Icons.Filled.Visibility,
+                accent = Spec.blueLink,
+                title = stringResource(R.string.profile_view_as_others),
+                subtitle = stringResource(R.string.profile_hidden_from_others),
+                onClick = onViewAsOthers,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileAccountActionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: Color,
+    title: String,
+    subtitle: String? = null,
+    value: String? = null,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 2.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(accent.copy(alpha = 0.14f))
+                .border(1.dp, accent.copy(alpha = 0.28f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(title, style = Spec.cardTitle.copy(fontSize = 15.sp), color = Spec.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            subtitle?.let {
+                Text(it, style = Spec.secondary.copy(fontSize = 12.sp), color = Spec.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        value?.let {
+            Text(it, style = Spec.statLabel.copy(fontWeight = FontWeight.ExtraBold), color = Spec.gold, maxLines = 1)
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.ArrowForward,
+            contentDescription = null,
+            tint = Spec.textMuted,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
@@ -1040,6 +1111,7 @@ fun UserProfileScreen(
     var showReport by remember { mutableStateOf(false) }
     var showMore by remember { mutableStateOf(false) }
     var showUnfriendConfirm by remember { mutableStateOf(false) }
+    var showBanConfirm by remember { mutableStateOf(false) }
     // إعادة القراءة بعد كل فعل (صداقة · كتم · حظر) بلا إعادة تنقّل
     var tick by remember { mutableStateOf(0) }
 
@@ -1310,8 +1382,8 @@ fun UserProfileScreen(
                 }
             }
 
-            // ٧) بطاقة الإشراف — للأدمن/المشرف وحدهما
-            if (me.isStaff) {
+            // ٧) بطاقة الإشراف — للأدمن/المشرف الجالس فقط (لا بحسب رتبة الملف المعروض)
+            if (myProfile?.isStaff == true) {
                 Spacer(Modifier.height(12.dp))
                 SpecCard(padding = 0.dp) {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
@@ -1332,14 +1404,7 @@ fun UserProfileScreen(
                         SpecActionRow(
                             text = stringResource(R.string.profile_ban_user),
                             color = Spec.danger,
-                            onClick = {
-                                scope.launch {
-                                    working = true
-                                    val ok = container.chat.banUser(userId).isSuccess
-                                    note = if (ok) doneMsg else failedMsg
-                                    working = false
-                                }
-                            },
+                            onClick = { if (!working) showBanConfirm = true },
                             showDivider = true,
                         )
                         SpecActionRow(
@@ -1416,6 +1481,47 @@ fun UserProfileScreen(
             },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { showReport = false }) {
+                    Text(stringResource(R.string.common_cancel), color = AppColors.Muted)
+                }
+            },
+        )
+    }
+
+    if (showBanConfirm) {
+        val targetName = profile?.displayName ?: profile?.username.orEmpty()
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { if (!working) showBanConfirm = false },
+            containerColor = AppColors.Surface,
+            title = { Text(stringResource(R.string.profile_ban_user), style = AppText.sectionTitle, color = Spec.danger) },
+            text = {
+                Text(
+                    stringResource(R.string.profile_ban_confirm, targetName),
+                    style = AppText.bodySmall,
+                    color = AppColors.Muted,
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    enabled = !working,
+                    onClick = {
+                        showBanConfirm = false
+                        scope.launch {
+                            working = true
+                            val ok = runCatching { container.chat.banUser(userId).isSuccess }.getOrDefault(false)
+                            note = if (ok) doneMsg else failedMsg
+                            working = false
+                            if (ok) tick += 1
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.profile_ban_user), color = Spec.danger)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    enabled = !working,
+                    onClick = { showBanConfirm = false },
+                ) {
                     Text(stringResource(R.string.common_cancel), color = AppColors.Muted)
                 }
             },

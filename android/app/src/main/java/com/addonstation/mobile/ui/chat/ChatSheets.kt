@@ -1,11 +1,14 @@
 package com.addonstation.mobile.ui.chat
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,12 +34,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.Tag
@@ -56,19 +66,33 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.zIndex
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -445,34 +469,54 @@ fun AttachSheet(
     SheetScaffold(onDismiss) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             AttachmentOptionCard(
-                emoji = "🖼",
+                icon = Icons.Filled.Image,
+                accent = AppColors.Blue,
                 title = stringResource(R.string.chat_attach_photo),
-                description = stringResource(R.string.chat_image_formats),
+                description = stringResource(R.string.chat_image_max),
                 modifier = Modifier.weight(1f),
                 onClick = onPhoto,
             )
             AttachmentOptionCard(
-                emoji = "🎬",
+                icon = Icons.Filled.PlayArrow,
+                accent = AppColors.Purple,
                 title = stringResource(R.string.chat_attach_media),
-                description = stringResource(R.string.chat_media_admin_only),
+                description = stringResource(R.string.chat_media_max),
                 modifier = Modifier.weight(1f),
                 locked = !isAdmin,
                 lockedLabel = stringResource(R.string.chat_admin_only_short),
                 onClick = onAudioVideo,
             )
         }
+        if (!isAdmin) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AppColors.Blue.copy(alpha = 0.12f))
+                    .border(1.dp, AppColors.Blue.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(Icons.Filled.Lightbulb, contentDescription = null, tint = AppColors.Blue, modifier = Modifier.size(18.dp))
+                Text(stringResource(R.string.chat_media_admin_only), style = AppText.bodySmall, color = AppColors.Text)
+            }
+        }
         Text(
-            stringResource(R.string.chat_media_max),
+            "${stringResource(R.string.chat_image_formats)} · ${stringResource(R.string.chat_image_max)}",
             style = AppText.tiny,
             color = AppColors.Muted,
-            modifier = Modifier.padding(start = 4.dp, top = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
     }
 }
 
 @Composable
 private fun AttachmentOptionCard(
-    emoji: String,
+    icon: ImageVector,
+    accent: Color,
     title: String,
     description: String,
     modifier: Modifier = Modifier,
@@ -489,22 +533,30 @@ private fun AttachmentOptionCard(
             .border(1.dp, AppColors.Border, shape)
             .clickable(enabled = !locked, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(emoji, style = AppText.sectionTitle.copy(fontSize = 28.sp))
+        Box(
+            Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(accent.copy(alpha = if (locked) 0.12f else 0.18f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = accent.copy(alpha = if (locked) 0.60f else 1f), modifier = Modifier.size(28.dp))
+        }
         Text(
             title,
-            style = AppText.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+            style = AppText.body.copy(fontSize = 14.sp, fontWeight = FontWeight.ExtraBold),
             color = AppColors.Text,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         Text(
             description,
-            style = AppText.tiny,
+            style = AppText.tiny.copy(fontSize = 12.sp),
             color = AppColors.Muted,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         if (locked) {
             Row(
@@ -566,7 +618,7 @@ private fun SheetRow(emoji: String, title: String, onClick: () -> Unit) {
     }
 }
 
-/** قائمة الأعضاء مجمّعة حسب الدور/الخطة (كما في Discord). */
+/** قائمة الأعضاء مجمّعة حسب الدور/الخطة، مع بحث محلي وملخص حالة الظهور. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MembersSheet(
@@ -576,13 +628,22 @@ fun MembersSheet(
 ) {
     val container = rememberContainer()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val groups = remember(authors) {
-        val staffOrCreator = authors.filter { it.role in listOf("admin", "moderator", "creator") }
-        val paidMembers = authors.filter {
+    var query by rememberSaveable { mutableStateOf("") }
+    val filteredAuthors = remember(authors, query) {
+        val needle = query.trim()
+        if (needle.isEmpty()) authors
+        else authors.filter { person ->
+            listOfNotNull(person.displayName, person.username, person.customStatus)
+                .any { it.contains(needle, ignoreCase = true) }
+        }
+    }
+    val groups = remember(filteredAuthors) {
+        val staffOrCreator = filteredAuthors.filter { it.role in listOf("admin", "moderator", "creator") }
+        val paidMembers = filteredAuthors.filter {
             it.role !in listOf("admin", "moderator", "creator") && it.effectivePlan in listOf("legendary", "epic")
         }
         val alreadyGrouped = (staffOrCreator + paidMembers).map { it.id }.toSet()
-        val otherMembers = authors.filterNot { it.id in alreadyGrouped }
+        val otherMembers = filteredAuthors.filterNot { it.id in alreadyGrouped }
         listOf(
             "admin" to staffOrCreator.filter { it.role == "admin" },
             "moderator" to staffOrCreator.filter { it.role == "moderator" },
@@ -593,43 +654,179 @@ fun MembersSheet(
             "offline" to otherMembers.filter { !it.showOnlineStatus },
         )
     }
+    val memberCount = authors.size
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = AppColors.Surface,
+        containerColor = Spec.barSurface,
     ) {
-        Column(Modifier.padding(horizontal = 14.dp)) {
-            Text(stringResource(R.string.chat_members), style = AppText.sectionTitle, color = AppColors.Text)
-            androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(420.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(stringResource(R.string.chat_members), style = AppText.sectionTitle, color = Spec.text)
+                Text(
+                    memberCount.toString(),
+                    style = Spec.badge.copy(fontSize = 13.sp),
+                    color = Spec.chipLabel,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(Spec.surfaceHigh)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Spec.surface)
+                    .border(1.dp, Spec.border, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.Search, contentDescription = null, tint = Spec.textMuted, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(10.dp))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    if (query.isEmpty()) {
+                        Text(stringResource(R.string.chat_search_members), style = Spec.secondary, color = Spec.textMuted)
+                    }
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        textStyle = Spec.secondary.copy(fontSize = 14.sp, color = Spec.text),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(Spec.blue),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (query.isNotEmpty()) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.common_close),
+                        tint = Spec.textMuted,
+                        modifier = Modifier.size(18.dp).clickable { query = "" },
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.heightIn(max = 520.dp)) {
                 groups.forEach { (key, people) ->
                     if (people.isEmpty()) return@forEach
-                    item {
-                        Text(
-                            groupLabel(key) + " — ${people.size}",
-                            style = AppText.tiny,
-                            color = AppColors.Muted,
-                            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
-                        )
+                    item(key = "member-group-$key") {
+                        MemberGroupHeader(key = key, count = people.size)
                     }
                     items(people, key = { it.id }) { person ->
-                        com.addonstation.mobile.ui.components.ProfileRow(
+                        MemberSheetRow(
                             profile = person,
-                            fallbackName = person.username ?: "",
                             avatarUrl = assetUrl(container, person.avatarUrl),
                             onClick = { onOpenProfile(person) },
-                            trailing = {
-                                Text(
-                                    if (person.showOnlineStatus) "🟢" else "⚪",
-                                    style = AppText.tiny,
-                                )
-                            },
+                        )
+                    }
+                }
+                if (filteredAuthors.isEmpty()) {
+                    item(key = "member-search-empty") {
+                        Text(
+                            stringResource(R.string.chat_members_no_results),
+                            style = Spec.secondary,
+                            color = Spec.textMuted,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
                         )
                     }
                 }
             }
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(16.dp))
     }
+}
+
+@Composable
+private fun MemberGroupHeader(key: String, count: Int) {
+    val color = when (key) {
+        "admin", "legendary" -> Spec.gold
+        "moderator" -> Spec.blueLink
+        "creator", "epic" -> Spec.epic
+        "online" -> Spec.onlineFill
+        else -> Spec.offlineGrey
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Text(groupLabel(key), style = Spec.secondary.copy(fontWeight = FontWeight.ExtraBold), color = Spec.chipLabel)
+        Text(
+            count.toString(),
+            style = Spec.badge.copy(fontSize = 10.sp),
+            color = Spec.textMuted,
+            modifier = Modifier.clip(RoundedCornerShape(9.dp)).background(Spec.surfaceHigh).padding(horizontal = 6.dp, vertical = 3.dp),
+        )
+    }
+}
+
+@Composable
+private fun MemberSheetRow(profile: Profile, avatarUrl: String?, onClick: () -> Unit) {
+    val online = profile.showOnlineStatus
+    val name = profile.displayName?.takeIf { it.isNotBlank() } ?: profile.username.orEmpty()
+    val subtitle = profile.customStatus?.takeIf { it.isNotBlank() } ?: if (!online && profile.lastSeenAt != null) {
+        stringResource(
+            R.string.chat_last_seen,
+            TimeFormat.dateTime(profile.lastSeenAt, Locale.getDefault()),
+        )
+    } else {
+        ""
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .alpha(if (online) 1f else 0.62f)
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(44.dp)) {
+            AvatarImage(url = avatarUrl, size = 44.dp, borderColor = Spec.border, borderWidth = 1.dp)
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(14.dp)
+                    .clip(CircleShape)
+                    .background(if (online) Spec.onlineFill else Spec.offlineGrey)
+                    .border(3.dp, Spec.barSurface, CircleShape),
+            )
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    name,
+                    style = Spec.secondary.copy(fontSize = 15.sp, fontWeight = FontWeight.ExtraBold),
+                    color = Spec.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                RankBadge(role = profile.role, plan = profile.effectivePlan)
+            }
+            if (subtitle.isNotBlank()) {
+                Text(
+                    subtitle,
+                    style = Spec.secondary.copy(fontSize = 12.sp),
+                    color = Spec.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+    Box(
+        Modifier.fillMaxWidth().padding(start = 60.dp).height(1.dp).background(Spec.border.copy(alpha = 0.65f)),
+    )
 }
 
 @Composable
@@ -643,139 +840,164 @@ private fun groupLabel(key: String): String = when (key) {
     else -> stringResource(R.string.grp_offline)
 }
 
-/** إجراءات الرسالة (ضغط مطوّل): تفاعل، رد، نسخ، بلاغ، حذف/إخفاء، تثبيت، كتم، فتح الملف الشخصي. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Floating message actions with the same permissions and callbacks as the previous sheet. */
 @Composable
 fun MessageActionsSheet(
     ui: ChatMessageUi,
+    anchorBounds: Rect?,
     myId: String?,
     isStaff: Boolean,
-    /** هل ما زال صاحب الرسالة داخل مدة الحذف (٣ دقائق)؟ يُحسب في الشات من وقت الإرسال. */
     canDeleteMine: Boolean = false,
-    /** ما تبقّى من مهلته بصيغة جاهزة (مثل «متبقٍ دقيقتان») — يُعرض تحت خيار الحذف. */
     deleteLeftText: String? = null,
     onDismiss: () -> Unit,
     onReply: () -> Unit,
     onCopy: () -> Unit,
     onReport: (String) -> Unit,
     onDeleteMine: () -> Unit,
-    /**
-     * حذف الرسالة **بصفة الإشراف**: يظهر للأدمن في كل الغرف، ولمشرف الغرفة
-     * داخل غرفه فقط — وبلا أي حدّ زمني (عكس [onDeleteMine] المقيَّد ب٣ دقائق).
-     */
     onDeleteStaff: () -> Unit = {},
     onModerate: () -> Unit,
     onPin: () -> Unit,
     onMute: (Int) -> Unit,
-    /** هل أنا حاظر صاحب هذه الرسالة؟ (يقلب الخيار بين «حظر» و«إلغاء الحظر») */
     isBlocked: Boolean = false,
-    /**
-     * حظر المستخدم — سياسة Google Play للمحتوى تشترط وسيلة حظر داخل التطبيق.
-     * الحظر متقابل: لا يرى أيٌّ منكما رسائل الآخر (والفلترة في القاعدة).
-     */
     onBlockUser: () -> Unit = {},
     onUnblockUser: () -> Unit = {},
     onOpenProfile: () -> Unit,
     onReact: (String) -> Unit,
+    onMoreReactions: () -> Unit = {},
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showReport by remember { mutableStateOf(false) }
     var showMute by remember { mutableStateOf(false) }
     var showBlock by remember { mutableStateOf(false) }
+    val isMine = myId != null && ui.message.userId == myId
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = AppColors.Surface,
-    ) {
-        Column(Modifier.padding(horizontal = 14.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RECENT_FALLBACK.forEach { emoji ->
-                    // الرموز التي تفاعلتَ بها already تظهر مضاءة بإطار أخضر (نفس
-                    // شكل البسولات تحت الرسالة) فتعرف ما أضفته قبل أن تضغط.
-                    val mine = ui.myReactions.contains(emoji)
-                    Text(
-                        emoji,
-                        style = AppText.welcomeName,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(if (mine) AppColors.GreenGlow else AppColors.Elevated)
-                            .border(
-                                if (mine) 1.5.dp else 0.dp,
-                                if (mine) AppColors.Green else Color.Transparent,
-                                CircleShape,
-                            )
-                            .clickable { onReact(emoji) }
-                            .padding(8.dp),
+    BoxWithConstraints(Modifier.fillMaxSize().zIndex(30f)) {
+        val density = LocalDensity.current
+        val anchorTop = anchorBounds?.top?.let { with(density) { it.toDp() } } ?: (maxHeight / 2)
+        val anchorBottom = anchorBounds?.bottom?.let { with(density) { it.toDp() } } ?: (maxHeight / 2)
+        val estimatedHeight = when {
+            isStaff -> 500.dp
+            isMine -> 330.dp
+            else -> 390.dp
+        }
+        val placeAbove = anchorBottom + estimatedHeight > maxHeight && anchorTop > maxHeight - anchorBottom
+        val popupTop = if (placeAbove) {
+            (anchorTop - estimatedHeight - 58.dp).coerceAtLeast(16.dp)
+        } else {
+            (anchorBottom + 8.dp).coerceAtMost((maxHeight - estimatedHeight).coerceAtLeast(16.dp))
+        }
+        val reactionWidth = minOf(310.dp, (maxWidth - 24.dp).coerceAtLeast(260.dp))
+        val cardWidth = minOf(260.dp, (maxWidth - 32.dp).coerceAtLeast(220.dp))
+
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .clickable { onDismiss() },
+        ) {
+            drawRect(Color(0xB3050810))
+            anchorBounds?.let { bounds ->
+                val inset = with(density) { 5.dp.toPx() }
+                val left = (bounds.left - inset).coerceAtLeast(0f)
+                val top = (bounds.top - inset).coerceAtLeast(0f)
+                val right = (bounds.right + inset).coerceAtMost(size.width)
+                val bottom = (bounds.bottom + inset).coerceAtMost(size.height)
+                drawRect(
+                    color = Color.Transparent,
+                    topLeft = Offset(left, top),
+                    size = Size((right - left).coerceAtLeast(0f), (bottom - top).coerceAtLeast(0f)),
+                    blendMode = BlendMode.Clear,
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .align(if (isMine) Alignment.TopEnd else Alignment.TopStart)
+                .padding(horizontal = 16.dp)
+                .offset(y = popupTop)
+                .widthIn(max = reactionWidth),
+            horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+        ) {
+            ReactionQuickBar(
+                reactions = ui.myReactions,
+                onReact = onReact,
+                onMore = onMoreReactions,
+            )
+            Spacer(Modifier.height(8.dp))
+            Column(
+                modifier = Modifier
+                    .widthIn(max = cardWidth)
+                    .heightIn(max = (maxHeight - 150.dp).coerceAtLeast(200.dp))
+                    .shadow(
+                        elevation = 14.dp,
+                        shape = RoundedCornerShape(20.dp),
+                        ambientColor = Color.Black.copy(alpha = 0.55f),
+                        spotColor = Color.Black.copy(alpha = 0.55f),
                     )
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Spec.barSurface)
+                    .border(1.dp, Spec.border, RoundedCornerShape(20.dp))
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+            ) {
+                ActionRow(Icons.Filled.Reply, stringResource(R.string.chat_reply), onReply)
+                ActionRow(Icons.Filled.ContentCopy, stringResource(R.string.chat_copy_text), onCopy)
+                if (isStaff) ActionRow(Icons.Filled.PushPin, stringResource(R.string.chat_pin), onPin)
+                if (!isMine) ActionRow(Icons.Filled.Person, stringResource(R.string.chat_view_profile), onOpenProfile)
+                DividerLine()
+                ActionRow(Icons.Filled.Flag, stringResource(R.string.chat_report), onClick = { showReport = true })
+                if (!isMine) {
+                    if (isBlocked) {
+                        ActionRow(Icons.Filled.Block, stringResource(R.string.block_user_undo), onUnblockUser)
+                    } else {
+                        ActionRow(Icons.Filled.Block, stringResource(R.string.block_user), onClick = { showBlock = true }, tint = Spec.danger)
+                    }
                 }
-            }
-            Spacer(Modifier.height(10.dp))
-            ActionRow(Icons.Filled.Reply, stringResource(R.string.chat_reply), onReply)
-            ActionRow(Icons.Filled.ContentCopy, stringResource(R.string.chat_copy_text), onCopy)
-            ActionRow(Icons.Filled.Flag, stringResource(R.string.chat_report), onClick = { showReport = true })
-            // الحظر: لا يظهر لرسالتي أنا (لا معنى لحظر النفس)
-            if (ui.message.userId != myId) {
-                if (isBlocked) {
-                    ActionRow(Icons.Filled.Block, stringResource(R.string.block_user_undo), onUnblockUser)
-                } else {
-                    ActionRow(Icons.Filled.Block, stringResource(R.string.block_user), onClick = { showBlock = true }, tint = AppColors.Red)
-                }
-            }
-            // خيار الحذف: للرسالة التي أرسلها المستخدم نفسه **وفي أول ٣ دقائق فقط**.
-            // بعد انتهاء المدة يختفي الخيار تماماً (والقاعدة ترفضه من جهة الخادم أيضاً).
-            if (ui.message.userId == myId && ui.message.status != "deleted") {
-                if (canDeleteMine) {
-                    ActionRow(Icons.Filled.Delete, stringResource(R.string.chat_delete_mine), onDeleteMine, AppColors.Red)
-                    if (deleteLeftText != null) {
+                if (isMine && ui.message.status != "deleted") {
+                    if (canDeleteMine) {
+                        ActionRow(Icons.Filled.Delete, stringResource(R.string.chat_delete_mine), onDeleteMine, Spec.danger)
+                        if (deleteLeftText != null) {
+                            Text(
+                                deleteLeftText,
+                                style = Spec.secondary.copy(fontSize = 11.sp),
+                                color = Spec.textMuted,
+                                modifier = Modifier.padding(start = 40.dp, bottom = 6.dp),
+                            )
+                        }
+                    } else {
                         Text(
-                            deleteLeftText,
-                            style = AppText.tiny,
-                            color = AppColors.Dim,
-                            modifier = Modifier.padding(start = 38.dp, bottom = 6.dp),
+                            stringResource(R.string.chat_delete_expired),
+                            style = Spec.secondary.copy(fontSize = 11.sp),
+                            color = Spec.textMuted,
+                            modifier = Modifier.padding(start = 12.dp, bottom = 8.dp),
                         )
                     }
-                } else {
-                    // انتهت المدة: نوضّح السبب بلطف بدل إخفاء الأمر بلا تفسير
-                    Text(
-                        stringResource(R.string.chat_delete_expired),
-                        style = AppText.tiny,
-                        color = AppColors.Dim,
-                        modifier = Modifier.padding(start = 10.dp, bottom = 8.dp),
-                    )
+                }
+                if (isStaff) {
+                    if (ui.message.status != "deleted") {
+                        ActionRow(
+                            Icons.Filled.Delete,
+                            stringResource(R.string.chat_delete_staff_plain),
+                            onDeleteStaff,
+                            Spec.danger,
+                        )
+                        Text(
+                            stringResource(R.string.chat_delete_staff_note),
+                            style = Spec.secondary.copy(fontSize = 11.sp),
+                            color = Spec.textMuted,
+                            modifier = Modifier.padding(start = 40.dp, bottom = 6.dp),
+                        )
+                        val isHidden = ui.message.status == "hidden"
+                        ActionRow(
+                            if (isHidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            stringResource(if (isHidden) R.string.chat_show else R.string.chat_hide_message),
+                            onModerate,
+                        )
+                    }
+                    ActionRow(Icons.Filled.VolumeOff, stringResource(R.string.chat_mute_user), onClick = { showMute = true })
                 }
             }
-            if (isStaff) {
-                // حذف **أي** رسالة مهما كان عمرها: لا نافذة ولا شرط زمني —
-                // النافذة (٣ دقائق) على صاحب الرسالة وحده في الخيار أعلاه.
-                if (ui.message.status != "deleted") {
-                    ActionRow(
-                        Icons.Filled.Delete,
-                        stringResource(R.string.chat_delete_staff_plain),
-                        onDeleteStaff,
-                        AppColors.Red,
-                    )
-                    Text(
-                        stringResource(R.string.chat_delete_staff_note),
-                        style = AppText.tiny,
-                        color = AppColors.Dim,
-                        modifier = Modifier.padding(start = 38.dp, bottom = 6.dp),
-                    )
-                }
-                if (ui.message.status != "deleted") {
-                    val isHidden = ui.message.status == "hidden"
-                    ActionRow(
-                        if (isHidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                        stringResource(if (isHidden) R.string.chat_show else R.string.chat_hide_message),
-                        onModerate,
-                    )
-                }
-                ActionRow(Icons.Filled.PushPin, stringResource(R.string.chat_pin), onPin)
-                ActionRow(Icons.Filled.VolumeOff, stringResource(R.string.chat_mute_user), onClick = { showMute = true })
-            }
-            ActionRow(Icons.Filled.Person, stringResource(R.string.chat_view_profile), onOpenProfile)
         }
-        Spacer(Modifier.height(16.dp))
     }
 
     if (showReport) {
@@ -810,18 +1032,73 @@ fun MessageActionsSheet(
 }
 
 @Composable
-private fun ActionRow(icon: ImageVector, title: String, onClick: () -> Unit, tint: androidx.compose.ui.graphics.Color = AppColors.Text) {
+private fun ReactionQuickBar(
+    reactions: Set<String>,
+    onReact: (String) -> Unit,
+    onMore: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .shadow(10.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.50f), spotColor = Color.Black.copy(alpha = 0.50f))
+            .background(Spec.barSurface)
+            .border(1.dp, Spec.border, CircleShape)
+            .padding(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RECENT_FALLBACK.take(5).forEach { emoji ->
+            val selected = emoji in reactions
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) Spec.blue.copy(alpha = 0.20f) else Spec.surfaceHigh)
+                    .border(if (selected) 1.dp else 0.dp, if (selected) Spec.blueLink.copy(alpha = 0.5f) else Color.Transparent, CircleShape)
+                    .clickable { onReact(emoji) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(emoji, style = AppText.welcomeName.copy(fontSize = 24.sp))
+            }
+        }
+        Box(
+            Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(Spec.surfaceHigh)
+                .clickable { onMore() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.chat_add_reaction), tint = Spec.textMuted, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+@Composable
+private fun DividerLine() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .height(1.dp)
+            .background(Spec.border),
+    )
+}
+
+@Composable
+private fun ActionRow(icon: ImageVector, title: String, onClick: () -> Unit, tint: Color = Spec.text) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(50.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 11.dp),
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
-        Text(title, style = AppText.body, color = tint)
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        Text(title, style = Spec.secondary.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold), color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
