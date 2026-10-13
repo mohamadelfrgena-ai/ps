@@ -25,6 +25,15 @@ std::string errorCode(const char* operation, int code) {
 void ignoreResult(int result) {
     (void)result;
 }
+
+void terminateSslContext(int contextId) {
+    // OpenOrbis' generated Ssl.h declares sceSslTerm() without parameters,
+    // while its own net_http C sample calls sceSslTerm(contextId). Use the
+    // sample's ABI without tripping the inaccurate C++ prototype.
+    using SslTermWithContext = void (*)(std::int32_t);
+    const auto terminate = reinterpret_cast<SslTermWithContext>(&sceSslTerm);
+    terminate(static_cast<std::int32_t>(contextId));
+}
 } // namespace
 
 OrbisHttpTransport::~OrbisHttpTransport() {
@@ -95,7 +104,7 @@ void OrbisHttpTransport::shutdown() {
         httpContextId_ = 0;
     }
     if (sslContextId_ > 0) {
-        sceSslTerm(sslContextId_);
+        terminateSslContext(sslContextId_);
         sslContextId_ = 0;
     }
     if (netPoolId_ > 0) {
