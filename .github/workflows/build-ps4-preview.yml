@@ -1,0 +1,60 @@
+name: Build PS4 Demo PKG
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - arena/2f6505fc-ps
+    paths:
+      - 'ps4/**'
+      - '.github/workflows/build-ps4-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-ps4-demo:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out the selected branch
+        uses: actions/checkout@v4
+
+      - name: Install host compiler and tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld make curl
+
+      - name: Download OpenOrbis toolchain and SDL2
+        env:
+          TOOLCHAIN_URL: https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/openorbis"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "$TOOLCHAIN_URL" -o "$RUNNER_TEMP/openorbis-toolchain.tar.gz"
+          tar -xzf "$RUNNER_TEMP/openorbis-toolchain.tar.gz" -C "$RUNNER_TEMP/openorbis"
+          TOOLCHAIN_ROOT="$RUNNER_TEMP/openorbis/OpenOrbis/PS4Toolchain"
+          test -d "$TOOLCHAIN_ROOT/include"
+          test -x "$TOOLCHAIN_ROOT/bin/linux/create-fself"
+          echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN_ROOT" >> "$GITHUB_ENV"
+          echo "$TOOLCHAIN_ROOT/bin/linux" >> "$GITHUB_PATH"
+          echo "Toolchain extracted to $TOOLCHAIN_ROOT"
+
+      - name: Build offline demo PKG (no Supabase configuration)
+        run: |
+          set -euo pipefail
+          rm -f ps4/config.local.hpp
+          make -C ps4 clean
+          make -C ps4
+          test -s ps4/IV0000-ASTN00001_00-ADDONSTATION0000.pkg
+          echo "### Offline demo PKG built" >> "$GITHUB_STEP_SUMMARY"
+          echo "No Supabase URL or key is included. The app uses local fictional sample data." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the PKG for direct download
+        uses: actions/upload-artifact@v4
+        with:
+          name: AddonStation-PS4-Demo-PKG
+          path: ps4/IV0000-ASTN00001_00-ADDONSTATION0000.pkg
+          if-no-files-found: error
+          retention-days: 30

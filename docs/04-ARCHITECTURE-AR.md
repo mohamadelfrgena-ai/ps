@@ -18,6 +18,12 @@ ps/
 │               ├── mipmap-*/ic_launcher.png            ← الأيقونة الرسمية
 │               ├── xml/network_security_config.xml     ← HTTPS فقط
 │               └── xml/data_extraction_rules.xml
+├── ps4/                         ← عميل PS4 تجريبي منفصل (C++17 + SDL2 + OpenOrbis)
+│   ├── Makefile                 ← إعداد ELF/SELF/PKG محلياً عبر OpenOrbis
+│   ├── config.local.example.hpp ← مثال إعدادات بلا مفاتيح حقيقية
+│   ├── src/                     ← واجهة SDL2 + SceHttp + REST read-only + بيانات وهمية + JSON
+│   ├── tests/                   ← اختبارات طبقة API والكتالوج التجريبي على الحاسوب
+│   └── README-AR.md             ← إعداد المفتاح العام وبناء PKG والقيود
 ├── supabase/                    ← كل شيء على الخادم
 │   ├── 01_schema.sql            ← 33 جدولاً
 │   ├── 02_functions_core.sql    ← الخطط · المحتوى · AC · المدفوعات · الملف الشخصي
@@ -63,9 +69,20 @@ ps/
           └── realtime: /realtime/v1      (رسائل الشات · التفاعلات · «يكتب الآن» · الإشعارات)
 ```
 
+العملاء مستقلون عن بعضهم، لكنهم يتشاركون **مشروع Supabase واحداً**:
+
+```text
+Android (موجود) ──┐
+PS4 C++ (تجريبي) ──┼── HTTPS/REST ──► قاعدة Supabase واحدة
+iOS (مخطط) ────────┤
+PC (مخطط) ─────────┘
+```
+
+نسخة PS4 الأولية في `ps4/` تقرأ `content_items` المنشورة و`subscription_plans` المفعّلة فقط، مستخدمةً مفتاحاً عاماً. إن لم يُضبط المشروع، تعرض 6 عناصر و3 خطط وهمية محلياً ولا ترسلها للخادم. لا توجد قاعدة بيانات على الجهاز ولا تغييرات على تطبيق Android. iOS وPC خطط عملاء مستقبلية وليسا تطبيقين موجودين حالياً في هذا المودع.
+
 **قواعد ثابتة في هذه المعمارية:**
 1. لا يُكتب في الجداول الحساسة (`payment_orders`, `ac_*`, `chat_messages`, `content_downloads`…) إلا عبر دوال RPC — ولذلك سُحقت صلاحيات الكتابة المباشرة في `04_rls.sql`.
-2. المفتاح الوحيد داخل التطبيق هو `anon public key`؛ يوضع في `BuildConfig` أو في شاشة الإعداد الأول.
+2. كل عميل يحمل المفتاح العام فقط (`anon` القديم أو `sb_publishable_…`)؛ لا يُضمَّن `sb_secret_…` أو `service_role` في أي تطبيق.
 3. الجلسة تُحفظ مشفّرة (Android Keystore) ولا تُرسل لغير `supabase.co`.
 4. الخطة الفعلية تُحسب دائماً على الخادم بدالة `effective_plan()` — التطبيق لا يقرر الصلاحيات.
 
@@ -82,6 +99,7 @@ ps/
 | الوسائط | Media3 ExoPlayer 1.4 (صوت/فيديو في الشات) |
 | التخزين المحلي | DataStore (اللغة/المظهر) + EncryptedSharedPreferences (الجلسة) |
 | الخادم | Supabase (PostgreSQL + RLS + RPC + Storage + Realtime) |
+| عميل PS4 التجريبي | C++17 + SDL2 · OpenOrbis · SceNet/SceSsl/SceHttp · REST read-only |
 
 ## 4) كيف تُختبر الميزات سريعاً (بدون انتظار بناء APK)
 
