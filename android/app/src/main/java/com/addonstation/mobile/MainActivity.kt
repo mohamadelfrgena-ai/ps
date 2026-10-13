@@ -129,9 +129,9 @@ class MainActivity : ComponentActivity() {
         val density = resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
         val dark = AppPrefs.readDark(this)
-        val background = if (dark) Color.rgb(10, 15, 28) else Color.rgb(244, 247, 252)
+        val backgroundColor = if (dark) Color.rgb(10, 15, 28) else Color.rgb(244, 247, 252)
         val surface = if (dark) Color.rgb(18, 26, 43) else Color.WHITE
-        val text = if (dark) Color.rgb(234, 240, 250) else Color.rgb(25, 35, 48)
+        val textColor = if (dark) Color.rgb(234, 240, 250) else Color.rgb(25, 35, 48)
         val muted = if (dark) Color.rgb(157, 176, 207) else Color.rgb(91, 105, 125)
         val blue = Color.rgb(46, 123, 239)
         val border = if (dark) Color.rgb(34, 48, 73) else Color.rgb(215, 223, 234)
@@ -143,8 +143,8 @@ class MainActivity : ComponentActivity() {
                 if (stroke != null) setStroke(dp(1), stroke)
             }
 
-        window.statusBarColor = background
-        window.navigationBarColor = background
+        window.statusBarColor = backgroundColor
+        window.navigationBarColor = backgroundColor
         @Suppress("DEPRECATION")
         run {
             window.decorView.systemUiVisibility = if (dark) 0 else
@@ -153,7 +153,7 @@ class MainActivity : ComponentActivity() {
 
         val root = ScrollView(this).apply {
             isFillViewport = true
-            setBackgroundColor(background)
+            setBackgroundColor(backgroundColor)
         }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -161,9 +161,9 @@ class MainActivity : ComponentActivity() {
             setPadding(dp(20), dp(60), dp(20), dp(28))
             layoutDirection = View.LAYOUT_DIRECTION_LOCALE
         }
-        root.addView(content, ScrollView.LayoutParams(
-            ScrollView.LayoutParams.MATCH_PARENT,
-            ScrollView.LayoutParams.WRAP_CONTENT,
+        root.addView(content, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
         ))
 
         val bug = TextView(this).apply {
@@ -178,7 +178,7 @@ class MainActivity : ComponentActivity() {
             text = getString(R.string.crash_report_title)
             textSize = 22f
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
-            setTextColor(text)
+            setTextColor(textColor)
             gravity = Gravity.CENTER
         }
         content.addView(title, LinearLayout.LayoutParams(
@@ -253,9 +253,9 @@ class MainActivity : ComponentActivity() {
             setLineSpacing(dp(2).toFloat(), 1.15f)
             setPadding(dp(12), dp(10), dp(12), dp(10))
         }
-        logScroll.addView(details, ScrollView.LayoutParams(
-            ScrollView.LayoutParams.MATCH_PARENT,
-            ScrollView.LayoutParams.WRAP_CONTENT,
+        logScroll.addView(details, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
         ))
         logCard.addView(logScroll, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -284,7 +284,7 @@ class MainActivity : ComponentActivity() {
             textSize = 14f
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
             gravity = Gravity.CENTER
-            setTextColor(if (dark) text else blue)
+            setTextColor(if (dark) textColor else blue)
             background = rounded(surface, border, dp(14))
             setOnClickListener {
                 CrashDiagnostics.clear(this@MainActivity)

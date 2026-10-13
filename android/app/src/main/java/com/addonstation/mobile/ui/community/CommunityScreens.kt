@@ -335,7 +335,7 @@ fun RoomListScreen(
                 modifier = Modifier.weight(1f),
             )
             Icon(
-                androidx.compose.material.icons.automirrored.filled.ArrowForward,
+                androidx.compose.material.icons.filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = Spec.textMuted,
                 modifier = Modifier.size(16.dp),

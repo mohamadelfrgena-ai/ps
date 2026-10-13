@@ -72,7 +72,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.draw.zIndex
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -871,6 +871,7 @@ fun MessageActionsSheet(
     val isMine = myId != null && ui.message.userId == myId
 
     BoxWithConstraints(Modifier.fillMaxSize().zIndex(30f)) {
+        val viewportHeight = maxHeight
         val density = LocalDensity.current
         val anchorTop = anchorBounds?.top?.let { with(density) { it.toDp() } } ?: (maxHeight / 2)
         val anchorBottom = anchorBounds?.bottom?.let { with(density) { it.toDp() } } ?: (maxHeight / 2)
@@ -927,7 +928,7 @@ fun MessageActionsSheet(
             Column(
                 modifier = Modifier
                     .widthIn(max = cardWidth)
-                    .heightIn(max = (maxHeight - 150.dp).coerceAtLeast(200.dp))
+                    .heightIn(max = (viewportHeight - 150.dp).coerceAtLeast(200.dp))
                     .shadow(
                         elevation = 14.dp,
                         shape = RoundedCornerShape(20.dp),
