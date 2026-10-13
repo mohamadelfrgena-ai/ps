@@ -945,7 +945,7 @@ private fun HomeQuickActions(
         HomeQuickActionTile(
             icon = Icons.Filled.PhoneAndroid,
             label = stringResource(R.string.home_qa_device),
-            accent = Color(0xFF3FBF6A),
+            accent = if (palette.isDark) Color(0xFF3FBF6A) else Color(0xFF1E7A44),
             font = font,
             palette = palette,
             onClick = null, // Destination intentionally remains unset until a device action is specified.

@@ -212,6 +212,7 @@ fun ChatScreen(
      */
     var pendingSticker by remember { mutableStateOf<String?>(null) }
     var showEmoji by remember { mutableStateOf(false) }
+    var reactionTargetMessageId by remember { mutableStateOf<Long?>(null) }
     var showAttach by remember { mutableStateOf(false) }
     var showMembers by remember { mutableStateOf(false) }
     var memberCardProfile by remember { mutableStateOf<Profile?>(null) }
@@ -240,7 +241,10 @@ fun ChatScreen(
     BackHandler(enabled = showMembers) { showMembers = false }
     BackHandler(enabled = showPinned) { showPinned = false }
     BackHandler(enabled = actionsFor != null) { actionsFor = null; actionAnchor = null }
-    BackHandler(enabled = showEmoji) { showEmoji = false }
+    BackHandler(enabled = showEmoji) {
+        showEmoji = false
+        reactionTargetMessageId = null
+    }
     BackHandler(enabled = imageViewerUrl != null) { imageViewerUrl = null }
 
     var statusMessage by remember { mutableStateOf<String?>(null) }
@@ -504,6 +508,7 @@ fun ChatScreen(
         val replySnapshot = replyTo
         if (body.isEmpty() && attach == null && sticker == null) return
         showEmoji = false
+        reactionTargetMessageId = null
         text = ""                // مسح فوري: الفقاعة تظهر الآن، ولا يمكن إرسالها مرّتين
         pendingSticker = null
         replyTo = null
@@ -638,6 +643,7 @@ fun ChatScreen(
                                 // (الحذف يبقى من قائمة الضغط المطوّل خلال ٣ دقائق.)
                                 ui.message.stickerUrl?.takeIf { it.isNotBlank() }?.let { sticker ->
                                     resentSticker = sticker
+                                    reactionTargetMessageId = null
                                     keyboardController?.hide()
                                     focusManager.clearFocus(force = true)
                                     showEmoji = true
@@ -876,12 +882,17 @@ fun ChatScreen(
                 },
                 onAttach = {
                     showEmoji = false
+                    reactionTargetMessageId = null
                     showAttach = true
                 },
                 panelOpen = showEmoji,
                 focusRequester = focusRequester,
-                onInputFocused = { showEmoji = false },
+                onInputFocused = {
+                    showEmoji = false
+                    reactionTargetMessageId = null
+                },
                 onEmoji = {
+                    reactionTargetMessageId = null
                     if (showEmoji) {
                         showEmoji = false
                         focusRequester.requestFocus()
@@ -903,6 +914,44 @@ fun ChatScreen(
                 canSend = text.isNotBlank() || attachment != null || pendingSticker != null,
             )
         }
+        // The picker occupies the IME area below the composer; messages resize instead of being covered.
+        if (showEmoji) {
+            EmojiStickerPanel(
+                stickers = stickers,
+                packs = packs,
+                resolvedStickerUrl = { container.siteAssetUrl(it) },
+                onEmoji = { emoji ->
+                    val reactionTarget = reactionTargetMessageId
+                    reactionTargetMessageId = null
+                    resentSticker = null
+                    showEmoji = false
+                    if (reactionTarget != null) {
+                        vm.toggleReaction(reactionTarget, emoji)
+                    } else {
+                        text += emoji
+                        if (canPost && !readOnlyRoom) {
+                            focusRequester.requestFocus()
+                            keyboardController?.show()
+                        }
+                    }
+                },
+                focusSticker = resentSticker,
+                showStickerTab = reactionTargetMessageId == null,
+                onSticker = { stickerUrl ->
+                    // اختيار الملصق لا يُرسله فوراً: يوضعه في مربع الإرسال (معاينة + ✕ أحمر)
+                    // فيستطيع صاحبه أن يكتب نصاً تحته إن أراد، ثم يضغط إرسال.
+                    pendingSticker = stickerUrl
+                    resentSticker = null
+                    reactionTargetMessageId = null
+                    showEmoji = false
+                    if (canPost && !readOnlyRoom) {
+                        focusRequester.requestFocus()
+                        keyboardController?.show()
+                    }
+                },
+            )
+        }
+
     }
 
     actionsFor?.let { ui ->
@@ -978,6 +1027,10 @@ fun ChatScreen(
                 actionsFor = null
             },
             onMoreReactions = {
+                reactionTargetMessageId = ui.message.id
+                resentSticker = null
+                keyboardController?.hide()
+                focusManager.clearFocus(force = true)
                 showEmoji = true
                 actionsFor = null
             },
@@ -986,27 +1039,7 @@ fun ChatScreen(
     }
 
 
-    // لوحة الإيموجي/الملصقات مثبتة أسفل المحرر؛ قائمة الرسائل تنكمش بدلاً من تغطية حقل الكتابة.
-    if (showEmoji) {
-        EmojiStickerPanel(
-            stickers = stickers,
-            packs = packs,
-            resolvedStickerUrl = { container.siteAssetUrl(it) },
-            onEmoji = { emoji ->
-                text += emoji
-            },
-            focusSticker = resentSticker,
-            onSticker = { stickerUrl ->
-                // اختيار الملصق لا يُرسله فوراً: يوضعه في مربع الإرسال (معاينة + ✕ أحمر)
-                // فيستطيع صاحبه أن يكتب نصاً تحته إن أراد، ثم يضغط إرسال.
-                pendingSticker = stickerUrl
-                resentSticker = null
-                showEmoji = false
-                keyboardController?.hide()
-                focusManager.clearFocus(force = true)
-            },
-        )
-    }
+
 
     if (showAttach) {
         AttachSheet(
@@ -1505,7 +1538,7 @@ private fun HeaderIcon(
                     .offset(x = 2.dp, y = (-2).dp)
                     .sizeIn(minWidth = 16.dp, minHeight = 16.dp)
                     .clip(CircleShape)
-                    .background(Spec.gold)
+                    .background(Spec.goldFill)
                     .border(2.dp, Spec.barSurface, CircleShape)
                     .padding(horizontal = 3.dp),
                 contentAlignment = Alignment.Center,
@@ -1513,7 +1546,7 @@ private fun HeaderIcon(
                 Text(
                     if (badge > 99) "99+" else badge.toString(),
                     style = Spec.badge,
-                    color = Spec.goldDeepBg,
+                    color = Spec.goldInk,
                     maxLines = 1,
                 )
             }

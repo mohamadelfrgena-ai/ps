@@ -186,7 +186,6 @@ fun SettingsScreen(
     var dialogKey by remember { mutableStateOf<String?>(null) }
     var dialogError by remember { mutableStateOf<ApiErrorKind?>(null) }
     var languageMenu by remember { mutableStateOf(false) }
-    var themeSheet by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleteInfo by remember { mutableStateOf(false) }
     var onlineBusy by remember { mutableStateOf(false) }
@@ -244,6 +243,13 @@ fun SettingsScreen(
             container.profile.setShowOnline(value)
                 .onFailure { onlineNote = it.toApiError().kind }
             onlineBusy = false
+        }
+    }
+
+    fun setDarkTheme(value: Boolean) {
+        scope.launch {
+            container.prefs.setDarkTheme(value)
+            AppPrefs.writeDark(context, value)
         }
     }
 
@@ -345,11 +351,16 @@ fun SettingsScreen(
                 AuthSettingsDivider()
                 AuthSettingsRow(
                     title = stringResource(R.string.set_theme),
-                    value = stringResource(if (dark) R.string.set_theme_dark else R.string.set_theme_light),
+                    subtitle = stringResource(if (dark) R.string.set_theme_dark else R.string.set_theme_light),
                     clickable = true,
-                    onClick = { themeSheet = true },
-                    chevron = true,
+                    onClick = { setDarkTheme(!dark) },
                     tile = { AuthSettingsImageTile(R.drawable.ic_set_appearance) },
+                    trailing = {
+                        AuthSettingsSwitch(
+                            checked = dark,
+                            onCheckedChange = { setDarkTheme(it) },
+                        )
+                    },
                 )
                 AuthSettingsDivider()
                 val canShowOnline = profile?.effectivePlan == "legendary"
@@ -596,20 +607,6 @@ fun SettingsScreen(
             },
         )
     }
-    if (themeSheet) {
-        ThemePickerSheet(
-            dark = dark,
-            onDismiss = { themeSheet = false },
-            onSelect = { nextDark ->
-                themeSheet = false
-                scope.launch {
-                    container.prefs.setDarkTheme(nextDark)
-                    AppPrefs.writeDark(context, nextDark)
-                }
-            },
-        )
-    }
-
     if (editUsername) {
         AlertDialog(
             onDismissRequest = { editUsername = false; usernameError = null },
@@ -753,82 +750,6 @@ private fun LanguagePickerSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ThemePickerSheet(
-    dark: Boolean,
-    onDismiss: () -> Unit,
-    onSelect: (Boolean) -> Unit,
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = AppColors.AuthSurface,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 20.dp)) {
-            Text(
-                stringResource(R.string.set_theme),
-                style = Spec.rowTitle.copy(fontSize = 18.sp),
-                color = AppColors.AuthText,
-                modifier = Modifier.padding(bottom = 14.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ThemePreviewCard(
-                    dark = true,
-                    selected = dark,
-                    label = stringResource(R.string.set_theme_dark),
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(true) },
-                )
-                ThemePreviewCard(
-                    dark = false,
-                    selected = !dark,
-                    label = stringResource(R.string.set_theme_light),
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(false) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThemePreviewCard(
-    dark: Boolean,
-    selected: Boolean,
-    label: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(16.dp)
-    val borderColor = if (selected) AppColors.AuthBlue else AppColors.AuthBorder
-    Column(
-        modifier = modifier
-            .clip(shape)
-            .background(AppColors.AuthSurfaceHigh)
-            .border(if (selected) 2.dp else 1.dp, borderColor, shape)
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(72.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(
-                    Brush.linearGradient(
-                        if (dark) listOf(Color(0xFF0A0F1C), Color(0xFF1A2438))
-                        else listOf(Color(0xFFF4F7FC), Color.White),
-                    ),
-                )
-                .then(if (dark) Modifier else Modifier.border(1.dp, Color(0xFFD7DFEA), RoundedCornerShape(12.dp))),
-        )
-        Text(label, style = Spec.rowTitle.copy(fontSize = 15.sp), color = AppColors.AuthText)
-    }
-}
-
 @Composable
 private fun SettingsPlanCard(profile: Profile?, onOpenPlans: () -> Unit) {
     val currentPlan = profile?.effectivePlan ?: "free"
@@ -846,13 +767,13 @@ private fun SettingsPlanCard(profile: Profile?, onOpenPlans: () -> Unit) {
             .padding(horizontal = 16.dp)
             .padding(top = 12.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(Brush.linearGradient(listOf(AppColors.AuthPlanTop, AppColors.AuthGoldDark)))
+            .background(Brush.linearGradient(listOf(AppColors.AuthPlanTop, AppColors.AuthPlanBottom)))
             .border(1.dp, AppColors.AuthGoldBorder, RoundedCornerShape(18.dp))
             .padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
-                Modifier.size(44.dp).clip(CircleShape).background(AppColors.AuthGold),
+                Modifier.size(44.dp).clip(CircleShape).background(AppColors.AuthGoldFill),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Outlined.Star, contentDescription = null, tint = AppColors.AuthGoldDark, modifier = Modifier.size(22.dp))
@@ -898,7 +819,7 @@ private fun SettingsPlanButton(
         modifier
             .height(46.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(if (primary) AppColors.AuthGold else AppColors.AuthPlanButton)
+            .background(if (primary) AppColors.AuthGoldFill else AppColors.AuthPlanButton)
             .then(if (primary) Modifier else Modifier.border(1.dp, AppColors.AuthGoldBorder, RoundedCornerShape(12.dp)))
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp),

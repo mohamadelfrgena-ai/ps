@@ -776,20 +776,20 @@ private fun ProfileItemCard(
             Box(
                 Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(8.dp))
                     .background(when (item.plan.lowercase()) {
-                        "legendary" -> Spec.gold
+                        "legendary" -> Spec.goldFill
                         "epic" -> Spec.epic
                         else -> Spec.freeGreen
                     }).padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
-                Text(planLabelOf(item.plan), style = Spec.badge, color = if (item.plan == "legendary") Spec.goldDeepBg else Color.White, maxLines = 1)
+                Text(planLabelOf(item.plan), style = Spec.badge, color = if (item.plan == "legendary") Spec.goldInk else Color.White, maxLines = 1)
             }
             if (favorite && onToggleFavorite != null) {
                 Box(
                     Modifier.align(Alignment.BottomEnd).padding(5.dp).size(30.dp).clip(CircleShape)
-                        .background(Spec.gold).clickable(onClick = onToggleFavorite),
+                        .background(Spec.goldFill).clickable(onClick = onToggleFavorite),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.profile_remove_favorite), tint = Spec.goldDeepBg, modifier = Modifier.size(17.dp))
+                    Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.profile_remove_favorite), tint = Spec.goldInk, modifier = Modifier.size(17.dp))
                 }
             }
         }

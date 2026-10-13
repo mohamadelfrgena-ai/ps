@@ -106,7 +106,18 @@ rows.append(("نقر الملصق يمرّر إلى onStickerTap", "if (takeBack
 rows.append(("النقر يشيل الرسالة من الشات", "vm.deleteMine(ui.message.id)" in screen))
 rows.append(("ثم تُفتح لوحة الملصقات", "resentSticker = sticker" in screen and "showEmoji = true" in screen))
 rows.append(("اللوحة تُحدّد الملصق المُعاد", "focusSticker" in sheets and "AppColors.Green else Color.Transparent" in sheets))
-rows.append(("التبويب يفتح على الملصقات", 'mutableStateOf(if (focusSticker != null) 1 else 0)' in sheets))
+rows.append(("التبويب يفتح على الملصقات", 'mutableStateOf(if (focusSticker != null && showStickerTab) 1 else 0)' in sheets))
+
+composer_panel_section = screen[screen.find("ChatInputBar("):screen.find("actionsFor?.let { ui ->")]
+rows.append(("لوحة الإيموجي/الملصقات تحت المحرر داخل عمود الشات",
+             "EmojiStickerPanel(" in composer_panel_section and "if (showEmoji)" in composer_panel_section
+             and "windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))" in screen))
+rows.append(("بعد اختيار الإيموجي يعود التركيز ولوحة المفاتيح",
+             "text += emoji" in composer_panel_section and "focusRequester.requestFocus()" in composer_panel_section
+             and "keyboardController?.show()" in composer_panel_section))
+rows.append(("اختيار التفاعل من القائمة يطبّق الإيموجي على الرسالة",
+             "reactionTargetMessageId = ui.message.id" in screen and "showStickerTab = reactionTargetMessageId == null" in composer_panel_section
+             and "vm.toggleReaction(reactionTarget, emoji)" in composer_panel_section))
 
 # ── 5) النص + الملصق/الوسائط = رسالة واحدة ────────────────────────────
 # (جديد بطلب المالك: اختيار الملصق لا يُرسله فوراً — بل يضعه في مربع الإرسال

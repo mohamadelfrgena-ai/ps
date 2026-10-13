@@ -74,7 +74,7 @@ fun WalletCoinImage(size: Dp, modifier: Modifier = Modifier) {
                 .scale(1.7f)
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(AppColors.AuthGold.copy(alpha = 0.55f), Color.Transparent),
+                        colors = listOf(AppColors.AuthGoldFill.copy(alpha = 0.55f), Color.Transparent),
                     ),
                     CircleShape,
                 ),
@@ -88,8 +88,8 @@ fun WalletCoinImage(size: Dp, modifier: Modifier = Modifier) {
                     elevation = 14.dp,
                     shape = CircleShape,
                     clip = false,
-                    ambientColor = AppColors.AuthGold.copy(alpha = 0.55f),
-                    spotColor = AppColors.AuthGold.copy(alpha = 0.55f),
+                    ambientColor = AppColors.AuthGoldFill.copy(alpha = 0.55f),
+                    spotColor = AppColors.AuthGoldFill.copy(alpha = 0.55f),
                 ),
         )
     }
@@ -116,7 +116,7 @@ fun WalletHeroCard(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Brush.linearGradient(listOf(AppColors.AuthWalletTop, AppColors.AuthGoldDark)))
+            .background(Brush.linearGradient(listOf(AppColors.AuthWalletTop, AppColors.AuthWalletBottom)))
             .border(1.dp, AppColors.AuthGoldBorder, shape)
             .padding(20.dp),
     ) {
@@ -127,7 +127,7 @@ fun WalletHeroCard(
                 .size(160.dp)
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(AppColors.AuthGold.copy(alpha = 0.28f), Color.Transparent),
+                        colors = listOf(AppColors.AuthGoldFill.copy(alpha = 0.28f), Color.Transparent),
                     ),
                     CircleShape,
                 ),
@@ -213,7 +213,7 @@ fun WalletHeroCard(
                     .fillMaxWidth()
                     .height(52.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(if (enabled) AppColors.AuthGold else AppColors.AuthClaimDisabled)
+                    .background(if (enabled) AppColors.AuthGoldFill else AppColors.AuthClaimDisabled)
                     .clickable(enabled = enabled, onClick = onClaim),
                 contentAlignment = Alignment.Center,
             ) {
@@ -232,7 +232,7 @@ fun WalletHeroCard(
 private fun StreakDay(day: Int, completed: Boolean, today: Boolean) {
     val dayShape = CircleShape
     val background = when {
-        completed -> AppColors.AuthGold
+        completed -> AppColors.AuthGoldFill
         day == 7 -> AppColors.AuthPlanButton
         else -> AppColors.AuthStreakBg
     }
@@ -395,7 +395,7 @@ fun WalletCompactCard(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Brush.linearGradient(listOf(AppColors.AuthWalletTop, AppColors.AuthGoldDark)))
+            .background(Brush.linearGradient(listOf(AppColors.AuthWalletTop, AppColors.AuthWalletBottom)))
             .border(1.dp, AppColors.AuthGoldBorder, shape)
             .clickable(onClick = onOpenWallet)
             .padding(16.dp),
@@ -442,7 +442,7 @@ fun WalletCompactCard(
                     Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(AppColors.AuthGold.copy(alpha = 0.16f))
+                        .background(AppColors.AuthGoldFill.copy(alpha = 0.16f))
                         .border(1.dp, AppColors.AuthGoldBorder, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -485,7 +485,7 @@ fun WalletCompactCard(
                             .widthIn(min = 92.dp)
                             .height(44.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Brush.linearGradient(listOf(AppColors.AuthGold, Color(0xFFE0A93A))))
+                            .background(Brush.linearGradient(listOf(AppColors.AuthGoldFill, Color(0xFFE0A93A))))
                             .clickable(enabled = enabled, onClick = onClaim)
                             .padding(horizontal = 12.dp),
                         contentAlignment = Alignment.Center,
@@ -533,7 +533,7 @@ private fun StreakProgressSegments(completedThrough: Int, todayDay: Int, showTod
                     .clip(shape)
                     .background(
                         when {
-                            complete -> AppColors.AuthGold
+                            complete -> AppColors.AuthGoldFill
                             day == 7 && !today -> Color.Transparent
                             else -> AppColors.AuthStreakBg
                         },

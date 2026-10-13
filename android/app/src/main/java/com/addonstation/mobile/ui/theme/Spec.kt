@@ -10,49 +10,51 @@ import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
 
 /**
- * رموز وثيقة التصميم الجديدة (AddonStation_handoff · SPEC.md) — حرفياً كما وردت.
- *
- * لماذا ملف مستقلّ ولم أُغيّر [AppColors]؟
- *   • هذه الرموز تخصّ **الشاشات الثلاث المعاد تصميمها** (الرئيسية · الغرف · الشات)
- *     كما طلبت الوثيقة («Dark theme only for these screens»).
- *   • بقية التطبيق (متجر · ملف شخصي · إدارة · إعدادات …) يبقى على لوحته الحالية
- *     بلا أي تغيير مفاجئ ⇒ لا انكسار بصري في شاشة لم تُراجع بعد.
- *   • عند اعتمادك للتوسعة، التغيير يصير بنقل القيم إلى [AppColors.DarkPalette] مرة واحدة.
+ * ألوان التصميم المعتمدة: تبقى قيم الوضع الداكن كما في مواصفة AddonStation_handoff،
+ * وتُقرأ لها نظائر فاتحة ذات تباين مناسب عند اختيار الوضع الفاتح.
  */
 object Spec {
 
-    // ── الألوان (جدول «Design tokens» في الوثيقة) ─────────────────────────────
-    val bg = Color(0xFF0A0F1C)            // خلفية الشاشة
-    val surface = Color(0xFF121A2B)       // البطاقات · الحقول · الشرائح
-    val surfaceHigh = Color(0xFF1A2438)   // الأقراص · الأزرار الثانوية · خلفية الأفاتار
-    val barSurface = Color(0xFF0E1526)    // الشرائط العلوية · شريط الكتابة
-    val border = Color(0xFF223049)        // 1dp حدود وفواصل
-    val text = Color(0xFFEAF0FA)          // النص الأساسي
-    val textMuted = Color(0xFF9DB0CF)     // النص الثانوي والتلميحات
-    val chipLabel = Color(0xFFC4D1E8)     // نص الشرائح غير المختارة
-    val blue = Color(0xFF2E7BEF)          // الأزرار الأساسية · رسائلي · شارة NEW
-    val blueLink = Color(0xFF6FA8FF)      // «عرض الكل»
-    val gold = Color(0xFFF0C25E)          // عناوين البكسل · رصيد AC · Legendary
-    val goldDeepBg = Color(0xFF1B1405)    // خلفية بطاقة Legendary
-    val goldBorder = Color(0xFF8A6A22)    // إطار بطاقة Legendary
-    val epic = Color(0xFF9B6BFF)          // شارة EPIC
-    val green = Color(0xFF7FD99A)         // «متصّل الآن»
-    val freeGreen = Color(0xFF3C9D5A)     // شارة FREE
-    val pinnedBorder = Color(0xFF5A4416)  // حدّ شريط المثبّتات
-    val heroSubtitle = Color(0xFFD3DDF0)
-    val legendText = Color(0xFFE8D5A3)
+    private val homePalette: HomePalette
+        get() = if (AppColors.isDark) HomePalettes.Dark else HomePalettes.Light
 
-    // ألوان أسماء الأعضاء الدورية (وثيقة الشات)
-    val nameColors = listOf(Color(0xFF9B6BFF), Color(0xFF7FD99A), Color(0xFF6FA8FF), Color(0xFFEAF0FA))
+    // ── ألوان عامة (تتبدّل مباشرة مع لوحة التطبيق) ────────────────────────────
+    val bg: Color get() = homePalette.bg
+    val surface: Color get() = homePalette.surface
+    val surfaceHigh: Color get() = homePalette.surfaceHigh
+    val barSurface: Color get() = homePalette.barSurface
+    val border: Color get() = homePalette.border
+    val text: Color get() = homePalette.text
+    val textMuted: Color get() = homePalette.textMuted
+    val chipLabel: Color get() = homePalette.chipText
+    val blue: Color get() = homePalette.blue
+    val blueLink: Color get() = homePalette.blueLink
+    val gold: Color get() = homePalette.goldText
+    val goldFill: Color get() = homePalette.goldFill
+    val goldInk: Color get() = homePalette.goldInk
+    val goldDeepBg: Color get() = homePalette.planEnd
+    val goldPlanStart: Color get() = homePalette.planStart
+    val goldBorder: Color get() = homePalette.planBorder
+    val epic: Color get() = if (AppColors.isDark) Color(0xFF9B6BFF) else Color(0xFF7B4FD1)
+    val green: Color get() = if (AppColors.isDark) Color(0xFF7FD99A) else Color(0xFF1E7A44)
+    val freeGreen: Color get() = if (AppColors.isDark) Color(0xFF3C9D5A) else Color(0xFF2D7A3E)
+    val pinnedBorder: Color get() = if (AppColors.isDark) Color(0xFF5A4416) else Color(0xFFE0B24A)
+    val heroSubtitle: Color get() = homePalette.heroSubtitle
+    val legendText: Color get() = homePalette.planSecondary
+    val nameColors: List<Color>
+        get() = if (AppColors.isDark) darkNameColors else lightNameColors
+
+    private val darkNameColors = listOf(Color(0xFF9B6BFF), Color(0xFF7FD99A), Color(0xFF6FA8FF), Color(0xFFEAF0FA))
+    private val lightNameColors = listOf(Color(0xFF7B4FD1), Color(0xFF1E7A44), Color(0xFF1D4FB8), Color(0xFF33425F))
 
     // ── رموز وثيقة الملف الشخصي (SPEC_PROFILES.md §1) ─────────────────────────
-    val danger = Color(0xFFFF8791)         // نصّ الخطر: حظر · إبلاغ · تسجيل الخروج
-    val dangerBorder = Color(0xFFB3414B)   // إطار زرّ الخطر
-    val onlineFill = Color(0xFF3FBF6A)     // أخضر نقطة الحالة
-    val onlineText = Color(0xFF7FD99A)     // نصّ «متصّل الآن» (قيمة الوثيقة)
-    val awayAmber = Color(0xFFF0C25E)      // «بعيد/خامل»: الوثيقة قالت amber بلا قيمة ⇒ كهرمان اللوحة
-    val offlineGrey = Color(0xFF6B7A94)    // «غير متصل» — بلا توهّج
-    val dashedBorder = Color(0xFF2E3C58)   // إطار متقطّع (بطاقة المحفظة المخفيّة في شاشة C)
+    val danger: Color get() = if (AppColors.isDark) Color(0xFFFF8791) else Color(0xFFB3262E)
+    val dangerBorder: Color get() = if (AppColors.isDark) Color(0xFFB3414B) else Color(0xFFB32626)
+    val onlineFill: Color get() = if (AppColors.isDark) Color(0xFF3FBF6A) else Color(0xFF17A75A)
+    val onlineText: Color get() = if (AppColors.isDark) Color(0xFF7FD99A) else Color(0xFF1E7A44)
+    val awayAmber: Color get() = if (AppColors.isDark) Color(0xFFF0C25E) else Color(0xFF8A5B00)
+    val offlineGrey: Color get() = if (AppColors.isDark) Color(0xFF6B7A94) else Color(0xFF53627F)
+    val dashedBorder: Color get() = if (AppColors.isDark) Color(0xFF2E3C58) else Color(0xFFD5DEEC)
 
 
     // ── المقاسات ──────────────────────────────────────────────────────────────

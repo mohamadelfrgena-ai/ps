@@ -84,16 +84,19 @@ def check(name, ok, why=""):
 
 # ── ١) رموز الوثيقة في Spec.kt (جدول §1 حرفياً) ──────────────────────────────
 TOKENS = {
-    "danger": "FFFF8791",
-    "dangerBorder": "FFB3414B",
-    "onlineFill": "FF3FBF6A",
-    "onlineText": "FF7FD99A",
-    "awayAmber": "FFF0C25E",
-    "offlineGrey": "FF6B7A94",
-    "dashedBorder": "FF2E3C58",
+    "danger": ("FFFF8791", "FFB3262E"),
+    "dangerBorder": ("FFB3414B", "FFB32626"),
+    "onlineFill": ("FF3FBF6A", "FF17A75A"),
+    "onlineText": ("FF7FD99A", "FF1E7A44"),
+    "awayAmber": ("FFF0C25E", "FF8A5B00"),
+    "offlineGrey": ("FF6B7A94", "FF53627F"),
+    "dashedBorder": ("FF2E3C58", "FFD5DEEC"),
 }
-missing = [k for k, v in TOKENS.items() if not re.search(r"val %s = Color\(0x%s\)" % (k, v), spec)]
-check("رموز الألوان الجديدة في Spec.kt (§1)", not missing, "ناقص: " + " · ".join(missing))
+missing = [
+    name for name, (dark, light) in TOKENS.items()
+    if f"val {name}: Color get() = if (AppColors.isDark) Color(0x{dark}) else Color(0x{light})" not in spec
+]
+check("رموز ألوان Spec.kt ذات تباين داكن/فاتح (§1)", not missing, "ناقص: " + " · ".join(missing))
 
 SIZES = {
     "bannerH": "150.dp",

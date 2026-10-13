@@ -487,7 +487,7 @@ def draw_chat(x0):
 
 # ═══════════════════════════ الرسم والكتابة ═══════════════════════════
 ar(W // 2, 40, "إعادة تصميم ثلاث شاشات — وثيقة AddonStation_handoff", size=22, color=TEXT, bold=True, anchor="mm")
-txt(W // 2, 68, "Home · Chat rooms · Chat room   —   dark theme only   —   tokens from ui/theme/Spec.kt", size=13, color=MUTED, anchor="mm")
+txt(W // 2, 68, "Home · Chat rooms · Chat room   —   dark-mode preview   —   adaptive tokens in ui/theme/Spec.kt", size=13, color=MUTED, anchor="mm")
 
 draw_home(MARGIN)
 draw_rooms(MARGIN + PW + GAP)

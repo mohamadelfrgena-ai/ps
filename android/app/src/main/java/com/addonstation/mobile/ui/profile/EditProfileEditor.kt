@@ -100,6 +100,7 @@ import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.components.BannerThumb
 import com.addonstation.mobile.ui.components.CoverImage
 import com.addonstation.mobile.ui.theme.LocalHomePalette
+import com.addonstation.mobile.ui.theme.Spec
 import com.addonstation.mobile.ui.theme.NunitoFont
 import com.addonstation.mobile.ui.theme.NumberFont
 import com.addonstation.mobile.ui.theme.PixelFont
@@ -114,18 +115,18 @@ private const val STATUS_MAX_LENGTH = 60
 private const val BIO_MAX_LENGTH = 400
 private const val ITEM_NONE = "none"
 
-private val EditBlue = Color(0xFF2E7BEF)
-private val EditBlueLight = Color(0xFF4C9AFF)
-private val EditEpic = Color(0xFF9B6BFF)
-private val EditGold = Color(0xFFF0C25E)
-private val EditGreen = Color(0xFF3FBF6A)
-private val EditOnlineText = Color(0xFF7FD99A)
-private val EditDanger = Color(0xFFFF8791)
-private val EditDangerBorder = Color(0xFF5A2830)
-private val UpgradeStart = Color(0xFF3A2A0B)
-private val UpgradeEnd = Color(0xFF1B1405)
-private val UpgradeBorder = Color(0xFF8A6A22)
-private val UpgradeText = Color(0xFFE8D5A3)
+private val EditBlue: Color get() = Spec.blue
+private val EditBlueLight: Color get() = Spec.blueLink
+private val EditEpic: Color get() = Spec.epic
+private val EditGold: Color get() = Spec.gold
+private val EditGreen: Color get() = Spec.onlineFill
+private val EditOnlineText: Color get() = Spec.onlineText
+private val EditDanger: Color get() = Spec.danger
+private val EditDangerBorder: Color get() = Spec.dangerBorder
+private val UpgradeStart: Color get() = Spec.goldPlanStart
+private val UpgradeEnd: Color get() = Spec.goldDeepBg
+private val UpgradeBorder: Color get() = Spec.goldBorder
+private val UpgradeText: Color get() = Spec.legendText
 
 private enum class EditorTab { Avatar, Banners, Item, About }
 
@@ -918,7 +919,7 @@ internal fun ProfileEditorScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(EditGold))
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(Spec.goldFill))
                         Text(
                             stringResource(R.string.edit_profile_unsaved),
                             style = TextStyle(fontFamily = bodyFont, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold),
@@ -1375,11 +1376,7 @@ private fun PreviewAvatar(url: String?, online: Boolean) {
                 .align(Alignment.BottomEnd)
                 .size(22.dp)
                 .clip(CircleShape)
-                .background(
-                    if (online) Brush.radialGradient(listOf(Color(0xFF8CF2AD), Color(0xFF2FB35C)))
-                    else SolidColor(palette.textMuted),
-                )
-                .border(2.dp, palette.surface, CircleShape),
+                .background(if (online) SolidColor(Spec.onlineFill) else SolidColor(palette.textMuted)),
         )
     }
 }
@@ -1986,12 +1983,12 @@ private fun PlanChip(planName: String) {
     val isLegendary = planName.equals(stringResource(R.string.plan_legendary_name), ignoreCase = true)
     val isAdminOnly = planName.equals(stringResource(R.string.chat_admin_only_short), ignoreCase = true)
     val background = when {
-        isLegendary -> EditGold
+        isLegendary -> Spec.goldFill
         isAdminOnly -> palette.surfaceHigh
         else -> EditEpic
     }
     val foreground = when {
-        isLegendary -> Color(0xFF1B1405)
+        isLegendary -> Spec.goldInk
         isAdminOnly -> palette.text
         else -> Color.White
     }
@@ -2006,14 +2003,9 @@ private fun PlanChip(planName: String) {
 
 @Composable
 private fun UpgradeCard(message: String, bodyFont: FontFamily, onUpgrade: () -> Unit) {
-    val palette = LocalHomePalette.current
-    val upgradeColors = if (palette.isDark) {
-        listOf(UpgradeStart, UpgradeEnd)
-    } else {
-        listOf(Color(0xFFFFF3D2), Color(0xFFFFFBF3))
-    }
-    val upgradeBorder = if (palette.isDark) UpgradeBorder else Color(0xFFE0B744)
-    val upgradeText = if (palette.isDark) UpgradeText else Color(0xFF6B4D0A)
+    val upgradeColors = listOf(UpgradeStart, UpgradeEnd)
+    val upgradeBorder = UpgradeBorder
+    val upgradeText = UpgradeText
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2038,7 +2030,7 @@ private fun UpgradeCard(message: String, bodyFont: FontFamily, onUpgrade: () -> 
             modifier = Modifier
                 .height(44.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(EditGold)
+                .background(Spec.goldFill)
                 .clickable(onClick = onUpgrade)
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.Center,
@@ -2046,7 +2038,7 @@ private fun UpgradeCard(message: String, bodyFont: FontFamily, onUpgrade: () -> 
             Text(
                 stringResource(R.string.item_upgrade),
                 style = TextStyle(fontFamily = bodyFont, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold),
-                color = Color(0xFF1B1405),
+                color = Spec.goldInk,
             )
         }
     }

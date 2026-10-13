@@ -129,11 +129,14 @@ fun EmojiStickerPanel(
     onSticker: (String) -> Unit,
     /** A sticker reopened from chat selects its pack tab and scrolls into view. */
     focusSticker: String? = null,
+    /** Reaction picker mode omits stickers and only offers emoji reactions. */
+    showStickerTab: Boolean = true,
 ) {
     val container = rememberContainer()
-    var tab by remember { mutableStateOf(if (focusSticker != null) 1 else 0) }
-    LaunchedEffect(focusSticker) {
-        if (focusSticker != null) tab = 1
+    var tab by remember { mutableStateOf(if (focusSticker != null && showStickerTab) 1 else 0) }
+    LaunchedEffect(focusSticker, showStickerTab) {
+        if (focusSticker != null && showStickerTab) tab = 1
+        else if (!showStickerTab) tab = 0
     }
     var selectedPack by remember { mutableStateOf<String?>(null) }
     var selectedEmojiCategory by remember { mutableIntStateOf(0) }
@@ -168,15 +171,17 @@ fun EmojiStickerPanel(
                     onClick = { tab = 0 },
                     modifier = Modifier.weight(1f),
                 )
-                ChatPanelSegment(
-                    label = stringResource(R.string.chat_stickers_tab),
-                    selected = tab == 1,
-                    onClick = { tab = 1 },
-                    modifier = Modifier.weight(1f),
-                )
+                if (showStickerTab) {
+                    ChatPanelSegment(
+                        label = stringResource(R.string.chat_stickers_tab),
+                        selected = tab == 1,
+                        onClick = { tab = 1 },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
             Spacer(Modifier.height(8.dp))
-            if (tab == 0) {
+            if (tab == 0 || !showStickerTab) {
                 val emojiGridState = rememberLazyGridState()
                 val categories = listOf(
                     Triple(R.string.chat_emoji_cat_smileys, Icons.Filled.EmojiEmotions, 0),

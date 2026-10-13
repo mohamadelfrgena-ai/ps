@@ -151,7 +151,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
             if (!deviceReady) {
                 AuthSettingsGroupCard(
                     radius = 16.dp,
-                    background = AppColors.AuthGoldDark,
+                    background = AppColors.AuthPlanBottom,
                     borderColor = AppColors.AuthPermissionBorder,
                 ) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -166,7 +166,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
             } else if (!permissionGranted) {
                 AuthSettingsGroupCard(
                     radius = 16.dp,
-                    background = AppColors.AuthGoldDark,
+                    background = AppColors.AuthPlanBottom,
                     borderColor = AppColors.AuthPermissionBorder,
                 ) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -179,7 +179,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                             Modifier
                                 .height(44.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(AppColors.AuthGold)
+                                .background(AppColors.AuthGoldFill)
                                 .clickable(onClick = { requestPermission() })
                                 .padding(horizontal = 18.dp),
                             contentAlignment = Alignment.Center,

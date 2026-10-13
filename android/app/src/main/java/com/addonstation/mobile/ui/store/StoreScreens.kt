@@ -496,7 +496,7 @@ private fun StoreContentCard(
     val tierColor = when (item.plan.lowercase()) {
         "legendary" -> palette.goldFill
         "epic" -> palette.epic
-        else -> Color(0xFF3FBF6A)
+        else -> if (palette.isDark) Color(0xFF3FBF6A) else Color(0xFF1E7A44)
     }
     Column(
         Modifier

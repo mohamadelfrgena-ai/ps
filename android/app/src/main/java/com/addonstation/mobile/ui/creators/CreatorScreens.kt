@@ -551,7 +551,8 @@ fun CreatorProfileScreen(
                             }
                         },
                         enabled = !busy,
-                        colors = listOf(AppColors.AuthGold, AppColors.AuthGoldDark),
+                        colors = if (AppColors.isDark) listOf(AppColors.AuthGoldFill, AppColors.AuthGoldDark)
+                            else listOf(AppColors.AuthGoldFill, Color(0xFFE0A93A)),
                         textColor = AppColors.AuthGoldDark,
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                     )
@@ -764,7 +765,7 @@ fun CreatorApplicationScreen(onBack: () -> Unit, onSubmitted: () -> Unit) {
 private fun CreatorApplicationInfoCard() {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
-            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF102244), Color(0xFF121A2B))))
+            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(AppColors.AuthMasterTop, AppColors.AuthSurface)))
             .border(1.dp, AppColors.Blue.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
             .padding(14.dp),
     ) {

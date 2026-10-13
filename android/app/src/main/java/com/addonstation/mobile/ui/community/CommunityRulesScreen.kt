@@ -91,7 +91,7 @@ private val RulesWarningLightIcon = Color(0xFFC26A00)
 
 private data class CommunityRuleDesign(val icon: ImageVector, val accent: Color)
 
-private val CommunityRuleDesigns = listOf(
+private val CommunityRuleDesignsDark = listOf(
     CommunityRuleDesign(Icons.Filled.Favorite, RulesBlue),
     CommunityRuleDesign(Icons.Filled.Block, RulesRed),
     CommunityRuleDesign(Icons.Filled.GroupOff, RulesRed),
@@ -99,6 +99,15 @@ private val CommunityRuleDesigns = listOf(
     CommunityRuleDesign(Icons.Filled.Lock, RulesOrange),
     CommunityRuleDesign(Icons.Filled.VisibilityOff, RulesRed),
     CommunityRuleDesign(Icons.Filled.AccountBalance, RulesPurple),
+)
+private val CommunityRuleDesignsLight = listOf(
+    CommunityRuleDesign(Icons.Filled.Favorite, Color(0xFF1D4FB8)),
+    CommunityRuleDesign(Icons.Filled.Block, Color(0xFFB3262E)),
+    CommunityRuleDesign(Icons.Filled.GroupOff, Color(0xFFB3262E)),
+    CommunityRuleDesign(Icons.Filled.LinkOff, Color(0xFF8A5B00)),
+    CommunityRuleDesign(Icons.Filled.Lock, Color(0xFF8A5B00)),
+    CommunityRuleDesign(Icons.Filled.VisibilityOff, Color(0xFFB3262E)),
+    CommunityRuleDesign(Icons.Filled.AccountBalance, Color(0xFF7B4FD1)),
 )
 
 private val LeadingRuleIcons = listOf("🏛️", "⚠️", "🤝", "🚫", "📵", "🔗", "🔒", "🛑", "🏛", "⚠")
@@ -212,6 +221,7 @@ internal fun CommunityRulesScreen(
             PrimaryRulesButton(
                 text = stringResource(R.string.chat_accept_enter),
                 bodyFont = bodyFont,
+                palette = palette,
                 focusRequester = acceptFocusRequester,
                 onClick = onAccepted,
             )
@@ -245,6 +255,8 @@ private fun CommunityRulesHeader(
         isEnglish -> 21.sp
         else -> 22.sp
     }
+    val badgeColors = if (palette.isDark) listOf(RulesButtonBlue, RulesButtonBlueLight) else listOf(palette.blue, palette.blueLink)
+    val badgeShadow = if (palette.isDark) Color(0x662E7BEF) else palette.blue.copy(alpha = 0.18f)
     Column(
         modifier = modifier.semantics { heading() },
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -255,11 +267,11 @@ private fun CommunityRulesHeader(
                 .shadow(
                     elevation = 22.dp,
                     shape = CircleShape,
-                    ambientColor = Color(0x662E7BEF),
-                    spotColor = Color(0x662E7BEF),
+                    ambientColor = badgeShadow,
+                    spotColor = badgeShadow,
                 )
                 .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(RulesButtonBlue, RulesButtonBlueLight))),
+                .background(Brush.linearGradient(badgeColors)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -313,7 +325,7 @@ private fun CommunityRulesCard(
             },
     ) {
         rules.forEachIndexed { index, text ->
-            val design = CommunityRuleDesigns[index]
+            val design = (if (palette.isDark) CommunityRuleDesignsDark else CommunityRuleDesignsLight)[index]
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -428,10 +440,13 @@ private fun CommunityRulesWarning(
 private fun PrimaryRulesButton(
     text: String,
     bodyFont: FontFamily,
+    palette: HomePalette,
     focusRequester: FocusRequester,
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(16.dp)
+    val buttonColors = if (palette.isDark) listOf(RulesButtonBlue, RulesButtonBlueLight) else listOf(palette.blue, palette.blueLink)
+    val buttonShadow = if (palette.isDark) Color(0x732E7BEF) else palette.blue.copy(alpha = 0.18f)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -439,11 +454,11 @@ private fun PrimaryRulesButton(
             .shadow(
                 elevation = 22.dp,
                 shape = shape,
-                ambientColor = Color(0x732E7BEF),
-                spotColor = Color(0x732E7BEF),
+                ambientColor = buttonShadow,
+                spotColor = buttonShadow,
             )
             .clip(shape)
-            .background(Brush.linearGradient(listOf(RulesButtonBlue, RulesButtonBlueLight)))
+            .background(Brush.linearGradient(buttonColors))
             .focusRequester(focusRequester)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 16.dp),

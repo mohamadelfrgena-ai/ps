@@ -386,8 +386,8 @@ private fun WalletBalanceCard(balance: Int) {
     val shape = RoundedCornerShape(18.dp)
     Row(
         Modifier.fillMaxWidth().clip(shape)
-            .background(Brush.linearGradient(listOf(Color(0xFF3E2D0C), Color(0xFF1B1405))))
-            .border(1.dp, Color(0xFF8A6A22), shape)
+            .background(Brush.linearGradient(listOf(AppColors.AuthWalletTop, AppColors.AuthWalletBottom)))
+            .border(1.dp, AppColors.AuthGoldBorder, shape)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -401,21 +401,21 @@ private fun WalletBalanceCard(balance: Int) {
             Text(
                 "${androidx.compose.ui.res.stringResource(R.string.ac_title)} · ${androidx.compose.ui.res.stringResource(R.string.ac_balance)}",
                 style = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold),
-                color = Color(0xFFE8D5A3),
+                color = AppColors.AuthGoldSoft,
                 maxLines = 1,
             )
             Spacer(Modifier.height(3.dp))
             Text(
                 NumberFormat.getIntegerInstance(Locale.US).format(balance),
                 style = TextStyle(fontSize = 34.sp, lineHeight = 38.sp, fontWeight = FontWeight.ExtraBold),
-                color = Color(0xFFFFD66B),
+                color = AppColors.AuthGold,
                 maxLines = 1,
             )
         }
         Text(
             "AC",
             style = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold),
-            color = Color(0xFFE8D5A3),
+            color = AppColors.AuthGoldSoft,
         )
     }
 }
