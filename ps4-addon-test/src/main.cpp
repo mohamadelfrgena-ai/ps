@@ -18,7 +18,8 @@ namespace {
 
 constexpr int kScreenWidth = 1920;
 constexpr int kScreenHeight = 1080;
-constexpr char kBundledMcpackPath[] = "/app0/assets/Backrooms-1.1-B.mcpack";
+constexpr char kBundledMcpackPath[] = "/app0/assets/PrizmaVisuals-1.3.10.mcpack";
+constexpr char kBundledCoverBmpPath[] = "/app0/assets/PrizmaVisuals-cover.bmp";
 
 constexpr SDL_Color kBg{11, 15, 25, 255};
 constexpr SDL_Color kCard{20, 28, 46, 255};
@@ -154,6 +155,7 @@ struct AppState {
     pkgtest::PackMetadata packMeta;
     pkgtest::TargetMode mode = pkgtest::TargetMode::AutoDetect;
     pkgtest::InstallReport lastReport;
+    SDL_Texture* coverTexture = nullptr;
     bool hasRunInstall = false;
     std::atomic<int> installJobState{0}; // 0=idle, 1=queued, 2=running
     std::atomic<bool> stopping{false};
@@ -163,11 +165,11 @@ void refreshScanLogs(AppState& state) {
     const pkgtest::ScanReport scan = pkgtest::scanFilesystemForMinecraft();
     std::lock_guard<std::mutex> lock(state.mutex);
     state.lastReport.ok = false;
-    state.lastReport.statusTitle = "READY — PRESS X OR SQUARE TO INSTALL";
+    state.lastReport.statusTitle = "READY — PRESS X OR SQUARE TO INSTALL PRIZMAVISUALS 1.3.10";
     state.lastReport.logs.clear();
     if (state.packMeta.valid) {
         state.lastReport.logs.push_back(
-            "BUNDLED PACK READY: UUID=" + state.packMeta.uuid +
+            "PACK READY: " + state.packMeta.name + " | UUID=" + state.packMeta.uuid +
             " | FILES=" + std::to_string(state.packMeta.fileCount) +
             " | SIZE=" + std::to_string(state.packMeta.totalBytes / 1024) + " KB");
     } else {
@@ -196,36 +198,54 @@ void renderScreen(SDL_Renderer* r, AppState& state) {
     }
 
     // Header
-    drawCenteredText(r, "PKG ADDON TEST", kScreenWidth / 2, 42, 6, kWhite);
-    drawCenteredText(r, "STANDALONE PS4 MINECRAFT ADDON INSTALLER TEST", kScreenWidth / 2, 102, 2, kTeal);
+    drawCenteredText(r, "PKG ADDON TEST — PRIZMAVISUALS 1.3.10", kScreenWidth / 2, 34, 5, kWhite);
+    drawCenteredText(r, "STANDALONE PS4 MINECRAFT ADDON INSTALLER TEST", kScreenWidth / 2, 84, 2, kTeal);
 
-    // Pack & Target Info Box
-    fillRect(r, 160, 150, 1600, 175, kCard);
-    drawBorder(r, 160, 150, 1600, 175, 2, kCardBorder);
+    // Top Card: Cover Image on the Left + Pack & Target Path Info on the Right
+    fillRect(r, 140, 125, 1640, 230, kCard);
+    drawBorder(r, 140, 125, 1640, 230, 2, kCardBorder);
 
+    const int coverX = 160;
+    const int coverY = 142;
+    const int coverW = 414;
+    const int coverH = 196;
+    if (state.coverTexture) {
+        SDL_Rect dst{coverX, coverY, coverW, coverH};
+        SDL_RenderCopy(r, state.coverTexture, nullptr, &dst);
+        drawBorder(r, coverX, coverY, coverW, coverH, 2, kTeal);
+    } else {
+        fillRect(r, coverX, coverY, coverW, coverH, kBg);
+        drawBorder(r, coverX, coverY, coverW, coverH, 2, kCardBorder);
+        drawCenteredText(r, "PRIZMAVISUALS 1.3.10", coverX + coverW / 2, coverY + 86, 3, kTeal);
+    }
+
+    const int infoX = 605;
+    const int infoW = 1150;
+    drawText(r, "ADDON: PRIZMAVISUALS 1.3.10 (VIBRANT VISUALS RESOURCE PACK)", infoX, 148, 3, infoW, kWhite);
     const std::string packLine = meta.valid
-        ? ("ADDON FILE: /APP0/ASSETS/BACKROOMS-1.1-B.MCPACK  (" + std::to_string(meta.fileCount) + " FILES | UUID: " + meta.uuid + ")")
+        ? ("UUID: " + meta.uuid + "  |  FILES: " + std::to_string(meta.fileCount) +
+           "  |  SIZE: " + std::to_string(meta.totalBytes / (1024 * 1024)) + " MB")
         : ("ADDON FILE ERROR: " + meta.error);
-    drawText(r, packLine, 195, 175, 2, 1530, meta.valid ? kGreen : kRed);
+    drawText(r, packLine, infoX, 188, 2, infoW, meta.valid ? kGreen : kRed);
 
-    drawText(r, "TARGET PATH MODE (USE D-PAD LEFT / RIGHT TO CHANGE):", 195, 215, 2, 1530, kMuted);
-    drawText(r, std::string("<  ") + pkgtest::targetModeLabel(currentMode) + "  >", 195, 248, 3, 1530, kAmber);
-    drawText(r, std::string("DESTINATION PATTERN: ") + pkgtest::targetModePathPreview(currentMode), 195, 288, 2, 1530, kWhite);
+    drawText(r, "TARGET PATH MODE (USE D-PAD LEFT / RIGHT TO CHANGE):", infoX, 230, 2, infoW, kMuted);
+    drawText(r, std::string("<  ") + pkgtest::targetModeLabel(currentMode) + "  >", infoX, 262, 3, infoW, kAmber);
+    drawText(r, std::string("PATH: ") + pkgtest::targetModePathPreview(currentMode), infoX, 304, 2, infoW, kWhite);
 
     // ONLY ONE BIG INSTALL BUTTON IN THE CENTER
     const int btnX = 360;
-    const int btnY = 360;
+    const int btnY = 380;
     const int btnW = 1200;
-    const int btnH = 170;
+    const int btnH = 165;
 
     SDL_Color btnColor = kButtonReady;
-    std::string btnMainText = "INSTALL ADDON NOW";
+    std::string btnMainText = "INSTALL PRIZMAVISUALS 1.3.10";
     std::string btnSubText = "PRESS  [ X ]  OR  [ SQUARE ]  ON CONTROLLER";
 
     if (jobState != 0) {
         btnColor = kButtonBusy;
         btnMainText = "INSTALLING ADDON... PLEASE WAIT";
-        btnSubText = "EXTRACTING 2705 FILES TO TARGET PATH...";
+        btnSubText = "EXTRACTING 8806 FILES TO TARGET PATH...";
     } else if (hasRun && report.ok) {
         btnColor = kButtonReady;
         btnMainText = "INSTALLED OK! PRESS [X] TO RE-INSTALL";
@@ -238,13 +258,13 @@ void renderScreen(SDL_Renderer* r, AppState& state) {
 
     fillRect(r, btnX, btnY, btnW, btnH, btnColor);
     drawBorder(r, btnX, btnY, btnW, btnH, 4, kButtonBorder);
-    drawCenteredText(r, btnMainText, kScreenWidth / 2, btnY + 42, 5, kWhite);
-    drawCenteredText(r, btnSubText, kScreenWidth / 2, btnY + 108, 3, kWhite);
+    drawCenteredText(r, btnMainText, kScreenWidth / 2, btnY + 40, 5, kWhite);
+    drawCenteredText(r, btnSubText, kScreenWidth / 2, btnY + 106, 3, kWhite);
 
     // Live Diagnostic & Result Panel
-    const int logX = 160;
-    const int logY = 565;
-    const int logW = 1600;
+    const int logX = 140;
+    const int logY = 570;
+    const int logW = 1640;
     const int logH = 430;
     fillRect(r, logX, logY, logW, logH, kCard);
     drawBorder(r, logX, logY, logW, logH, 2, kCardBorder);
@@ -254,15 +274,15 @@ void renderScreen(SDL_Renderer* r, AppState& state) {
     else if (hasRun && report.ok) statusColor = kGreen;
     else if (hasRun && !report.ok) statusColor = kRed;
 
-    drawText(r, "STATUS: " + report.statusTitle, logX + 30, logY + 24, 3, logW - 60, statusColor);
+    drawText(r, "STATUS: " + report.statusTitle, logX + 30, logY + 22, 3, logW - 60, statusColor);
 
     if (!report.destinationDir.empty()) {
-        drawText(r, "INSTALLED TO: " + report.destinationDir, logX + 30, logY + 64, 2, logW - 60, kGreen);
+        drawText(r, "INSTALLED TO: " + report.destinationDir, logX + 30, logY + 62, 2, logW - 60, kGreen);
     } else {
-        drawText(r, "FILESYSTEM DIAGNOSTICS & INSTALL LOG:", logX + 30, logY + 64, 2, logW - 60, kMuted);
+        drawText(r, "FILESYSTEM DIAGNOSTICS & INSTALL LOG:", logX + 30, logY + 62, 2, logW - 60, kMuted);
     }
 
-    int lineY = logY + 102;
+    int lineY = logY + 100;
     const std::size_t maxLines = 11;
     const std::size_t startIdx = report.logs.size() > maxLines ? (report.logs.size() - maxLines) : 0;
     for (std::size_t i = startIdx; i < report.logs.size(); ++i) {
@@ -332,6 +352,10 @@ int main(int, char**) {
     SDL_JoystickEventState(SDL_ENABLE);
 
     AppState state;
+    if (SDL_Surface* coverSurface = SDL_LoadBMP(kBundledCoverBmpPath)) {
+        state.coverTexture = SDL_CreateTextureFromSurface(renderer, coverSurface);
+        SDL_FreeSurface(coverSurface);
+    }
     state.packMeta = pkgtest::inspectMcpackFile(kBundledMcpackPath);
     refreshScanLogs(state);
 
@@ -343,7 +367,7 @@ int main(int, char**) {
                 {
                     std::lock_guard<std::mutex> lock(state.mutex);
                     selectedMode = state.mode;
-                    state.lastReport.statusTitle = "INSTALLING ADDON NOW...";
+                    state.lastReport.statusTitle = "INSTALLING PRIZMAVISUALS 1.3.10...";
                 }
                 pkgtest::InstallReport result = pkgtest::installMcpack(kBundledMcpackPath, selectedMode);
                 {
@@ -431,6 +455,7 @@ int main(int, char**) {
     state.stopping.store(true);
     if (installerThread.joinable()) installerThread.join();
 
+    if (state.coverTexture) SDL_DestroyTexture(state.coverTexture);
     for (SDL_Joystick* joy : joysticks) {
         if (joy) SDL_JoystickClose(joy);
     }

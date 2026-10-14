@@ -1,4 +1,4 @@
-# pkg addon test — Standalone PS4 Minecraft Addon Installer Test PKG
+# pkg addon test — Standalone PS4 Minecraft Addon Installer Test PKG (PrizmaVisuals 1.3.10)
 TITLE       := pkg addon test
 VERSION     := 0.1
 TITLE_ID    := ATST00001
@@ -33,7 +33,7 @@ PKG_FILE    := pkg-addon-test.pkg
 OO_SDL_SAMPLE := $(TOOLCHAIN)/samples/SDL2
 
 RUNTIME_FILES := sce_module/libc.prx sce_module/libSceFios2.prx sce_sys/about/right.sprx
-BUNDLED_ADDON_ASSETS := assets/Backrooms-1.1-B.mcpack
+BUNDLED_ADDON_ASSETS := assets/PrizmaVisuals-1.3.10.mcpack assets/PrizmaVisuals-cover.bmp assets/PrizmaVisuals-cover.png
 PKG_CONTENTS := eboot.bin sce_sys/param.sfo sce_sys/icon0.png $(RUNTIME_FILES) $(BUNDLED_ADDON_ASSETS)
 
 CXX_OBJECTS := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/json.o
@@ -113,14 +113,13 @@ prepare-runtime: check-toolchain
 	  for file in sce_module/libc.prx sce_module/libSceFios2.prx sce_sys/about/right.sprx; do \
 	    test -s "$$sample/$$file" || { echo "Missing OpenOrbis SDL2 runtime file: $$sample/$$file"; exit 1; }; \
 	  done; \
-	  mkdir -p sce_module sce_sys/about assets; \
+	  mkdir -p sce_module sce_sys/about; \
 	  cp "$$sample/sce_module/libc.prx" sce_module/libc.prx; \
 	  cp "$$sample/sce_module/libSceFios2.prx" sce_module/libSceFios2.prx; \
 	  cp "$$sample/sce_sys/about/right.sprx" sce_sys/about/right.sprx; \
-	  cp "../ps4/sce_sys/icon0.png" sce_sys/icon0.png; \
-	  cp "../ps4/assets/Backrooms-1.1-B.mcpack" assets/Backrooms-1.1-B.mcpack
+	  cp "../ps4/sce_sys/icon0.png" sce_sys/icon0.png
 
-$(PKG_FILE): eboot.bin sce_sys/param.sfo | prepare-runtime
+$(PKG_FILE): eboot.bin sce_sys/param.sfo $(BUNDLED_ADDON_ASSETS) | prepare-runtime
 	$(CREATE_GP4) -out pkg.gp4 --content-id=$(CONTENT_ID) --files "$(PKG_CONTENTS)"
 	$(PKG_TOOL) pkg_build pkg.gp4 .
 	cp "$(RAW_PKG)" "$(PKG_FILE)"
@@ -139,4 +138,4 @@ host-test: $(HOST_MINIZ_OBJECTS)
 	./build-host/test_installer
 
 clean:
-	rm -rf build build-host pkg.gp4 eboot.bin $(RAW_PKG) $(PKG_FILE) sce_sys assets sce_module
+	rm -rf build build-host pkg.gp4 eboot.bin $(RAW_PKG) $(PKG_FILE) sce_sys sce_module

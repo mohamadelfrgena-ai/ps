@@ -23,12 +23,13 @@ std::string makeTempDir() {
 } // namespace
 
 int main() {
-    const std::string archive = "../ps4/assets/Backrooms-1.1-B.mcpack";
+    const std::string archive = "assets/PrizmaVisuals-1.3.10.mcpack";
     const pkgtest::PackMetadata meta = pkgtest::inspectMcpackFile(archive);
     assert(meta.valid);
-    assert(meta.uuid == "29661a5a-ef24-0c27-ad26-e3f2260f0d55");
+    assert(meta.name == "PrizmaVisuals 1.3.10");
+    assert(meta.uuid == "3bcccbf1-ff4d-43a5-8452-12b9534dd70d");
     assert(meta.kind == pkgtest::PackKind::Resource);
-    assert(meta.fileCount == 2705);
+    assert(meta.fileCount == 8806);
 
     const fs::path tempRoot(makeTempDir());
     const fs::path appTmp = tempRoot / "app_tmp";
@@ -42,11 +43,12 @@ int main() {
         {appTmp.string()},
         dataMojang.string());
     assert(firstInstall.ok);
-    assert(firstInstall.filesWritten == 2705);
+    assert(firstInstall.filesWritten == 8806);
     const fs::path expectedDest =
         appTmp / "CUSA00744" / "1000000a" / "games" / "com.mojang" / "resource_packs" / meta.uuid;
     assert(firstInstall.destinationDir == expectedDest.string());
     assert(fs::exists(expectedDest / "manifest.json"));
+    assert(fs::exists(expectedDest / "pack_icon.png"));
 
     // Case 2: Pressing Install a second time overwrites cleanly without failing
     const pkgtest::InstallReport secondInstall = pkgtest::installMcpack(
@@ -55,7 +57,7 @@ int main() {
         {appTmp.string()},
         dataMojang.string());
     assert(secondInstall.ok);
-    assert(secondInstall.filesWritten == 2705);
+    assert(secondInstall.filesWritten == 8806);
     assert(fs::exists(expectedDest / "manifest.json"));
 
     // Case 3: Direct /data/com.mojang mode
@@ -65,10 +67,10 @@ int main() {
         {appTmp.string()},
         dataMojang.string());
     assert(dataInstall.ok);
-    assert(dataInstall.filesWritten == 2705);
+    assert(dataInstall.filesWritten == 8806);
     assert(fs::exists(dataMojang / "resource_packs" / meta.uuid / "manifest.json"));
 
     fs::remove_all(tempRoot);
-    std::cout << "pkg addon test host tests passed (2705 files verified).\n";
+    std::cout << "pkg addon test (PrizmaVisuals 1.3.10) host tests passed (8806 files verified).\n";
     return 0;
 }
