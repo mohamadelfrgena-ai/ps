@@ -174,6 +174,8 @@ int main(int, char**) {
         return 1;
     }
 
+    ps4app::initializeUiAssets(renderer);
+
     SDL_Joystick* controller = nullptr;
     if (SDL_NumJoysticks() > 0) {
         controller = SDL_JoystickOpen(0);
@@ -287,6 +289,7 @@ int main(int, char**) {
     transport.shutdown();
 
     if (controller) SDL_JoystickClose(controller);
+    ps4app::shutdownUiAssets();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

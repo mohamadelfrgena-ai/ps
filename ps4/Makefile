@@ -1,6 +1,6 @@
 # AddonStation PS4 Preview — OpenOrbis PS4 Toolchain / Linux or macOS
 TITLE       := AddonStation PS4 Preview
-VERSION     := 0.1
+VERSION     := 0.2
 TITLE_ID    := ASTN00001
 CONTENT_ID  := IV0000-ASTN00001_00-ADDONSTATION0000
 
@@ -32,7 +32,7 @@ PKG_FILE    := $(CONTENT_ID).pkg
 OO_SDL_SAMPLE := $(TOOLCHAIN)/samples/SDL2
 RUNTIME_FILES := sce_module/libc.prx sce_module/libSceFios2.prx \
                  sce_sys/about/right.sprx
-BUNDLED_ADDON_ASSETS := assets/Backrooms-1.1-B.mcpack assets/Backrooms-1.1-B-cover.jpg
+BUNDLED_ADDON_ASSETS := assets/Backrooms-1.1-B.mcpack assets/Backrooms-1.1-B-cover.jpg assets/Backrooms-1.1-B-cover.bmp
 PKG_CONTENTS := eboot.bin sce_sys/param.sfo sce_sys/icon0.png $(RUNTIME_FILES) $(BUNDLED_ADDON_ASSETS)
 SOURCES        := $(wildcard src/*.cpp)
 CXX_OBJECTS    := $(patsubst src/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
