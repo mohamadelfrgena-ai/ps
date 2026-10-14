@@ -1,6 +1,8 @@
+#include "addon_importer.hpp"
 #include "addonstation_api.hpp"
 #include "config.hpp"
 #include "demo_data.hpp"
+#include "minecraft_storage.hpp"
 #include "orbis_http_transport.hpp"
 #include "ui.hpp"
 
@@ -28,6 +30,8 @@ struct SharedWorkerState {
     std::uint32_t revision = 0;
     std::atomic<bool> loading{false};
     std::atomic<bool> refreshRequested{false};
+    // 0 = idle, 1 = queued by an explicit user action, 2 = importing.
+    std::atomic<int> packImportState{0};
     std::atomic<bool> stopping{false};
 };
 
@@ -35,6 +39,69 @@ void setInitialError(ps4app::UiState& ui, const std::string& message) {
     ui.status = "DEMO MODE: fictional sample list only. " + message;
     ui.connected = false;
     ui.demoMode = true;
+}
+
+constexpr char kBundledBackroomsMcpack[] = "/app0/assets/Backrooms-1.1-B.mcpack";
+constexpr char kPackImportHint[] = " SQUARE: install bundled Backrooms; existing packs are never overwritten.";
+
+std::string installBundledBackrooms() {
+    const ps4app::addon_importer::Inspection inspection =
+        ps4app::addon_importer::inspectMcpack(kBundledBackroomsMcpack);
+    if (!inspection.ok()) {
+        return std::string("Backrooms preflight failed (") +
+               ps4app::addon_importer::errorName(inspection.error) + "): " + inspection.message;
+    }
+    if (inspection.packKind != ps4app::addon_importer::PackKind::Resource) {
+        return "Backrooms is not a resource-only pack; nothing was written.";
+    }
+
+    ps4app::minecraft_storage::LocateResult storage;
+    constexpr int kLocateAttempts = 40;
+    for (int attempt = 0; attempt < kLocateAttempts; ++attempt) {
+        storage = ps4app::minecraft_storage::locateComMojangDirectories(
+            ps4app::minecraft_storage::ps4AppTemporaryRootCandidates());
+        if (storage.ok() || storage.error == ps4app::minecraft_storage::LocateError::Ambiguous ||
+            storage.error == ps4app::minecraft_storage::LocateError::InvalidRoot) {
+            break;
+        }
+        sceKernelUsleep(250 * 1000);
+    }
+    if (!storage.ok()) {
+        if (storage.error == ps4app::minecraft_storage::LocateError::Ambiguous) {
+            return "Backrooms not installed: multiple Minecraft profiles were found; none was selected.";
+        }
+        return "No Minecraft com.mojang mount appeared under /app_tmp or /app_temp after 10 seconds. "
+               "Keep Minecraft open or suspended, then press Square to retry.";
+    }
+
+    std::string destination;
+    std::string destinationError;
+    if (!ps4app::minecraft_storage::packDestinationDirectory(
+            storage.locations.front().comMojangDirectory,
+            inspection.packKind,
+            inspection.packUuid,
+            destination,
+            destinationError)) {
+        return "Backrooms not installed: " + destinationError;
+    }
+
+    ps4app::addon_importer::ImportRequest request;
+    request.archivePath = kBundledBackroomsMcpack;
+    request.destinationDirectory = destination;
+    // This function is only queued by an explicit Square-button/I-key action.
+    request.writeApproved = true;
+    const ps4app::addon_importer::ImportResult result =
+        ps4app::addon_importer::importMcpack(request);
+    if (!result.ok()) {
+        if (result.error == ps4app::addon_importer::Error::DestinationAlreadyExists) {
+            return "Backrooms is already present; its existing resource_packs folder was left unchanged.";
+        }
+        return std::string("Backrooms import failed (") +
+               ps4app::addon_importer::errorName(result.error) + "): " + result.message;
+    }
+
+    return "Backrooms installed to " + destination + " (" +
+           std::to_string(result.filesWritten) + " files).";
 }
 
 } // namespace
@@ -63,6 +130,19 @@ int main(int, char**) {
         if (!transportReady) setInitialError(ui, networkError);
         else ui.status = "DEMO MODE: showing samples while checking the shared Supabase catalog...";
     }
+
+    const ps4app::minecraft_storage::LocateResult minecraftStorage =
+        ps4app::minecraft_storage::locateComMojangDirectories(
+            ps4app::minecraft_storage::ps4AppTemporaryRootCandidates());
+    std::string minecraftStorageStatus;
+    if (minecraftStorage.ok()) {
+        minecraftStorageStatus = " Minecraft pack storage detected.";
+    } else if (minecraftStorage.error == ps4app::minecraft_storage::LocateError::Ambiguous) {
+        minecraftStorageStatus = " Multiple Minecraft profiles detected; no profile was selected.";
+    } else {
+        minecraftStorageStatus = " Minecraft storage was not resolved.";
+    }
+    ui.status += minecraftStorageStatus + kPackImportHint;
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) {
         std::printf("SDL initialization failed: %s\n", SDL_GetError());
@@ -138,6 +218,27 @@ int main(int, char**) {
         });
     }
 
+    std::thread packImportWorker([&shared]() {
+        while (!shared.stopping.load()) {
+            int expected = 1;
+            if (shared.packImportState.compare_exchange_strong(expected, 2)) {
+                {
+                    std::lock_guard<std::mutex> lock(shared.mutex);
+                    shared.status = "Waiting up to 10 seconds for Minecraft's temporary CUSA/user mount, then importing Backrooms...";
+                    ++shared.revision;
+                }
+                const std::string status = installBundledBackrooms();
+                {
+                    std::lock_guard<std::mutex> lock(shared.mutex);
+                    shared.status = status;
+                    ++shared.revision;
+                }
+                shared.packImportState.store(0);
+            }
+            sceKernelUsleep(50 * 1000);
+        }
+    });
+
     bool running = true;
     std::uint32_t shownRevision = 0;
     while (running) {
@@ -151,12 +252,20 @@ int main(int, char**) {
                 shared.refreshRequested.store(true);
                 ui.status = "Refresh requested from the shared database...";
             }
+            if (actions.requestPackImport) {
+                int expected = 0;
+                if (shared.packImportState.compare_exchange_strong(expected, 1)) {
+                    ui.status = "Backrooms import queued; the pack will use its manifest UUID folder.";
+                } else {
+                    ui.status = "Backrooms import is already queued or in progress.";
+                }
+            }
         }
 
         {
             std::lock_guard<std::mutex> lock(shared.mutex);
             if (shared.revision != shownRevision) {
-                ui.status = shared.status;
+                ui.status = shared.status + minecraftStorageStatus + kPackImportHint;
                 ui.connected = shared.connected;
                 ui.loadedOnce = shared.loadedOnce;
                 ui.demoMode = shared.demoMode;
@@ -174,6 +283,7 @@ int main(int, char**) {
 
     shared.stopping.store(true);
     if (worker.joinable()) worker.join();
+    if (packImportWorker.joinable()) packImportWorker.join();
     transport.shutdown();
 
     if (controller) SDL_JoystickClose(controller);

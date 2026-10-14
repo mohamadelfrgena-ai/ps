@@ -28,6 +28,7 @@ struct UiState {
 
 struct UiActions {
     bool requestRefresh = false;
+    bool requestPackImport = false;
     bool quit = false;
 };
 

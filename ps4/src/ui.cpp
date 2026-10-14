@@ -381,6 +381,9 @@ void handleInput(const SDL_Event& event, UiState& state, UiActions& actions) {
             case SDLK_RETURN:
                 actions.requestRefresh = true;
                 break;
+            case SDLK_i:
+                actions.requestPackImport = true;
+                break;
             default: break;
         }
         return;
@@ -388,6 +391,7 @@ void handleInput(const SDL_Event& event, UiState& state, UiActions& actions) {
     if (event.type == SDL_JOYBUTTONDOWN) {
         switch (event.jbutton.button) {
             case 1: actions.quit = true; break;       // Circle
+            case 2: actions.requestPackImport = true; break; // Square
             case 3: actions.requestRefresh = true; break; // Triangle
             case 4: toggleTab(state); break;           // L1
             case 5: toggleTab(state); break;           // R1

@@ -8,6 +8,9 @@ ps4/*.pkg
 ps4/sce_sys/param.sfo
 ps4/sce_sys/about/right.sprx
 ps4/sce_module/*.prx
+ps4/nextgen/src/config.h
+ps4/nextgen/src/config.local.h
+ps4/nextgen/build/
 ps4/**/*.o
 ps4/**/*.elf
 ps4/**/*.oelf
@@ -54,3 +57,7 @@ redeem-codes/
 
 # صور مرجعية من بحث الويب (مواد عمل، لا تُرفع)
 image-search/
+
+# Local SDK archives and extracted toolchains (never include in Git)
+/.cache/
+ps4/.agent-deps/

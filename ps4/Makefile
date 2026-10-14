@@ -20,6 +20,7 @@ else
   TOOL_OS   := unsupported
 endif
 HOST_CXX    ?= c++
+HOST_CC     ?= cc
 
 PKG_TOOL    := $(TOOLCHAIN)/bin/$(TOOL_OS)/PkgTool.Core
 CREATE_GP4  := $(TOOLCHAIN)/bin/$(TOOL_OS)/create-gp4
@@ -31,9 +32,15 @@ PKG_FILE    := $(CONTENT_ID).pkg
 OO_SDL_SAMPLE := $(TOOLCHAIN)/samples/SDL2
 RUNTIME_FILES := sce_module/libc.prx sce_module/libSceFios2.prx \
                  sce_sys/about/right.sprx
-PKG_CONTENTS := eboot.bin sce_sys/param.sfo sce_sys/icon0.png $(RUNTIME_FILES)
-SOURCES     := $(wildcard src/*.cpp)
-OBJECTS     := $(patsubst src/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
+BUNDLED_ADDON_ASSETS := assets/Backrooms-1.1-B.mcpack assets/Backrooms-1.1-B-cover.jpg
+PKG_CONTENTS := eboot.bin sce_sys/param.sfo sce_sys/icon0.png $(RUNTIME_FILES) $(BUNDLED_ADDON_ASSETS)
+SOURCES        := $(wildcard src/*.cpp)
+CXX_OBJECTS    := $(patsubst src/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
+MINIZ_SOURCES  := third_party/miniz/miniz.c third_party/miniz/miniz_zip.c \
+                  third_party/miniz/miniz_tinfl.c third_party/miniz/miniz_tdef.c
+MINIZ_OBJECTS  := $(patsubst third_party/miniz/%.c,$(OBJ_DIR)/miniz_%.o,$(MINIZ_SOURCES))
+OBJECTS        := $(CXX_OBJECTS) $(MINIZ_OBJECTS)
+HOST_MINIZ_OBJECTS := $(patsubst third_party/miniz/%.c,build-host/miniz_%.o,$(MINIZ_SOURCES))
 
 # SDL2 provides the 1080p UI and DS4 input. SceHttp/SceSsl/SceNet provide
 # HTTPS REST access; the client deliberately has no database write operations.
@@ -42,12 +49,16 @@ LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut \
 COMMONFLAGS := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
                -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include
 CXXFLAGS    := $(COMMONFLAGS) -std=c++17 -fexceptions -D_POSIX_C_SOURCE=200809L -D_GNU_SOURCE \
-               -isystem $(TOOLCHAIN)/include/c++/v1
+               -isystem $(TOOLCHAIN)/include/c++/v1 -Ithird_party/miniz
+CFLAGS      := $(COMMONFLAGS) -std=c99 -fPIC -D_POSIX_C_SOURCE=200809L -D_GNU_SOURCE
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr \
                -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
 
-.PHONY: all pkg clean check-toolchain prepare-runtime host-test
+.PHONY: all pkg clean check-toolchain prepare-runtime host-test host-test-api host-test-importer host-test-storage objects
 all: pkg
+
+# Compile target translation units only; does not link, package, or create eboot.bin.
+objects: $(OBJECTS)
 
 pkg: check-toolchain $(PKG_FILE)
 
@@ -62,6 +73,9 @@ $(OBJ_DIR):
 
 $(OBJ_DIR)/%.o: src/%.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/miniz_%.o: third_party/miniz/%.c | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -Ithird_party/miniz -c -o $@ $<
 
 $(ELF_FILE): $(OBJECTS) | check-toolchain
 	@mkdir -p build
@@ -95,15 +109,35 @@ prepare-runtime: check-toolchain
 	  cp "$$sample/sce_module/libSceFios2.prx" sce_module/libSceFios2.prx; \
 	  cp "$$sample/sce_sys/about/right.sprx" sce_sys/about/right.sprx
 
-$(PKG_FILE): eboot.bin sce_sys/param.sfo sce_sys/icon0.png | prepare-runtime
+$(PKG_FILE): eboot.bin sce_sys/param.sfo sce_sys/icon0.png $(BUNDLED_ADDON_ASSETS) | prepare-runtime
 	$(CREATE_GP4) -out pkg.gp4 --content-id=$(CONTENT_ID) --files "$(PKG_CONTENTS)"
 	$(PKG_TOOL) pkg_build pkg.gp4 .
 
-host-test:
+host-test: host-test-api host-test-importer host-test-storage
+
+host-test-api:
 	@mkdir -p build-host
-	$(HOST_CXX) -std=c++17 -Wall -Wextra -Werror -pedantic -Isrc \
+	$(HOST_CXX) -std=c++17 -Wall -Wextra -Werror -pedantic -D_GNU_SOURCE -Isrc \
 		tests/test_api.cpp src/json.cpp src/addonstation_api.cpp src/demo_data.cpp -o build-host/test_api
 	./build-host/test_api
+
+build-host/miniz_%.o: third_party/miniz/%.c | build-host
+	$(HOST_CC) -std=c99 -O2 -D_GNU_SOURCE -Ithird_party/miniz -c -o $@ $<
+
+build-host:
+	@mkdir -p $@
+
+host-test-importer: $(HOST_MINIZ_OBJECTS)
+	$(HOST_CXX) -std=c++17 -Wall -Wextra -Werror -pedantic -D_GNU_SOURCE -Isrc -isystem third_party/miniz \
+		tests/test_addon_importer.cpp src/addon_importer.cpp src/json.cpp \
+		$(HOST_MINIZ_OBJECTS) -o build-host/test_addon_importer
+	./build-host/test_addon_importer
+
+host-test-storage:
+	@mkdir -p build-host
+	$(HOST_CXX) -std=c++17 -Wall -Wextra -Werror -pedantic -D_GNU_SOURCE -Isrc \
+		tests/test_minecraft_storage.cpp src/minecraft_storage.cpp -o build-host/test_minecraft_storage
+	./build-host/test_minecraft_storage
 
 clean:
 	rm -rf build build-host pkg.gp4 eboot.bin $(PKG_FILE) sce_sys/param.sfo
