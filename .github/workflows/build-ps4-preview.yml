@@ -5,8 +5,10 @@ on:
   push:
     branches:
       - arena/2f6505fc-ps
+      - arena/5622bbf6-ps
     paths:
       - 'ps4/**'
+      - 'ps4-addon-test/**'
       - '.github/workflows/build-ps4-preview.yml'
 
 permissions:
@@ -80,5 +82,24 @@ jobs:
         with:
           name: AddonStation-PS4-Demo-PKG
           path: ps4/IV0000-ASTN00001_00-ADDONSTATION0000.pkg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Build standalone pkg addon test PKG
+        run: |
+          set -euo pipefail
+          make -C ps4-addon-test clean
+          make -C ps4-addon-test host-test
+          make -C ps4-addon-test clean
+          make -C ps4-addon-test
+          test -s ps4-addon-test/pkg-addon-test.pkg
+          echo "### Standalone pkg addon test built" >> "$GITHUB_STEP_SUMMARY"
+          echo "File: ps4-addon-test/pkg-addon-test.pkg" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload pkg addon test PKG for direct download
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg-addon-test
+          path: ps4-addon-test/pkg-addon-test.pkg
           if-no-files-found: error
           retention-days: 30
