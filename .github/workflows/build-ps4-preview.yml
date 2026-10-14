@@ -8,11 +8,12 @@ on:
       - arena/5622bbf6-ps
     paths:
       - 'ps4/**'
+      - '!ps4/downloads/**'
       - 'ps4-addon-test/**'
       - '.github/workflows/build-ps4-preview.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-ps4-demo:
@@ -103,3 +104,16 @@ jobs:
           path: ps4-addon-test/pkg-addon-test.pkg
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish pkg-addon-test.pkg to ps4/downloads
+        run: |
+          set -euo pipefail
+          mkdir -p ps4/downloads
+          cp ps4-addon-test/pkg-addon-test.pkg ps4/downloads/pkg-addon-test.pkg
+          git config user.name "AddonStation CI"
+          git config user.email "ci@users.noreply.github.com"
+          git add -f ps4/downloads/pkg-addon-test.pkg
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish pkg-addon-test.pkg to ps4/downloads [skip ci]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
