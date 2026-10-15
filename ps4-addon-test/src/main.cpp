@@ -153,7 +153,7 @@ void drawCenteredText(SDL_Renderer* r, const std::string& raw, int centerX, int 
 struct AppState {
     std::mutex mutex;
     pkgtest::PackMetadata packMeta;
-    pkgtest::TargetMode mode = pkgtest::TargetMode::AutoDetect;
+    pkgtest::TargetMode mode = pkgtest::TargetMode::ExactUserPath;
     pkgtest::InstallReport lastReport;
     SDL_Texture* coverTexture = nullptr;
     bool hasRunInstall = false;

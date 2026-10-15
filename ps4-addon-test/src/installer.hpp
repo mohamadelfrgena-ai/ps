@@ -14,12 +14,13 @@ enum class PackKind {
 };
 
 enum class TargetMode {
-    AutoDetect = 0,
-    AppTmpUsa = 1,
-    AppTmpEur = 2,
-    AppTempUsa = 3,
-    AppTempEur = 4,
-    DataComMojang = 5,
+    ExactUserPath = 0,
+    AutoDetect = 1,
+    AppTmpUsa = 2,
+    AppTmpEur = 3,
+    AppTempUsa = 4,
+    AppTempEur = 5,
+    DataComMojang = 6,
 };
 
 struct PackMetadata {

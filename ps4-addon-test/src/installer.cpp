@@ -71,6 +71,12 @@ bool mkdirRecursive(const std::string& path, int& outErrno) {
         outErrno = EINVAL;
         return false;
     }
+    if (isDirectory(path)) {
+        return true;
+    }
+    if (::mkdir(path.c_str(), 0755) == 0 || errno == EEXIST) {
+        if (isDirectory(path)) return true;
+    }
     std::size_t pos = 1;
     while (pos <= path.size()) {
         const std::size_t slash = path.find('/', pos);
@@ -79,13 +85,17 @@ bool mkdirRecursive(const std::string& path, int& outErrno) {
         if (!sub.empty() && !isDirectory(sub)) {
             if (::mkdir(sub.c_str(), 0755) != 0 && errno != EEXIST) {
                 outErrno = errno;
-                return false;
             }
         }
         if (slash == std::string::npos) break;
         pos = slash + 1;
     }
-    return isDirectory(path);
+    if (isDirectory(path)) {
+        outErrno = 0;
+        return true;
+    }
+    if (outErrno == 0) outErrno = errno;
+    return false;
 }
 
 bool removeTreeRecursive(const std::string& path, int& outErrno) {
@@ -249,24 +259,28 @@ std::string resolveSpecificCusaMojang(const std::string& root, const std::string
 
 const char* targetModeLabel(TargetMode mode) {
     switch (mode) {
+        case TargetMode::ExactUserPath:
+            return "MODE 1: EXACT PATH /app_tmp/CUSA00265/user497444003/games/com.mojang";
         case TargetMode::AutoDetect:
-            return "MODE 1: AUTO DETECT (MINECRAFT /app_tmp OR /app_temp)";
+            return "MODE 2: AUTO DETECT (MINECRAFT /app_tmp OR /app_temp)";
         case TargetMode::AppTmpUsa:
-            return "MODE 2: FORCE /app_tmp/CUSA00744 (MINECRAFT USA)";
+            return "MODE 3: FORCE /app_tmp/CUSA00744 (MINECRAFT USA)";
         case TargetMode::AppTmpEur:
-            return "MODE 3: FORCE /app_tmp/CUSA00265 (MINECRAFT EUR)";
+            return "MODE 4: FORCE /app_tmp/CUSA00265 (MINECRAFT EUR)";
         case TargetMode::AppTempUsa:
-            return "MODE 4: FORCE /app_temp/CUSA00744 (MINECRAFT USA)";
+            return "MODE 5: FORCE /app_temp/CUSA00744 (MINECRAFT USA)";
         case TargetMode::AppTempEur:
-            return "MODE 5: FORCE /app_temp/CUSA00265 (MINECRAFT EUR)";
+            return "MODE 6: FORCE /app_temp/CUSA00265 (MINECRAFT EUR)";
         case TargetMode::DataComMojang:
-            return "MODE 6: FORCE /data/com.mojang (PS4 DATA TEST PATH)";
+            return "MODE 7: FORCE /data/com.mojang (PS4 DATA TEST PATH)";
     }
-    return "AUTO DETECT";
+    return "EXACT PATH";
 }
 
 const char* targetModePathPreview(TargetMode mode) {
     switch (mode) {
+        case TargetMode::ExactUserPath:
+            return "/app_tmp/CUSA00265/user497444003/games/com.mojang/resource_packs/<uuid>";
         case TargetMode::AutoDetect:
             return "/app_tmp/<CUSA>/<user>/games/com.mojang/resource_packs/<uuid>";
         case TargetMode::AppTmpUsa:
@@ -284,7 +298,7 @@ const char* targetModePathPreview(TargetMode mode) {
 }
 
 TargetMode nextTargetMode(TargetMode mode, int delta) {
-    constexpr int kCount = 6;
+    constexpr int kCount = 7;
     int current = static_cast<int>(mode);
     current = (current + delta) % kCount;
     if (current < 0) current += kCount;
@@ -399,6 +413,31 @@ ScanReport scanFilesystemForMinecraft(const std::vector<std::string>& customRoot
         if (!topList.empty()) {
             report.diagnosticLines.push_back("VISIBLE IN /: " + topList);
         }
+
+        const char* exactMojangCandidates[] = {
+            "/app_tmp/CUSA00265/user497444003/games/com.mojang",
+            "/user/app_tmp/CUSA00265/user497444003/games/com.mojang",
+            "/app_temp/CUSA00265/user497444003/games/com.mojang",
+            "/user/app_temp/CUSA00265/user497444003/games/com.mojang",
+        };
+        for (const char* exactMojang : exactMojangCandidates) {
+            const std::string rp = std::string(exactMojang) + "/resource_packs";
+            struct stat st {};
+            if (::stat(rp.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+                report.detectedMojangDirs.push_back(exactMojang);
+                report.diagnosticLines.push_back(std::string("FOUND EXACT PATH: ") + rp);
+            } else if (::stat(exactMojang, &st) == 0 && S_ISDIR(st.st_mode)) {
+                report.detectedMojangDirs.push_back(exactMojang);
+                report.diagnosticLines.push_back(std::string("FOUND EXACT MOJANG: ") + exactMojang);
+            } else {
+                const int err = errno;
+                if (std::string(exactMojang) == "/app_tmp/CUSA00265/user497444003/games/com.mojang") {
+                    report.diagnosticLines.push_back(
+                        "STAT /app_tmp/CUSA00265/user497444003/... -> ERRNO " + std::to_string(err) +
+                        " (" + std::strerror(err) + ")");
+                }
+            }
+        }
     }
     const std::vector<std::string> roots = customRoots.empty() ? defaultPs4Roots() : customRoots;
 
@@ -482,6 +521,18 @@ InstallReport installMcpack(const std::string& archivePath,
 
     std::string targetMojang;
     switch (mode) {
+        case TargetMode::ExactUserPath:
+            if (isDirectory("/user/app_tmp/CUSA00265/user497444003/games/com.mojang") &&
+                !isDirectory("/app_tmp/CUSA00265/user497444003/games/com.mojang")) {
+                targetMojang = "/user/app_tmp/CUSA00265/user497444003/games/com.mojang";
+            } else if (isDirectory("/app_temp/CUSA00265/user497444003/games/com.mojang") &&
+                       !isDirectory("/app_tmp/CUSA00265/user497444003/games/com.mojang")) {
+                targetMojang = "/app_temp/CUSA00265/user497444003/games/com.mojang";
+            } else {
+                targetMojang = "/app_tmp/CUSA00265/user497444003/games/com.mojang";
+            }
+            report.logs.push_back("USING EXACT TARGET: " + targetMojang);
+            break;
         case TargetMode::AutoDetect:
             if (!scan.detectedMojangDirs.empty()) {
                 targetMojang = scan.detectedMojangDirs.front();
