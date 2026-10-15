@@ -199,7 +199,7 @@ void renderScreen(SDL_Renderer* r, AppState& state) {
 
     // Header
     drawCenteredText(r, "PKG ADDON TEST — PRIZMAVISUALS 1.3.10", kScreenWidth / 2, 34, 5, kWhite);
-    drawCenteredText(r, "STANDALONE PS4 MINECRAFT ADDON INSTALLER TEST", kScreenWidth / 2, 84, 2, kTeal);
+    drawCenteredText(r, "MINI-APP EDITION (APP_TYPE=5) — RUNS WHILE MINECRAFT IS OPEN IN BACKGROUND", kScreenWidth / 2, 84, 2, kTeal);
 
     // Top Card: Cover Image on the Left + Pack & Target Path Info on the Right
     fillRect(r, 140, 125, 1640, 230, kCard);
