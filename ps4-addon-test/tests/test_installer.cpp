@@ -60,7 +60,19 @@ int main() {
     assert(secondInstall.filesWritten == 8806);
     assert(fs::exists(expectedDest / "manifest.json"));
 
-    // Case 3: Direct /data/com.mojang mode
+    // Case 3: Existing "resource packs" (with space) under com.mojang
+    const fs::path appTmpSpace = tempRoot / "app_tmp_space";
+    fs::create_directories(appTmpSpace / "CUSA00265" / "user123456" / "games" / "com.mojang" / "resource packs");
+    const pkgtest::InstallReport spaceInstall = pkgtest::installMcpack(
+        archive,
+        pkgtest::TargetMode::AutoDetect,
+        {appTmpSpace.string()},
+        dataMojang.string());
+    assert(spaceInstall.ok);
+    assert(spaceInstall.filesWritten == 8806);
+    assert(fs::exists(appTmpSpace / "CUSA00265" / "user123456" / "games" / "com.mojang" / "resource packs" / meta.uuid / "manifest.json"));
+
+    // Case 4: Direct /data/com.mojang mode
     const pkgtest::InstallReport dataInstall = pkgtest::installMcpack(
         archive,
         pkgtest::TargetMode::DataComMojang,

@@ -217,6 +217,17 @@ std::vector<std::string> defaultPs4Roots() {
     };
 }
 
+std::string pickResourcePacksSubfolder(const std::string& comMojangDir, PackKind kind) {
+    if (kind == PackKind::Behavior) {
+        if (isDirectory(comMojangDir + "/behavior_packs")) return "behavior_packs";
+        if (isDirectory(comMojangDir + "/behavior packs")) return "behavior packs";
+        return "behavior_packs";
+    }
+    if (isDirectory(comMojangDir + "/resource_packs")) return "resource_packs";
+    if (isDirectory(comMojangDir + "/resource packs")) return "resource packs";
+    return "resource_packs";
+}
+
 std::string resolveSpecificCusaMojang(const std::string& root, const std::string& cusaId) {
     const std::string cusaPath = root + "/" + cusaId;
     if (isDirectory(cusaPath)) {
@@ -478,18 +489,10 @@ InstallReport installMcpack(const std::string& archivePath,
             } else if (!scan.candidateUserDirs.empty()) {
                 targetMojang = scan.candidateUserDirs.front();
                 report.logs.push_back("AUTO SELECTED ACTIVE CUSA USER PATH: " + targetMojang);
-            } else if (!customRoots.empty()) {
-                targetMojang = customRoots.front() + "/CUSA00744/user/games/com.mojang";
-                report.logs.push_back("USING DEFAULT ROOT PATH: " + targetMojang);
-            } else if (isDirectory("/app_tmp")) {
-                targetMojang = "/app_tmp/CUSA00744/user/games/com.mojang";
-                report.logs.push_back("TRYING /app_tmp DEFAULT: " + targetMojang);
-            } else if (isDirectory("/app_temp")) {
-                targetMojang = "/app_temp/CUSA00744/user/games/com.mojang";
-                report.logs.push_back("TRYING /app_temp DEFAULT: " + targetMojang);
             } else {
-                targetMojang = customDataRoot;
-                report.logs.push_back("NO /app_tmp MOUNT FOUND; FALLING BACK TO: " + targetMojang);
+                report.statusTitle = "NOT FOUND: /app_tmp/<CUSA>/<user>/games/com.mojang";
+                report.logs.push_back("ERROR: No /app_tmp/<CUSA>/<user>/games/com.mojang path was found.");
+                return report;
             }
             break;
         case TargetMode::AppTmpUsa:
@@ -509,31 +512,18 @@ InstallReport installMcpack(const std::string& archivePath,
             break;
     }
 
-    const char* packSubfolder = (meta.kind == PackKind::Behavior) ? "behavior_packs" : "resource_packs";
+    const std::string packSubfolder = pickResourcePacksSubfolder(targetMojang, meta.kind);
+    const std::string packsParentDir = targetMojang + "/" + packSubfolder;
     int mkdirErr = 0;
-    if (!mkdirRecursive(targetMojang + "/resource_packs", mkdirErr) ||
-        !mkdirRecursive(targetMojang + "/behavior_packs", mkdirErr)) {
-        if (mode == TargetMode::AutoDetect && targetMojang != customDataRoot && !customDataRoot.empty()) {
-            report.logs.push_back("CANNOT CREATE " + targetMojang + " (ERRNO " + std::to_string(mkdirErr) +
-                                  "), FALLING BACK TO " + customDataRoot);
-            targetMojang = customDataRoot;
-            if (!mkdirRecursive(targetMojang + "/resource_packs", mkdirErr) ||
-                !mkdirRecursive(targetMojang + "/behavior_packs", mkdirErr)) {
-                report.statusTitle = "FAILED TO CREATE TARGET DIRECTORY";
-                report.logs.push_back("MKDIR FAILED AT " + targetMojang + " (ERRNO " + std::to_string(mkdirErr) +
-                                      ": " + std::strerror(mkdirErr) + ")");
-                return report;
-            }
-        } else {
-            report.statusTitle = "FAILED TO CREATE TARGET DIRECTORY";
-            report.logs.push_back("MKDIR FAILED AT " + targetMojang + " (ERRNO " + std::to_string(mkdirErr) +
-                                  ": " + std::strerror(mkdirErr) + ")");
-            return report;
-        }
+    if (!mkdirRecursive(packsParentDir, mkdirErr)) {
+        report.statusTitle = "FAILED TO CREATE " + packSubfolder;
+        report.logs.push_back("MKDIR FAILED AT " + packsParentDir + " (ERRNO " + std::to_string(mkdirErr) +
+                              ": " + std::strerror(mkdirErr) + ")");
+        return report;
     }
 
     report.resolvedMojangDir = targetMojang;
-    report.destinationDir = targetMojang + "/" + packSubfolder + "/" + meta.uuid;
+    report.destinationDir = packsParentDir + "/" + meta.uuid;
 
     if (isDirectory(report.destinationDir)) {
         int rmErr = 0;
