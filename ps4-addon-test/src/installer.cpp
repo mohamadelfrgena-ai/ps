@@ -39,12 +39,24 @@ std::vector<std::string> listChildDirectories(const std::string& dirPath) {
     std::vector<std::string> result;
     DIR* dir = ::opendir(dirPath.c_str());
     if (!dir) return result;
+    const std::string prefix = (dirPath == "/") ? "/" : (dirPath + "/");
     while (dirent* entry = ::readdir(dir)) {
         const std::string name(entry->d_name);
         if (name.empty() || name == "." || name == "..") continue;
-        const std::string full = dirPath + "/" + name;
-        struct stat st {};
-        if (::lstat(full.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+        bool isDir = false;
+#ifdef DT_DIR
+        if (entry->d_type == DT_DIR) {
+            isDir = true;
+        } else if (entry->d_type == DT_UNKNOWN)
+#endif
+        {
+            const std::string full = prefix + name;
+            struct stat st {};
+            if (::stat(full.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+                isDir = true;
+            }
+        }
+        if (isDir) {
             result.push_back(name);
         }
     }
@@ -78,7 +90,7 @@ bool mkdirRecursive(const std::string& path, int& outErrno) {
 
 bool removeTreeRecursive(const std::string& path, int& outErrno) {
     struct stat st {};
-    if (::lstat(path.c_str(), &st) != 0) {
+    if (::stat(path.c_str(), &st) != 0) {
         if (errno == ENOENT) return true;
         outErrno = errno;
         return false;
@@ -366,6 +378,17 @@ PackMetadata inspectMcpackFile(const std::string& archivePath) {
 
 ScanReport scanFilesystemForMinecraft(const std::vector<std::string>& customRoots) {
     ScanReport report;
+    if (customRoots.empty()) {
+        const std::vector<std::string> topDirs = listChildDirectories("/");
+        std::string topList;
+        for (std::size_t i = 0; i < topDirs.size() && i < 12; ++i) {
+            if (i > 0) topList += ", ";
+            topList += "/" + topDirs[i];
+        }
+        if (!topList.empty()) {
+            report.diagnosticLines.push_back("VISIBLE IN /: " + topList);
+        }
+    }
     const std::vector<std::string> roots = customRoots.empty() ? defaultPs4Roots() : customRoots;
 
     for (const std::string& root : roots) {
