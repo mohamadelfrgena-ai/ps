@@ -1,6 +1,6 @@
 # pkg addon test — Minimalist PS4 Folder Copy Installer (PrizmaVisuals 1.3.10222)
 TITLE       := pkg addon test
-VERSION     := 0.3
+VERSION     := 0.4
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
@@ -23,6 +23,7 @@ HOST_CXX    ?= c++
 
 PKG_TOOL    := $(TOOLCHAIN)/bin/$(TOOL_OS)/PkgTool.Core
 CREATE_FSELF:= $(TOOLCHAIN)/bin/$(TOOL_OS)/create-fself
+CREATE_GP4  := $(TOOLCHAIN)/bin/$(TOOL_OS)/create-gp4
 OBJ_DIR     := build/obj
 ELF_FILE    := build/pkg-addon-test.elf
 OELF_FILE   := build/pkg-addon-test.oelf
@@ -30,13 +31,22 @@ RAW_PKG     := $(CONTENT_ID).pkg
 PKG_FILE    := pkg-addon-test.pkg
 OO_SDL_SAMPLE := $(TOOLCHAIN)/samples/SDL2
 
-OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o
+PKG_FILES   := eboot.bin \
+               sce_sys/param.sfo \
+               sce_sys/icon0.png \
+               sce_sys/about/right.sprx \
+               sce_module/libc.prx \
+               sce_module/libSceFios2.prx \
+               assets/folder.raw
+
+OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/jbc.o
 
 LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut \
                -lScePad -lSceSysmodule -lSDL2
 COMMONFLAGS := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
                -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include
-CXXFLAGS    := $(COMMONFLAGS) -std=c++17 -fexceptions -D_POSIX_C_SOURCE=200809L -D_GNU_SOURCE \
+CFLAGS      := $(COMMONFLAGS) -std=c11 -mno-red-zone -D__ORBIS__ -Isrc
+CXXFLAGS    := $(COMMONFLAGS) -std=c++17 -fexceptions -D_POSIX_C_SOURCE=200809L -D_GNU_SOURCE -D__ORBIS__ \
                -isystem $(TOOLCHAIN)/include/c++/v1 -Isrc
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr \
                -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
@@ -52,6 +62,7 @@ check-toolchain:
 	@test -n "$(TOOLCHAIN)" || { echo "Set OO_PS4_TOOLCHAIN to your OpenOrbis toolchain directory."; exit 1; }
 	@test -x "$(TOOLCHAIN)/bin/$(TOOL_OS)/PkgTool.Core" || { echo "OpenOrbis package tools not found under $(TOOLCHAIN)/bin/$(TOOL_OS)."; exit 1; }
 	@test -x "$(TOOLCHAIN)/bin/$(TOOL_OS)/create-fself" || { echo "OpenOrbis create-fself tool is missing."; exit 1; }
+	@test -x "$(TOOLCHAIN)/bin/$(TOOL_OS)/create-gp4" || { echo "OpenOrbis create-gp4 tool is missing."; exit 1; }
 
 $(OBJ_DIR):
 	@mkdir -p $@
@@ -61,6 +72,9 @@ $(OBJ_DIR)/main.o: src/main.cpp | $(OBJ_DIR)
 
 $(OBJ_DIR)/installer.o: src/installer.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/jbc.o: src/jbc.c | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(ELF_FILE): $(OBJECTS) | check-toolchain
 	@mkdir -p build
@@ -96,8 +110,11 @@ prepare-runtime: check-toolchain
 	  cp "$$sample/sce_sys/about/right.sprx" sce_sys/about/right.sprx; \
 	  cp "../ps4/sce_sys/icon0.png" sce_sys/icon0.png
 
-$(PKG_FILE): eboot.bin sce_sys/param.sfo assets/PrizmaVisuals-1.3.10222.zip make_gp4.py | prepare-runtime
-	python3 make_gp4.py "$(CONTENT_ID)" pkg.gp4
+assets/folder.raw: assets/PrizmaVisuals-1.3.10222.zip make_gp4.py
+	python3 make_gp4.py assets/folder.raw
+
+$(PKG_FILE): eboot.bin sce_sys/param.sfo assets/folder.raw | prepare-runtime
+	$(CREATE_GP4) -out pkg.gp4 --content-id=$(CONTENT_ID) --files="$(PKG_FILES)"
 	$(PKG_TOOL) pkg_build pkg.gp4 .
 	cp "$(RAW_PKG)" "$(PKG_FILE)"
 
@@ -108,4 +125,4 @@ host-test:
 	./build-host/test_installer
 
 clean:
-	rm -rf build build-host pkg.gp4 eboot.bin $(RAW_PKG) $(PKG_FILE) sce_sys sce_module "PrizmaVisuals 1.3.10222"
+	rm -rf build build-host pkg.gp4 eboot.bin $(RAW_PKG) $(PKG_FILE) sce_sys sce_module assets/folder.raw

@@ -1,8 +1,13 @@
 #include "installer.hpp"
 
+#ifdef __ORBIS__
+#include "jbc.h"
+#endif
+
 #include <algorithm>
 #include <cerrno>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <dirent.h>
 #include <fcntl.h>
@@ -51,22 +56,75 @@ bool ensureDirectory(const std::string& path, int& outErrno) {
     return false;
 }
 
-bool readExact(int fd, void* dst, std::size_t len, int& outErrno) {
+void removeTreeRecursive(const std::string& path) {
+    struct stat st {};
+    if (::stat(path.c_str(), &st) != 0) return;
+    if (!S_ISDIR(st.st_mode)) {
+        ::unlink(path.c_str());
+        return;
+    }
+
+    DIR* dir = ::opendir(path.c_str());
+    if (dir) {
+        while (dirent* entry = ::readdir(dir)) {
+            const std::string name(entry->d_name);
+            if (name.empty() || name == "." || name == "..") continue;
+            removeTreeRecursive(path + "/" + name);
+        }
+        ::closedir(dir);
+    }
+    ::rmdir(path.c_str());
+}
+
+void cleanPreviousPackFolders(const std::string& destinationFolder) {
+    removeTreeRecursive(destinationFolder);
+    const std::size_t slash = destinationFolder.rfind('/');
+    if (slash == std::string::npos) return;
+    const std::string parentDir = destinationFolder.substr(0, slash);
+    DIR* dir = ::opendir(parentDir.c_str());
+    if (!dir) return;
+    while (dirent* entry = ::readdir(dir)) {
+        const std::string name(entry->d_name);
+        if (name.rfind("PrizmaVisuals", 0) == 0) {
+            removeTreeRecursive(parentDir + "/" + name);
+        }
+    }
+    ::closedir(dir);
+}
+
+#ifdef __ORBIS__
+struct ScopedRootJailbreak {
+    jbc_cred origCred{};
+    bool active = false;
+
+    ScopedRootJailbreak() {
+        if (jbc_get_cred(&origCred) == 0) {
+            jbc_cred rootCred = origCred;
+            if (jbc_jailbreak_cred(&rootCred) == 0 && jbc_set_cred(&rootCred) == 0) {
+                active = true;
+            }
+        }
+    }
+
+    ~ScopedRootJailbreak() {
+        if (active) {
+            jbc_set_cred(&origCred);
+        }
+    }
+};
+#endif
+
+bool freadExact(std::FILE* fp, void* dst, std::size_t len, int& outErrno) {
     char* ptr = static_cast<char*>(dst);
     std::size_t remaining = len;
     while (remaining > 0) {
-        const ssize_t r = ::read(fd, ptr, remaining);
-        if (r < 0) {
-            if (errno == EINTR) continue;
-            outErrno = errno;
-            return false;
-        }
+        const std::size_t r = std::fread(ptr, 1, remaining, fp);
         if (r == 0) {
-            outErrno = EIO;
+            outErrno = errno != 0 ? errno : EIO;
             return false;
         }
         ptr += r;
-        remaining -= static_cast<std::size_t>(r);
+        remaining -= r;
     }
     return true;
 }
@@ -81,40 +139,48 @@ bool writeExact(int fd, const void* src, std::size_t len, int& outErrno) {
             outErrno = errno;
             return false;
         }
+        if (w == 0) {
+            outErrno = EIO;
+            return false;
+        }
         ptr += w;
         remaining -= static_cast<std::size_t>(w);
     }
     return true;
 }
 
-bool copyFromPreExtractedStream(const std::string& rawStreamPath,
-                                const std::string& dstRoot,
-                                CopyResult& result) {
+std::string resolveActualDestinationFolder(const std::string& requestedDest) {
+    const std::string exactParent = "/app_tmp/CUSA00265/user497444003/games/com.mojang";
+    const std::string userParent = "/user/app_tmp/CUSA00265/user497444003/games/com.mojang";
+    if (!isDirectory("/app_tmp/CUSA00265") && isDirectory("/user/app_tmp/CUSA00265")) {
+        if (requestedDest.rfind(exactParent, 0) == 0) {
+            return userParent + requestedDest.substr(exactParent.size());
+        }
+    }
+    return requestedDest;
+}
+
+bool copyFromOpenStream(std::FILE* inFp,
+                        const std::string& dstRoot,
+                        CopyResult& result) {
     int err = 0;
+    cleanPreviousPackFolders(dstRoot);
+
     if (!ensureDirectory(dstRoot, err)) {
         result.errorCode = err;
         result.message = "MKDIR FAILED (" + std::to_string(err) + ")";
         return false;
     }
 
-    const int inFd = ::open(rawStreamPath.c_str(), O_RDONLY);
-    if (inFd < 0) {
-        result.errorCode = errno;
-        result.message = "OPEN FAILED (" + std::to_string(result.errorCode) + ")";
-        return false;
-    }
-
     char magic[8] = {};
-    if (!readExact(inFd, magic, 8, err) || std::memcmp(magic, "PVRAW001", 8) != 0) {
-        ::close(inFd);
+    if (!freadExact(inFp, magic, 8, err) || std::memcmp(magic, "PVRAW001", 8) != 0) {
         result.errorCode = err != 0 ? err : EINVAL;
         result.message = "HEADER FAILED";
         return false;
     }
 
     std::uint32_t dirCount = 0;
-    if (!readExact(inFd, &dirCount, sizeof(dirCount), err)) {
-        ::close(inFd);
+    if (!freadExact(inFp, &dirCount, sizeof(dirCount), err)) {
         result.errorCode = err;
         result.message = "READ DIRCOUNT FAILED";
         return false;
@@ -122,15 +188,13 @@ bool copyFromPreExtractedStream(const std::string& rawStreamPath,
 
     for (std::uint32_t i = 0; i < dirCount; ++i) {
         std::uint16_t pathLen = 0;
-        if (!readExact(inFd, &pathLen, sizeof(pathLen), err)) {
-            ::close(inFd);
+        if (!freadExact(inFp, &pathLen, sizeof(pathLen), err)) {
             result.errorCode = err;
             result.message = "READ DIRLEN FAILED";
             return false;
         }
         std::string relDir(pathLen, '\0');
-        if (pathLen > 0 && !readExact(inFd, &relDir[0], pathLen, err)) {
-            ::close(inFd);
+        if (pathLen > 0 && !freadExact(inFp, &relDir[0], pathLen, err)) {
             result.errorCode = err;
             result.message = "READ DIRPATH FAILED";
             return false;
@@ -138,7 +202,6 @@ bool copyFromPreExtractedStream(const std::string& rawStreamPath,
         const std::string fullDir = dstRoot + "/" + relDir;
         if (::mkdir(fullDir.c_str(), 0777) != 0 && errno != EEXIST) {
             if (!ensureDirectory(fullDir, err)) {
-                ::close(inFd);
                 result.errorCode = err;
                 result.message = "MKDIR FAILED (" + std::to_string(err) + ")";
                 return false;
@@ -147,29 +210,26 @@ bool copyFromPreExtractedStream(const std::string& rawStreamPath,
     }
 
     std::uint32_t fileCount = 0;
-    if (!readExact(inFd, &fileCount, sizeof(fileCount), err)) {
-        ::close(inFd);
+    if (!freadExact(inFp, &fileCount, sizeof(fileCount), err)) {
         result.errorCode = err;
         result.message = "READ FILECOUNT FAILED";
         return false;
     }
 
-    std::vector<char> buffer(256 * 1024);
+    std::vector<char> buffer(32 * 1024);
     for (std::uint32_t i = 0; i < fileCount; ++i) {
         std::uint16_t pathLen = 0;
         std::uint64_t fileSize = 0;
-        if (!readExact(inFd, &pathLen, sizeof(pathLen), err) ||
-            !readExact(inFd, &fileSize, sizeof(fileSize), err)) {
-            ::close(inFd);
+        if (!freadExact(inFp, &pathLen, sizeof(pathLen), err) ||
+            !freadExact(inFp, &fileSize, sizeof(fileSize), err)) {
             result.errorCode = err;
-            result.message = "READ FILEMETA FAILED";
+            result.message = "READ META ERR (" + std::to_string(err) + ")";
             return false;
         }
         std::string relFile(pathLen, '\0');
-        if (pathLen > 0 && !readExact(inFd, &relFile[0], pathLen, err)) {
-            ::close(inFd);
+        if (pathLen > 0 && !freadExact(inFp, &relFile[0], pathLen, err)) {
             result.errorCode = err;
-            result.message = "READ FILEPATH FAILED";
+            result.message = "READ PATH ERR (" + std::to_string(err) + ")";
             return false;
         }
 
@@ -183,9 +243,9 @@ bool copyFromPreExtractedStream(const std::string& rawStreamPath,
             outFd = ::open(fullFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
             if (outFd < 0) {
                 err = errno;
-                ::close(inFd);
                 result.errorCode = err;
-                result.message = "WRITE OPEN FAILED (" + std::to_string(err) + ")";
+                result.message = "OPEN ERR (" + std::to_string(err) + ") AT " +
+                                 std::to_string(result.filesCopied);
                 return false;
             }
         }
@@ -194,29 +254,28 @@ bool copyFromPreExtractedStream(const std::string& rawStreamPath,
         while (remaining > 0) {
             const std::size_t chunk = static_cast<std::size_t>(
                 std::min<std::uint64_t>(remaining, buffer.size()));
-            if (!readExact(inFd, buffer.data(), chunk, err) ||
-                !writeExact(outFd, buffer.data(), chunk, err)) {
+            if (!freadExact(inFp, buffer.data(), chunk, err)) {
                 ::close(outFd);
-                ::close(inFd);
                 result.errorCode = err;
-                result.message = "COPY FAILED (" + std::to_string(err) + ")";
+                result.message = "READ ERR (" + std::to_string(err) + ") AT " +
+                                 std::to_string(result.filesCopied);
+                return false;
+            }
+            if (!writeExact(outFd, buffer.data(), chunk, err)) {
+                ::close(outFd);
+                result.errorCode = err;
+                result.message = "WRITE ERR (" + std::to_string(err) + ") AT " +
+                                 std::to_string(result.filesCopied);
                 return false;
             }
             remaining -= chunk;
             result.bytesCopied += chunk;
         }
 
-        if (::close(outFd) != 0) {
-            err = errno;
-            ::close(inFd);
-            result.errorCode = err;
-            result.message = "CLOSE FAILED (" + std::to_string(err) + ")";
-            return false;
-        }
+        ::close(outFd);
         ++result.filesCopied;
     }
 
-    ::close(inFd);
     return true;
 }
 
@@ -237,7 +296,7 @@ bool copySingleFile(const std::string& srcPath,
         return false;
     }
 
-    std::vector<char> buffer(64 * 1024);
+    std::vector<char> buffer(32 * 1024);
     while (true) {
         const ssize_t readBytes = ::read(inFd, buffer.data(), buffer.size());
         if (readBytes < 0) {
@@ -258,10 +317,7 @@ bool copySingleFile(const std::string& srcPath,
     }
 
     ::close(inFd);
-    if (::close(outFd) != 0) {
-        outErrno = errno;
-        return false;
-    }
+    ::close(outFd);
     return true;
 }
 
@@ -322,15 +378,34 @@ bool copyTreeRecursive(const std::string& srcDir,
 CopyResult copyAddonFolder(const std::string& sourceFolder,
                            const std::string& destinationFolder) {
     CopyResult result;
-    if (!isDirectory(sourceFolder)) {
-        result.errorCode = errno;
-        result.message = "SOURCE MISSING (" + std::to_string(result.errorCode) + ")";
-        return result;
+
+    std::string rawCandidate = sourceFolder;
+    if (!isRegularFile(rawCandidate)) {
+        if (isRegularFile(sourceFolder + "/folder.raw")) {
+            rawCandidate = sourceFolder + "/folder.raw";
+        } else if (isRegularFile("/app0/assets/folder.raw")) {
+            rawCandidate = "/app0/assets/folder.raw";
+        }
     }
 
-    const std::string rawStreamPath = sourceFolder + "/folder.raw";
-    if (isRegularFile(rawStreamPath)) {
-        if (!copyFromPreExtractedStream(rawStreamPath, destinationFolder, result)) {
+    if (isRegularFile(rawCandidate)) {
+        std::FILE* inFp = std::fopen(rawCandidate.c_str(), "rb");
+        if (!inFp) {
+            result.errorCode = errno;
+            result.message = "OPEN FAILED (" + std::to_string(result.errorCode) + ")";
+            return result;
+        }
+
+        std::vector<char> ioBuf(64 * 1024);
+        std::setvbuf(inFp, ioBuf.data(), _IOFBF, ioBuf.size());
+
+#ifdef __ORBIS__
+        ScopedRootJailbreak jailbreakGuard;
+#endif
+        const std::string actualDest = resolveActualDestinationFolder(destinationFolder);
+        const bool ok = copyFromOpenStream(inFp, actualDest, result);
+        std::fclose(inFp);
+        if (!ok) {
             return result;
         }
         result.ok = true;
@@ -338,6 +413,13 @@ CopyResult copyAddonFolder(const std::string& sourceFolder,
         return result;
     }
 
+    if (!isDirectory(sourceFolder)) {
+        result.errorCode = errno;
+        result.message = "SOURCE MISSING (" + std::to_string(result.errorCode) + ")";
+        return result;
+    }
+
+    cleanPreviousPackFolders(destinationFolder);
     if (!copyTreeRecursive(sourceFolder, destinationFolder, result)) {
         return result;
     }

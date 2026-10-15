@@ -17,7 +17,7 @@ namespace {
 
 constexpr int kScreenWidth = 1920;
 constexpr int kScreenHeight = 1080;
-constexpr char kSourceAddonFolder[] = "/app0/PrizmaVisuals 1.3.10222";
+constexpr char kSourceAddonFolder[] = "/app0/assets/folder.raw";
 constexpr char kTargetAddonFolder[] =
     "/app_tmp/CUSA00265/user497444003/games/com.mojang/resource_packs/PrizmaVisuals 1.3.10222";
 
