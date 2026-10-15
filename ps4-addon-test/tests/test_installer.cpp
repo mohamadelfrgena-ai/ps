@@ -1,6 +1,7 @@
 #include "installer.hpp"
 
 #include <cassert>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -43,7 +44,22 @@ int main() {
     assert(fs::exists(dst / "manifest.json"));
     assert(fs::exists(dst / "textures" / "blocks" / "stone.png"));
 
+    if (fs::exists("assets/PrizmaVisuals-1.3.10222.zip")) {
+        const int rc = std::system("python3 make_gp4.py IV0000-ATST00002_00-PKGADDONTEST0000 pkg.gp4");
+        assert(rc == 0);
+        const fs::path realDst = root / "real_resource_packs" / "PrizmaVisuals 1.3.10222";
+        const pkgtest::CopyResult realRes =
+            pkgtest::copyAddonFolder("PrizmaVisuals 1.3.10222", realDst.string());
+        assert(realRes.ok);
+        assert(realRes.filesCopied == 8806);
+        assert(fs::exists(realDst / "manifest.json"));
+        assert(fs::exists(realDst / "pack_icon.png"));
+        assert(fs::exists(realDst / "subpacks" / "1" / "textures" / "blocks"));
+        fs::remove_all("PrizmaVisuals 1.3.10222");
+        fs::remove("pkg.gp4");
+    }
+
     fs::remove_all(root);
-    std::cout << "pkg addon test folder copy host tests passed.\n";
+    std::cout << "pkg addon test folder copy host tests passed (8806 files verified).\n";
     return 0;
 }
