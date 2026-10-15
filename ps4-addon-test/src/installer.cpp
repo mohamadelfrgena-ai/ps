@@ -280,19 +280,19 @@ const char* targetModeLabel(TargetMode mode) {
 const char* targetModePathPreview(TargetMode mode) {
     switch (mode) {
         case TargetMode::ExactUserPath:
-            return "/app_tmp/CUSA00265/user497444003/games/com.mojang/resource_packs/<uuid>";
+            return "/app_tmp/CUSA00265/user497444003/games/com.mojang/resource_packs/PrizmaVisuals 1.3.10";
         case TargetMode::AutoDetect:
-            return "/app_tmp/<CUSA>/<user>/games/com.mojang/resource_packs/<uuid>";
+            return "/app_tmp/<CUSA>/<user>/games/com.mojang/resource_packs/PrizmaVisuals 1.3.10";
         case TargetMode::AppTmpUsa:
-            return "/app_tmp/CUSA00744/<user>/games/com.mojang/resource_packs/<uuid>";
+            return "/app_tmp/CUSA00744/<user>/games/com.mojang/resource_packs/PrizmaVisuals 1.3.10";
         case TargetMode::AppTmpEur:
-            return "/app_tmp/CUSA00265/<user>/games/com.mojang/resource_packs/<uuid>";
+            return "/app_tmp/CUSA00265/<user>/games/com.mojang/resource_packs/PrizmaVisuals 1.3.10";
         case TargetMode::AppTempUsa:
-            return "/app_temp/CUSA00744/<user>/games/com.mojang/resource_packs/<uuid>";
+            return "/app_temp/CUSA00744/<user>/games/com.mojang/resource_packs/PrizmaVisuals 1.3.10";
         case TargetMode::AppTempEur:
-            return "/app_temp/CUSA00265/<user>/games/com.mojang/resource_packs/<uuid>";
+            return "/app_temp/CUSA00265/<user>/games/com.mojang/resource_packs/PrizmaVisuals 1.3.10";
         case TargetMode::DataComMojang:
-            return "/data/com.mojang/resource_packs/<uuid>";
+            return "/data/com.mojang/resource_packs/PrizmaVisuals 1.3.10";
     }
     return "";
 }
@@ -574,7 +574,8 @@ InstallReport installMcpack(const std::string& archivePath,
     }
 
     report.resolvedMojangDir = targetMojang;
-    report.destinationDir = packsParentDir + "/" + meta.uuid;
+    const std::string folderName = meta.name.empty() ? "PrizmaVisuals 1.3.10" : meta.name;
+    report.destinationDir = packsParentDir + "/" + folderName;
 
     if (isDirectory(report.destinationDir)) {
         int rmErr = 0;

@@ -45,7 +45,7 @@ int main() {
     assert(firstInstall.ok);
     assert(firstInstall.filesWritten == 8806);
     const fs::path expectedDest =
-        appTmp / "CUSA00744" / "1000000a" / "games" / "com.mojang" / "resource_packs" / meta.uuid;
+        appTmp / "CUSA00744" / "1000000a" / "games" / "com.mojang" / "resource_packs" / "PrizmaVisuals 1.3.10";
     assert(firstInstall.destinationDir == expectedDest.string());
     assert(fs::exists(expectedDest / "manifest.json"));
     assert(fs::exists(expectedDest / "pack_icon.png"));
@@ -70,7 +70,7 @@ int main() {
         dataMojang.string());
     assert(spaceInstall.ok);
     assert(spaceInstall.filesWritten == 8806);
-    assert(fs::exists(appTmpSpace / "CUSA00265" / "user123456" / "games" / "com.mojang" / "resource packs" / meta.uuid / "manifest.json"));
+    assert(fs::exists(appTmpSpace / "CUSA00265" / "user123456" / "games" / "com.mojang" / "resource packs" / "PrizmaVisuals 1.3.10" / "manifest.json"));
 
     // Case 4: Direct /data/com.mojang mode
     const pkgtest::InstallReport dataInstall = pkgtest::installMcpack(
@@ -80,7 +80,7 @@ int main() {
         dataMojang.string());
     assert(dataInstall.ok);
     assert(dataInstall.filesWritten == 8806);
-    assert(fs::exists(dataMojang / "resource_packs" / meta.uuid / "manifest.json"));
+    assert(fs::exists(dataMojang / "resource_packs" / "PrizmaVisuals 1.3.10" / "manifest.json"));
 
     fs::remove_all(tempRoot);
     std::cout << "pkg addon test (PrizmaVisuals 1.3.10) host tests passed (8806 files verified).\n";
