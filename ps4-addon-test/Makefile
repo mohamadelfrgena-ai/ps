@@ -1,8 +1,8 @@
 # pkg addon test — Standalone PS4 Minecraft Addon Installer Test PKG (PrizmaVisuals 1.3.10)
 TITLE       := pkg addon test
-VERSION     := 0.1
-TITLE_ID    := ATST00001
-CONTENT_ID  := IV0000-ATST00001_00-PKGADDONTEST0000
+VERSION     := 0.2
+TITLE_ID    := ATST00002
+CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
 TOOLCHAIN   ?= $(OO_PS4_TOOLCHAIN)
 UNAME_S     := $(shell uname -s)
@@ -96,10 +96,10 @@ eboot.bin: $(ELF_FILE)
 sce_sys/param.sfo: Makefile | check-toolchain
 	@mkdir -p sce_sys
 	$(PKG_TOOL) sfo_new $@
-	$(PKG_TOOL) sfo_setentry $@ APP_TYPE --type Integer --maxsize 4 --value 5
+	$(PKG_TOOL) sfo_setentry $@ APP_TYPE --type Integer --maxsize 4 --value 0
 	$(PKG_TOOL) sfo_setentry $@ APP_VER --type Utf8 --maxsize 8 --value '$(VERSION)'
-	$(PKG_TOOL) sfo_setentry $@ ATTRIBUTE --type Integer --maxsize 4 --value 0
-	$(PKG_TOOL) sfo_setentry $@ CATEGORY --type Utf8 --maxsize 4 --value 'gd'
+	$(PKG_TOOL) sfo_setentry $@ ATTRIBUTE --type Integer --maxsize 4 --value 16
+	$(PKG_TOOL) sfo_setentry $@ CATEGORY --type Utf8 --maxsize 4 --value 'gde'
 	$(PKG_TOOL) sfo_setentry $@ CONTENT_ID --type Utf8 --maxsize 48 --value '$(CONTENT_ID)'
 	$(PKG_TOOL) sfo_setentry $@ DOWNLOAD_DATA_SIZE --type Integer --maxsize 4 --value 0
 	$(PKG_TOOL) sfo_setentry $@ SYSTEM_VER --type Integer --maxsize 4 --value 0
