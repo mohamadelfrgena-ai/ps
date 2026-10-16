@@ -1,0 +1,6 @@
+F77 Minecraft (F77-Minecraft.ttf)
+License embedded in the font file: Creative Commons Attribution-NoDerivatives 3.0 (http://creativecommons.org/licenses/by-nd/3.0/).
+- Use is allowed (also commercial) with ATTRIBUTION to the font's author ("F77 Minecraft") in the app's About/credits screen.
+- NoDerivatives: do not modify, convert or subset the font file; ship it unchanged.
+- The font file's embedding flag is "Preview & Print" (fsType 4): check with the font's author/source that bundling it inside an app is allowed before release.
+- It is not an official Minecraft or Mojang asset.
