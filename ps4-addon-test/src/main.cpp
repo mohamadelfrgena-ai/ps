@@ -478,21 +478,27 @@ int main(int, char**) {
                 const Uint8 b = ev.jbutton.button;
                 if (b == 0) { activate(1); stateChanged = true; }
                 else if (b == 1) { back(); stateChanged = true; }
-                else if (b == 2) { // square - language / save
+                else if (b == 2) { // square - filter / language / save
                     if (state.screen == Screen::Detail) {
                         state.saved = !state.saved;
                         toast(state.saved ? "Saved to your favorites" : "Removed from favorites");
+                    } else if (state.screen == Screen::Store) {
+                        state.focus = 9 + state.storeFilter;      // jump to filter chips
+                        stateChanged = true;
+                    } else if (state.screen == Screen::Deals) {
+                        state.focus = state.dealsFilter;          // jump to filter chips
+                        stateChanged = true;
                     } else if (state.screen == Screen::Home || state.screen == Screen::Welcome ||
-                               state.screen == Screen::Deals || state.screen == Screen::Store ||
                                state.screen == Screen::Chat) {
                         state.prevScreen = state.screen;
                         state.focus = state.langIndex;
                         if (state.screen != Screen::Language) state.screen = Screen::Language;
+                        stateChanged = true;
                     }
-                    stateChanged = true;
-                } else if (b == 3) { // triangle - share / menu
+                } else if (b == 3) { // triangle - share / sort
                     if (state.screen == Screen::Detail) toast("Share link copied");
                     else if (state.screen == Screen::Deals) toast("Sorted by biggest discount");
+                    else if (state.screen == Screen::Store) toast("Sorted by newest");
                     stateChanged = true;
                 } else if (b == 4) { switchTab(-1); stateChanged = true; }             // L1
                 else if (b == 5) { switchTab(1); stateChanged = true; }                // R1

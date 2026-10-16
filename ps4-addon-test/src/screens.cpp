@@ -114,6 +114,16 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
         {"shop_sale", {{"en", "Shop the sale"}, {"ar", "تسوق التخفيضات"}, {"fr", "Acheter en solde"},
                        {"tr", "İndirimden satın al"}, {"es", "Comprar en oferta"},
                        {"ru", "Купить со скидкой"}, {"pt", "Comprar na promoção"}, {"zh", "抢购特惠"}}},
+        {"save", {{"en", "Save"}, {"ar", "حفظ"}, {"fr", "Enregistrer"}, {"tr", "Kaydet"},
+                  {"es", "Guardar"}, {"ru", "Сохранить"}, {"pt", "Salvar"}, {"zh", "收藏"}}},
+        {"share", {{"en", "Share"}, {"ar", "مشاركة"}, {"fr", "Partager"}, {"tr", "Paylaş"},
+                   {"es", "Compartir"}, {"ru", "Поделиться"}, {"pt", "Compartilhar"}, {"zh", "分享"}}},
+        {"prev_offer", {{"en", "Prev offer"}, {"ar", "العرض السابق"}, {"fr", "Offre précédente"},
+                        {"tr", "Önceki teklif"}, {"es", "Oferta anterior"}, {"ru", "Пред. предложение"},
+                        {"pt", "Oferta anterior"}, {"zh", "上一个优惠"}}},
+        {"next_offer", {{"en", "Next offer"}, {"ar", "العرض التالي"}, {"fr", "Offre suivante"},
+                        {"tr", "Sonraki teklif"}, {"es", "Oferta siguiente"}, {"ru", "След. предложение"},
+                        {"pt", "Próxima oferta"}, {"zh", "下一个优惠"}}},
         {"filter", {{"en", "Filter"}, {"ar", "تصفية"}, {"fr", "Filtrer"}, {"tr", "Filtre"},
                     {"es", "Filtrar"}, {"ru", "Фильтр"}, {"pt", "Filtrar"}, {"zh", "筛选"}}},
         {"sort", {{"en", "Sort"}, {"ar", "ترتيب"}, {"fr", "Trier"}, {"tr", "Sırala"},
@@ -722,7 +732,8 @@ void drawInstallDemo(UiEngine& e, DemoState state, int percent, const std::strin
 
     drawLegendBar(e, {{"\xE2\x9C\x95", "select"},
                       {"\xE2\x97\x8B", "back"},
-                      {"\xE2\x96\xB3", "open"}},
+                      {"\xE2\x96\xA1", "save"},
+                      {"\xE2\x96\xB3", "share"}},
                   langCode);
 }
 
@@ -1016,7 +1027,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     }
 
     drawLegendBar(e, {{"\xE2\x9C\x95", "select"}, {"\xE2\x97\x8B", "back"},
-                      {"L2", "open"}, {"R2", "open"}}, langCode);
+                      {"L2", "prev_offer"}, {"R2", "next_offer"}}, langCode);
 }
 
 void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langCode) {
@@ -1077,7 +1088,7 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
     }
 
     drawLegendBar(e, {{"\xE2\x9C\x95", "open"}, {"\xE2\x97\x8B", "back"},
-                      {"\xE2\x96\xB3", "select"}}, langCode);
+                      {"\xE2\x96\xA1", "filter"}, {"\xE2\x96\xB3", "sort"}}, langCode);
 }
 
 // Deals campaign landing (design section 6): header band 430 + chips + 5-col grid

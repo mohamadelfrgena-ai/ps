@@ -144,6 +144,7 @@ on conflict (slug) do update
       badge_text           = excluded.badge_text,
       discount_percent     = excluded.discount_percent,
       target_type          = excluded.target_type,
+      ends_at              = excluded.ends_at,
       enabled              = true,
       updated_at           = now();
 
@@ -347,7 +348,12 @@ begin
     );
   end if;
 
-  if v_row.status in ('linked', 'consumed') and v_row.user_id is not null then
+  -- استهلاك مرة واحدة: إن كانت الرموز مسحوبة سابقاً لا نعيد تسليمها
+  if v_row.status = 'consumed' then
+    return jsonb_build_object('ok', true, 'status', 'consumed');
+  end if;
+
+  if v_row.status = 'linked' and v_row.user_id is not null then
     select * into v_profile from public.profiles where id = v_row.user_id;
     v_plan := public.effective_plan(v_row.user_id);
     select coalesce(balance, 0) into v_balance from public.ac_wallets where user_id = v_row.user_id;
