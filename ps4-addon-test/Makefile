@@ -1,5 +1,6 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
+# AddonStation PS4 Mini-App — v0.13 test build (includes Settings auto-launch toggle)
 VERSION     := 0.13
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
