@@ -5,9 +5,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <map>
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <vector>
 
 namespace {
 
@@ -23,26 +25,44 @@ void writeTextFile(const std::string& path, const std::string& content) {
     assert(out.good());
 }
 
+// Builds a tiny PVRAW001 stream (same format the store pipeline produces)
+void writeTestRaw(const std::string& rawPath,
+                  const std::vector<std::string>& dirs,
+                  const std::vector<std::pair<std::string, std::string>>& files) {
+    std::ofstream out(rawPath, std::ios::binary);
+    assert(out.good());
+    out.write("PVRAW001", 8);
+    const std::uint32_t dirCount = static_cast<std::uint32_t>(dirs.size());
+    out.write(reinterpret_cast<const char*>(&dirCount), sizeof(dirCount));
+    for (const std::string& d : dirs) {
+        const std::uint16_t len = static_cast<std::uint16_t>(d.size());
+        out.write(reinterpret_cast<const char*>(&len), sizeof(len));
+        out.write(d.data(), len);
+    }
+    const std::uint32_t fileCount = static_cast<std::uint32_t>(files.size());
+    out.write(reinterpret_cast<const char*>(&fileCount), sizeof(fileCount));
+    for (const auto& f : files) {
+        const std::uint16_t len = static_cast<std::uint16_t>(f.first.size());
+        const std::uint64_t size = f.second.size();
+        out.write(reinterpret_cast<const char*>(&len), sizeof(len));
+        out.write(reinterpret_cast<const char*>(&size), sizeof(size));
+        out.write(f.first.data(), len);
+        out.write(f.second.data(), static_cast<std::streamsize>(size));
+    }
+}
+
 } // namespace
 
 int main() {
-    // 1. Verify 8-language notification & phase strings
-    assert(pkgtest::formatEnjoyNotification("PrizmaVisuals", "ar") ==
-           "تم تثبيت PrizmaVisuals — استمتع!");
-    assert(pkgtest::formatEnjoyNotification("PrizmaVisuals", "en") ==
-           "PrizmaVisuals installed — Enjoy!");
-    assert(pkgtest::formatEnjoyNotification("PrizmaVisuals", "fr") ==
-           "PrizmaVisuals installé — Profitez-en !");
-    assert(pkgtest::formatEnjoyNotification("PrizmaVisuals", "tr") ==
-           "PrizmaVisuals yüklendi — Keyfini çıkarın!");
-    assert(pkgtest::formatEnjoyNotification("PrizmaVisuals", "es") ==
-           "PrizmaVisuals instalado — ¡Disfruta!");
-    assert(pkgtest::formatEnjoyNotification("PrizmaVisuals", "ru") ==
-           "PrizmaVisuals установлен — Приятной игры!");
-    assert(pkgtest::formatEnjoyNotification("PrizmaVisuals", "pt") ==
-           "PrizmaVisuals instalado — Aproveite!");
-    assert(pkgtest::formatEnjoyNotification("PrizmaVisuals", "zh") ==
-           "PrizmaVisuals 已安装 — 尽情畅玩吧！");
+    // 1. 8-language notification & phase strings
+    assert(pkgtest::formatEnjoyNotification("My Pack", "ar") == "تم تثبيت My Pack — استمتع!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "en") == "My Pack installed — Enjoy!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "fr") == "My Pack installé — Profitez-en !");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "tr") == "My Pack yüklendi — Keyfini çıkarın!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "es") == "My Pack instalado — ¡Disfruta!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "ru") == "My Pack установлен — Приятной игры!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "pt") == "My Pack instalado — Aproveite!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "zh") == "My Pack 已安装 — 尽情畅玩吧！");
 
     assert(pkgtest::formatInstallPhaseLabel(pkgtest::InstallPhase::Downloading, "en") == "Downloading...");
     assert(pkgtest::formatInstallPhaseLabel(pkgtest::InstallPhase::Installing, "ar") == "جارٍ التثبيت...");
@@ -53,16 +73,16 @@ int main() {
     assert(rootPtr != nullptr);
     const std::string root(rootPtr);
 
-    const std::string srcAddon = root + "/src/PrizmaVisuals 1.3.10222";
+    // 2. copyAddonFolder from an extracted folder
+    const std::string srcAddon = root + "/src/My Pack 1.0";
     assert(::mkdir((root + "/src").c_str(), 0777) == 0);
     assert(::mkdir(srcAddon.c_str(), 0777) == 0);
     assert(::mkdir((srcAddon + "/textures").c_str(), 0777) == 0);
-
-    writeTextFile(srcAddon + "/manifest.json", "{\"format_version\":2,\"header\":{\"name\":\"PrizmaVisuals\"}}");
-    writeTextFile(srcAddon + "/textures/terrain_texture.json", "{\"resource_pack_name\":\"prizma\"}");
+    writeTextFile(srcAddon + "/manifest.json", "{\"format_version\":2,\"header\":{\"name\":\"My Pack\"}}");
+    writeTextFile(srcAddon + "/textures/terrain_texture.json", "{\"resource_pack_name\":\"my-pack\"}");
 
     const std::string dstPack =
-        root + "/app_tmp/CUSA00744/user987654321/games/com.mojang/resource_packs/PrizmaVisuals 1.3.10222";
+        root + "/app_tmp/CUSA00744/user987654321/games/com.mojang/resource_packs/My Pack 1.0";
 
     const pkgtest::CopyResult res = pkgtest::copyAddonFolder(srcAddon, dstPack);
     assert(res.ok);
@@ -70,74 +90,66 @@ int main() {
     assert(fileExists(dstPack + "/manifest.json"));
     assert(fileExists(dstPack + "/textures/terrain_texture.json"));
 
-    struct stat zipSt {};
-    if (::stat("assets/PrizmaVisuals-1.3.10222.zip", &zipSt) == 0) {
-        const int rc = std::system("python3 make_gp4.py assets/folder.raw");
-        assert(rc == 0);
+    // 3. Build a synthetic .raw (store pipeline format) — no external assets needed
+    const std::string testRaw = root + "/my-pack-1.0.raw";
+    writeTestRaw(testRaw,
+                 {"textures"},
+                 {
+                     {"manifest.json", "{\"header\":{\"name\":\"My Pack\"}}"},
+                     {"textures/terrain_texture.json", "{\"resource_pack_name\":\"my-pack\"}"},
+                 });
 
-        const std::string stageDir = root + "/data_stage";
+    const std::string stageDir = root + "/data_stage";
+
+    // 4. Mode 1: Minecraft is CLOSED -> stage + flag, then auto-sync when mounted
+    {
         const std::string closedMojangDir =
             root + "/closed_mc/CUSA00744/user123456789/games/com.mojang";
 
-        // Mode 1: Minecraft is CLOSED (closedMojangDir does NOT exist yet)
         const pkgtest::CopyResult queuedRes = pkgtest::installOrQueueAddon(
-            "assets/folder.raw",
-            "PrizmaVisuals 1.3.10222",
-            stageDir,
-            closedMojangDir,
-            "resource_packs",
-            "ar");
+            testRaw, "My Pack 1.0", stageDir, closedMojangDir, "resource_packs", "ar");
         assert(queuedRes.ok);
         assert(queuedRes.queuedForMinecraft);
-        assert(fileExists(stageDir + "/PrizmaVisuals 1.3.10222.raw"));
-        assert(fileExists(stageDir + "/PrizmaVisuals 1.3.10222.pending"));
+        assert(fileExists(stageDir + "/My Pack 1.0.raw"));
+        assert(fileExists(stageDir + "/My Pack 1.0.pending"));
 
-        // Simulate Minecraft opening and mounting closedMojangDir
         const std::string mkCmd = "mkdir -p \"" + closedMojangDir + "\"";
         assert(std::system(mkCmd.c_str()) == 0);
 
-        const pkgtest::CopyResult syncRes = pkgtest::syncPendingAddonsIfMounted(
-            stageDir,
-            closedMojangDir,
-            "ar");
+        const pkgtest::CopyResult syncRes =
+            pkgtest::syncPendingAddonsIfMounted(stageDir, closedMojangDir, "ar");
         assert(syncRes.ok);
-        assert(syncRes.filesCopied == 8805);
-        assert(fileExists(closedMojangDir + "/resource_packs/PrizmaVisuals 1.3.10222/manifest.json"));
-        // Verify automatic cleanup of both .pending AND the large .raw file!
-        assert(!fileExists(stageDir + "/PrizmaVisuals 1.3.10222.pending"));
-        assert(!fileExists(stageDir + "/PrizmaVisuals 1.3.10222.raw"));
-        assert(pkgtest::isAddonMarkedInstalled("PrizmaVisuals 1.3.10222", stageDir));
+        assert(syncRes.filesCopied == 2);
+        assert(fileExists(closedMojangDir + "/resource_packs/My Pack 1.0/manifest.json"));
+        assert(!fileExists(stageDir + "/My Pack 1.0.pending"));
+        assert(!fileExists(stageDir + "/My Pack 1.0.raw"));
+        assert(pkgtest::isAddonMarkedInstalled("My Pack 1.0", stageDir));
+    }
 
-        // Mode 2: Minecraft is ALREADY OPEN (downloaded source lives in stageDir)
+    // 5. Mode 2: Minecraft is OPEN (downloaded source lives in stageDir -> deleted after)
+    {
         const std::string openMojangDir =
             root + "/open_mc/CUSA00283/user555666777/games/com.mojang";
         const std::string mkOpenCmd = "mkdir -p \"" + openMojangDir + "\"";
         assert(std::system(mkOpenCmd.c_str()) == 0);
 
-        // simulate a downloaded .raw inside stageDir (store flow)
-        {
-            std::ifstream srcRaw("assets/folder.raw", std::ios::binary);
-            assert(srcRaw.good());
-            std::ofstream dstRaw(stageDir + "/PrizmaVisuals 1.3.10222.raw", std::ios::binary);
-            dstRaw << srcRaw.rdbuf();
-            assert(dstRaw.good());
-        }
+        const std::string downloadedRaw = stageDir + "/My Pack 1.0.raw";
+        writeTestRaw(downloadedRaw,
+                     {"textures"},
+                     {
+                         {"manifest.json", "{\"header\":{\"name\":\"My Pack\"}}"},
+                         {"textures/terrain_texture.json", "{\"resource_pack_name\":\"my-pack\"}"},
+                     });
 
         const pkgtest::CopyResult immediateRes = pkgtest::installOrQueueAddon(
-            stageDir + "/PrizmaVisuals 1.3.10222.raw",
-            "PrizmaVisuals 1.3.10222",
-            stageDir,
-            openMojangDir,
-            "resource_packs",
-            "en");
+            downloadedRaw, "My Pack 1.0", stageDir, openMojangDir, "resource_packs", "en");
         assert(immediateRes.ok);
         assert(!immediateRes.queuedForMinecraft);
-        assert(immediateRes.filesCopied == 8805);
-        assert(fileExists(openMojangDir + "/resource_packs/PrizmaVisuals 1.3.10222/manifest.json"));
-        assert(!fileExists(stageDir + "/PrizmaVisuals 1.3.10222.raw"));
-        assert(pkgtest::isAddonMarkedInstalled("PrizmaVisuals 1.3.10222", stageDir));
+        assert(immediateRes.filesCopied == 2);
+        assert(fileExists(openMojangDir + "/resource_packs/My Pack 1.0/manifest.json"));
+        assert(!fileExists(downloadedRaw));
     }
 
-    std::printf("pkg addon test dual-mode + dynamic CUSA/user + cleanup + 8-lang host tests passed.\n");
+    std::printf("installer host tests passed (dynamic paths, dual-mode, cleanup, 8-lang).\n");
     return 0;
 }

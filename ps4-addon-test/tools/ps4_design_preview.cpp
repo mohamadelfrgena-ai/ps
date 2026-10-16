@@ -77,13 +77,13 @@ int main(int argc, char** argv) {
     // 7. Install demo - Installed + AR notification (the user's requested toast)
     engine.clear(theme::BG);
     drawInstallDemo(engine, DemoState::Installed, 100, "ar");
-    drawToast(engine, "تم تثبيت PrizmaVisuals — استمتع!", "ar");
+    drawToast(engine, "تم تثبيت [اسم الإضافة] — استمتع!", "ar");
     savePng(engine, outDir + "/ps4_install_done_toast_ar.png");
 
     // 8. Install demo - Installed + EN notification
     engine.clear(theme::BG);
     drawInstallDemo(engine, DemoState::Installed, 100, "en");
-    drawToast(engine, "PrizmaVisuals installed — Enjoy!", "en");
+    drawToast(engine, "[Addon name] installed — Enjoy!", "en");
     savePng(engine, outDir + "/ps4_install_done_toast_en.png");
 
     // 9. Install demo - Installing FR (progress)

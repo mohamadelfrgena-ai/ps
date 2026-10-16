@@ -1,9 +1,0 @@
-{
-  "tag": "content-prizmavisuals-1.3.10222",
-  "title": "AddonStation content: PrizmaVisuals 1.3.10222",
-  "source": "ps4-addon-test/assets/PrizmaVisuals-1.3.10222.zip",
-  "name": "PrizmaVisuals",
-  "version": "1.3.10222",
-  "cover": "content-staging/prizmavisuals-cover.jpg",
-  "notes": "PS4/PS5 + phone + PC content package. .raw installs to resource_packs/<slug>_<uuid8> (manifest header.uuid) — handles scattered files and pack0/pack1 collisions."
-}

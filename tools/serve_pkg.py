@@ -29,7 +29,7 @@ PAGE = """<!doctype html>
 </style></head><body>
 <div class="card">
   <h1>🎮 تنزيل حزمة pkg addon test (PS4 Mini-App)</h1>
-  <p class="sub">نسخة <b>CATEGORY = gde (Mini-App)</b> بمعرّف <code>ATST00002</code> تحتوي على إضافة وغلاف <b>PrizmaVisuals 1.3.10</b> (8,806 ملفات) وتعمل مع بقاء Minecraft معلّقة في الخلفية.</p>
+  <p class="sub">نسخة <b>CATEGORY = gde (Mini-App)</b> بمعرّف <code>ATST00002</code> واجهة التصميم الكاملة ومثبّت ذكي يحمّل المحتوى من GitHub Releases، وتعمل مع بقاء Minecraft معلّقة في الخلفية.</p>
   <a class="btn" href="/pkg-addon-test.pkg?v={tag}" download="pkg-addon-test.pkg">⬇️ تحميل مباشر pkg-addon-test.pkg ({size})</a>
   <a class="btn2" href="https://github.com/mohamadelfrgena-ai/ps/raw/arena/5622bbf6-ps/ps4/downloads/pkg-addon-test.pkg" target="_blank" rel="noopener">🔗 رابط التحميل المباشر من GitHub Raw</a>
   <a class="btn2" href="https://github.com/mohamadelfrgena-ai/ps/actions/runs/38732514925" target="_blank" rel="noopener">📦 صفحة البناء في GitHub Actions (Artifacts)</a>

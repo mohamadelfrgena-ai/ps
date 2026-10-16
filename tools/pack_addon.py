@@ -25,9 +25,8 @@ Outputs (per pack, plus an index):
   - `dist/<slug>.zip`           clean re-packed archive for GitHub Releases
 
 Usage:
-  python3 tools/pack_addon.py MyAddon.zip --name "PrizmaVisuals" \
-      --version 1.3.10222 --repo owner/repo --tag v1.3.10222 \
-      --title-id CUSA00265
+  python3 tools/pack_addon.py MyAddon.zip --name "MyAddon" \
+      --version 1.0.0 --repo owner/repo --tag content-myaddon-1.0.0
 
   # then upload the .raw files to a GitHub Release:
   gh release upload <tag> dist/*.raw dist/*.zip

@@ -93,10 +93,10 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
         {"enjoy", {{"en", "Enjoy!"}, {"ar", "استمتع!"}, {"fr", "Profitez-en !"},
                    {"tr", "Keyfini çıkarın!"}, {"es", "¡Disfruta!"}, {"ru", "Приятной игры!"},
                    {"pt", "Aproveite!"}, {"zh", "尽情畅玩吧！"}}},
-        {"install_demo_title", {{"en", "Install PrizmaVisuals 1.3.10222"}, {"ar", "تثبيت PrizmaVisuals 1.3.10222"},
-                                {"fr", "Installer PrizmaVisuals 1.3.10222"}, {"tr", "PrizmaVisuals 1.3.10222 kur"},
-                                {"es", "Instalar PrizmaVisuals 1.3.10222"}, {"ru", "Установить PrizmaVisuals 1.3.10222"},
-                                {"pt", "Instalar PrizmaVisuals 1.3.10222"}, {"zh", "安装 PrizmaVisuals 1.3.10222"}}},
+        {"install_demo_title", {{"en", "Install [Addon name]"}, {"ar", "تثبيت [اسم الإضافة]"},
+                                {"fr", "Installer [nom de l'addon]"}, {"tr", "[Eklenti adını] kur"},
+                                {"es", "Instalar [nombre del addon]"}, {"ru", "Установить [аддон]"},
+                                {"pt", "Instalar [nome do addon]"}, {"zh", "安装 [模组名称]"}}},
         {"install_demo_sub", {{"en", "Dynamic PS4 addon & world installer — auto-detects CUSAxxxxx and userXXXXXXXXX"},
                               {"ar", "مثبّت إضافات وعوالم ذكي — يكتشف CUSAxxxxx وuserXXXXXXXXX تلقائياً"},
                               {"fr", "Installateur intelligent PS4 — détecte CUSAxxxxx et userXXXXXXXXX"},
@@ -474,7 +474,7 @@ void drawInstallDemo(UiEngine& e, DemoState state, int percent, const std::strin
     e.drawRoundRect(cardX, cardY, cardW, cardH, 24, theme::SF);
     e.drawRoundBorder(cardX, cardY, cardW, cardH, 24, 2, theme::BD);
     e.drawImage("cover_0", cardX + 12, cardY + 12, cardW - 24, cardH - 120);
-    e.drawText("PrizmaVisuals 1.3.10222", cardX + 32, cardY + cardH - 86, 32, theme::TX, FontRole::Body, false, rtl, cardW - 320);
+    e.drawText("[Addon name]", cardX + 32, cardY + cardH - 86, 32, theme::TX, FontRole::Body, false, rtl, cardW - 320);
     e.drawRoundRect(cardX + cardW - 250, cardY + cardH - 92, 140, 44, 10, SDL_Color{155, 107, 255, 45});
     e.drawText("Epic", cardX + cardW - 220, cardY + cardH - 82, 24, theme::EPT, FontRole::Body);
 

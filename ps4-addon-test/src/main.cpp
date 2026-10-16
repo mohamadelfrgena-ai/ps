@@ -12,6 +12,7 @@
 // Minecraft closed-> stage, launch Minecraft, auto-sync, delete the .raw
 // CUSAxxxxx and userYYYY are always auto-detected.
 
+#include "content_config.hpp"
 #include "http_download.hpp"
 #include "installer.hpp"
 #include "screens.hpp"
@@ -29,10 +30,6 @@
 namespace {
 
 constexpr const char* kStageDir = "/data/AddonStation/installed";
-constexpr const char* kAddonFolderName = "PrizmaVisuals 1.3.10222";
-constexpr const char* kDownloadUrl =
-    "https://github.com/mohamadelfrgena-ai/ps/releases/download/"
-    "content-prizmavisuals-1.3.10222/prizmavisuals-1-3-10_3bcccbf1.raw";
 
 const char* kLangCodes[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
 
@@ -122,16 +119,23 @@ int main(int, char**) {
     // Download the .raw from the GitHub Release, then install it (dual-mode)
     auto triggerInstall = [&state, &currentLang]() {
         if (state.installing.load()) return;
+        // No content configured yet (content_config.hpp) — nothing to install
+        if (std::string(pkgtest::content::kAddonFolderName).empty() ||
+            std::string(pkgtest::content::kDownloadUrl).empty()) {
+            state.demoState = pkgtest::DemoState::Idle;
+            state.progress = 0;
+            return;
+        }
         state.installing.store(true);
         state.demoState = pkgtest::DemoState::Downloading;
         state.progress = 0;
 
         std::thread([&, lang = currentLang()]() {
             const std::string rawPath =
-                std::string(kStageDir) + "/" + kAddonFolderName + ".raw";
+                std::string(kStageDir) + "/" + pkgtest::content::kAddonFolderName + ".raw";
 
             const pkgtest::DownloadResult dl = pkgtest::downloadToFile(
-                kDownloadUrl,
+                pkgtest::content::kDownloadUrl,
                 rawPath,
                 [&](int percent) {
                     state.demoState = pkgtest::DemoState::Downloading;
@@ -150,7 +154,7 @@ int main(int, char**) {
 
             const pkgtest::CopyResult res = pkgtest::installOrQueueAddon(
                 rawPath,
-                kAddonFolderName,
+                pkgtest::content::kAddonFolderName,
                 kStageDir,
                 "",
                 "resource_packs",
@@ -171,7 +175,7 @@ int main(int, char**) {
             } else if (res.ok) {
                 state.demoState = pkgtest::DemoState::Installed;
                 state.progress = 100;
-                state.toastText = pkgtest::formatEnjoyNotification(kAddonFolderName, lang);
+                state.toastText = pkgtest::formatEnjoyNotification(pkgtest::content::kAddonFolderName, lang);
                 state.toastUntil = nowSeconds() + 6.0;
             } else {
                 state.demoState = pkgtest::DemoState::Idle;

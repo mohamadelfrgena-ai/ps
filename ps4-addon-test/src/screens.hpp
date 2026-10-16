@@ -40,7 +40,7 @@ void drawWelcome(UiEngine& e, int focusIndex, const std::string& langCode);
 // Language dialog with 8 languages (grid), selectedLang 0..7
 void drawLanguageDialog(UiEngine& e, int selectedLang, const std::string& langCode);
 
-// Top pill toast (green check) e.g. "تم تثبيت PrizmaVisuals — استمتع!"
+// Top pill toast (green check) e.g. "تم تثبيت [اسم الإضافة] — استمتع!"
 void drawToast(UiEngine& e, const std::string& text, const std::string& langCode);
 
 // Bottom controller legend bar: pairs of (button glyph, label)

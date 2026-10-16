@@ -86,14 +86,26 @@ void cleanPreviousPackFolders(const std::string& destinationFolder) {
     if (slash == std::string::npos) return;
     const std::string parentDir = destinationFolder.substr(0, slash);
     const std::string baseName = destinationFolder.substr(slash + 1);
-    if (baseName.rfind("PrizmaVisuals", 0) != 0) return;
+
+    // Remove older versions of the SAME pack: siblings whose name equals the
+    // product prefix (first whitespace token) or starts with "<prefix> -_.".
+    const std::size_t space = baseName.find(' ');
+    const std::string prefix = (space == std::string::npos) ? baseName : baseName.substr(0, space);
+    if (prefix.empty()) return;
 
     DIR* dir = ::opendir(parentDir.c_str());
     if (!dir) return;
     while (dirent* entry = ::readdir(dir)) {
         const std::string name(entry->d_name);
-        if (name.rfind("PrizmaVisuals", 0) == 0) {
+        if (name == baseName || name == prefix) {
             removeTreeRecursive(parentDir + "/" + name);
+            continue;
+        }
+        if (name.size() > prefix.size() && name.rfind(prefix, 0) == 0) {
+            const char sep = name[prefix.size()];
+            if (sep == ' ' || sep == '-' || sep == '_' || sep == '.') {
+                removeTreeRecursive(parentDir + "/" + name);
+            }
         }
     }
     ::closedir(dir);

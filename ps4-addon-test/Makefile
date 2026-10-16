@@ -1,6 +1,6 @@
-# pkg addon test — Minimalist PS4 Folder Copy Installer (PrizmaVisuals 1.3.10222)
+# pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
-VERSION     := 0.8
+VERSION     := 0.9
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
