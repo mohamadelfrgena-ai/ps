@@ -254,7 +254,7 @@ std::vector<std::string> detectInstalledMinecraftTitleIds() {
     return found;
 }
 
-bool launchMinecraftOnPs4() {
+bool launchMinecraftImpl() {
     const int32_t userId = getActivePs4UserId();
 
     LncAppParam param{};
@@ -296,7 +296,7 @@ bool launchMinecraftOnPs4() {
 #else
 void sendPs4Notification(const std::string&) {}
 int32_t getActivePs4UserId() { return 0; }
-bool launchMinecraftOnPs4() { return true; }
+bool launchMinecraftImpl() { return true; }
 #endif
 
 bool freadExact(std::FILE* fp, void* dst, std::size_t len, int& outErrno) {
@@ -713,6 +713,9 @@ bool copyTreeRecursive(const std::string& srcDir,
 
 } // namespace
 
+// عام (external linkage) — يُستدعى من main.cpp لزر «فتح Minecraft» (△).
+bool launchMinecraftOnPs4() { return launchMinecraftImpl(); }
+
 std::string formatEnjoyNotification(const std::string& addonName, const std::string& langCode) {
     if (langCode == "ar") {
         return "تم تثبيت " + addonName + " — استمتع!";
@@ -951,7 +954,11 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
 
     result.ok = true;
     result.queuedForMinecraft = true;
-    result.launchedMinecraft = launchMinecraftOnPs4();
+    // v0.13: اللعبة لا تُطلق تلقائياً بعد التثبيت — اُلغِي الطلب.
+    // الملف يبقى مؤجَّلاً في stageDir وتُكمله المزامنة التلقائية
+    // (syncPendingAddonsIfMounted) في أول ظهور لمجلد com.mojang، سواء
+    // شغّلت Minecraft بنفسك من △ في صفحة الإضافة أو يدوياً من القائمة.
+    result.launchedMinecraft = false;
     result.message = formatInstallPhaseLabel(InstallPhase::Installing, langCode);
     return result;
 }
@@ -1032,6 +1039,7 @@ CopyResult syncPendingAddonsIfMounted(const std::string& stageDir,
                 removeTreeRecursive(correctedDir);
                 ::rename(targetPackDir.c_str(), correctedDir.c_str());
             }
+            result.lastAddonName = addonName;
 
             // Delete both .pending and the large .raw file to free PS4 HDD space!
             ::unlink(pendingPath.c_str());

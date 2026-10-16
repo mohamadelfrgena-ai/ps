@@ -733,7 +733,7 @@ void drawInstallDemo(UiEngine& e, DemoState state, int percent, const std::strin
     drawLegendBar(e, {{"\xE2\x9C\x95", "select"},
                       {"\xE2\x97\x8B", "back"},
                       {"\xE2\x96\xA1", "save"},
-                      {"\xE2\x96\xB3", "share"}},
+                      {"\xE2\x96\xB3", "open"}},
                   langCode);
 }
 

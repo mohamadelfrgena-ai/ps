@@ -21,6 +21,7 @@ struct CopyResult {
     bool ok = false;
     bool queuedForMinecraft = false;
     bool launchedMinecraft = false;
+    std::string lastAddonName;   // آخر إضافة اكتملت في syncPendingAddonsIfMounted
     std::size_t filesCopied = 0;
     std::uint64_t bytesCopied = 0;
     int errorCode = 0;
@@ -61,6 +62,10 @@ CopyResult installOrQueueAddon(
 
 // Background watcher: checks if ANY Minecraft com.mojang is mounted, installs pending addons from stageDir,
 // deletes the staged .raw files after copying to free PS4 disk space, and triggers the 8-language notification.
+// يُطلق Minecraft المثبَّت (يكتشف CUSAxxxxx تلقائياً). لا يُستدعى من المثبّت
+// نفسه منذ v0.13 — بل فقط من فعل المستخدم «فتح Minecraft» (△ في صفحة الإضافة).
+bool launchMinecraftOnPs4();
+
 CopyResult syncPendingAddonsIfMounted(
     const std::string& stageDir = "/data/AddonStation/installed",
     const std::string& preferredMojangDir = "",

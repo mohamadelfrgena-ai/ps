@@ -153,16 +153,6 @@ int main(int, char**) {
     bool firstLaunch = true;
     state.codeUntil = bootTime + 582.0;   // 9:42 like the design
 
-    std::thread syncWatcher([&state]() {
-        while (true) {
-            if (!state.installing.load()) {
-                pkgtest::syncPendingAddonsIfMounted(kStageDir);
-            }
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-        }
-    });
-    syncWatcher.detach();
-
     auto currentLang = [&state]() { return std::string(kLangCodes[state.langIndex]); };
     auto toast = [&state](const std::string& text) {
         state.toastText = text;
@@ -173,6 +163,27 @@ int main(int, char**) {
         state.screen = s;
         state.focus = 0;
     };
+
+    // Background auto-sync: delivers staged installs the moment com.mojang is
+    // mounted (game open/suspended) — and flips the button to "Installed ✓"
+    // with the completion toast when the deferred install finishes.
+    std::thread syncWatcher([&state, &currentLang, &toast]() {
+        while (true) {
+            if (!state.installing.load()) {
+                const pkgtest::CopyResult res =
+                    pkgtest::syncPendingAddonsIfMounted(kStageDir, "", currentLang());
+                if (res.ok && state.demoState == pkgtest::DemoState::Installing) {
+                    state.demoState = pkgtest::DemoState::Installed;
+                    state.progress = 100;
+                    toast(pkgtest::formatEnjoyNotification(
+                        res.lastAddonName.empty() ? "the addon" : res.lastAddonName,
+                        currentLang()));
+                }
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
+    });
+    syncWatcher.detach();
 
     // Download the .raw from the GitHub Release, then install it (dual-mode)
     auto triggerInstall = [&state, &currentLang, &toast]() {
@@ -495,9 +506,11 @@ int main(int, char**) {
                         if (state.screen != Screen::Language) state.screen = Screen::Language;
                         stateChanged = true;
                     }
-                } else if (b == 3) { // triangle - share / sort
-                    if (state.screen == Screen::Detail) toast("Share link copied");
-                    else if (state.screen == Screen::Deals) toast("Sorted by biggest discount");
+                } else if (b == 3) { // triangle - open Minecraft / sort
+                    if (state.screen == Screen::Detail) {
+                        toast("Opening Minecraft\xE2\x80\xA6");
+                        pkgtest::launchMinecraftOnPs4();
+                    } else if (state.screen == Screen::Deals) toast("Sorted by biggest discount");
                     else if (state.screen == Screen::Store) toast("Sorted by newest");
                     stateChanged = true;
                 } else if (b == 4) { switchTab(-1); stateChanged = true; }             // L1
