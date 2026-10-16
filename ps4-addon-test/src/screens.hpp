@@ -34,6 +34,24 @@ constexpr SDL_Color FOCUS{156, 193, 255, 255};  // #9CC1FF
 // t = seconds since splash start. Shows art zoom, icon pop, slogans slide-in, 10 gold loader segments.
 
 // focusIndex: 0 = code button, 1 = email button, 2 = guest button
+// ربط نصوص الواجهة ببيانات Supabase (اختياري — الحقول الفارغة تُرجع نصوص التصميم)
+struct CardInfo {
+    std::string title;
+    std::string creator;
+    std::string price;
+    std::string oldPrice;
+    std::string badge;
+};
+struct HeroInfo {
+    std::string title;
+    std::string subtitle;
+    std::string kicker;
+    std::string badge;
+};
+// heroes[3] للعروض المنزلقة، exCards[3] للحصريات، gridCards[5] لشبكات المتجر/العروض
+void setServerContent(const HeroInfo* heroes, const CardInfo* exCards, const CardInfo* gridCards);
+void setDetailTitle(const std::string& title);
+
 void drawWelcome(UiEngine& e, int focusIndex, const std::string& langCode);
 
 // Language dialog with 8 languages (grid), selectedLang 0..7

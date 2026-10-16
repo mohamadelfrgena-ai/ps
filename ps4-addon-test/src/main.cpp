@@ -67,6 +67,13 @@ struct AppState {
     bool haveSession = false;
     std::string sessionName;
 
+    // محتوى Supabase المرتبط (بانرات + عناصر منشورة)
+    std::vector<pkgtest::BannerData> banners;
+    std::vector<pkgtest::ItemData> items;
+    int contentStamp = 0;
+    std::string detailItemId;
+    std::string detailTitle;
+
     // email
     std::string email;
     std::string pass;
@@ -121,7 +128,8 @@ int frameSignature(const AppState& s, double t) {
               (linkDone ? 11 : (codeSecs % 60));
     sig += s.heroIndex * 31337 + s.filterIndex * 2711 +
            s.storeFilter * 397 + s.dealsFilter * 53 +
-           (s.autoLaunch ? 31 : 0) + (s.notifOn ? 17 : 0);
+           (s.autoLaunch ? 31 : 0) + (s.notifOn ? 17 : 0) +
+           s.contentStamp * 7919;
     return sig;
 }
 
@@ -286,6 +294,19 @@ int main(int, char**) {
         }
     });
     linkPoller.detach();
+
+    // تحميل البانرات والمحتوى المنشور من Supabase (اختياري — صامت عند غياب التهيئة)
+    std::thread contentLoader([&state, &supaCfg]() {
+        if (!supaCfg.ok()) return;
+        const std::vector<pkgtest::BannerData> banners = pkgtest::fetchStoreBanners(supaCfg);
+        const std::vector<pkgtest::ItemData> items = pkgtest::fetchContentItems(supaCfg, 20);
+        if (banners.empty() && items.empty()) return;
+        std::lock_guard<std::mutex> lk(gLinkMx);
+        state.banners = banners;
+        state.items = items;
+        ++state.contentStamp;
+    });
+    contentLoader.detach();
     auto go = [&state](Screen s) {
         if (state.screen != s) state.prevScreen = state.screen;
         state.screen = s;
@@ -313,11 +334,38 @@ int main(int, char**) {
     });
     syncWatcher.detach();
 
+    // اختيار عنصر السيرفر للصفحة التفصيلية (بطاقات الحصريات/المتجر/العروض)
+    auto selectDetail = [&state](int idx, bool exclusive) {
+        std::lock_guard<std::mutex> lk(gLinkMx);
+        state.detailItemId.clear();
+        state.detailTitle.clear();
+        int n = 0;
+        for (const pkgtest::ItemData& it : state.items) {
+            if (exclusive && !it.isExclusive) continue;
+            if (n == idx) {
+                state.detailItemId = it.id;
+                state.detailTitle = it.title;
+                break;
+            }
+            ++n;
+        }
+    };
+
     // Download the .raw from the GitHub Release, then install it (dual-mode)
-    auto triggerInstall = [&state, &currentLang, &toast]() {
+    auto triggerInstall = [&state, &currentLang, &toast, &supaCfg]() {
         if (state.installing.load()) return;
-        if (std::string(pkgtest::content::kAddonFolderName).empty() ||
-            std::string(pkgtest::content::kDownloadUrl).empty()) {
+        std::string itemId, itemTitle;
+        {
+            std::lock_guard<std::mutex> lk(gLinkMx);
+            itemId = state.detailItemId;
+            itemTitle = state.detailTitle;
+        }
+        const pkgtest::LinkSession sess = pkgtest::loadLinkSession();
+        const bool useServer = !itemId.empty() && supaCfg.ok() && sess.valid &&
+                               !sess.accessToken.empty();
+        if (!useServer &&
+            (std::string(pkgtest::content::kAddonFolderName).empty() ||
+             std::string(pkgtest::content::kDownloadUrl).empty())) {
             state.demoState = pkgtest::DemoState::Idle;
             state.progress = 0;
             toast("No content configured yet — add it in content_config.hpp");
@@ -327,7 +375,90 @@ int main(int, char**) {
         state.demoState = pkgtest::DemoState::Downloading;
         state.progress = 0;
 
-        std::thread([&, lang = currentLang()]() {
+        std::thread([&, lang = currentLang(), useServer, itemId, itemTitle, sess]() {
+            if (useServer) {
+                // المسار الرسمي: طلب التحميل المسجَّل ثم تنزيل كل حزمة لوجهتها
+                const pkgtest::DownloadGrant grant =
+                    pkgtest::callRecordContentDownload(supaCfg, itemId, sess.accessToken);
+                if (!grant.ok) {
+                    state.demoState = pkgtest::DemoState::Idle;
+                    state.progress = 0;
+                    toast(pkgtest::tr("link_failed", lang));
+                    state.installing.store(false);
+                    return;
+                }
+                std::vector<pkgtest::PackTarget> packs = grant.packs;
+                if (packs.empty()) {
+                    pkgtest::PackTarget t;
+                    t.target = "resource_packs";
+                    t.destFolder = itemTitle.empty() ? "addon" : itemTitle;
+                    t.ps4RawUrl = grant.ps4RawUrl;
+                    packs.push_back(t);
+                }
+                const int total = static_cast<int>(packs.size());
+                pkgtest::CopyResult lastRes;
+                for (int i = 0; i < total; ++i) {
+                    const pkgtest::PackTarget& pk = packs[static_cast<std::size_t>(i)];
+                    const std::string rawName = pk.rawFile.empty()
+                        ? (pk.destFolder.empty() ? ("pack" + std::to_string(i)) : pk.destFolder)
+                        : pk.rawFile;
+                    const std::string rawPath = std::string(kStageDir) + "/" + rawName + ".raw";
+                    const std::string url = pk.ps4RawUrl.empty() ? grant.ps4RawUrl : pk.ps4RawUrl;
+                    const int base = i * 100 / total;
+                    const pkgtest::DownloadResult dl = pkgtest::downloadToFile(
+                        url, rawPath,
+                        [&](int percent) {
+                            state.demoState = pkgtest::DemoState::Downloading;
+                            state.progress = std::min(99, base + percent / total);
+                        });
+                    if (!dl.ok) {
+                        state.demoState = pkgtest::DemoState::Idle;
+                        state.progress = 0;
+                        toast(pkgtest::tr("link_failed", lang));
+                        state.installing.store(false);
+                        return;
+                    }
+                    state.demoState = pkgtest::DemoState::Installing;
+                    state.progress = 50;
+                    lastRes = pkgtest::installOrQueueAddon(
+                        rawPath,
+                        pk.destFolder.empty() ? itemTitle : pk.destFolder,
+                        kStageDir,
+                        "",
+                        pk.target.empty() ? "resource_packs" : pk.target,
+                        lang,
+                        [&](pkgtest::InstallPhase phase, int percent) {
+                            if (phase == pkgtest::InstallPhase::Installing) {
+                                state.demoState = pkgtest::DemoState::Installing;
+                                state.progress = std::min(99, 50 + percent / 4);
+                            } else if (phase == pkgtest::InstallPhase::Installed) {
+                                state.demoState = pkgtest::DemoState::Installed;
+                                state.progress = 100;
+                            }
+                        },
+                        state.autoLaunch);
+                    if (!lastRes.ok) {
+                        state.demoState = pkgtest::DemoState::Idle;
+                        state.progress = 0;
+                        state.installing.store(false);
+                        return;
+                    }
+                }
+                if (lastRes.ok && lastRes.queuedForMinecraft) {
+                    state.demoState = pkgtest::DemoState::Installing;
+                    state.progress = 75;
+                } else if (lastRes.ok) {
+                    state.demoState = pkgtest::DemoState::Installed;
+                    state.progress = 100;
+                    state.toastText = pkgtest::formatEnjoyNotification(
+                        itemTitle.empty() ? "the addon" : itemTitle, lang);
+                    state.toastUntil = nowSeconds() + 6.0;
+                }
+                state.installing.store(false);
+                return;
+            }
+
+            // المسار التجريبي: من content_config.hpp (GitHub Release مباشرة)
             const std::string rawPath =
                 std::string(kStageDir) + "/" + pkgtest::content::kAddonFolderName + ".raw";
 
@@ -424,7 +555,41 @@ int main(int, char**) {
                     if (!t.empty()) state.pass = t;
                 } else {
                     if (state.email.empty()) { state.emailError = true; }
-                    else { state.emailError = false; state.tabScreen = Screen::Home; go(Screen::Home); }
+                    else if (!supaCfg.ok()) {
+                        // بدون تهيئة: دخول تجريبي محلي
+                        state.emailError = false; state.tabScreen = Screen::Home; go(Screen::Home);
+                    } else {
+                        // دخول حقيقي عبر Supabase Auth
+                        const std::string em = state.email;
+                        const std::string pw = state.pass;
+                        std::thread([&state, &supaCfg, &toast, &currentLang, em, pw]() {
+                            const pkgtest::AuthLogin auth =
+                                pkgtest::callEmailLogin(supaCfg, em, pw);
+                            if (!auth.ok) {
+                                state.emailError = true;
+                                toast(pkgtest::tr("login_failed", currentLang()));
+                                return;
+                            }
+                            pkgtest::LinkSession s;
+                            s.valid = true;
+                            s.userId = auth.userId;
+                            s.username = auth.email;
+                            s.displayName = auth.displayName;
+                            s.accessToken = auth.accessToken;
+                            s.refreshToken = auth.refreshToken;
+                            pkgtest::saveLinkSession(s);
+                            {
+                                std::lock_guard<std::mutex> lk(gLinkMx);
+                                state.haveSession = true;
+                                state.sessionName = auth.displayName;
+                            }
+                            state.emailError = false;
+                            state.tabScreen = Screen::Home;
+                            state.screen = Screen::Home;
+                            state.focus = 0;
+                            toast(pkgtest::tr("login_ok", currentLang()));
+                        }).detach();
+                    }
                 }
                 break;
             case Screen::Language:
@@ -437,21 +602,21 @@ int main(int, char**) {
                 // category chips -> apply a filter (never the install page)
                 if (state.focus == 0) { state.tabScreen = Screen::Store; go(Screen::Store); }
                 else if (state.focus == 1) { back(); }
-                else if (state.focus <= 4) { go(Screen::Detail); }
+                else if (state.focus <= 4) { selectDetail(state.focus - 2, true); go(Screen::Detail); }
                 else if (state.focus <= 11) {
                     state.filterIndex = state.focus - 5;
                     toast(std::string("Filter: ") + kHomeChips[state.filterIndex]);
-                } else { go(Screen::Detail); }
+                } else { selectDetail(state.focus - 12, false); go(Screen::Detail); }
                 break;
             case Screen::Deals:
                 if (state.focus <= 4) {
                     state.dealsFilter = state.focus;
                     toast(std::string("Filter: ") + kDealsChips[state.dealsFilter]);
-                } else { go(Screen::Detail); }
+                } else { selectDetail(state.focus - 5, false); go(Screen::Detail); }
                 break;
             case Screen::Store:
                 // cards -> the addon page, promo button -> Deals, chips -> filter
-                if (state.focus <= 4) { go(Screen::Detail); }
+                if (state.focus <= 4) { selectDetail(state.focus, false); go(Screen::Detail); }
                 else if (state.focus == 8) { state.tabScreen = Screen::Deals; go(Screen::Deals); }
                 else {
                     state.storeFilter = std::min(2, std::max(0, state.focus - 9));
@@ -479,7 +644,7 @@ int main(int, char**) {
                     toast(pkgtest::tr(state.autoLaunch ? "autolaunch_on" : "autolaunch_off", currentLang()));
                 }
                 else if (state.focus == 4) { requestNewCode(); go(Screen::CodeLink); }
-                else if (state.focus == 5) toast("AddonStation PS4 v0.15 — official app");
+                else if (state.focus == 5) toast("AddonStation PS4 v0.16 — official app");
                 else go(Screen::Confirm);
                 break;
             case Screen::Detail:
@@ -713,10 +878,35 @@ int main(int, char**) {
         if (stateChanged || sig != lastSig || toastVisible != lastToastVisible ||
             codeAnim) {
             std::string accountCopy;
+            pkgtest::HeroInfo heroInfos[3];
+            pkgtest::CardInfo exInfos[3];
+            pkgtest::CardInfo gridInfos[5];
             {
                 std::lock_guard<std::mutex> lk(gLinkMx);
                 accountCopy = state.haveSession ? state.sessionName
                                                 : std::string("name@example.com");
+                for (int i = 0; i < 3 && i < static_cast<int>(state.banners.size()); ++i) {
+                    const pkgtest::BannerData& b = state.banners[i];
+                    heroInfos[i].title = pkgtest::i18nPick(b.titleI18n, lang);
+                    heroInfos[i].subtitle = pkgtest::i18nPick(b.subtitleI18n, lang);
+                    heroInfos[i].kicker = pkgtest::i18nPick(b.kickerI18n, lang);
+                    heroInfos[i].badge = !b.badgeText.empty() ? b.badgeText
+                        : (b.discountPercent > 0 ? ("-" + std::to_string(b.discountPercent) + "%")
+                                                 : std::string());
+                }
+                int exN = 0, gridN = 0;
+                for (const pkgtest::ItemData& it : state.items) {
+                    pkgtest::CardInfo c;
+                    c.title = it.title;
+                    c.price = std::to_string(it.saleAcPrice >= 0 ? it.saleAcPrice : it.acPrice);
+                    if (it.isExclusive && exN < 3) exInfos[exN++] = c;
+                    if (gridN < 5) gridInfos[gridN++] = c;
+                }
+            }
+            pkgtest::setServerContent(heroInfos, exInfos, gridInfos);
+            {
+                std::lock_guard<std::mutex> lk(gLinkMx);
+                pkgtest::setDetailTitle(state.detailTitle);
             }
             engine.clear(pkgtest::theme::BG);
             switch (state.screen) {

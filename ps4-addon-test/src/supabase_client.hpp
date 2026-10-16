@@ -2,6 +2,7 @@
 #define PKG_ADDON_TEST_SUPABASE_CLIENT_HPP
 
 #include <string>
+#include <vector>
 
 namespace pkgtest {
 
@@ -26,6 +27,10 @@ SupabaseConfig loadSupabaseConfig();
 std::string jsonGetString(const std::string& json, const std::string& key);
 long jsonGetInt(const std::string& json, const std::string& key, long def = 0);
 bool jsonGetBool(const std::string& json, const std::string& key, bool def = false);
+// قيمة كائن/مصفوفة خام متوازنة {...} أو [...] بعد المفتاح
+std::string jsonGetRaw(const std::string& json, const std::string& key);
+// تفكيك مصفوفة JSON [...] إلى كائنات {...} منفصلة
+std::vector<std::string> splitJsonObjects(const std::string& jsonArray);
 
 struct RpcResult {
     bool ok = false;        // نجاح النقل + الاستجابة قابلة للقراءة
@@ -35,10 +40,11 @@ struct RpcResult {
     std::string message;    // message من الدالة أو رسالة خطأ النقل
 };
 
-// POST /rest/v1/rpc/<fn>  بجسم JSON
+// POST /rest/v1/rpc/<fn>  بجسم JSON (userToken اختياري لاستدعاءات authenticated)
 RpcResult supabaseRpc(const SupabaseConfig& cfg,
                       const std::string& fn,
-                      const std::string& jsonBody);
+                      const std::string& jsonBody,
+                      const std::string& userToken = "");
 
 // استدعاءات نظام الكود
 RpcResult callCreateLinkCode(const SupabaseConfig& cfg,
@@ -47,6 +53,74 @@ RpcResult callCreateLinkCode(const SupabaseConfig& cfg,
 RpcResult callPollLinkCode(const SupabaseConfig& cfg,
                            const std::string& code,
                            const std::string& pollToken);
+
+// تسجيل الدخول بالبريد عبر Supabase Auth (شاشة Email في التطبيق)
+struct AuthLogin {
+    bool ok = false;
+    std::string message;
+    std::string userId;
+    std::string email;
+    std::string displayName;
+    std::string accessToken;
+    std::string refreshToken;
+};
+AuthLogin callEmailLogin(const SupabaseConfig& cfg,
+                         const std::string& email,
+                         const std::string& password);
+
+// بيانات العرض المرتبطة من قاعدة البيانات
+struct BannerData {
+    std::string slug;
+    std::string theme;        // winter | sunset | night
+    std::string kickerI18n;   // كائن json خام {"en":..,"ar":..}
+    std::string titleI18n;
+    std::string subtitleI18n;
+    std::string primaryLabelI18n;
+    std::string secondaryLabelI18n;
+    std::string badgeText;    // مثل -50%
+    long discountPercent = 0;
+    std::string targetType;   // deals | item | creators | store
+};
+
+struct PackTarget {
+    std::string target;       // resource_packs | behavior_packs | minecraftWorlds
+    std::string destFolder;
+    std::string rawFile;
+    std::string ps4RawUrl;
+    std::string sha256;
+};
+
+struct ItemData {
+    std::string id;
+    std::string title;
+    std::string slug;
+    std::string contentType;
+    std::string plan;
+    long acPrice = 0;
+    long saleAcPrice = -1;    // -1 = لا يوجد سعر خصم
+    bool isFeatured = false;
+    bool isExclusive = false;
+};
+
+// قراءة البانرات والمحتوى المنشور (anon)
+std::vector<BannerData> fetchStoreBanners(const SupabaseConfig& cfg);
+std::vector<ItemData> fetchContentItems(const SupabaseConfig& cfg, int limit = 20);
+
+// طلب التحميل المسجَّل (يتطلب جلسة مستخدم) → رابط .raw ووجهات الحزم
+struct DownloadGrant {
+    bool ok = false;
+    std::string message;
+    std::string title;
+    std::string contentType;
+    std::string ps4RawUrl;
+    std::vector<PackTarget> packs;
+};
+DownloadGrant callRecordContentDownload(const SupabaseConfig& cfg,
+                                        const std::string& itemId,
+                                        const std::string& userAccessToken);
+
+// ترجمة كائن i18n {"en":..,"ar":..} للغة المطلوبة (مع fallback للإنجليزية)
+std::string i18nPick(const std::string& i18nJson, const std::string& langCode);
 
 // جلسة المستخدم المرتبط (تُحفَظ على القرص لتعمل بعد إعادة التشغيل)
 struct LinkSession {

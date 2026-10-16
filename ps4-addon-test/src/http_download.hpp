@@ -37,6 +37,10 @@ HttpPostResult httpPostJson(const std::string& url,
                             const std::vector<std::pair<std::string, std::string>>& headers,
                             const std::string& jsonBody);
 
+// GET JSON with custom headers over HTTPS (Supabase PostgREST reads).
+HttpPostResult httpGetJson(const std::string& url,
+                           const std::vector<std::pair<std::string, std::string>>& headers);
+
 } // namespace pkgtest
 
 #endif

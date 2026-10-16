@@ -1,4 +1,5 @@
 #include "installer.hpp"
+#include "supabase_client.hpp"
 
 #include <cassert>
 #include <cstdio>
@@ -176,6 +177,52 @@ int main() {
         assert(!noAutoRes.launchedMinecraft);
     }
 
-    std::printf("installer host tests passed (dynamic paths, dual-mode, cleanup, 8-lang, autolaunch).\n");
+    // 7. Supabase JSON helpers + array splitting (content pipeline parsing)
+    {
+        const std::string created =
+            "{\"ok\":true,\"code\":\"K7P4QX\",\"formatted_code\":\"K7P 4QX\","
+            "\"poll_token\":\"3f1c9a20-1234-4abc-9def-000000000001\","
+            "\"expires_at\":\"2026-10-16T20:00:00Z\",\"expires_in_seconds\":600}";
+        assert(pkgtest::jsonGetBool(created, "ok"));
+        assert(pkgtest::jsonGetString(created, "code") == "K7P4QX");
+        assert(pkgtest::jsonGetString(created, "formatted_code") == "K7P 4QX");
+        assert(pkgtest::jsonGetInt(created, "expires_in_seconds", 0) == 600);
+
+        const std::string linked =
+            "{\"ok\":true,\"status\":\"linked\",\"username\":\"gamer\","
+            "\"display_name\":\"Gamer One\",\"plan\":\"epic\",\"ac_balance\":150,"
+            "\"access_token\":\"tok-a\",\"refresh_token\":\"ref-b\"}";
+        assert(pkgtest::jsonGetString(linked, "status") == "linked");
+        assert(pkgtest::jsonGetString(linked, "display_name") == "Gamer One");
+        assert(pkgtest::jsonGetInt(linked, "ac_balance", 0) == 150);
+        assert(pkgtest::jsonGetString(linked, "access_token") == "tok-a");
+
+        const std::string i18n = "{\"en\":\"Winter Sale\",\"ar\":\"\\xD8\\xAA\\xD8\\xAE\\xD9\\x81\\xD9\\x8A\\xD8\\xB6\\xD8\\xA7\\xD8\\xAA\"}";
+        assert(pkgtest::i18nPick(i18n, "en") == "Winter Sale");
+        assert(!pkgtest::i18nPick(i18n, "ar").empty());
+        assert(pkgtest::i18nPick(i18n, "fr") == "Winter Sale");  // fallback
+
+        const std::string arr =
+            "[{\"id\":\"a1\",\"title\":\"Pack A\",\"sale_ac_price\":null,\"ac_price\":200,"
+            "\"is_exclusive\":true},{\"id\":\"b2\",\"title\":\"Pack B\",\"sale_ac_price\":75,"
+            "\"ac_price\":150,\"is_exclusive\":false}]";
+        const std::vector<std::string> objs = pkgtest::splitJsonObjects(arr);
+        assert(objs.size() == 2);
+        assert(pkgtest::jsonGetString(objs[0], "title") == "Pack A");
+        assert(pkgtest::jsonGetString(objs[1], "id") == "b2");
+        assert(pkgtest::jsonGetRaw(arr, "missing").empty());
+
+        const std::string grant =
+            "{\"ok\":true,\"ps4_raw_url\":\"https://x/y.raw\","
+            "\"pack_targets\":[{\"target\":\"resource_packs\",\"dest_folder\":\"pack_ab12\","
+            "\"raw_file\":\"pack0.raw\",\"ps4_raw_url\":\"https://x/p0.raw\"}]}";
+        const std::string packs = pkgtest::jsonGetRaw(grant, "pack_targets");
+        const std::vector<std::string> packObjs = pkgtest::splitJsonObjects(packs);
+        assert(packObjs.size() == 1);
+        assert(pkgtest::jsonGetString(packObjs[0], "target") == "resource_packs");
+        assert(pkgtest::jsonGetString(packObjs[0], "dest_folder") == "pack_ab12");
+    }
+
+    std::printf("installer host tests passed (dynamic paths, dual-mode, cleanup, 8-lang, autolaunch, json).\n");
     return 0;
 }

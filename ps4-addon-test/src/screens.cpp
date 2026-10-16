@@ -204,6 +204,18 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
                       {"fr", "Nouveau code créé"}, {"tr", "Yeni kod oluşturuldu"},
                       {"es", "Nuevo código creado"}, {"ru", "Новый код создан"},
                       {"pt", "Novo código criado"}, {"zh", "已生成新代码"}}},
+        {"login_failed", {{"en", "Login failed — check email and password"},
+                          {"ar", "فشل تسجيل الدخول — تحقق من البريد وكلمة المرور"},
+                          {"fr", "Échec de connexion — vérifiez e-mail et mot de passe"},
+                          {"tr", "Giriş başarısız — e-posta ve şifreyi kontrol edin"},
+                          {"es", "Error de inicio — revisa correo y contraseña"},
+                          {"ru", "Ошибка входа — проверьте почту и пароль"},
+                          {"pt", "Falha no login — verifique e-mail e senha"},
+                          {"zh", "登录失败 — 请检查邮箱和密码"}}},
+        {"login_ok", {{"en", "Signed in!"}, {"ar", "تم تسجيل الدخول!"},
+                      {"fr", "Connecté !"}, {"tr", "Giriş yapıldı!"},
+                      {"es", "¡Sesión iniciada!"}, {"ru", "Вход выполнен!"},
+                      {"pt", "Sessão iniciada!"}, {"zh", "登录成功！"}}},
     };
     return kTable;
 }
@@ -365,6 +377,37 @@ void iconDownload(UiEngine& e, int x, int y, int s, SDL_Color c) {
 }
 
 } // namespace
+
+// ---- بيانات Supabase المرتبطة بالواجهة (اختيارية) -------------------------
+namespace {
+HeroInfo gHeroes[3];
+CardInfo gExCards[3];
+CardInfo gGridCards[5];
+std::string gDetailTitle;
+
+const HeroInfo& heroAt(int i) {
+    static const HeroInfo kEmpty;
+    return (i >= 0 && i < 3) ? gHeroes[i] : kEmpty;
+}
+const CardInfo& exAt(int i) {
+    static const CardInfo kEmpty;
+    return (i >= 0 && i < 3) ? gExCards[i] : kEmpty;
+}
+const CardInfo& gridAt(int i) {
+    static const CardInfo kEmpty;
+    return (i >= 0 && i < 5) ? gGridCards[i] : kEmpty;
+}
+} // namespace
+
+void setServerContent(const HeroInfo* heroes, const CardInfo* exCards, const CardInfo* gridCards) {
+    for (int i = 0; i < 3; ++i) {
+        gHeroes[i] = heroes ? heroes[i] : HeroInfo{};
+        gExCards[i] = exCards ? exCards[i] : CardInfo{};
+    }
+    for (int i = 0; i < 5; ++i) gGridCards[i] = gridCards ? gridCards[i] : CardInfo{};
+}
+
+void setDetailTitle(const std::string& title) { gDetailTitle = title; }
 
 void drawWelcome(UiEngine& e, int focusIndex, const std::string& langCode) {
     const bool rtl = langCode == "ar";
@@ -662,7 +705,8 @@ void drawInstallDemo(UiEngine& e, DemoState state, int percent, const std::strin
     }
 
     // right column
-    e.drawText(tr("install_demo_title", langCode), rightX, topY + 4, 48, kWHT,
+    e.drawText(gDetailTitle.empty() ? tr("install_demo_title", langCode) : gDetailTitle,
+               rightX, topY + 4, 48, kWHT,
                FontRole::Pixel, false, rtl, 700);
     e.drawText("[Creator]", rightX, topY + 76, 28, kMU, FontRole::Body, false, false);
     // stats row
@@ -907,18 +951,25 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     // kicker pill
     e.drawRoundRect(hx + 56, hy + 44, 320, 46, 23, SDL_Color{156, 220, 255, 40});
     e.drawRoundBorder(hx + 56, hy + 44, 320, 46, 23, 2, SDL_Color{156, 220, 255, 128});
-    e.drawText("*  LIMITED TIME", hx + 78, hy + 52, 22, SDL_Color{189, 230, 255, 255},
+    e.drawText(heroAt(heroIndex).kicker.empty() ? "*  LIMITED TIME" : heroAt(heroIndex).kicker,
+               hx + 78, hy + 52, 22, SDL_Color{189, 230, 255, 255},
                FontRole::Body, false, false);
     // headline (winter gradient)
-    const char* heroTitle = heroIndex == 0 ? "WINTER SALE" : (heroIndex == 1 ? "SUNSET VILLAGE" : "CREATOR SPOTLIGHT");
+    std::string heroTitle = heroAt(heroIndex).title;
+    if (heroTitle.empty()) {
+        heroTitle = heroIndex == 0 ? "WINTER SALE" : (heroIndex == 1 ? "SUNSET VILLAGE" : "CREATOR SPOTLIGHT");
+    }
     e.drawTextGradV(heroTitle, hx + 56, hy + 110, 72, kWHT, SDL_Color{111, 178, 255, 255},
                     FontRole::Pixel, false, false);
-    e.drawText("Up to 50% off the best addons and worlds", hx + 56, hy + 210, 30,
+    e.drawText(heroAt(heroIndex).subtitle.empty()
+                   ? "Up to 50% off the best addons and worlds" : heroAt(heroIndex).subtitle,
+               hx + 56, hy + 210, 30,
                SDL_Color{230, 238, 251, 255}, FontRole::Body, false, false);
     // -50% badge + countdown
     e.drawRoundGradD(hx + 56, hy + 270, 170, 78, 20, SDL_Color{255, 92, 122, 255},
                      SDL_Color{255, 61, 107, 255});
-    e.drawTextCentered("-50%", hx + 141, hy + 286, 44, kWHT, FontRole::Body, false);
+    e.drawTextCentered(heroAt(heroIndex).badge.empty() ? "-50%" : heroAt(heroIndex).badge,
+                       hx + 141, hy + 286, 44, kWHT, FontRole::Body, false);
     const char* cdVals[3] = {"03", "12", "45"};
     const char* cdLbls[3] = {"DAYS", "HRS", "MIN"};
     for (int i = 0; i < 3; ++i) {
@@ -957,8 +1008,10 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
         e.drawRoundRect(x + 16, y + 16, 150, 40, 10, kGD);
         e.drawText("EXCLUSIVE", x + 28, y + 24, 19, SDL_Color{27, 20, 5, 255}, FontRole::Body, false, false);
         e.drawImage("icon_coin", x + w - 110, y + 18, 26, 26);
-        e.drawText(ex.price, x + w - 76, y + 22, 24, kWHT, FontRole::Body, false, false);
-        e.drawText(ex.title, x + 20, y + h - 64, 26, kWHT, FontRole::Body, false, false, w - 40);
+        e.drawText(exAt(i).price.empty() ? ex.price : exAt(i).price,
+                   x + w - 76, y + 22, 24, kWHT, FontRole::Body, false, false);
+        e.drawText(exAt(i).title.empty() ? ex.title : exAt(i).title,
+                   x + 20, y + h - 64, 26, kWHT, FontRole::Body, false, false, w - 40);
     };
     drawEx(0, exX, 126, exW, 300);
     drawEx(1, exX, 438, (exW - 28) / 2, 192);
@@ -1009,7 +1062,8 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
         e.drawRoundBorder(x, 840, 318, 178, 22, 2, kBD);
         e.drawImageRounded(i == 0 ? "cover_0" : (i == 1 ? "cover_1" : (i == 2 ? "cover_2" : (i == 3 ? "cover_3" : "cover_4"))),
                            x + 6, 846, 306, 120, 16);
-        e.drawText("[Addon name]", x + 14, 976, 24, kWHT, FontRole::Body, false, false);
+        e.drawText(gridAt(i).title.empty() ? "[Addon name]" : gridAt(i).title,
+                   x + 14, 976, 24, kWHT, FontRole::Body, false, false);
         if (focus == 12 + i) focusRing(e, x, 840, 318, 178, 22);
     }
 
@@ -1025,9 +1079,11 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
     // promo strip
     e.drawImageRounded("bg_winter", 96, 130, 1728, 210, 30);
     e.fillGradH(96, 130, 1728, 210, SDL_Color{5, 10, 24, 230}, SDL_Color{5, 10, 24, 40});
-    e.drawTextGradV("WINTER SALE", 148, 170, 60, kWHT, SDL_Color{111, 178, 255, 255},
+    e.drawTextGradV(heroAt(0).title.empty() ? "WINTER SALE" : heroAt(0).title,
+                    148, 170, 60, kWHT, SDL_Color{111, 178, 255, 255},
                     FontRole::Pixel, false, false);
-    e.drawText("Up to 50% off the best addons and worlds", 148, 252, 26,
+    e.drawText(heroAt(0).subtitle.empty() ? "Up to 50% off the best addons and worlds" : heroAt(0).subtitle,
+               148, 252, 26,
                SDL_Color{230, 238, 251, 255}, FontRole::Body, false, false);
     e.drawRoundGradD(1480, 190, 300, 88, 26, kBL, kBL2);
     e.drawTextCentered(tr("shop_sale", langCode), 1630, 214, 28, kWHT, FontRole::Body, rtl);
@@ -1067,10 +1123,13 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
             e.drawTextCentered(badges[i], x + 76, 492, 20,
                                i == 4 ? SDL_Color{27, 20, 5, 255} : kWHT, FontRole::Body, false);
         }
-        e.drawText("[Addon name]", x + 16, 692, 26, kWHT, FontRole::Body, false, false);
-        e.drawText("By [Creator]", x + 16, 730, 20, kMU, FontRole::Body, false, false);
+        e.drawText(gridAt(i).title.empty() ? "[Addon name]" : gridAt(i).title,
+                   x + 16, 692, 26, kWHT, FontRole::Body, false, false);
+        e.drawText(gridAt(i).creator.empty() ? "By [Creator]" : gridAt(i).creator,
+                   x + 16, 730, 20, kMU, FontRole::Body, false, false);
         e.drawImage("icon_coin", x + 16, 770, 26, 26);
-        e.drawText(i == 3 ? "0" : "200", x + 52, 772, 26, kGD, FontRole::Body, false, false);
+        e.drawText(gridAt(i).price.empty() ? (i == 3 ? "0" : "200") : gridAt(i).price,
+                   x + 52, 772, 26, kGD, FontRole::Body, false, false);
         if (focus == i) focusRing(e, x, 470, 318, 430, 22);
     }
 
@@ -1092,15 +1151,19 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
 
     e.drawRoundRect(152, 174, 320, 46, 23, SDL_Color{156, 220, 255, 40});
     e.drawRoundBorder(152, 174, 320, 46, 23, 2, SDL_Color{156, 220, 255, 128});
-    e.drawText("*  LIMITED TIME", 174, 182, 22, SDL_Color{189, 230, 255, 255},
+    e.drawText(heroAt(0).kicker.empty() ? "*  LIMITED TIME" : heroAt(0).kicker,
+               174, 182, 22, SDL_Color{189, 230, 255, 255},
                FontRole::Body, false, false);
-    e.drawTextGradV("WINTER SALE", 152, 236, 80, kWHT, SDL_Color{111, 178, 255, 255},
+    e.drawTextGradV(heroAt(0).title.empty() ? "WINTER SALE" : heroAt(0).title,
+                    152, 236, 80, kWHT, SDL_Color{111, 178, 255, 255},
                     FontRole::Pixel, false, false);
-    e.drawText(tr("up_to_50", langCode), 152, 348, 30, SDL_Color{230, 238, 251, 255},
+    e.drawText(heroAt(0).subtitle.empty() ? tr("up_to_50", langCode) : heroAt(0).subtitle,
+               152, 348, 30, SDL_Color{230, 238, 251, 255},
                FontRole::Body, false, rtl, 900);
     e.drawRoundGradD(152, 404, 170, 78, 20, SDL_Color{255, 92, 122, 255},
                      SDL_Color{255, 61, 107, 255});
-    e.drawTextCentered("-50%", 237, 420, 44, kWHT, FontRole::Body, false);
+    e.drawTextCentered(heroAt(0).badge.empty() ? "-50%" : heroAt(0).badge,
+                       237, 420, 44, kWHT, FontRole::Body, false);
     const char* cdVals[3] = {"03", "12", "45"};
     const char* cdLbls[3] = {"DAYS", "HRS", "MIN"};
     for (int i = 0; i < 3; ++i) {
@@ -1143,13 +1206,17 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
         e.drawImageRounded(i == 0 ? "cover_0" : (i == 1 ? "cover_1" : (i == 2 ? "cover_2" : (i == 3 ? "cover_3" : "cover_4"))),
                            x + 6, 686, 306, 150, 16);
         e.drawRoundRect(x + 16, 696, 110, 38, 10, SDL_Color{255, 92, 122, 255});
-        e.drawTextCentered(badges[i], x + 71, 702, 20, kWHT, FontRole::Body, false);
-        e.drawText("[Addon name]", x + 16, 852, 26, kWHT, FontRole::Body, false, false);
+        e.drawTextCentered(gridAt(i).badge.empty() ? badges[i] : gridAt(i).badge,
+                           x + 71, 702, 20, kWHT, FontRole::Body, false);
+        e.drawText(gridAt(i).title.empty() ? "[Addon name]" : gridAt(i).title,
+                   x + 16, 852, 26, kWHT, FontRole::Body, false, false);
         e.drawImage("icon_coin", x + 16, 896, 26, 26);
-        e.drawText(prices[i], x + 52, 898, 26, kGD, FontRole::Body, false, false);
-        if (olds[i][0]) {
-            const int ow = e.measureText(olds[i], 20, FontRole::Body, false);
-            e.drawText(olds[i], x + 130, 902, 20, kMU, FontRole::Body, false, false);
+        e.drawText(gridAt(i).price.empty() ? prices[i] : gridAt(i).price,
+                   x + 52, 898, 26, kGD, FontRole::Body, false, false);
+        const char* oldP = gridAt(i).oldPrice.empty() ? olds[i] : gridAt(i).oldPrice.c_str();
+        if (oldP[0]) {
+            const int ow = e.measureText(oldP, 20, FontRole::Body, false);
+            e.drawText(oldP, x + 130, 902, 20, kMU, FontRole::Body, false, false);
             e.fillRect(x + 128, 912, ow + 4, 2, withA(kMU, 220));
         }
         if (focus == 5 + i) focusRing(e, x, 680, 318, 286, 22);

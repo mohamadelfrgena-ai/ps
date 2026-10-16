@@ -122,9 +122,89 @@ bool jsonGetBool(const std::string& json, const std::string& key, bool def) {
     return def;
 }
 
+std::string jsonGetRaw(const std::string& json, const std::string& key) {
+    const std::string pat = "\"" + key + "\"";
+    std::size_t p = 0;
+    while ((p = json.find(pat, p)) != std::string::npos) {
+        std::size_t q = p + pat.size();
+        while (q < json.size() && (json[q] == ' ' || json[q] == '\t' || json[q] == '\n' || json[q] == '\r')) ++q;
+        if (q >= json.size() || json[q] != ':') { p += pat.size(); continue; }
+        ++q;
+        while (q < json.size() && (json[q] == ' ' || json[q] == '\t' || json[q] == '\n' || json[q] == '\r')) ++q;
+        if (q >= json.size()) return "";
+        const char open = json[q];
+        if (open != '{' && open != '[') {
+            // قيمة بسيطة — أعِد نفس منطق jsonGetString
+            return jsonGetString(json, key);
+        }
+        const char close = (open == '{') ? '}' : ']';
+        int depth = 0;
+        bool inStr = false;
+        std::size_t i = q;
+        for (; i < json.size(); ++i) {
+            const char c = json[i];
+            if (inStr) {
+                if (c == '\\') ++i;
+                else if (c == '"') inStr = false;
+                continue;
+            }
+            if (c == '"') { inStr = true; continue; }
+            if (c == open) ++depth;
+            else if (c == close) {
+                --depth;
+                if (depth == 0) return json.substr(q, i - q + 1);
+            }
+        }
+        return "";
+    }
+    return "";
+}
+
+std::vector<std::string> splitJsonObjects(const std::string& jsonArray) {
+    std::vector<std::string> out;
+    std::size_t i = 0;
+    while (i < jsonArray.size() && jsonArray[i] != '[') ++i;
+    if (i >= jsonArray.size()) return out;
+    ++i;
+    while (i < jsonArray.size()) {
+        while (i < jsonArray.size() && jsonArray[i] != '{' && jsonArray[i] != ']') ++i;
+        if (i >= jsonArray.size() || jsonArray[i] == ']') break;
+        int depth = 0;
+        bool inStr = false;
+        std::size_t start = i;
+        for (; i < jsonArray.size(); ++i) {
+            const char c = jsonArray[i];
+            if (inStr) {
+                if (c == '\\') ++i;
+                else if (c == '"') inStr = false;
+                continue;
+            }
+            if (c == '"') { inStr = true; continue; }
+            if (c == '{') ++depth;
+            else if (c == '}') {
+                --depth;
+                if (depth == 0) {
+                    out.push_back(jsonArray.substr(start, i - start + 1));
+                    ++i;
+                    break;
+                }
+            }
+        }
+        if (depth != 0) break;  // JSON غير مكتمل
+    }
+    return out;
+}
+
+std::string i18nPick(const std::string& i18nJson, const std::string& langCode) {
+    std::string v = jsonGetString(i18nJson, langCode);
+    if (v.empty()) v = jsonGetString(i18nJson, "en");
+    return v;
+}
+
 RpcResult supabaseRpc(const SupabaseConfig& cfg,
                       const std::string& fn,
-                      const std::string& jsonBody) {
+                      const std::string& jsonBody,
+                      const std::string& userToken) {
     RpcResult result;
     if (!cfg.ok()) {
         result.message = "not_configured";
@@ -132,9 +212,10 @@ RpcResult supabaseRpc(const SupabaseConfig& cfg,
     }
 
     const std::string url = cfg.url + "/rest/v1/rpc/" + fn;
+    const std::string bearer = userToken.empty() ? cfg.anonKey : userToken;
     const std::vector<std::pair<std::string, std::string>> headers = {
         {"apikey", cfg.anonKey},
-        {"Authorization", "Bearer " + cfg.anonKey},
+        {"Authorization", "Bearer " + bearer},
         {"Content-Type", "application/json"},
         {"Accept", "application/json"},
     };
@@ -169,6 +250,138 @@ RpcResult callPollLinkCode(const SupabaseConfig& cfg,
         "{\"p_code\":\"" + jsonEscape(code) + "\","
         "\"p_poll_token\":\"" + jsonEscape(pollToken) + "\"}";
     return supabaseRpc(cfg, "poll_console_link_code", body);
+}
+
+AuthLogin callEmailLogin(const SupabaseConfig& cfg,
+                         const std::string& email,
+                         const std::string& password) {
+    AuthLogin out;
+    if (!cfg.ok()) {
+        out.message = "not_configured";
+        return out;
+    }
+    const std::string url = cfg.url + "/auth/v1/token?grant_type=password";
+    const std::vector<std::pair<std::string, std::string>> headers = {
+        {"apikey", cfg.anonKey},
+        {"Content-Type", "application/json"},
+        {"Accept", "application/json"},
+    };
+    const std::string body =
+        "{\"email\":\"" + jsonEscape(email) + "\","
+        "\"password\":\"" + jsonEscape(password) + "\"}";
+    const HttpPostResult http = httpPostJson(url, headers, body);
+    if (!http.ok) {
+        out.message = http.message;
+        return out;
+    }
+    out.accessToken = jsonGetString(http.body, "access_token");
+    out.refreshToken = jsonGetString(http.body, "refresh_token");
+    if (out.accessToken.empty()) {
+        out.message = jsonGetString(http.body, "error_description");
+        if (out.message.empty()) out.message = jsonGetString(http.body, "msg");
+        if (out.message.empty()) out.message = "login_failed";
+        return out;
+    }
+    out.ok = true;
+    out.userId = jsonGetString(http.body, "id");
+    out.email = jsonGetString(http.body, "email");
+    const std::string meta = jsonGetRaw(http.body, "user_metadata");
+    out.displayName = jsonGetString(meta, "display_name");
+    if (out.displayName.empty()) out.displayName = jsonGetString(meta, "name");
+    if (out.displayName.empty()) out.displayName = jsonGetString(meta, "username");
+    if (out.displayName.empty()) out.displayName = out.email;
+    return out;
+}
+
+std::vector<BannerData> fetchStoreBanners(const SupabaseConfig& cfg) {
+    std::vector<BannerData> out;
+    if (!cfg.ok()) return out;
+    const std::string url =
+        cfg.url + "/rest/v1/store_banners?enabled=eq.true&order=sort_order.asc&select=*";
+    const std::vector<std::pair<std::string, std::string>> headers = {
+        {"apikey", cfg.anonKey},
+        {"Authorization", "Bearer " + cfg.anonKey},
+        {"Accept", "application/json"},
+    };
+    const HttpPostResult http = httpGetJson(url, headers);
+    if (!http.ok || http.statusCode != 200) return out;
+    for (const std::string& obj : splitJsonObjects(http.body)) {
+        BannerData b;
+        b.slug = jsonGetString(obj, "slug");
+        b.theme = jsonGetString(obj, "theme");
+        b.kickerI18n = jsonGetRaw(obj, "kicker_i18n");
+        b.titleI18n = jsonGetRaw(obj, "title_i18n");
+        b.subtitleI18n = jsonGetRaw(obj, "subtitle_i18n");
+        b.primaryLabelI18n = jsonGetRaw(obj, "primary_label_i18n");
+        b.secondaryLabelI18n = jsonGetRaw(obj, "secondary_label_i18n");
+        b.badgeText = jsonGetString(obj, "badge_text");
+        b.discountPercent = jsonGetInt(obj, "discount_percent", 0);
+        b.targetType = jsonGetString(obj, "target_type");
+        out.push_back(b);
+    }
+    return out;
+}
+
+std::vector<ItemData> fetchContentItems(const SupabaseConfig& cfg, int limit) {
+    std::vector<ItemData> out;
+    if (!cfg.ok()) return out;
+    const std::string url =
+        cfg.url + "/rest/v1/content_items?is_published=eq.true"
+        "&order=created_at.desc&limit=" + std::to_string(limit) +
+        "&select=id,title,slug,content_type,plan,ac_price,sale_ac_price,is_featured,is_exclusive";
+    const std::vector<std::pair<std::string, std::string>> headers = {
+        {"apikey", cfg.anonKey},
+        {"Authorization", "Bearer " + cfg.anonKey},
+        {"Accept", "application/json"},
+    };
+    const HttpPostResult http = httpGetJson(url, headers);
+    if (!http.ok || http.statusCode != 200) return out;
+    for (const std::string& obj : splitJsonObjects(http.body)) {
+        ItemData it;
+        it.id = jsonGetString(obj, "id");
+        it.title = jsonGetString(obj, "title");
+        it.slug = jsonGetString(obj, "slug");
+        it.contentType = jsonGetString(obj, "content_type");
+        it.plan = jsonGetString(obj, "plan");
+        it.acPrice = jsonGetInt(obj, "ac_price", 0);
+        const std::string sale = jsonGetString(obj, "sale_ac_price");
+        it.saleAcPrice = (sale.empty() || sale == "null") ? -1 : std::strtol(sale.c_str(), nullptr, 10);
+        it.isFeatured = jsonGetBool(obj, "is_featured", false);
+        it.isExclusive = jsonGetBool(obj, "is_exclusive", false);
+        out.push_back(it);
+    }
+    return out;
+}
+
+DownloadGrant callRecordContentDownload(const SupabaseConfig& cfg,
+                                        const std::string& itemId,
+                                        const std::string& userAccessToken) {
+    DownloadGrant out;
+    if (!cfg.ok()) {
+        out.message = "not_configured";
+        return out;
+    }
+    const std::string body = "{\"p_item_id\":\"" + jsonEscape(itemId) + "\"}";
+    const RpcResult r = supabaseRpc(cfg, "record_content_download", body, userAccessToken);
+    out.message = r.message;
+    if (!r.ok || !r.rpcOk) {
+        if (out.message.empty()) out.message = "download_denied";
+        return out;
+    }
+    out.ok = true;
+    out.title = jsonGetString(r.body, "title");
+    out.contentType = jsonGetString(r.body, "content_type");
+    out.ps4RawUrl = jsonGetString(r.body, "ps4_raw_url");
+    for (const std::string& p : splitJsonObjects(jsonGetRaw(r.body, "pack_targets"))) {
+        PackTarget t;
+        t.target = jsonGetString(p, "target");
+        t.destFolder = jsonGetString(p, "dest_folder");
+        t.rawFile = jsonGetString(p, "raw_file");
+        t.ps4RawUrl = jsonGetString(p, "ps4_raw_url");
+        t.sha256 = jsonGetString(p, "sha256");
+        out.packs.push_back(t);
+    }
+    return out;
 }
 
 void saveLinkSession(const LinkSession& s) {

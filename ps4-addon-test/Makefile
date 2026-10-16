@@ -1,7 +1,7 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
-# AddonStation PS4 Mini-App — v0.15 test build (live Supabase code-link + translated settings)
-VERSION     := 0.15
+# AddonStation PS4 Mini-App — v0.16 test build (live content pipeline + real email login)
+VERSION     := 0.16
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
@@ -139,7 +139,8 @@ $(PKG_FILE): eboot.bin sce_sys/param.sfo assets/ui.pak | prepare-runtime
 host-test:
 	@mkdir -p build-host
 	$(HOST_CXX) -std=c++17 -Wall -Wextra -Werror -pedantic -D_GNU_SOURCE -Isrc \
-		tests/test_installer.cpp src/installer.cpp -o build-host/test_installer
+		tests/test_installer.cpp src/installer.cpp src/supabase_client.cpp src/http_download.cpp \
+		-o build-host/test_installer
 	./build-host/test_installer
 
 clean:
