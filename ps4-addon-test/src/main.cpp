@@ -1,7 +1,15 @@
 // AddonStation "pkg addon test" PS4 Mini-App — design UI (splash + welcome + installer)
-// Dual-mode installer: copies PrizmaVisuals into com.mojang immediately if Minecraft is
-// open; otherwise stages to /data/AddonStation/installed/, launches Minecraft, auto-syncs
-// and deletes the staged .raw afterwards. CUSAxxxxx and userYYYY are always auto-detected.
+//
+// Rendering: the UiEngine rasterizes EVERYTHING into its own RGBA framebuffer
+// (proven stb_truetype/stb_image path — no SDL textures, no SDL_RenderCopy),
+// then the frame is blitted into the SDL window surface and presented exactly
+// like the working v0.5 app:
+//     SDL_RenderPresent(renderer); SDL_UpdateWindowSurface(window);
+//
+// Dual-mode installer: copies PrizmaVisuals into com.mojang immediately if
+// Minecraft is open; otherwise stages to /data/AddonStation/installed/, launches
+// Minecraft, auto-syncs and deletes the staged .raw afterwards. CUSAxxxxx and
+// userYYYY are always auto-detected.
 
 #include "installer.hpp"
 #include "screens.hpp"
@@ -13,6 +21,7 @@
 #include <cstdio>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace {
 
@@ -26,7 +35,7 @@ enum class Screen { Splash, Welcome, Language, Installing };
 
 struct AppState {
     Screen screen = Screen::Splash;
-    int focus = 0;              // welcome: 0 code, 1 email, 2 guest; language: 0..7
+    int focus = 0;
     int langIndex = 0;
     pkgtest::DemoState demoState = pkgtest::DemoState::Idle;
     int progress = 0;
@@ -42,29 +51,45 @@ float nowSeconds() {
 } // namespace
 
 int main(int, char**) {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) {
-        std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
-        return 1;
-    }
+    setvbuf(stdout, nullptr, _IONBF, 0);
 
-    SDL_Joystick* pad = nullptr;
-    if (SDL_NumJoysticks() > 0) {
-        pad = SDL_JoystickOpen(0);
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) {
+        return 1;
     }
 
     SDL_Window* window = SDL_CreateWindow(
-        "AddonStation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080, 0);
-    SDL_Surface* windowSurface = window ? SDL_GetWindowSurface(window) : nullptr;
-    SDL_Renderer* renderer = windowSurface ? SDL_CreateSoftwareRenderer(windowSurface) : nullptr;
-    if (!renderer) {
-        std::fprintf(stderr, "No renderer available\n");
+        "pkg addon test",
+        SDL_WINDOWPOS_UNDEFINED,
+        SDL_WINDOWPOS_UNDEFINED,
+        1920,
+        1080,
+        0);
+    if (!window) {
+        SDL_Quit();
         return 1;
     }
 
-    pkgtest::UiEngine engine;
-    if (!engine.init(renderer, "/app0/assets/ui.pak")) {
-        std::fprintf(stderr, "ui.pak load failed\n");
+    SDL_Surface* windowSurface = SDL_GetWindowSurface(window);
+    SDL_Renderer* renderer = windowSurface ? SDL_CreateSoftwareRenderer(windowSurface) : nullptr;
+    if (!renderer) {
+        SDL_DestroyWindow(window);
+        SDL_Quit();
         return 1;
+    }
+
+    std::vector<SDL_Joystick*> joysticks;
+    const int numJoy = SDL_NumJoysticks();
+    for (int i = 0; i < numJoy; ++i) {
+        if (SDL_Joystick* joy = SDL_JoystickOpen(i)) {
+            joysticks.push_back(joy);
+        }
+    }
+    SDL_JoystickEventState(SDL_ENABLE);
+
+    pkgtest::UiEngine engine;
+    const bool fontsOk = engine.init("/app0/assets/ui.pak");
+    if (!fontsOk) {
+        std::fprintf(stderr, "ui.pak missing or invalid - fallback font active\n");
     }
 
     AppState state;
@@ -87,9 +112,6 @@ int main(int, char**) {
 
     auto triggerInstall = [&state, &currentLang]() {
         if (state.installing.load()) return;
-        if (state.demoState == pkgtest::DemoState::Installed) {
-            // Re-install allowed
-        }
         state.installing.store(true);
         state.demoState = pkgtest::DemoState::Downloading;
         state.progress = 0;
@@ -116,7 +138,6 @@ int main(int, char**) {
                 });
 
             if (res.ok && res.queuedForMinecraft) {
-                // Minecraft closed: staged + launched — keep "Installing..." until sync watcher finishes
                 state.demoState = pkgtest::DemoState::Installing;
                 state.progress = 75;
             } else if (res.ok) {
@@ -137,7 +158,6 @@ int main(int, char**) {
     while (running) {
         const float t = nowSeconds();
         const std::string lang = currentLang();
-        const bool rtl = lang == "ar";
 
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT) {
@@ -157,13 +177,8 @@ int main(int, char**) {
                 // 0=Cross(select/install) 1=Circle(back) 2=Square(language) 3=Triangle
                 const Uint8 b = ev.jbutton.button;
                 if (b == 1) {
-                    if (state.screen == Screen::Language) {
+                    if (state.screen == Screen::Language || state.screen == Screen::Installing) {
                         state.screen = Screen::Welcome;
-                    } else if (state.screen == Screen::Installing) {
-                        state.screen = Screen::Welcome;
-                    } else if (state.screen == Screen::Welcome && state.focus == 2) {
-                        // guest: go straight to installer demo
-                        state.screen = Screen::Installing;
                     } else {
                         running = false;
                     }
@@ -174,10 +189,7 @@ int main(int, char**) {
                         if (b == 2) {
                             state.screen = Screen::Language;
                             state.focus = state.langIndex;
-                        } else if (state.focus == 2) {
-                            state.screen = Screen::Installing;
                         } else {
-                            // code / email sign-in not wired yet -> straight to installer demo
                             state.screen = Screen::Installing;
                         }
                     } else if (state.screen == Screen::Language) {
@@ -206,7 +218,7 @@ int main(int, char**) {
                         state.langIndex = state.focus;
                         state.screen = Screen::Welcome;
                     }
-                    if (k == SDLK_BACKSPACE || k == SDLK_ESCAPE) state.screen = Screen::Welcome;
+                    if (k == SDLK_BACKSPACE) state.screen = Screen::Welcome;
                 } else if (state.screen == Screen::Installing) {
                     if (k == SDLK_RETURN || k == SDLK_SPACE) triggerInstall();
                     if (k == SDLK_BACKSPACE) state.screen = Screen::Welcome;
@@ -223,8 +235,8 @@ int main(int, char**) {
             }
         }
 
-        // Render
-        engine.fillRect(0, 0, 1920, 1080, pkgtest::theme::BG);
+        // Render into the engine framebuffer
+        engine.clear(pkgtest::theme::BG);
         switch (state.screen) {
             case Screen::Splash:
                 pkgtest::drawSplash(engine, t - splashStart, lang);
@@ -243,14 +255,20 @@ int main(int, char**) {
                 }
                 break;
         }
+
+        // Blit + present exactly like the working v0.5 app
+        engine.present(windowSurface);
         SDL_RenderPresent(renderer);
+        SDL_UpdateWindowSurface(window);
         SDL_Delay(16);
     }
 
-    engine.shutdown();
-    if (renderer) SDL_DestroyRenderer(renderer);
-    if (window) SDL_DestroyWindow(window);
-    if (pad) SDL_JoystickClose(pad);
+    state.installing.store(true);
+    for (SDL_Joystick* joy : joysticks) {
+        if (joy) SDL_JoystickClose(joy);
+    }
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;
 }

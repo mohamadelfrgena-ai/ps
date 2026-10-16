@@ -17,10 +17,17 @@ typedef unsigned short Uint16;
 typedef struct SDL_Color { Uint8 r, g, b, a; } SDL_Color;
 typedef struct SDL_Rect { int x, y, w, h; } SDL_Rect;
 
+typedef struct SDL_PixelFormat {
+    Uint32 format;
+    Uint32 Rmask, Gmask, Bmask, Amask;
+    Uint8 BytesPerPixel;
+} SDL_PixelFormat;
+
 typedef struct SDL_Surface {
     int w, h, pitch;
     void* pixels;
     int mustlock;
+    SDL_PixelFormat* format;
 } SDL_Surface;
 
 typedef struct SDL_Texture {
@@ -47,12 +54,18 @@ static inline const char* SDL_GetError(void) { return "host sdl stub"; }
 static inline int SDL_Init(Uint32) { return 0; }
 static inline void SDL_Quit(void) {}
 
+static inline SDL_PixelFormat* stubDefaultFormat() {
+    static SDL_PixelFormat fmt{0x16362004u, 0x00FF0000u, 0x0000FF00u, 0x000000FFu, 0xFF000000u, 4};
+    return &fmt;
+}
+
 static inline SDL_Surface* SDL_CreateRGBSurfaceWithFormat(Uint32, int w, int h, int, Uint32) {
     SDL_Surface* s = (SDL_Surface*)std::calloc(1, sizeof(SDL_Surface));
     s->w = w;
     s->h = h;
     s->pitch = w * 4;
     s->pixels = std::calloc((size_t)w * h, 4);
+    s->format = stubDefaultFormat();
     return s;
 }
 
@@ -61,6 +74,7 @@ static inline SDL_Surface* SDL_CreateRGBSurfaceWithFormatFrom(void* pixels, int 
     s->w = w;
     s->h = h;
     s->pitch = w * 4;
+    s->format = stubDefaultFormat();
     s->pixels = std::malloc((size_t)w * h * 4);
     const Uint8* src = (const Uint8*)pixels;
     Uint8* dst = (Uint8*)s->pixels;

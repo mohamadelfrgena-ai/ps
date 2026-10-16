@@ -1,6 +1,6 @@
 # pkg addon test — Minimalist PS4 Folder Copy Installer (PrizmaVisuals 1.3.10222)
 TITLE       := pkg addon test
-VERSION     := 0.6
+VERSION     := 0.7
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
