@@ -829,4 +829,29 @@ CRÉALO.</string>
     <string name="edit_profile_tab_item">Objeto</string>
     <string name="edit_profile_tab_about">Acerca de</string>
     <string name="edit_profile_message_preview">[Texto del mensaje]</string>
+
+    <!-- PlayStation console linking -->
+    <string name="console_link_title">Vincular dispositivo PlayStation</string>
+    <string name="console_link_settings_subtitle">Vincula una PlayStation con un código de un solo uso</string>
+    <string name="console_devices_title">Dispositivos vinculados</string>
+    <string name="console_devices_settings_subtitle">Consulta tus consolas vinculadas y desvincúlalas</string>
+    <string name="console_link_help">Genera un código de 6 caracteres en tu PlayStation. Caduca en 10 minutos y solo se puede usar una vez.</string>
+    <string name="console_link_code_label">Código de 6 caracteres</string>
+    <string name="console_link_action">Vincular dispositivo</string>
+    <string name="console_link_success">Dispositivo vinculado ✓ — %1$s</string>
+    <string name="console_link_invalid_code">Código no válido — introduce 6 caracteres del alfabeto permitido.</string>
+    <string name="console_link_code_not_found">Código incorrecto. Revísalo e inténtalo de nuevo.</string>
+    <string name="console_link_code_expired">Caducado o ya utilizado — solicita un código nuevo.</string>
+    <string name="console_link_sign_in_required">Inicia sesión antes de vincular una PlayStation.</string>
+    <string name="console_link_sign_in_action">Iniciar sesión</string>
+    <string name="console_link_view_devices">Ver dispositivos vinculados</string>
+    <string name="console_devices_empty">Aún no hay dispositivos vinculados.</string>
+    <string name="console_devices_load_failed">No se pudieron cargar tus dispositivos vinculados.</string>
+    <string name="console_device_linked_at">Vinculado: %1$s</string>
+    <string name="console_device_last_seen">Última actividad: %1$s</string>
+    <string name="console_device_unlink">Desvincular</string>
+    <string name="console_device_unlink_confirm_title">¿Desvincular este dispositivo?</string>
+    <string name="console_device_unlink_confirm_message">¿Quieres quitar %1$s de tus dispositivos vinculados?</string>
+    <string name="console_device_unlink_success">Dispositivo desvinculado.</string>
+    <string name="console_device_unlink_failed">No se pudo desvincular el dispositivo.</string>
 </resources>

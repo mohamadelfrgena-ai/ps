@@ -7,6 +7,7 @@ import com.addonstation.mobile.data.repo.AuthRepository
 import com.addonstation.mobile.data.repo.AssetsRepository
 import com.addonstation.mobile.data.repo.ChatRepository
 import com.addonstation.mobile.data.repo.ContentRepository
+import com.addonstation.mobile.data.repo.ConsoleLinkRepository
 import com.addonstation.mobile.data.repo.CreatorRepository
 import com.addonstation.mobile.data.repo.NotificationsRepository
 import com.addonstation.mobile.data.repo.PlansRepository
@@ -35,6 +36,7 @@ class AppContainer(context: Context) {
 
     val auth = AuthRepository(supabase, sessionStore)
     val profile = ProfileRepository(supabase, state)
+    val consoleLinks = ConsoleLinkRepository(supabase)
     val content = ContentRepository(supabase, state)
     val plans = PlansRepository(supabase, state)
     val ac = AcRepository(supabase, state)

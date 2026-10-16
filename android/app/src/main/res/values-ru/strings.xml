@@ -829,4 +829,29 @@
     <string name="edit_profile_tab_item">Предмет</string>
     <string name="edit_profile_tab_about">О себе</string>
     <string name="edit_profile_message_preview">[Текст сообщения]</string>
+
+    <!-- PlayStation console linking -->
+    <string name="console_link_title">Привязать устройство PlayStation</string>
+    <string name="console_link_settings_subtitle">Привяжите PlayStation одноразовым кодом</string>
+    <string name="console_devices_title">Привязанные устройства</string>
+    <string name="console_devices_settings_subtitle">Просмотр и отвязка ваших консолей</string>
+    <string name="console_link_help">Создайте на PlayStation код из 6 символов. Он действует 10 минут и используется только один раз.</string>
+    <string name="console_link_code_label">Код из 6 символов</string>
+    <string name="console_link_action">Привязать устройство</string>
+    <string name="console_link_success">Устройство привязано ✓ — %1$s</string>
+    <string name="console_link_invalid_code">Неверный код — введите 6 символов из разрешённого алфавита.</string>
+    <string name="console_link_code_not_found">Код не найден. Проверьте его и попробуйте ещё раз.</string>
+    <string name="console_link_code_expired">Срок истёк или код уже использован — запросите новый.</string>
+    <string name="console_link_sign_in_required">Войдите в аккаунт перед привязкой PlayStation.</string>
+    <string name="console_link_sign_in_action">Войти</string>
+    <string name="console_link_view_devices">Мои устройства</string>
+    <string name="console_devices_empty">Пока нет привязанных устройств.</string>
+    <string name="console_devices_load_failed">Не удалось загрузить привязанные устройства.</string>
+    <string name="console_device_linked_at">Привязано: %1$s</string>
+    <string name="console_device_last_seen">Последняя активность: %1$s</string>
+    <string name="console_device_unlink">Отвязать</string>
+    <string name="console_device_unlink_confirm_title">Отвязать это устройство?</string>
+    <string name="console_device_unlink_confirm_message">Удалить %1$s из списка привязанных устройств?</string>
+    <string name="console_device_unlink_success">Устройство отвязано.</string>
+    <string name="console_device_unlink_failed">Не удалось отвязать устройство.</string>
 </resources>

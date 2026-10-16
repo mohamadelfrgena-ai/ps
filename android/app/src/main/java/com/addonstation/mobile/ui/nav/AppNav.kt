@@ -69,6 +69,8 @@ import com.addonstation.mobile.ui.splash.SplashScreen
 import com.addonstation.mobile.ui.store.StoreScreen
 import com.addonstation.mobile.ui.store.ContentDetailScreen
 import com.addonstation.mobile.ui.settings.SettingsScreen
+import com.addonstation.mobile.ui.settings.ConsoleLinkScreen
+import com.addonstation.mobile.ui.settings.LinkedConsolesScreen
 import com.addonstation.mobile.ui.profile.ProfileScreen
 import com.addonstation.mobile.ui.common.SetupScreen
 import com.addonstation.mobile.ui.theme.AppColors
@@ -114,6 +116,8 @@ object Routes {
     const val NOTIFICATIONS = "notifications"
     /** إعدادات الإشعارات (الأقسام وساعات الهدوء ووتيرة التذكير). */
     const val NOTIF_SETTINGS = "notification-settings"
+    const val CONSOLE_LINK = "console-link"
+    const val LINKED_CONSOLES = "linked-consoles"
     const val FRIENDS = "friends"
     const val PLANS = "plans"
     const val CHECKOUT = "checkout/{planId}"
@@ -639,7 +643,24 @@ private fun MainNavigation(
                         onOpenAbout = { go(Routes.APP_ABOUT) },
                         onOpenPrivacy = { go(Routes.PRIVACY) },
                         onOpenTerms = { go(Routes.TERMS) },
+                        onOpenConsoleLink = { go(Routes.CONSOLE_LINK) },
+                        onOpenLinkedConsoles = { go(Routes.LINKED_CONSOLES) },
                         onBack = { back() },
+                    )
+                }
+
+                composable(Routes.CONSOLE_LINK) {
+                    ConsoleLinkScreen(
+                        onBack = { back() },
+                        onLogin = { go(Routes.LOGIN) },
+                        onOpenDevices = { go(Routes.LINKED_CONSOLES) },
+                    )
+                }
+                composable(Routes.LINKED_CONSOLES) {
+                    LinkedConsolesScreen(
+                        onBack = { back() },
+                        onLogin = { go(Routes.LOGIN) },
+                        onLinkAnother = { go(Routes.CONSOLE_LINK) },
                     )
                 }
 

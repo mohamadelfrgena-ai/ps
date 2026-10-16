@@ -13,6 +13,16 @@ data class Session(
     val expiresAtEpochSeconds: Long,
 )
 
+/** جهاز PlayStation مرتبط بحساب المستخدم؛ صفوفه تُقرأ وتُحذف عبر RLS. */
+@Serializable
+data class LinkedConsole(
+    val id: String,
+    @SerialName("device_name") val deviceName: String? = null,
+    val platform: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("last_seen_at") val lastSeenAt: String? = null,
+)
+
 data class AuthUser(
     val id: String,
     val email: String,

@@ -843,4 +843,29 @@ CREATE IT.</string>
     <string name="edit_profile_tab_item">Item</string>
     <string name="edit_profile_tab_about">About</string>
     <string name="edit_profile_message_preview">[Message text]</string>
+
+    <!-- PlayStation console linking -->
+    <string name="console_link_title">Link PlayStation device</string>
+    <string name="console_link_settings_subtitle">Link a PlayStation with a one-time code</string>
+    <string name="console_devices_title">Linked devices</string>
+    <string name="console_devices_settings_subtitle">View linked consoles and remove a device</string>
+    <string name="console_link_help">Generate a 6-character code on your PlayStation. It expires after 10 minutes and can only be used once.</string>
+    <string name="console_link_code_label">6-character code</string>
+    <string name="console_link_action">Link device</string>
+    <string name="console_link_success">Device linked ✓ — %1$s</string>
+    <string name="console_link_invalid_code">Invalid code — enter 6 characters from the allowed alphabet.</string>
+    <string name="console_link_code_not_found">Code not found. Check the code and try again.</string>
+    <string name="console_link_code_expired">Expired or already used — request a new code.</string>
+    <string name="console_link_sign_in_required">Sign in before linking a PlayStation device.</string>
+    <string name="console_link_sign_in_action">Sign in</string>
+    <string name="console_link_view_devices">View linked devices</string>
+    <string name="console_devices_empty">No linked devices yet.</string>
+    <string name="console_devices_load_failed">Could not load your linked devices.</string>
+    <string name="console_device_linked_at">Linked: %1$s</string>
+    <string name="console_device_last_seen">Last seen: %1$s</string>
+    <string name="console_device_unlink">Unlink</string>
+    <string name="console_device_unlink_confirm_title">Unlink this device?</string>
+    <string name="console_device_unlink_confirm_message">Remove %1$s from your linked devices?</string>
+    <string name="console_device_unlink_success">Device unlinked.</string>
+    <string name="console_device_unlink_failed">Could not unlink this device.</string>
 </resources>

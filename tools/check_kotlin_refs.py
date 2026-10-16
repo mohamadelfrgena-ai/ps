@@ -197,6 +197,7 @@ def main() -> int:
     repo_files = {
         "auth": "data/repo/AuthRepository.kt",
         "profile": "data/repo/ProfileRepository.kt",
+        "consoleLinks": "data/repo/ConsoleLinkRepository.kt",
         "content": "data/repo/ContentRepository.kt",
         "plans": "data/repo/PlansRepository.kt",
         "ac": "data/repo/AcRepository.kt",

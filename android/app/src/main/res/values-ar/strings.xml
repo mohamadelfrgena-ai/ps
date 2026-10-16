@@ -827,4 +827,29 @@
     <string name="edit_profile_tab_item">الأداة</string>
     <string name="edit_profile_tab_about">نبذة</string>
     <string name="edit_profile_message_preview">[نص الرسالة]</string>
+
+    <!-- PlayStation console linking -->
+    <string name="console_link_title">ربط جهاز PlayStation</string>
+    <string name="console_link_settings_subtitle">اربط جهاز PlayStation باستخدام كود لمرة واحدة</string>
+    <string name="console_devices_title">الأجهزة المرتبطة</string>
+    <string name="console_devices_settings_subtitle">اعرض أجهزة PlayStation المرتبطة وألغِ ربطها</string>
+    <string name="console_link_help">أنشئ كوداً من 6 خانات على جهاز PlayStation. تنتهي صلاحيته بعد 10 دقائق ويُستخدم مرة واحدة.</string>
+    <string name="console_link_code_label">الكود المكوّن من 6 خانات</string>
+    <string name="console_link_action">ربط الجهاز</string>
+    <string name="console_link_success">تم ربط جهازك ✓ — %1$s</string>
+    <string name="console_link_invalid_code">الكود غير صالح — أدخل 6 خانات من الأبجدية المسموحة.</string>
+    <string name="console_link_code_not_found">الكود غير صحيح. تحقق منه وحاول مجدداً.</string>
+    <string name="console_link_code_expired">انتهت صلاحيته أو استُخدم — اطلب كوداً جديداً.</string>
+    <string name="console_link_sign_in_required">سجّل الدخول أولاً لربط جهاز PlayStation.</string>
+    <string name="console_link_sign_in_action">تسجيل الدخول</string>
+    <string name="console_link_view_devices">عرض الأجهزة المرتبطة</string>
+    <string name="console_devices_empty">لا توجد أجهزة مرتبطة بعد.</string>
+    <string name="console_devices_load_failed">تعذّر تحميل الأجهزة المرتبطة.</string>
+    <string name="console_device_linked_at">تاريخ الربط: %1$s</string>
+    <string name="console_device_last_seen">آخر ظهور: %1$s</string>
+    <string name="console_device_unlink">إلغاء الربط</string>
+    <string name="console_device_unlink_confirm_title">إلغاء ربط هذا الجهاز؟</string>
+    <string name="console_device_unlink_confirm_message">هل تريد إزالة %1$s من أجهزتك المرتبطة؟</string>
+    <string name="console_device_unlink_success">تم إلغاء ربط الجهاز.</string>
+    <string name="console_device_unlink_failed">تعذّر إلغاء ربط الجهاز.</string>
 </resources>

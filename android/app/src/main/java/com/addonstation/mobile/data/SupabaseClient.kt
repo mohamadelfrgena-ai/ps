@@ -385,6 +385,29 @@ class SupabaseClient(
         if (text.isBlank() || text == "null") null else json.parseToJsonElement(text)
     }
 
+    /**
+     * RPC يستعمل لقطة جلسة محدّدة في الترويسة دون استبدالها تلقائياً عند 401.
+     * يفيد العمليات التي تحمل access/refresh tokens نفسها داخل body.
+     */
+    suspend fun rpcWithToken(
+        function: String,
+        params: Map<String, JsonElement?>,
+        accessToken: String,
+    ): JsonElement? = withContext(Dispatchers.IO) {
+        if (accessToken.isBlank()) throw ApiError(ApiErrorKind.NOT_SIGNED_IN)
+        val body = buildJsonObject {
+            params.forEach { (key, value) -> put(key, value ?: JsonNull) }
+        }
+        val text = exec(
+            method = "POST",
+            url = "${config().restUrl}/rpc/$function",
+            token = accessToken,
+            body = body.toString().toRequestBody(JSON_MEDIA),
+            allowRefresh = false,
+        )
+        if (text.isBlank() || text == "null") null else json.parseToJsonElement(text)
+    }
+
     // --------------------------------------------------------------- Storage
 
     fun publicUrl(bucket: String, path: String): String =

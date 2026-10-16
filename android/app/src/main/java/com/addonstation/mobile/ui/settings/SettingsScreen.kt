@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Visibility
@@ -141,6 +143,8 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit = {},
     onOpenPrivacy: () -> Unit = {},
     onOpenTerms: () -> Unit = {},
+    onOpenConsoleLink: () -> Unit = {},
+    onOpenLinkedConsoles: () -> Unit = {},
     onBack: () -> Unit = {},
     scrollToTopRequest: Int = 0,
 ) {
@@ -328,6 +332,24 @@ fun SettingsScreen(
                             onClick = { if (signedOut) onLogin() else requestPasswordReset() },
                         )
                     },
+                )
+                AuthSettingsDivider()
+                AuthSettingsRow(
+                    title = stringResource(R.string.console_link_title),
+                    subtitle = stringResource(R.string.console_link_settings_subtitle),
+                    tile = { AuthSettingsIconTile(Icons.Outlined.Link, AppColors.AuthAccentBlue) },
+                    clickable = true,
+                    onClick = onOpenConsoleLink,
+                    chevron = true,
+                )
+                AuthSettingsDivider()
+                AuthSettingsRow(
+                    title = stringResource(R.string.console_devices_title),
+                    subtitle = stringResource(R.string.console_devices_settings_subtitle),
+                    tile = { AuthSettingsIconTile(Icons.Outlined.Devices, AppColors.AuthGreen) },
+                    clickable = true,
+                    onClick = onOpenLinkedConsoles,
+                    chevron = true,
                 )
                 if ((profileLoadStatus == ProfileLoadStatus.FAILED || profileLoadStatus == ProfileLoadStatus.MISSING) && signedIn && profile == null) {
                     ErrorState(onRetry = { profileRetryTick += 1 })

@@ -829,4 +829,29 @@ CRÉE-LE.</string>
     <string name="edit_profile_tab_item">Objet</string>
     <string name="edit_profile_tab_about">À propos</string>
     <string name="edit_profile_message_preview">[Texte du message]</string>
+
+    <!-- PlayStation console linking -->
+    <string name="console_link_title">Associer un appareil PlayStation</string>
+    <string name="console_link_settings_subtitle">Associez une PlayStation avec un code à usage unique</string>
+    <string name="console_devices_title">Appareils associés</string>
+    <string name="console_devices_settings_subtitle">Consultez vos consoles associées et dissociez-les</string>
+    <string name="console_link_help">Générez un code à 6 caractères sur votre PlayStation. Il expire au bout de 10 minutes et ne peut être utilisé qu’une fois.</string>
+    <string name="console_link_code_label">Code à 6 caractères</string>
+    <string name="console_link_action">Associer l’appareil</string>
+    <string name="console_link_success">Appareil associé ✓ — %1$s</string>
+    <string name="console_link_invalid_code">Code invalide — saisissez 6 caractères de l’alphabet autorisé.</string>
+    <string name="console_link_code_not_found">Code incorrect. Vérifiez-le et réessayez.</string>
+    <string name="console_link_code_expired">Expiré ou déjà utilisé — demandez un nouveau code.</string>
+    <string name="console_link_sign_in_required">Connectez-vous avant d’associer une PlayStation.</string>
+    <string name="console_link_sign_in_action">Se connecter</string>
+    <string name="console_link_view_devices">Voir les appareils associés</string>
+    <string name="console_devices_empty">Aucun appareil associé pour le moment.</string>
+    <string name="console_devices_load_failed">Impossible de charger vos appareils associés.</string>
+    <string name="console_device_linked_at">Associé le : %1$s</string>
+    <string name="console_device_last_seen">Vu pour la dernière fois : %1$s</string>
+    <string name="console_device_unlink">Dissocier</string>
+    <string name="console_device_unlink_confirm_title">Dissocier cet appareil ?</string>
+    <string name="console_device_unlink_confirm_message">Retirer %1$s de vos appareils associés ?</string>
+    <string name="console_device_unlink_success">Appareil dissocié.</string>
+    <string name="console_device_unlink_failed">Impossible de dissocier cet appareil.</string>
 </resources>
