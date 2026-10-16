@@ -5,7 +5,7 @@
 // is then blitted/presented like the working v0.5 app:
 //     SDL_RenderPresent(renderer); SDL_UpdateWindowSurface(window);
 //
-// Navigation (v0.12): EVERY button has its real action — Welcome (code /
+// Navigation (v0.13): EVERY button has its real action — Welcome (code /
 // email / guest) leads to its own screen; ONLY content cards open the addon
 // install page; category/filter chips apply a filter (visible active chip);
 // banner Back returns; "Shop the sale" opens Deals; L1/R1 switch tabs only
@@ -357,7 +357,7 @@ int main(int, char**) {
                     toast(pkgtest::tr(state.autoLaunch ? "autolaunch_on" : "autolaunch_off", currentLang()));
                 }
                 else if (state.focus == 4) { state.linked = false; state.code = makeCode(); state.codeUntil = nowSeconds() + 582.0; go(Screen::CodeLink); }
-                else if (state.focus == 5) toast("AddonStation PS4 v0.12 — official app");
+                else if (state.focus == 5) toast("AddonStation PS4 v0.13 — official app");
                 else go(Screen::Confirm);
                 break;
             case Screen::Detail:
