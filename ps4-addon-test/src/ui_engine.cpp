@@ -548,10 +548,251 @@ void UiEngine::drawCircle(int cx, int cy, int radius, SDL_Color c) {
     drawRoundRect(cx - radius, cy - radius, radius * 2, radius * 2, radius, c);
 }
 
+void UiEngine::drawRoundGradV(int x, int y, int w, int h, int radius, SDL_Color top, SDL_Color bottom) {
+    if (w <= 0 || h <= 0) return;
+    const int r = std::max(0, std::min({radius, w / 2, h / 2}));
+    for (int row = 0; row < h; ++row) {
+        const float t = static_cast<float>(row) / static_cast<float>(std::max(1, h - 1));
+        const Uint8 cr = clamp8(static_cast<int>(top.r + (bottom.r - top.r) * t));
+        const Uint8 cg = clamp8(static_cast<int>(top.g + (bottom.g - top.g) * t));
+        const Uint8 cb = clamp8(static_cast<int>(top.b + (bottom.b - top.b) * t));
+        const Uint8 ca = clamp8(static_cast<int>(top.a + (bottom.a - top.a) * t));
+        int xr0 = 0, xr1 = w;
+        if (r > 1) {
+            if (row < r) {
+                const float yf = static_cast<float>(r - row) - 0.5f;
+                const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(r * r) - yf * yf)));
+                xr0 = r - dx; xr1 = w - (r - dx);
+            } else if (row >= h - r) {
+                const float yf = static_cast<float>(row - (h - r)) + 0.5f;
+                const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(r * r) - yf * yf)));
+                xr0 = r - dx; xr1 = w - (r - dx);
+            }
+        }
+        blendRow(x + xr0, x + xr1, y + row, cr, cg, cb, ca);
+    }
+}
+
+void UiEngine::drawRoundGradD(int x, int y, int w, int h, int radius, SDL_Color c0, SDL_Color c1) {
+    // 135deg diagonal gradient (design: .pb.pri linear-gradient(135deg,#2E7BEF,#4C9AFF))
+    if (w <= 0 || h <= 0) return;
+    const int r = std::max(0, std::min({radius, w / 2, h / 2}));
+    for (int row = 0; row < h; ++row) {
+        int xr0 = 0, xr1 = w;
+        if (r > 1) {
+            if (row < r) {
+                const float yf = static_cast<float>(r - row) - 0.5f;
+                const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(r * r) - yf * yf)));
+                xr0 = r - dx; xr1 = w - (r - dx);
+            } else if (row >= h - r) {
+                const float yf = static_cast<float>(row - (h - r)) + 0.5f;
+                const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(r * r) - yf * yf)));
+                xr0 = r - dx; xr1 = w - (r - dx);
+            }
+        }
+        for (int col = xr0; col < xr1; ++col) {
+            const float t = (static_cast<float>(col) / std::max(1, w) +
+                             static_cast<float>(row) / std::max(1, h)) * 0.5f;
+            blendPx(x + col, y + row,
+                    clamp8(static_cast<int>(c0.r + (c1.r - c0.r) * t)),
+                    clamp8(static_cast<int>(c0.g + (c1.g - c0.g) * t)),
+                    clamp8(static_cast<int>(c0.b + (c1.b - c0.b) * t)),
+                    clamp8(static_cast<int>(c0.a + (c1.a - c0.a) * t)));
+        }
+    }
+}
+
+void UiEngine::dropShadow(int x, int y, int w, int h, int radius, int blur, Uint8 alpha) {
+    // Layered rounded rects from large→small give a soft CSS-like shadow
+    if (w <= 0 || h <= 0) return;
+    const int rings = std::max(1, std::min(blur, 10));
+    for (int i = rings; i >= 1; --i) {
+        const int grow = (blur * i) / rings;
+        const int a = static_cast<int>(alpha) * (rings - i + 1) / (rings * 2);
+        if (a <= 0) continue;
+        drawRoundRect(x - grow, y + grow / 3, w + 2 * grow, h + 2 * grow,
+                      radius + grow, SDL_Color{0, 0, 0, static_cast<Uint8>(a)});
+    }
+}
+
+void UiEngine::drawImageRounded(const std::string& name, int x, int y, int w, int h,
+                                int radius, Uint8 alpha) {
+    auto it = images_.find(name);
+    if (it == images_.end() || it->second.w <= 0 || it->second.h <= 0) return;
+    const ImageData& img = it->second;
+    // COVER crop (fills the box, centered) like CSS background-size:cover
+    const float scale = std::max(static_cast<float>(w) / img.w, static_cast<float>(h) / img.h);
+    const int sw = std::max(1, static_cast<int>(w / scale));
+    const int sh = std::max(1, static_cast<int>(h / scale));
+    const int sx0 = std::max(0, (img.w - sw) / 2);
+    const int sy0 = std::max(0, (img.h - sh) / 2);
+    drawImageCropped(name, sx0, sy0, sw, sh, x, y, w, h, alpha, radius);
+}
+
+void UiEngine::drawImageRotated(const std::string& name, int cx, int cy, int w, int h,
+                                float angleDeg, Uint8 alpha) {
+    if (w <= 0 || h <= 0) return;
+    auto it = images_.find(name);
+    if (it == images_.end()) return;
+    const ImageData& img = it->second;
+    if (img.w <= 0 || img.h <= 0) return;
+
+    const float ang = angleDeg * 3.14159265f / 180.0f;
+    const float ca = std::cos(ang);
+    const float sa = std::sin(ang);
+    const float hw = w * 0.5f, hh = h * 0.5f;
+    // Dest bounding box of the rotated rect
+    const float bw = std::fabs(ca * w) + std::fabs(sa * h);
+    const float bh = std::fabs(sa * w) + std::fabs(ca * h);
+    const int x0 = cx - static_cast<int>(bw / 2) - 1;
+    const int y0 = cy - static_cast<int>(bh / 2) - 1;
+    const int x1 = cx + static_cast<int>(bw / 2) + 1;
+    const int y1 = cy + static_cast<int>(bh / 2) + 1;
+
+    for (int py = y0; py < y1; ++py) {
+        if (py < 0 || py >= kHeight) continue;
+        for (int px = x0; px < x1; ++px) {
+            if (px < 0 || px >= kWidth) continue;
+            const float dx = (px + 0.5f) - cx;
+            const float dy = (py + 0.5f) - cy;
+            // inverse rotate into card space
+            const float u = ca * dx + sa * dy + hw;
+            const float v = -sa * dx + ca * dy + hh;
+            if (u < 0 || v < 0 || u >= w || v >= h) continue;
+            const float fx = u * img.w / w;
+            const float fy = v * img.h / h;
+            const int sx = std::min(img.w - 1, std::max(0, static_cast<int>(fx)));
+            const int sy = std::min(img.h - 1, std::max(0, static_cast<int>(fy)));
+            const std::uint8_t* p = &img.rgba[static_cast<std::size_t>((sy * img.w + sx) * 4)];
+            const Uint8 a = static_cast<Uint8>((static_cast<int>(p[3]) * alpha) / 255);
+            if (a == 0) continue;
+            blendPx(px, py, p[0], p[1], p[2], a);
+        }
+    }
+}
+
+int UiEngine::drawTextGradV(const std::string& utf8, int x, int y, int pxSize,
+                            SDL_Color top, SDL_Color bottom,
+                            FontRole role,
+                            bool alignRight, bool isArabicLang,
+                            int maxWidth) {
+    const TextBitmap& bmp = getOrBuildText(utf8, pxSize, role, isArabicLang);
+    if (bmp.w <= 0 || bmp.h <= 0) return 0;
+    int drawW = bmp.w;
+    int srcX0 = 0;
+    if (maxWidth > 0 && drawW > maxWidth) {
+        drawW = maxWidth;
+        if (alignRight) srcX0 = bmp.w - maxWidth;
+    }
+    const int drawX = alignRight ? (x - drawW) : x;
+    for (int dy = 0; dy < bmp.h; ++dy) {
+        const float t = static_cast<float>(dy) / static_cast<float>(std::max(1, bmp.h - 1));
+        const Uint8 cr = clamp8(static_cast<int>(top.r + (bottom.r - top.r) * t));
+        const Uint8 cg = clamp8(static_cast<int>(top.g + (bottom.g - top.g) * t));
+        const Uint8 cb = clamp8(static_cast<int>(top.b + (bottom.b - top.b) * t));
+        for (int dx = 0; dx < drawW; ++dx) {
+            const std::uint32_t cell = bmp.px[static_cast<std::size_t>(dy) * bmp.w + (srcX0 + dx)];
+            const unsigned char a = static_cast<unsigned char>((cell >> 24) & 0xFF);
+            if (a == 0) continue;
+            blendPx(drawX + dx, y + dy, cr, cg, cb, a);
+        }
+    }
+    return drawW;
+}
+
+
+void UiEngine::drawRoundRectRotated(int cx, int cy, int w, int h, int radius,
+                                    float angleDeg, SDL_Color c) {
+    const float ang = angleDeg * 3.14159265f / 180.0f;
+    const float ca = std::cos(ang), sa = std::sin(ang);
+    const float hw = w * 0.5f, hh = h * 0.5f;
+    const int r = std::max(0, std::min({radius, w / 2, h / 2}));
+    const float bw = std::fabs(ca * w) + std::fabs(sa * h);
+    const float bh = std::fabs(sa * w) + std::fabs(ca * h);
+    for (int py = cy - static_cast<int>(bh / 2) - 1; py <= cy + static_cast<int>(bh / 2) + 1; ++py) {
+        if (py < 0 || py >= kHeight) continue;
+        for (int px = cx - static_cast<int>(bw / 2) - 1; px <= cx + static_cast<int>(bw / 2) + 1; ++px) {
+            if (px < 0 || px >= kWidth) continue;
+            const float dx = (px + 0.5f) - cx, dy = (py + 0.5f) - cy;
+            const float u = std::fabs(ca * dx + sa * dy) - (hw - r);
+            const float v = std::fabs(-sa * dx + ca * dy) - (hh - r);
+            const float d = std::sqrt(std::max(0.0f, u) * std::max(0.0f, u) +
+                                      std::max(0.0f, v) * std::max(0.0f, v)) -
+                            static_cast<float>(r);
+            if (d <= 0.5f) {
+                const Uint8 a = d < -1.0f ? c.a : static_cast<Uint8>(c.a * (0.5f - d));
+                blendPx(px, py, c.r, c.g, c.b, a);
+            }
+        }
+    }
+}
+
+int UiEngine::drawTextRotated(const std::string& utf8, int cx, int cy, int pxSize,
+                              SDL_Color color, float angleDeg,
+                              FontRole role, bool isArabicLang) {
+    const TextBitmap& bmp = getOrBuildText(utf8, pxSize, role, isArabicLang);
+    if (bmp.w <= 0 || bmp.h <= 0) return 0;
+    const float ang = angleDeg * 3.14159265f / 180.0f;
+    const float ca = std::cos(ang), sa = std::sin(ang);
+    const float hw = bmp.w * 0.5f, hh = bmp.h * 0.5f;
+    const float bw = std::fabs(ca * bmp.w) + std::fabs(sa * bmp.h);
+    const float bh = std::fabs(sa * bmp.w) + std::fabs(ca * bmp.h);
+    for (int py = cy - static_cast<int>(bh / 2) - 1; py <= cy + static_cast<int>(bh / 2) + 1; ++py) {
+        if (py < 0 || py >= kHeight) continue;
+        for (int px = cx - static_cast<int>(bw / 2) - 1; px <= cx + static_cast<int>(bw / 2) + 1; ++px) {
+            if (px < 0 || px >= kWidth) continue;
+            const float dx = (px + 0.5f) - cx, dy = (py + 0.5f) - cy;
+            const int u = static_cast<int>(ca * dx + sa * dy + hw);
+            const int v = static_cast<int>(-sa * dx + ca * dy + hh);
+            if (u < 0 || v < 0 || u >= bmp.w || v >= bmp.h) continue;
+            const std::uint32_t cell = bmp.px[static_cast<std::size_t>(v) * bmp.w + u];
+            const unsigned char a = static_cast<unsigned char>((cell >> 24) & 0xFF);
+            if (a == 0) continue;
+            const int fa = (a * color.a) / 255;
+            if (fa <= 0) continue;
+            blendPx(px, py, color.r, color.g, color.b, static_cast<Uint8>(fa));
+        }
+    }
+    return bmp.w;
+}
+
+int UiEngine::drawTextGlow(const std::string& utf8, int x, int y, int pxSize,
+                           SDL_Color color, SDL_Color glow,
+                           FontRole role,
+                           bool alignRight, bool isArabicLang) {
+    // cheap glow: 8 offset translucent copies + solid core
+    const TextBitmap& bmp = getOrBuildText(utf8, pxSize, role, isArabicLang);
+    if (bmp.w <= 0 || bmp.h <= 0) return 0;
+    const int drawX = alignRight ? (x - bmp.w) : x;
+    auto blitAt = [&](int ox, int oy, Uint8 mulA) {
+        for (int dy = 0; dy < bmp.h; ++dy) {
+            for (int dx = 0; dx < bmp.w; ++dx) {
+                const std::uint32_t cell = bmp.px[static_cast<std::size_t>(dy) * bmp.w + dx];
+                const unsigned char a = static_cast<unsigned char>((cell >> 24) & 0xFF);
+                if (a == 0) continue;
+                const int fa = (a * mulA) / 255;
+                if (fa <= 0) continue;
+                blendPx(drawX + dx + ox, y + dy + oy, glow.r, glow.g, glow.b, static_cast<Uint8>(fa));
+            }
+        }
+    };
+    static const int kOffs[8][2] = {{-3,0},{3,0},{0,-3},{0,3},{-2,-2},{2,-2},{-2,2},{2,2}};
+    for (const auto& o : kOffs) blitAt(o[0], o[1], 90);
+    for (int dy = 0; dy < bmp.h; ++dy) {
+        for (int dx = 0; dx < bmp.w; ++dx) {
+            const std::uint32_t cell = bmp.px[static_cast<std::size_t>(dy) * bmp.w + dx];
+            const unsigned char a = static_cast<unsigned char>((cell >> 24) & 0xFF);
+            if (a == 0) continue;
+            blendPx(drawX + dx, y + dy, color.r, color.g, color.b, a);
+        }
+    }
+    return bmp.w;
+}
+
 void UiEngine::drawImageCropped(const std::string& name,
                                 int sx0, int sy0, int sw, int sh,
                                 int x, int y, int w, int h,
-                                Uint8 alpha) {
+                                Uint8 alpha, int radius) {
     auto it = images_.find(name);
     if (it == images_.end() || w <= 0 || h <= 0 || sw <= 0 || sh <= 0) return;
     const ImageData& img = it->second;
@@ -760,9 +1001,6 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
     const float scalePrimary = stbtt_ScaleForPixelHeight(primaryFont, static_cast<float>(pxSize));
     int ascent = 0, descent = 0, lineGap = 0;
     stbtt_GetFontVMetrics(primaryFont, &ascent, &descent, &lineGap);
-    const int baseline = static_cast<int>(std::ceil(ascent * scalePrimary)) + 2;
-    const int surfH = std::max(pxSize + 8,
-                               static_cast<int>(std::ceil((ascent - descent) * scalePrimary)) + 6);
 
     auto pickFontForCp = [&](std::uint32_t cp, float& outScale) -> stbtt_fontinfo* {
         if (stbtt_FindGlyphIndex(primaryFont, static_cast<int>(cp)) != 0) {
@@ -785,12 +1023,21 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
         return primaryFont;
     };
 
+    // Pass 1: advances + exact glyph ink boxes (NEVER clip glyph tops/bottoms).
     float penX = 2.0f;
+    int minY = 0, maxY = 0;
+    bool firstBox = true;
     for (std::size_t i = 0; i < cps.size(); ++i) {
         float sc = scalePrimary;
         stbtt_fontinfo* fn = pickFontForCp(cps[i], sc);
         int adv = 0, lsb = 0;
         stbtt_GetCodepointHMetrics(fn, static_cast<int>(cps[i]), &adv, &lsb);
+        int bx0 = 0, by0 = 0, bx1 = 0, by1 = 0;
+        stbtt_GetCodepointBitmapBox(fn, static_cast<int>(cps[i]), sc, sc, &bx0, &by0, &bx1, &by1);
+        if (bx1 > bx0 && by1 > by0) {
+            if (firstBox) { minY = by0; maxY = by1; firstBox = false; }
+            else { minY = std::min(minY, by0); maxY = std::max(maxY, by1); }
+        }
         penX += adv * sc;
         if (i + 1 < cps.size() && fn == primaryFont) {
             penX += sc * stbtt_GetCodepointKernAdvance(
@@ -798,6 +1045,12 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
         }
     }
     const int surfW = std::max(4, static_cast<int>(std::ceil(penX)) + 6);
+    const int kPadTop = 3;
+    const int baseline = firstBox ? (kPadTop + static_cast<int>(ascent * scalePrimary))
+                                  : (kPadTop - minY);
+    const int surfH = std::max(pxSize + 8, firstBox
+                               ? static_cast<int>(std::ceil((ascent - descent) * scalePrimary)) + 6
+                               : (maxY - minY) + 2 * kPadTop + 1);
 
     TextBitmap bmp;
     bmp.w = surfW;

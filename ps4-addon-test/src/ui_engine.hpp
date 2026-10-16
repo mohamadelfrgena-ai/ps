@@ -41,9 +41,37 @@ public:
 
     void drawRoundRect(int x, int y, int w, int h, int radius, SDL_Color c);
     void drawRoundGradH(int x, int y, int w, int h, int radius, SDL_Color left, SDL_Color right);
+    void drawRoundGradV(int x, int y, int w, int h, int radius, SDL_Color top, SDL_Color bottom);
+    void drawRoundGradD(int x, int y, int w, int h, int radius, SDL_Color c0, SDL_Color c1);
     void drawRoundBorder(int x, int y, int w, int h, int radius, int thickness, SDL_Color c);
+    void dropShadow(int x, int y, int w, int h, int radius, int blur, Uint8 alpha);
     void drawFocusRing(int x, int y, int w, int h, int radius);
     void drawCircle(int cx, int cy, int radius, SDL_Color c);
+
+    // Image with rounded-corner clip (design cards use radius 14..36)
+    void drawImageRounded(const std::string& name, int x, int y, int w, int h,
+                          int radius, Uint8 alpha = 255);
+    // Tilted card art (welcome floaters: -5deg / +4deg)
+    void drawImageRotated(const std::string& name, int cx, int cy, int w, int h,
+                          float angleDeg, Uint8 alpha = 255);
+    void drawRoundRectRotated(int cx, int cy, int w, int h, int radius,
+                              float angleDeg, SDL_Color c);
+    int drawTextRotated(const std::string& utf8, int cx, int cy, int pxSize,
+                        SDL_Color color, float angleDeg,
+                        FontRole role = FontRole::Body,
+                        bool isArabicLang = false);
+
+    // Vertical 2-stop gradient text (WINTER SALE / DREAM IT. headlines)
+    int drawTextGradV(const std::string& utf8, int x, int y, int pxSize,
+                      SDL_Color top, SDL_Color bottom,
+                      FontRole role = FontRole::Pixel,
+                      bool alignRight = false, bool isArabicLang = false,
+                      int maxWidth = 0);
+    // Soft text glow (CREATE IT. gold glow) — draws blurred copies behind text
+    int drawTextGlow(const std::string& utf8, int x, int y, int pxSize,
+                     SDL_Color color, SDL_Color glow,
+                     FontRole role = FontRole::Pixel,
+                     bool alignRight = false, bool isArabicLang = false);
 
     void drawImage(const std::string& name, int x, int y, int w, int h, Uint8 alpha = 255);
     void drawImageZoomed(const std::string& name, int x, int y, int w, int h, float zoom, Uint8 alpha = 255);
@@ -96,7 +124,7 @@ private:
     void drawImageCropped(const std::string& name,
                           int sx0, int sy0, int sw, int sh,
                           int x, int y, int w, int h,
-                          Uint8 alpha);
+                          Uint8 alpha, int radius = 0);
     const TextBitmap& getOrBuildText(const std::string& utf8, int pxSize, FontRole role, bool isArabicLang);
     const TextBitmap& buildFallbackText(const std::string& utf8, int pxSize);
 
