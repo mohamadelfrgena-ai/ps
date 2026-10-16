@@ -21,6 +21,17 @@ constexpr const char* kAddonFolderName = "";
 // رابط ملف .raw على GitHub Release (PVRAW001). اتركه فارغاً حتى يُحدَّد.
 constexpr const char* kDownloadUrl = "";
 
+// ----------------------------------------------------------------------------
+//  إعداد Supabase — لنظام الدخول برمز (ربط جهاز السوني بالحساب)
+//  املأ القيمتين من لوحة Supabase: Settings → API
+//    kSupabaseUrl      = Project URL   (مثل https://xxxx.supabase.co)
+//    kSupabaseAnonKey  = anon / publishable key (المفتاح العام — ليس السري!)
+//  يمكن أيضاً تعديلهما على جهاز السوني مباشرة عبر ملف:
+//    /data/AddonStation/supabase.cfg  (سطر 1: الرابط — سطر 2: المفتاح)
+// ----------------------------------------------------------------------------
+constexpr const char* kSupabaseUrl = "";
+constexpr const char* kSupabaseAnonKey = "";
+
 } // namespace content
 } // namespace pkgtest
 

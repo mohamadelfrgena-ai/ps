@@ -161,6 +161,49 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
                             {"fr", "Lancement auto désactivé"}, {"tr", "Otomatik başlatma kapalı"},
                             {"es", "Inicio automático desactivado"}, {"ru", "Автозапуск выключен"},
                             {"pt", "Abertura automática desativada"}, {"zh", "自动启动已关闭"}}},
+        {"settings_language", {{"en", "App language"}, {"ar", "لغة التطبيق"},
+                               {"fr", "Langue de l'application"}, {"tr", "Uygulama dili"},
+                               {"es", "Idioma de la aplicación"}, {"ru", "Язык приложения"},
+                               {"pt", "Idioma do aplicativo"}, {"zh", "应用语言"}}},
+        {"settings_account", {{"en", "Account"}, {"ar", "الحساب"}, {"fr", "Compte"}, {"tr", "Hesap"},
+                              {"es", "Cuenta"}, {"ru", "Аккаунт"}, {"pt", "Conta"}, {"zh", "账户"}}},
+        {"settings_notifications", {{"en", "Notifications"}, {"ar", "الإشعارات"},
+                                    {"fr", "Notifications"}, {"tr", "Bildirimler"},
+                                    {"es", "Notificaciones"}, {"ru", "Уведомления"},
+                                    {"pt", "Notificações"}, {"zh", "通知"}}},
+        {"settings_link", {{"en", "Link a console"}, {"ar", "ربط جهاز"}, {"fr", "Lier une console"},
+                           {"tr", "Konsol bağla"}, {"es", "Vincular una consola"},
+                           {"ru", "Привязать консоль"}, {"pt", "Vincular um console"}, {"zh", "绑定主机"}}},
+        {"settings_about", {{"en", "About the app"}, {"ar", "عن التطبيق"}, {"fr", "À propos"},
+                            {"tr", "Uygulama hakkında"}, {"es", "Acerca de la aplicación"},
+                            {"ru", "О приложении"}, {"pt", "Sobre o aplicativo"}, {"zh", "关于应用"}}},
+        {"settings_signout", {{"en", "Sign out"}, {"ar", "تسجيل الخروج"}, {"fr", "Se déconnecter"},
+                              {"tr", "Çıkış yap"}, {"es", "Cerrar sesión"}, {"ru", "Выйти"},
+                              {"pt", "Sair"}, {"zh", "退出登录"}}},
+        {"link_linked", {{"en", "Console linked!"}, {"ar", "تم ربط الجهاز!"},
+                         {"fr", "Console liée !"}, {"tr", "Konsol bağlandı!"},
+                         {"es", "¡Consola vinculada!"}, {"ru", "Консоль привязана!"},
+                         {"pt", "Console vinculado!"}, {"zh", "主机已绑定！"}}},
+        {"link_expired", {{"en", "Code expired — request a new one"},
+                          {"ar", "انتهت صلاحية الكود — اطلب كوداً جديداً"},
+                          {"fr", "Code expiré — demandez-en un nouveau"},
+                          {"tr", "Kodun süresi doldu — yenisini isteyin"},
+                          {"es", "Código caducado — pide uno nuevo"},
+                          {"ru", "Код истёк — запросите новый"},
+                          {"pt", "Código expirado — peça um novo"},
+                          {"zh", "代码已过期 — 请获取新代码"}}},
+        {"link_failed", {{"en", "Connection failed — try again"},
+                         {"ar", "تعذّر الاتصال — حاول مجدداً"},
+                         {"fr", "Échec de connexion — réessayez"},
+                         {"tr", "Bağlantı başarısız — tekrar deneyin"},
+                         {"es", "Error de conexión — inténtalo de nuevo"},
+                         {"ru", "Ошибка соединения — попробуйте снова"},
+                         {"pt", "Falha na conexão — tente novamente"},
+                         {"zh", "连接失败 — 请重试"}}},
+        {"link_new", {{"en", "New code created"}, {"ar", "تم إنشاء كود جديد"},
+                      {"fr", "Nouveau code créé"}, {"tr", "Yeni kod oluşturuldu"},
+                      {"es", "Nuevo código creado"}, {"ru", "Новый код создан"},
+                      {"pt", "Novo código criado"}, {"zh", "已生成新代码"}}},
     };
     return kTable;
 }
@@ -1173,22 +1216,23 @@ void drawChat(UiEngine& e, int focus, bool roomOpen, const std::string& langCode
     drawLegendBar(e, {{"\xE2\x9C\x95", roomOpen ? "select" : "open"}, {"\xE2\x97\x8B", "back"}}, langCode);
 }
 
-void drawSettings(UiEngine& e, int focus, bool notifOn, bool autoLaunchOn, const std::string& langCode) {
+void drawSettings(UiEngine& e, int focus, bool notifOn, bool autoLaunchOn,
+                  const std::string& accountValue, const std::string& langCode) {
     const bool rtl = langCode == "ar";
     e.clear(kBG);
     drawTopNav(e, 4, langCode, 1250);
 
     e.drawText("Settings", 96, 150, 44, kWHT, FontRole::Pixel, false, false);
 
-    struct Row { std::string label; const char* value; bool danger; int toggle; };
+    struct Row { std::string label; std::string value; bool danger; int toggle; };
     const Row rows[7] = {
-        {"App language", "English >", false, 0},
-        {"Account", "name@example.com", false, 0},
-        {"Notifications", "", false, 1},
+        {tr("settings_language", langCode), "English >", false, 0},
+        {tr("settings_account", langCode), accountValue, false, 0},
+        {tr("settings_notifications", langCode), "", false, 1},
         {tr("autolaunch", langCode), "", false, 2},
-        {"Link a console", "1 device >", false, 0},
-        {"About the app", ">", false, 0},
-        {"Sign out", ">", true, 0},
+        {tr("settings_link", langCode), "1 device >", false, 0},
+        {tr("settings_about", langCode), ">", false, 0},
+        {tr("settings_signout", langCode), ">", true, 0},
     };
     const int listX = 96, listW = 900;
     for (int i = 0; i < 7; ++i) {

@@ -1,7 +1,7 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
-# AddonStation PS4 Mini-App — v0.14 test build (no splash; ○/ESC never exits)
-VERSION     := 0.14
+# AddonStation PS4 Mini-App — v0.15 test build (live Supabase code-link + translated settings)
+VERSION     := 0.15
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
@@ -41,6 +41,7 @@ PKG_FILES   := eboot.bin \
                assets/ui.pak
 
 OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/http_download.o \
+               $(OBJ_DIR)/supabase_client.o \
                $(OBJ_DIR)/ime_dialog.o $(OBJ_DIR)/ui_engine.o $(OBJ_DIR)/screens.o $(OBJ_DIR)/jbc.o
 
 LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut \
@@ -82,6 +83,9 @@ $(OBJ_DIR)/screens.o: src/screens.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/http_download.o: src/http_download.cpp | $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/supabase_client.o: src/supabase_client.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/ime_dialog.o: src/ime_dialog.cpp | $(OBJ_DIR)

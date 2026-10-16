@@ -181,6 +181,90 @@ cleanup:
     return result;
 }
 
+HttpPostResult httpPostJson(const std::string& url,
+                            const std::vector<std::pair<std::string, std::string>>& headers,
+                            const std::string& jsonBody) {
+    HttpPostResult result;
+
+    if (!gHttp.init()) {
+        result.message = "HTTP INIT FAILED";
+        return result;
+    }
+
+    const int templateId = sceHttpCreateTemplate(
+        gHttp.httpContextId, kUserAgent, ORBIS_HTTP_VERSION_1_1, 1);
+    if (templateId < 0) {
+        result.message = "TEMPLATE FAILED (" + std::to_string(templateId) + ")";
+        return result;
+    }
+
+    sceHttpSetConnectTimeOut(templateId, 20U * 1000U * 1000U);
+    sceHttpSetSendTimeOut(templateId, 20U * 1000U * 1000U);
+    {
+        using SetRecvTimeoutFn = std::int32_t (*)(std::int32_t, std::uint32_t);
+        const auto setRecvTimeout = reinterpret_cast<SetRecvTimeoutFn>(&sceHttpSetRecvTimeOut);
+        setRecvTimeout(templateId, 20U * 1000U * 1000U);
+    }
+    {
+        using SetAutoRedirectFn = std::int32_t (*)(std::int32_t, std::int32_t);
+        const auto setAutoRedirect = reinterpret_cast<SetAutoRedirectFn>(&sceHttpSetAutoRedirect);
+        setAutoRedirect(templateId, 1);
+    }
+
+    const int connectionId = sceHttpCreateConnectionWithURL(templateId, url.c_str(), 1);
+    if (connectionId < 0) {
+        sceHttpDeleteTemplate(templateId);
+        result.message = "CONNECT FAILED (" + std::to_string(connectionId) + ")";
+        return result;
+    }
+
+    const int requestId = sceHttpCreateRequestWithURL(
+        connectionId, ORBIS_METHOD_POST, url.c_str(), jsonBody.size());
+    if (requestId < 0) {
+        sceHttpDeleteConnection(connectionId);
+        sceHttpDeleteTemplate(templateId);
+        result.message = "REQUEST FAILED (" + std::to_string(requestId) + ")";
+        return result;
+    }
+
+    for (const auto& h : headers) {
+        sceHttpAddRequestHeader(requestId, h.first.c_str(), h.second.c_str(), 1);
+    }
+
+    const int sendResult = sceHttpSendRequest(
+        requestId, jsonBody.data(), static_cast<std::uint32_t>(jsonBody.size()));
+    if (sendResult < 0) {
+        result.message = "SEND FAILED (" + std::to_string(sendResult) + ")";
+    } else {
+        int statusCode = 0;
+        if (sceHttpGetStatusCode(requestId, &statusCode) < 0) {
+            result.message = "STATUS FAILED";
+        } else {
+            result.statusCode = statusCode;
+            std::vector<char> buffer(64 * 1024);
+            for (;;) {
+                const int bytesRead = sceHttpReadData(
+                    requestId, buffer.data(), static_cast<std::uint32_t>(buffer.size()));
+                if (bytesRead < 0) {
+                    result.message = "READ FAILED (" + std::to_string(bytesRead) + ")";
+                    break;
+                }
+                if (bytesRead == 0) break;
+                result.body.append(buffer.data(), static_cast<std::size_t>(bytesRead));
+            }
+            if (result.message.empty()) {
+                result.ok = true;
+                result.message = "DONE";
+            }
+        }
+    }
+
+    sceHttpDeleteRequest(requestId);
+    sceHttpDeleteConnection(connectionId);
+    sceHttpDeleteTemplate(templateId);
+    return result;
+}
+
 } // namespace pkgtest
 
 #else // ---- host build (tests) ----
@@ -190,6 +274,14 @@ namespace pkgtest {
 DownloadResult downloadToFile(const std::string&, const std::string&, DownloadProgress) {
     DownloadResult result;
     result.message = "DOWNLOAD NOT AVAILABLE ON HOST";
+    return result;
+}
+
+HttpPostResult httpPostJson(const std::string&,
+                            const std::vector<std::pair<std::string, std::string>>&,
+                            const std::string&) {
+    HttpPostResult result;
+    result.message = "NETWORK NOT AVAILABLE ON HOST";
     return result;
 }
 

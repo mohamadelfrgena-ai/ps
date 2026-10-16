@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace pkgtest {
 
@@ -22,6 +24,18 @@ struct DownloadResult {
 DownloadResult downloadToFile(const std::string& url,
                               const std::string& outFilePath,
                               DownloadProgress onProgress = nullptr);
+
+struct HttpPostResult {
+    bool ok = false;          // transport-level success (response body received)
+    int statusCode = 0;
+    std::string body;         // raw response body (JSON)
+    std::string message;
+};
+
+// POST JSON with custom headers over HTTPS (Supabase RPC). Returns the raw body.
+HttpPostResult httpPostJson(const std::string& url,
+                            const std::vector<std::pair<std::string, std::string>>& headers,
+                            const std::string& jsonBody);
 
 } // namespace pkgtest
 

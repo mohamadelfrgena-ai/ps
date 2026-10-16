@@ -23,6 +23,7 @@
 #include "ime_dialog.hpp"
 #include "installer.hpp"
 #include "screens.hpp"
+#include "supabase_client.hpp"
 
 #include <SDL2/SDL.h>
 
@@ -31,6 +32,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -61,6 +63,9 @@ struct AppState {
     std::string code = "K7P 4QX";
     double codeUntil = 0.0;
     bool linked = false;
+    std::string pollToken;
+    bool haveSession = false;
+    std::string sessionName;
 
     // email
     std::string email;
@@ -97,14 +102,23 @@ std::string makeCode() {
     return c;
 }
 
+std::mutex gLinkMx;   // يحمي حقول ربط الكود بين خيوط الخلفية وواجهة الرسم
+
 int frameSignature(const AppState& s, double t) {
-    const int codeSecs = static_cast<int>(std::max(0.0, s.codeUntil - t));
+    double linkUntil;
+    bool linkDone;
+    {
+        std::lock_guard<std::mutex> lk(gLinkMx);
+        linkUntil = s.codeUntil;
+        linkDone = s.linked;
+    }
+    const int codeSecs = static_cast<int>(std::max(0.0, linkUntil - t));
     int sig = static_cast<int>(s.screen) * 100000000 +
               s.focus * 1000000 +
               s.langIndex * 100000 +
               static_cast<int>(s.demoState) * 10000 +
               (s.progress >= 100 ? 99 : s.progress) * 100 +
-              (s.linked ? 11 : (codeSecs % 60));
+              (linkDone ? 11 : (codeSecs % 60));
     sig += s.heroIndex * 31337 + s.filterIndex * 2711 +
            s.storeFilter * 397 + s.dealsFilter * 53 +
            (s.autoLaunch ? 31 : 0) + (s.notifOn ? 17 : 0);
@@ -157,12 +171,121 @@ int main(int, char**) {
     const double bootTime = nowSeconds();
     state.codeUntil = bootTime + 582.0;   // 9:42 like the design
     state.autoLaunch = pkgtest::loadAutoLaunchSetting();
+    const pkgtest::SupabaseConfig supaCfg = pkgtest::loadSupabaseConfig();
+    {
+        const pkgtest::LinkSession sess = pkgtest::loadLinkSession();
+        if (sess.valid) {
+            state.haveSession = true;
+            state.sessionName = sess.displayName.empty() ? sess.username : sess.displayName;
+        }
+    }
 
     auto currentLang = [&state]() { return std::string(kLangCodes[state.langIndex]); };
     auto toast = [&state](const std::string& text) {
         state.toastText = text;
         state.toastUntil = nowSeconds() + 4.5;
     };
+
+    // ---- نظام الدخول برمز (Supabase) --------------------------------------
+    // كود جديد من الخادم (create_console_link_code) — مع كود تجريبي محلي
+    // إذا لم يُضبط Supabase بعد في content_config.hpp أو supabase.cfg.
+    auto requestNewCode = [&state, &supaCfg, &toast]() {
+        {
+            std::lock_guard<std::mutex> lk(gLinkMx);
+            state.linked = false;
+            state.pollToken.clear();
+        }
+        if (!supaCfg.ok()) {
+            const std::string c = makeCode();
+            std::lock_guard<std::mutex> lk(gLinkMx);
+            state.code = c;
+            state.codeUntil = nowSeconds() + 582.0;
+            return;
+        }
+        {
+            std::lock_guard<std::mutex> lk(gLinkMx);
+            state.code = "------";
+            state.codeUntil = nowSeconds() + 30.0;
+        }
+        std::thread([&state, &supaCfg, &toast]() {
+            const pkgtest::RpcResult r =
+                pkgtest::callCreateLinkCode(supaCfg, "ps4", "PlayStation 4");
+            if (r.ok && r.rpcOk) {
+                std::string code = pkgtest::jsonGetString(r.body, "formatted_code");
+                if (code.empty()) code = pkgtest::jsonGetString(r.body, "code");
+                const std::string token = pkgtest::jsonGetString(r.body, "poll_token");
+                const double secs = static_cast<double>(
+                    pkgtest::jsonGetInt(r.body, "expires_in_seconds", 600));
+                std::lock_guard<std::mutex> lk(gLinkMx);
+                state.code = code;
+                state.pollToken = token;
+                state.codeUntil = nowSeconds() + secs;
+            } else {
+                const std::string c = makeCode();
+                {
+                    std::lock_guard<std::mutex> lk(gLinkMx);
+                    state.code = c;
+                    state.codeUntil = nowSeconds() + 582.0;
+                    state.pollToken.clear();
+                }
+                toast("Link service unavailable \xE2\x80\x94 demo code");
+            }
+        }).detach();
+    };
+
+    // استطلاع حالة الكود كل 3 ثوانٍ (poll_console_link_code)
+    std::thread linkPoller([&state, &supaCfg, &toast, &currentLang]() {
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            std::string code, token;
+            {
+                std::lock_guard<std::mutex> lk(gLinkMx);
+                if (state.linked || state.pollToken.empty()) continue;
+                code = state.code;
+                token = state.pollToken;
+            }
+            const pkgtest::RpcResult r = pkgtest::callPollLinkCode(supaCfg, code, token);
+            if (!r.ok || !r.rpcOk) continue;
+            const std::string status = pkgtest::jsonGetString(r.body, "status");
+            if (status == "waiting") {
+                const double secs = static_cast<double>(
+                    pkgtest::jsonGetInt(r.body, "expires_in_seconds", 600));
+                std::lock_guard<std::mutex> lk(gLinkMx);
+                state.codeUntil = nowSeconds() + secs;
+            } else if (status == "linked") {
+                pkgtest::LinkSession s;
+                s.valid = true;
+                s.userId = pkgtest::jsonGetString(r.body, "user_id");
+                s.username = pkgtest::jsonGetString(r.body, "username");
+                s.displayName = pkgtest::jsonGetString(r.body, "display_name");
+                s.plan = pkgtest::jsonGetString(r.body, "plan");
+                s.acBalance = pkgtest::jsonGetInt(r.body, "ac_balance", 0);
+                s.accessToken = pkgtest::jsonGetString(r.body, "access_token");
+                s.refreshToken = pkgtest::jsonGetString(r.body, "refresh_token");
+                pkgtest::saveLinkSession(s);
+                const std::string name =
+                    s.displayName.empty() ? s.username : s.displayName;
+                {
+                    std::lock_guard<std::mutex> lk(gLinkMx);
+                    state.linked = true;
+                    state.haveSession = true;
+                    state.sessionName = name;
+                }
+                toast(pkgtest::tr("link_linked", currentLang()));
+            } else if (status == "expired") {
+                {
+                    std::lock_guard<std::mutex> lk(gLinkMx);
+                    state.codeUntil = nowSeconds();
+                    state.pollToken.clear();
+                }
+                toast(pkgtest::tr("link_expired", currentLang()));
+            } else if (status == "consumed") {
+                std::lock_guard<std::mutex> lk(gLinkMx);
+                state.pollToken.clear();
+            }
+        }
+    });
+    linkPoller.detach();
     auto go = [&state](Screen s) {
         if (state.screen != s) state.prevScreen = state.screen;
         state.screen = s;
@@ -284,15 +407,13 @@ int main(int, char**) {
         (void)cross;
         switch (state.screen) {
             case Screen::Welcome:
-                if (state.focus == 0) { state.linked = false; state.code = makeCode(); state.codeUntil = nowSeconds() + 582.0; go(Screen::CodeLink); }
+                if (state.focus == 0) { requestNewCode(); go(Screen::CodeLink); }
                 else if (state.focus == 1) go(Screen::Email);
                 else { state.tabScreen = Screen::Home; go(Screen::Home); }
                 break;
             case Screen::CodeLink:
-                state.code = makeCode();
-                state.codeUntil = nowSeconds() + 582.0;
-                state.linked = false;
-                toast("New code generated");
+                requestNewCode();
+                toast(pkgtest::tr("link_new", currentLang()));
                 break;
             case Screen::Email:
                 if (state.focus == 0) {
@@ -346,15 +467,19 @@ int main(int, char**) {
                 break;
             case Screen::Settings:
                 if (state.focus == 0) { state.focus = state.langIndex; state.prevScreen = state.screen; state.screen = Screen::Language; }
-                else if (state.focus == 1) toast("Account: name@example.com");
+                else if (state.focus == 1) {
+                    std::lock_guard<std::mutex> lk(gLinkMx);
+                    toast(state.haveSession ? ("Account: " + state.sessionName)
+                                            : std::string("Account: name@example.com"));
+                }
                 else if (state.focus == 2) { state.notifOn = !state.notifOn; toast(state.notifOn ? "Notifications ON" : "Notifications OFF"); }
                 else if (state.focus == 3) {
                     state.autoLaunch = !state.autoLaunch;
                     pkgtest::saveAutoLaunchSetting(state.autoLaunch);
                     toast(pkgtest::tr(state.autoLaunch ? "autolaunch_on" : "autolaunch_off", currentLang()));
                 }
-                else if (state.focus == 4) { state.linked = false; state.code = makeCode(); state.codeUntil = nowSeconds() + 582.0; go(Screen::CodeLink); }
-                else if (state.focus == 5) toast("AddonStation PS4 v0.14 — official app");
+                else if (state.focus == 4) { requestNewCode(); go(Screen::CodeLink); }
+                else if (state.focus == 5) toast("AddonStation PS4 v0.15 — official app");
                 else go(Screen::Confirm);
                 break;
             case Screen::Detail:
@@ -362,7 +487,20 @@ int main(int, char**) {
                 break;
             case Screen::Confirm:
                 if (state.focus == 0) go(Screen::Settings);
-                else { toast("Signed out"); state.email.clear(); state.pass.clear(); go(Screen::Welcome); }
+                else {
+                    toast("Signed out");
+                    state.email.clear();
+                    state.pass.clear();
+                    pkgtest::clearLinkSession();
+                    {
+                        std::lock_guard<std::mutex> lk(gLinkMx);
+                        state.haveSession = false;
+                        state.sessionName.clear();
+                        state.linked = false;
+                        state.pollToken.clear();
+                    }
+                    go(Screen::Welcome);
+                }
                 break;
         }
     };
@@ -562,8 +700,9 @@ int main(int, char**) {
         }
 
         // code countdown expiry
-        if (state.screen == Screen::CodeLink && !state.linked && t > state.codeUntil) {
-            state.codeUntil = t;  // hold at 0
+        if (state.screen == Screen::CodeLink) {
+            std::lock_guard<std::mutex> lk(gLinkMx);
+            if (!state.linked && t > state.codeUntil) state.codeUntil = t;  // hold at 0
         }
 
         // Redraw ONLY when something changed (perf):
@@ -573,16 +712,30 @@ int main(int, char**) {
 
         if (stateChanged || sig != lastSig || toastVisible != lastToastVisible ||
             codeAnim) {
+            std::string accountCopy;
+            {
+                std::lock_guard<std::mutex> lk(gLinkMx);
+                accountCopy = state.haveSession ? state.sessionName
+                                                : std::string("name@example.com");
+            }
             engine.clear(pkgtest::theme::BG);
             switch (state.screen) {
                 case Screen::Welcome:
                     pkgtest::drawWelcome(engine, state.focus, lang);
                     break;
-                case Screen::CodeLink:
-                    pkgtest::drawCodeLink(engine, state.code,
-                                          static_cast<int>(std::max(0.0, state.codeUntil - t)),
-                                          state.linked, lang);
+                case Screen::CodeLink: {
+                    std::string codeCopy;
+                    int secsLeft = 0;
+                    bool linkedCopy = false;
+                    {
+                        std::lock_guard<std::mutex> lk(gLinkMx);
+                        codeCopy = state.code;
+                        secsLeft = static_cast<int>(std::max(0.0, state.codeUntil - t));
+                        linkedCopy = state.linked;
+                    }
+                    pkgtest::drawCodeLink(engine, codeCopy, secsLeft, linkedCopy, lang);
                     break;
+                }
                 case Screen::Email:
                     pkgtest::drawEmailSignin(engine, state.focus, state.email, state.pass,
                                              state.emailError, lang);
@@ -599,13 +752,15 @@ int main(int, char**) {
                     pkgtest::drawChat(engine, state.focus, state.roomOpen, lang);
                     break;
                 case Screen::Settings:
-                    pkgtest::drawSettings(engine, state.focus, state.notifOn, state.autoLaunch, lang);
+                    pkgtest::drawSettings(engine, state.focus, state.notifOn, state.autoLaunch,
+                                          accountCopy, lang);
                     break;
                 case Screen::Detail:
                     pkgtest::drawInstallDemo(engine, state.demoState, state.progress, lang);
                     break;
                 case Screen::Confirm:
-                    pkgtest::drawSettings(engine, state.focus, state.notifOn, state.autoLaunch, lang);
+                    pkgtest::drawSettings(engine, state.focus, state.notifOn, state.autoLaunch,
+                                          accountCopy, lang);
                     pkgtest::drawConfirmDialog(engine, "Sign out?",
                                                "You can sign in again any time with a code.",
                                                "Sign out", "Cancel",
