@@ -23,14 +23,14 @@ constexpr const char* kDownloadUrl = "";
 
 // ----------------------------------------------------------------------------
 //  إعداد Supabase — لنظام الدخول برمز (ربط جهاز السوني بالحساب)
-//  املأ القيمتين من لوحة Supabase: Settings → API
-//    kSupabaseUrl      = Project URL   (مثل https://xxxx.supabase.co)
+//  القيم من لوحة Supabase: Settings → API
+//    kSupabaseUrl      = Project URL
 //    kSupabaseAnonKey  = anon / publishable key (المفتاح العام — ليس السري!)
-//  يمكن أيضاً تعديلهما على جهاز السوني مباشرة عبر ملف:
+//  يمكن تعديلهما على جهاز السوني مباشرة عبر ملف (يتفوق على القيم هنا):
 //    /data/AddonStation/supabase.cfg  (سطر 1: الرابط — سطر 2: المفتاح)
 // ----------------------------------------------------------------------------
-constexpr const char* kSupabaseUrl = "";
-constexpr const char* kSupabaseAnonKey = "";
+constexpr const char* kSupabaseUrl = "https://jqjmkssgjdsfdojkuqzq.supabase.co";
+constexpr const char* kSupabaseAnonKey = "sb_publishable_HjkmzYpP7SPjfKH4usnWjg_N760ZeCs";
 
 } // namespace content
 } // namespace pkgtest
