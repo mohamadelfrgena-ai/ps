@@ -1,7 +1,7 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
-# AddonStation PS4 Mini-App — v0.17 test build (Supabase configured — live)
-VERSION     := 0.17
+# AddonStation PS4 Mini-App — v0.18 test build (sharp rendering: area-average + text 2x AA)
+VERSION     := 0.18
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 

@@ -836,7 +836,52 @@ void UiEngine::drawImageCropped(const std::string& name,
         built.w = w;
         built.h = h;
         built.px.resize(static_cast<std::size_t>(w) * h);
-        // bilinear resample ONCE into RGBA32 cache
+        // High-quality resample ONCE into RGBA32 cache:
+        //  - SHRINK (icons/covers -> small sizes): area-average (box) over each
+        //    destination pixel's full source footprint with premultiplied alpha.
+        //    Plain point-bilinear minification caused the blur + aliasing noise
+        //    (ضباب وتشويش) on buttons and covers.
+        //  - GROW: bilinear (smooth).
+        const bool minify = (sw > w) || (sh > h);
+        if (minify) {
+            for (int dy = 0; dy < h; ++dy) {
+                int fy0 = sy0 + dy * sh / h;
+                int fy1 = sy0 + (dy + 1) * sh / h;
+                if (fy1 <= fy0) fy1 = fy0 + 1;
+                fy0 = std::max(0, fy0);
+                fy1 = std::min(img.h, fy1);
+                for (int dx = 0; dx < w; ++dx) {
+                    int fx0 = sx0 + dx * sw / w;
+                    int fx1 = sx0 + (dx + 1) * sw / w;
+                    if (fx1 <= fx0) fx1 = fx0 + 1;
+                    fx0 = std::max(0, fx0);
+                    fx1 = std::min(img.w, fx1);
+                    std::uint64_t sumR = 0, sumG = 0, sumB = 0, sumA = 0;
+                    for (int yy = fy0; yy < fy1; ++yy) {
+                        const std::uint8_t* row = &img.rgba[static_cast<std::size_t>(yy) * img.w * 4];
+                        for (int xx = fx0; xx < fx1; ++xx) {
+                            const std::uint8_t* px4 = &row[xx * 4];
+                            const std::uint64_t a = px4[3];
+                            sumR += px4[0] * a;
+                            sumG += px4[1] * a;
+                            sumB += px4[2] * a;
+                            sumA += a;
+                        }
+                    }
+                    std::uint32_t r = 0, g = 0, b = 0, a = 0;
+                    const std::uint64_t n =
+                        static_cast<std::uint64_t>(fx1 - fx0) * static_cast<std::uint64_t>(fy1 - fy0);
+                    if (sumA > 0 && n > 0) {
+                        a = static_cast<std::uint32_t>(sumA / n);
+                        r = static_cast<std::uint32_t>(sumR / sumA);
+                        g = static_cast<std::uint32_t>(sumG / sumA);
+                        b = static_cast<std::uint32_t>(sumB / sumA);
+                    }
+                    built.px[static_cast<std::size_t>(dy) * w + dx] =
+                        (a << 24) | (r << 16) | (g << 8) | b;
+                }
+            }
+        } else {
         for (int dy = 0; dy < h; ++dy) {
             const float sy = sy0 + ((dy + 0.5f) / h) * sh - 0.5f;
             const int y0 = std::max(0, std::min(img.h - 1, static_cast<int>(std::floor(sy))));
@@ -864,6 +909,7 @@ void UiEngine::drawImageCropped(const std::string& name,
                     (static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, sample[1]))) << 8) |
                     static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, sample[2])));
             }
+        }
         }
         sc = scaledCache_.emplace(key, std::move(built)).first;
     }
@@ -1101,18 +1147,38 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
         stbtt_GetCodepointHMetrics(fn, static_cast<int>(cps[i]), &adv, &lsb);
 
         int gw = 0, gh = 0, xoff = 0, yoff = 0;
+        // 2x supersampling for body/arabic/cjk text (smoother, cleaner edges —
+        // the pixel font F77 keeps its intentional hard pixel edges at 1:1).
+        const bool pixelFont = (fn == &fonts_->f77Info);
+        const float rs = pixelFont ? sc : sc * 2.0f;
         unsigned char* glyphBmp = stbtt_GetCodepointBitmap(
-            fn, sc, sc, static_cast<int>(cps[i]), &gw, &gh, &xoff, &yoff);
+            fn, rs, rs, static_cast<int>(cps[i]), &gw, &gh, &xoff, &yoff);
         if (glyphBmp) {
-            const int dstX0 = static_cast<int>(std::floor(penX)) + xoff;
-            const int dstY0 = baseline + yoff;
-            for (int gy = 0; gy < gh; ++gy) {
+            const int dstX0 = static_cast<int>(std::floor(penX)) +
+                              static_cast<int>(std::floor(xoff * (pixelFont ? 1.0f : 0.5f)));
+            const int dstY0 = baseline +
+                              static_cast<int>(std::floor(yoff * (pixelFont ? 1.0f : 0.5f)));
+            const int step = pixelFont ? 1 : 2;
+            const int outW = (gw + step - 1) / step;
+            const int outH = (gh + step - 1) / step;
+            for (int gy = 0; gy < outH; ++gy) {
                 const int py = dstY0 + gy;
                 if (py < 0 || py >= surfH) continue;
-                for (int gx = 0; gx < gw; ++gx) {
+                for (int gx = 0; gx < outW; ++gx) {
                     const int px = dstX0 + gx;
                     if (px < 0 || px >= surfW) continue;
-                    const unsigned char a = glyphBmp[gy * gw + gx];
+                    int sum = 0, n = 0;
+                    for (int syi = 0; syi < step; ++syi) {
+                        const int yy = gy * step + syi;
+                        if (yy >= gh) continue;
+                        for (int sxi = 0; sxi < step; ++sxi) {
+                            const int xx = gx * step + sxi;
+                            if (xx >= gw) continue;
+                            sum += glyphBmp[yy * gw + xx];
+                            ++n;
+                        }
+                    }
+                    const unsigned char a = (n > 0) ? static_cast<unsigned char>(sum / n) : 0;
                     if (a == 0) continue;
                     std::uint32_t& cell = bmp.px[static_cast<std::size_t>(py * surfW + px)];
                     const unsigned char prevA = static_cast<unsigned char>((cell >> 24) & 0xFFu);
