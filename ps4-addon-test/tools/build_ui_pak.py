@@ -63,8 +63,8 @@ def build(out_path: str, design_dir: str, font_cjk: str) -> None:
         ("flag_zh", imgs["i23"]),
     ]
 
-    # PS legacy button icons (cropped from 17220652-pslegacy_xl.png) — packed
-    # from assets/design_art so a --force rebuild keeps them.
+    # PS button icons (cropped from design_art/ps_buttons.png — pixel-style
+    # button sheet) — packed from assets/design_art so a --force rebuild keeps them.
     art_dir = os.path.join(os.path.dirname(os.path.abspath(out_path)), "design_art")
     for btn in ("btn_cross", "btn_circle", "btn_square", "btn_triangle",
                 "btn_l1", "btn_r1", "btn_l2", "btn_r2", "btn_options"):

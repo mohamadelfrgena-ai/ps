@@ -446,7 +446,7 @@ void drawWelcome(UiEngine& e, int focusIndex, const std::string& langCode) {
         e.drawRoundBorder(cx, cy, chipW, 68, 34, 2, SDL_Color{255, 255, 255, 42});
         e.drawImageRounded(flag, cx + 12, cy + 12, 44, 44, 22);
         e.drawText(langName, cx + 68, cy + 18, 26, kWHT, FontRole::Body, false, langCode == "ar", 110);
-        drawBtn(e, "\xE2\x96\xA1", cx + chipW - 32, cy + 34, 38);
+        drawBtn(e, "\xE2\x96\xA1", cx + chipW - 30, cy + 31, 32);
     }
 
     // .wcol — left 96 top 190 width 1040 (RTL: right 96)
@@ -670,7 +670,7 @@ void drawLegendBar(UiEngine& e,
     e.fillGradV(0, 984, 1920, 96, SDL_Color{5, 8, 16, 0}, SDL_Color{5, 8, 16, 242});
     int x = 96;
     for (const auto& it : items) {
-        const int iw = drawBtn(e, it.first, x + 30, 1032, 46);
+        const int iw = drawBtn(e, it.first, x + 28, 1032, 38);
         const std::string label = tr(it.second, langCode);
         const int lx = x + 30 + iw / 2 + 16;
         e.drawText(label, lx, 1018, 24, SDL_Color{196, 209, 232, 255},
@@ -781,7 +781,7 @@ void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int acB
     struct Tab { const char* key; };
     const char* keys[5] = {"nav_home", "nav_deals", "nav_store", "nav_chat", "nav_settings"};
     int x = bx + 76 + e.measureText("ADDONSTATION", 22, FontRole::Pixel, false) + 48;
-    x += drawBtn(e, "L1", x + 26, 60, 44) / 2 + 36;
+    x += drawBtn(e, "L1", x + 26, 60, 36) / 2 + 36;
     for (int i = 0; i < 5; ++i) {
         const std::string label = tr(keys[i], langCode);
         const int tw = e.measureText(label, 30, FontRole::Body, langCode == "ar");
@@ -791,7 +791,7 @@ void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int acB
         if (on) e.fillRect(x, 84, tw, 5, kBLl);
         x += tw + 34;
     }
-    drawBtn(e, "R1", x + 26, 60, 44);
+    drawBtn(e, "R1", x + 26, 60, 36);
 
     // right cluster: bell + AC pill + avatar
     int rx = 1920 - 96;
