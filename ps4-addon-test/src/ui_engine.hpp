@@ -75,6 +75,8 @@ public:
 
     void drawImage(const std::string& name, int x, int y, int w, int h, Uint8 alpha = 255);
     void drawImageZoomed(const std::string& name, int x, int y, int w, int h, float zoom, Uint8 alpha = 255);
+    // Native pixel size of a packed image (for aspect-correct icon drawing)
+    bool imageSize(const std::string& name, int& w, int& h) const;
 
     int measureText(const std::string& utf8, int pxSize, FontRole role, bool isArabicLang = false);
     int drawText(const std::string& utf8,

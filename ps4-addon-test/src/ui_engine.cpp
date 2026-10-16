@@ -905,6 +905,14 @@ void UiEngine::drawImageCropped(const std::string& name,
     }
 }
 
+bool UiEngine::imageSize(const std::string& name, int& w, int& h) const {
+    const auto it = images_.find(name);
+    if (it == images_.end()) return false;
+    w = it->second.w;
+    h = it->second.h;
+    return w > 0 && h > 0;
+}
+
 void UiEngine::drawImage(const std::string& name, int x, int y, int w, int h, Uint8 alpha) {
     auto it = images_.find(name);
     if (it == images_.end() || w <= 0 || h <= 0) return;

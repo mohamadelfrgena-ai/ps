@@ -63,6 +63,15 @@ def build(out_path: str, design_dir: str, font_cjk: str) -> None:
         ("flag_zh", imgs["i23"]),
     ]
 
+    # PS legacy button icons (cropped from 17220652-pslegacy_xl.png) — packed
+    # from assets/design_art so a --force rebuild keeps them.
+    art_dir = os.path.join(os.path.dirname(os.path.abspath(out_path)), "design_art")
+    for btn in ("btn_cross", "btn_circle", "btn_square", "btn_triangle",
+                "btn_l1", "btn_r1", "btn_l2", "btn_r2", "btn_options"):
+        bp = os.path.join(art_dir, btn + ".png")
+        if os.path.exists(bp):
+            entries.append((btn, read(bp)))
+
     with open(out_path, "wb") as out:
         out.write(b"ASUI0001")
         out.write(struct.pack("<I", len(entries)))

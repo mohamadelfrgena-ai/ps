@@ -233,12 +233,33 @@ void drawSpaced(UiEngine& e, const std::string& text, int x, int y, int pxSize,
     }
 }
 
-// .gl gamepad glyph circle
-void drawGl(UiEngine& e, int cx, int cy, const std::string& label, SDL_Color color, int size = 44) {
-    const int r = size / 2;
-    e.drawRoundRect(cx - r, cy - r, size, size, r, SDL_Color{10, 15, 28, 90});
-    e.drawRoundBorder(cx - r, cy - r, size, size, r, size >= 44 ? 3 : 2, color);
-    e.drawTextCentered(label, cx, cy, size >= 44 ? 22 : 16, color, FontRole::Body, false);
+// PS legacy button icons (cropped from 17220652-pslegacy_xl.png into ui.pak).
+// The old drawn circle+glyph shape is gone — these icons ARE the buttons.
+std::string btnIconName(const std::string& key) {
+    if (key.find("\xE2\x9C\x95") == 0 || key == "X") return "btn_cross";
+    if (key.find("\xE2\x97\x8B") == 0) return "btn_circle";
+    if (key.find("\xE2\x96\xA1") == 0) return "btn_square";
+    if (key.find("\xE2\x96\xB3") == 0) return "btn_triangle";
+    if (key == "L1") return "btn_l1";
+    if (key == "R1") return "btn_r1";
+    if (key == "L2") return "btn_l2";
+    if (key == "R2") return "btn_r2";
+    if (key == "OPT" || key == "OPTIONS") return "btn_options";
+    return "";
+}
+
+// Draws the button icon centered at (cx,cy) with pixel height `h`
+// (aspect preserved). Returns the drawn width.
+int drawBtn(UiEngine& e, const std::string& key, int cx, int cy, int h) {
+    const std::string name = btnIconName(key);
+    if (name.empty()) return h;
+    int iw = h, ih = h;
+    if (e.imageSize(name, iw, ih) && ih > 0) {
+        iw = std::max(8, h * iw / ih);
+        ih = h;
+    }
+    e.drawImage(name, cx - iw / 2, cy - ih / 2, iw, ih);
+    return iw;
 }
 
 // css .focus — outline 5px #9CC1FF offset 4 + blue glow
@@ -385,7 +406,7 @@ void drawWelcome(UiEngine& e, int focusIndex, const std::string& langCode) {
         e.drawRoundBorder(cx, cy, chipW, 68, 34, 2, SDL_Color{255, 255, 255, 42});
         e.drawImageRounded(flag, cx + 12, cy + 12, 44, 44, 22);
         e.drawText(langName, cx + 68, cy + 18, 26, kWHT, FontRole::Body, false, langCode == "ar", 110);
-        drawGl(e, cx + chipW - 30, cy + 34, "\xE2\x96\xA1", kPNK, 36);
+        drawBtn(e, "\xE2\x96\xA1", cx + chipW - 32, cy + 34, 38);
     }
 
     // .wcol — left 96 top 190 width 1040 (RTL: right 96)
@@ -609,18 +630,12 @@ void drawLegendBar(UiEngine& e,
     e.fillGradV(0, 984, 1920, 96, SDL_Color{5, 8, 16, 0}, SDL_Color{5, 8, 16, 242});
     int x = 96;
     for (const auto& it : items) {
-        const std::string& glyph = it.first;
-        const std::string& labelKey = it.second;
-        SDL_Color color = SDL_Color{196, 209, 232, 255};
-        if (glyph.find("\xE2\x9C\x95") == 0 || glyph == "✕") color = kBLl;
-        else if (glyph == "○") color = kRED;
-        else if (glyph == "□") color = kPNK;
-        else if (glyph == "△") color = kGRN;
-        drawGl(e, x + 22, 1032, glyph, color, 44);
-        const std::string label = tr(labelKey, langCode);
-        e.drawText(label, x + 58, 1018, 24, SDL_Color{196, 209, 232, 255},
+        const int iw = drawBtn(e, it.first, x + 30, 1032, 46);
+        const std::string label = tr(it.second, langCode);
+        const int lx = x + 30 + iw / 2 + 16;
+        e.drawText(label, lx, 1018, 24, SDL_Color{196, 209, 232, 255},
                    FontRole::Body, false, langCode == "ar");
-        x += 58 + e.measureText(label, 24, FontRole::Body, false) + 44;
+        x = lx + e.measureText(label, 24, FontRole::Body, false) + 44;
     }
 }
 
@@ -724,8 +739,7 @@ void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int acB
     struct Tab { const char* key; };
     const char* keys[5] = {"nav_home", "nav_deals", "nav_store", "nav_chat", "nav_settings"};
     int x = bx + 76 + e.measureText("ADDONSTATION", 22, FontRole::Pixel, false) + 48;
-    drawGl(e, x + 22, 60, "L1", kMU, 44);
-    x += 62;
+    x += drawBtn(e, "L1", x + 26, 60, 44) / 2 + 36;
     for (int i = 0; i < 5; ++i) {
         const std::string label = tr(keys[i], langCode);
         const int tw = e.measureText(label, 30, FontRole::Body, langCode == "ar");
@@ -735,7 +749,7 @@ void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int acB
         if (on) e.fillRect(x, 84, tw, 5, kBLl);
         x += tw + 34;
     }
-    drawGl(e, x + 22, 60, "R1", kMU, 44);
+    drawBtn(e, "R1", x + 26, 60, 44);
 
     // right cluster: bell + AC pill + avatar
     int rx = 1920 - 96;
