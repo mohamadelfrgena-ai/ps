@@ -55,6 +55,20 @@ void drawInstallDemo(UiEngine& e, DemoState state, int percent, const std::strin
 // Top navigation bar with L1/R1 tabs (Home Deals Store Chat Settings) + bell + AC pill + avatar
 void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int acBalance);
 
+// --- interactive screens (every button navigates / acts) ---
+void drawCodeLink(UiEngine& e, const std::string& code, int secondsLeft,
+                  bool linked, const std::string& langCode);
+void drawEmailSignin(UiEngine& e, int focus, const std::string& email,
+                     const std::string& pass, bool showError,
+                     const std::string& langCode);
+void drawHome(UiEngine& e, int focus, int heroIndex, const std::string& langCode);
+void drawStore(UiEngine& e, int focus, const std::string& langCode);
+void drawChat(UiEngine& e, int focus, bool roomOpen, const std::string& langCode);
+void drawSettings(UiEngine& e, int focus, bool notifOn, const std::string& langCode);
+void drawConfirmDialog(UiEngine& e, const std::string& title, const std::string& sub,
+                       const std::string& yesLabel, const std::string& noLabel,
+                       int focus, const std::string& langCode);
+
 std::string tr(const std::string& key, const std::string& langCode);
 
 } // namespace pkgtest

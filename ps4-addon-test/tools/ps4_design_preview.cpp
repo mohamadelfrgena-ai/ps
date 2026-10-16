@@ -91,5 +91,42 @@ int main(int argc, char** argv) {
     drawInstallDemo(engine, DemoState::Installing, 34, "fr");
     savePng(engine, outDir + "/ps4_install_installing_fr.png");
 
+    // 10. Code link screen
+    engine.clear(theme::BG);
+    drawCodeLink(engine, "K7P 4QX", 582, false, "en");
+    savePng(engine, outDir + "/ps4_code_link_en.png");
+
+    // 11. Email sign-in (error state)
+    engine.clear(theme::BG);
+    drawEmailSignin(engine, 1, "name@example.com", "password123", true, "en");
+    savePng(engine, outDir + "/ps4_email_error_en.png");
+
+    // 12. Home (hero + exclusives + chips + recommended)
+    engine.clear(theme::BG);
+    drawHome(engine, 0, 0, "en");
+    savePng(engine, outDir + "/ps4_home_en.png");
+
+    // 13. Store grid
+    engine.clear(theme::BG);
+    drawStore(engine, 0, "en");
+    savePng(engine, outDir + "/ps4_store_en.png");
+
+    // 14. Chat rooms
+    engine.clear(theme::BG);
+    drawChat(engine, 0, false, "en");
+    savePng(engine, outDir + "/ps4_chat_en.png");
+
+    // 15. Settings
+    engine.clear(theme::BG);
+    drawSettings(engine, 0, true, "en");
+    savePng(engine, outDir + "/ps4_settings_en.png");
+
+    // 16. Confirm dialog (sign out)
+    engine.clear(theme::BG);
+    drawSettings(engine, 5, true, "en");
+    drawConfirmDialog(engine, "Sign out?", "You can sign in again any time with a code.",
+                      "Sign out", "Cancel", 0, "en");
+    savePng(engine, outDir + "/ps4_confirm_en.png");
+
     return 0;
 }

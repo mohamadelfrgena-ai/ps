@@ -1,6 +1,6 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
-VERSION     := 0.10
+VERSION     := 0.11
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
@@ -40,10 +40,10 @@ PKG_FILES   := eboot.bin \
                assets/ui.pak
 
 OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/http_download.o \
-               $(OBJ_DIR)/ui_engine.o $(OBJ_DIR)/screens.o $(OBJ_DIR)/jbc.o
+               $(OBJ_DIR)/ime_dialog.o $(OBJ_DIR)/ui_engine.o $(OBJ_DIR)/screens.o $(OBJ_DIR)/jbc.o
 
 LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut \
-               -lScePad -lSceSysmodule -lSDL2 -lSceNet -lSceSsl -lSceHttp
+               -lScePad -lSceSysmodule -lSDL2 -lSceNet -lSceSsl -lSceHttp -lSceImeDialog
 COMMONFLAGS := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
                -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include
 CFLAGS      := $(COMMONFLAGS) -std=c11 -mno-red-zone -D__ORBIS__ -Isrc
@@ -81,6 +81,9 @@ $(OBJ_DIR)/screens.o: src/screens.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/http_download.o: src/http_download.cpp | $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/ime_dialog.o: src/ime_dialog.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/jbc.o: src/jbc.c | $(OBJ_DIR)

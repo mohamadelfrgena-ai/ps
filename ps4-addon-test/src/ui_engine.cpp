@@ -392,7 +392,27 @@ void UiEngine::blendRow(int x0, int x1, int y, Uint8 r, Uint8 g, Uint8 b, Uint8 
     if (y < 0 || y >= kHeight) return;
     const int xs = std::max(0, x0);
     const int xe = std::min(kWidth, x1);
-    for (int x = xs; x < xe; ++x) blendPx(x, y, r, g, b, a);
+    if (xs >= xe) return;
+    std::uint32_t* row = &fb_[static_cast<std::size_t>(y) * kWidth];
+    if (a >= 255) {
+        const std::uint32_t v = (255u << 24) | (static_cast<std::uint32_t>(r) << 16) |
+                                (static_cast<std::uint32_t>(g) << 8) | b;
+        std::fill(row + xs, row + xe, v);
+        return;
+    }
+    if (a == 0) return;
+    const int ia = 255 - a;
+    const int ra = r * a, ga = g * a, ba = b * a;
+    for (int x = xs; x < xe; ++x) {
+        const std::uint32_t cell = row[x];
+        const Uint8 dr = static_cast<Uint8>((cell >> 16) & 0xFF);
+        const Uint8 dg = static_cast<Uint8>((cell >> 8) & 0xFF);
+        const Uint8 db = static_cast<Uint8>(cell & 0xFF);
+        row[x] = (255u << 24) |
+                 (static_cast<std::uint32_t>((ra + dr * ia) / 255) << 16) |
+                 (static_cast<std::uint32_t>((ga + dg * ia) / 255) << 8) |
+                 static_cast<std::uint32_t>((ba + db * ia) / 255);
+    }
 }
 
 void UiEngine::clear(SDL_Color c) {
@@ -417,9 +437,7 @@ void UiEngine::fillRect(int x, int y, int w, int h, SDL_Color c) {
         }
         return;
     }
-    for (int yy = y0; yy < y1; ++yy) {
-        for (int xx = x0; xx < x1; ++xx) blendPx(xx, yy, c.r, c.g, c.b, c.a);
-    }
+    for (int yy = y0; yy < y1; ++yy) blendRow(x0, x1, yy, c.r, c.g, c.b, c.a);
 }
 
 void UiEngine::fillGradH(int x, int y, int w, int h, SDL_Color left, SDL_Color right) {
@@ -603,16 +621,21 @@ void UiEngine::drawRoundGradD(int x, int y, int w, int h, int radius, SDL_Color 
 }
 
 void UiEngine::dropShadow(int x, int y, int w, int h, int radius, int blur, Uint8 alpha) {
-    // Layered rounded rects from large→small give a soft CSS-like shadow
+    // Concentric BORDER rings only (perimeter cost) — soft falloff, ~30x cheaper
+    // than filling layered rects, and visually equivalent at these alphas.
     if (w <= 0 || h <= 0) return;
-    const int rings = std::max(1, std::min(blur, 10));
+    const int rings = std::max(1, std::min(blur / 3, 5));
     for (int i = rings; i >= 1; --i) {
-        const int grow = (blur * i) / rings;
-        const int a = static_cast<int>(alpha) * (rings - i + 1) / (rings * 2);
+        const int grow = 2 + (blur * i) / rings;
+        const int a = static_cast<int>(alpha) * (rings - i + 1) / (rings * 3);
         if (a <= 0) continue;
-        drawRoundRect(x - grow, y + grow / 3, w + 2 * grow, h + 2 * grow,
-                      radius + grow, SDL_Color{0, 0, 0, static_cast<Uint8>(a)});
+        drawRoundBorder(x - grow, y + grow / 3, w + 2 * grow, h + 2 * grow,
+                        radius + grow, std::max(3, grow / 2),
+                        SDL_Color{0, 0, 0, static_cast<Uint8>(a)});
     }
+    // tight dark edge (contact shadow)
+    drawRoundBorder(x - 1, y + 1, w + 2, h + 2, radius + 1, 2,
+                    SDL_Color{0, 0, 0, static_cast<Uint8>(alpha / 2)});
 }
 
 void UiEngine::drawImageRounded(const std::string& name, int x, int y, int w, int h,
@@ -716,12 +739,17 @@ void UiEngine::drawRoundRectRotated(int cx, int cy, int w, int h, int radius,
             const float dx = (px + 0.5f) - cx, dy = (py + 0.5f) - cy;
             const float u = std::fabs(ca * dx + sa * dy) - (hw - r);
             const float v = std::fabs(-sa * dx + ca * dy) - (hh - r);
-            const float d = std::sqrt(std::max(0.0f, u) * std::max(0.0f, u) +
-                                      std::max(0.0f, v) * std::max(0.0f, v)) -
-                            static_cast<float>(r);
-            if (d <= 0.5f) {
-                const Uint8 a = d < -1.0f ? c.a : static_cast<Uint8>(c.a * (0.5f - d));
-                blendPx(px, py, c.r, c.g, c.b, a);
+            const float uu = std::max(0.0f, u), vv = std::max(0.0f, v);
+            const float d2 = uu * uu + vv * vv;
+            const float rr = static_cast<float>(r);
+            if (d2 <= (rr + 0.5f) * (rr + 0.5f)) {
+                if (d2 <= (rr - 1.0f) * (rr - 1.0f) || r == 0) {
+                    blendPx(px, py, c.r, c.g, c.b, c.a);
+                } else {
+                    const float d = std::sqrt(d2) - rr;
+                    const Uint8 a = static_cast<Uint8>(c.a * std::max(0.0f, 0.5f - d));
+                    if (a > 0) blendPx(px, py, c.r, c.g, c.b, a);
+                }
             }
         }
     }
