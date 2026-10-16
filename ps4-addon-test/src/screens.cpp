@@ -145,6 +145,22 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
         {"choose_language", {{"en", "Choose app language"}, {"ar", "اختر لغة التطبيق"},
                              {"fr", "Choisir la langue"}, {"tr", "Uygulama dilini seç"},
                              {"es", "Elegir idioma"}, {"ru", "Выберите язык"}, {"pt", "Escolher idioma"}, {"zh", "选择语言"}}},
+        {"autolaunch", {{"en", "Auto-launch Minecraft after install"},
+                        {"ar", "تشغيل Minecraft تلقائياً بعد التثبيت"},
+                        {"fr", "Lancer Minecraft après l'installation"},
+                        {"tr", "Kurulumdan sonra Minecraft'ı otomatik başlat"},
+                        {"es", "Iniciar Minecraft automáticamente al instalar"},
+                        {"ru", "Автозапуск Minecraft после установки"},
+                        {"pt", "Abrir Minecraft automaticamente após instalar"},
+                        {"zh", "安装后自动启动 Minecraft"}}},
+        {"autolaunch_on", {{"en", "Auto-launch ON"}, {"ar", "التشغيل التلقائي مُفعَّل"},
+                           {"fr", "Lancement auto activé"}, {"tr", "Otomatik başlatma açık"},
+                           {"es", "Inicio automático activado"}, {"ru", "Автозапуск включён"},
+                           {"pt", "Abertura automática ativada"}, {"zh", "自动启动已开启"}}},
+        {"autolaunch_off", {{"en", "Auto-launch OFF"}, {"ar", "التشغيل التلقائي مُعطَّل"},
+                            {"fr", "Lancement auto désactivé"}, {"tr", "Otomatik başlatma kapalı"},
+                            {"es", "Inicio automático desactivado"}, {"ru", "Автозапуск выключен"},
+                            {"pt", "Abertura automática desativada"}, {"zh", "自动启动已关闭"}}},
     };
     return kTable;
 }
@@ -1229,46 +1245,47 @@ void drawChat(UiEngine& e, int focus, bool roomOpen, const std::string& langCode
     drawLegendBar(e, {{"\xE2\x9C\x95", roomOpen ? "select" : "open"}, {"\xE2\x97\x8B", "back"}}, langCode);
 }
 
-void drawSettings(UiEngine& e, int focus, bool notifOn, const std::string& langCode) {
+void drawSettings(UiEngine& e, int focus, bool notifOn, bool autoLaunchOn, const std::string& langCode) {
     const bool rtl = langCode == "ar";
     e.clear(kBG);
     drawTopNav(e, 4, langCode, 1250);
 
     e.drawText("Settings", 96, 150, 44, kWHT, FontRole::Pixel, false, false);
 
-    struct Row { const char* label; const char* value; bool danger; };
-    const Row rows[6] = {
-        {"App language", "English >", false},
-        {"Account", "name@example.com", false},
-        {"Notifications", "", false},
-        {"Link a console", "1 device >", false},
-        {"About the app", ">", false},
-        {"Sign out", ">", true},
+    struct Row { std::string label; const char* value; bool danger; int toggle; };
+    const Row rows[7] = {
+        {"App language", "English >", false, 0},
+        {"Account", "name@example.com", false, 0},
+        {"Notifications", "", false, 1},
+        {tr("autolaunch", langCode), "", false, 2},
+        {"Link a console", "1 device >", false, 0},
+        {"About the app", ">", false, 0},
+        {"Sign out", ">", true, 0},
     };
     const int listX = 96, listW = 900;
-    for (int i = 0; i < 6; ++i) {
-        const int y = 230 + i * 110;
-        e.drawRoundRect(listX, y, listW, 96, 26, kSF);
-        e.drawRoundBorder(listX, y, listW, 96, 26, 2, kBD);
-        e.drawText(rows[i].label, listX + 36, y + 30, 28,
+    for (int i = 0; i < 7; ++i) {
+        const int y = 230 + i * 100;
+        e.drawRoundRect(listX, y, listW, 92, 26, kSF);
+        e.drawRoundBorder(listX, y, listW, 92, 26, 2, kBD);
+        e.drawText(rows[i].label, listX + 36, y + 28, 28,
                    rows[i].danger ? SDL_Color{255, 135, 145, 255} : kWHT,
-                   FontRole::Body, false, rtl);
-        if (i == 2) {
-            // toggle
+                   FontRole::Body, false, rtl, 560);
+        if (rows[i].toggle) {
+            const bool on = rows[i].toggle == 1 ? notifOn : autoLaunchOn;
             const int tx = listX + listW - 120;
-            e.drawRoundRect(tx, y + 26, 84, 44, 22, notifOn ? kBL : kBD);
-            e.drawCircle(tx + (notifOn ? 62 : 22), y + 48, 18, kWHT);
+            e.drawRoundRect(tx, y + 24, 84, 44, 22, on ? kBL : kBD);
+            e.drawCircle(tx + (on ? 62 : 22), y + 46, 18, kWHT);
         } else {
-            e.drawText(rows[i].value, listX + listW - 300, y + 34, 22, kMU,
+            e.drawText(rows[i].value, listX + listW - 300, y + 32, 22, kMU,
                        FontRole::Body, true, false, 260);
         }
-        if (focus == i) focusRing(e, listX, y, listW, 96, 26);
+        if (focus == i) focusRing(e, listX, y, listW, 92, 26);
     }
 
     // right panel: language grid
     const int rx = 1050, rw = 1920 - 96 - rx;
-    e.drawRoundRect(rx, 230, rw, 650, 32, SDL_Color{14, 21, 38, 255});
-    e.drawRoundBorder(rx, 230, rw, 650, 32, 2, kBD);
+    e.drawRoundRect(rx, 230, rw, 692, 32, SDL_Color{14, 21, 38, 255});
+    e.drawRoundBorder(rx, 230, rw, 692, 32, 2, kBD);
     e.drawText("App language", rx + 36, 260, 36, kWHT, FontRole::Pixel, false, false);
     e.drawText("The app changes language right away. Arabic switches the whole layout to right-to-left.",
                rx + 36, 310, 22, kMU, FontRole::Body, false, false, rw - 72);

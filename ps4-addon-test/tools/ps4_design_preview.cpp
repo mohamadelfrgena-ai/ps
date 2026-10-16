@@ -123,12 +123,12 @@ int main(int argc, char** argv) {
 
     // 16. Settings
     engine.clear(theme::BG);
-    drawSettings(engine, 0, true, "en");
+    drawSettings(engine, 0, true, true, "en");
     savePng(engine, outDir + "/ps4_settings_en.png");
 
     // 17. Confirm dialog (sign out)
     engine.clear(theme::BG);
-    drawSettings(engine, 5, true, "en");
+    drawSettings(engine, 6, true, true, "en");
     drawConfirmDialog(engine, "Sign out?", "You can sign in again any time with a code.",
                       "Sign out", "Cancel", 0, "en");
     savePng(engine, outDir + "/ps4_confirm_en.png");

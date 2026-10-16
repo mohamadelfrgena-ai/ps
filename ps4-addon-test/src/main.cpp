@@ -10,8 +10,9 @@
 // install page; category/filter chips apply a filter (visible active chip);
 // banner Back returns; "Shop the sale" opens Deals; L1/R1 switch tabs only
 // inside the app (Home · Deals · Store · Chat · Settings) and L2/R2 change
-// the Home offer; Settings rows act (language / notifications toggle / link
-// console / sign out with confirm dialog), text fields open the PS4 system
+// the Home offer; Settings rows act (language / notifications toggle /
+// auto-launch Minecraft after install / link console / sign out with confirm
+// dialog), text fields open the PS4 system
 // keyboard (sceImeDialog), Download installs content from the GitHub Release.
 
 #include "content_config.hpp"
@@ -68,6 +69,7 @@ struct AppState {
     int storeFilter = 0;   // Store filter chip 0..2
     int dealsFilter = 0;   // Deals chip 0..4
     bool notifOn = true;
+    bool autoLaunch = false;   // «تشغيل Minecraft تلقائياً بعد التثبيت» (يُقرأ من الإعدادات)
     bool roomOpen = false;
     bool saved = false;
 
@@ -101,7 +103,8 @@ int frameSignature(const AppState& s, double t) {
               (s.progress >= 100 ? 99 : s.progress) * 100 +
               (s.linked ? 11 : (codeSecs % 60));
     sig += s.heroIndex * 31337 + s.filterIndex * 2711 +
-           s.storeFilter * 397 + s.dealsFilter * 53;
+           s.storeFilter * 397 + s.dealsFilter * 53 +
+           (s.autoLaunch ? 31 : 0) + (s.notifOn ? 17 : 0);
     return sig;
 }
 
@@ -152,6 +155,7 @@ int main(int, char**) {
     double splashStart = bootTime;
     bool firstLaunch = true;
     state.codeUntil = bootTime + 582.0;   // 9:42 like the design
+    state.autoLaunch = pkgtest::loadAutoLaunchSetting();
 
     auto currentLang = [&state]() { return std::string(kLangCodes[state.langIndex]); };
     auto toast = [&state](const std::string& text) {
@@ -236,7 +240,8 @@ int main(int, char**) {
                         state.demoState = pkgtest::DemoState::Installed;
                         state.progress = 100;
                     }
-                });
+                },
+                state.autoLaunch);
 
             if (res.ok && res.queuedForMinecraft) {
                 state.demoState = pkgtest::DemoState::Installing;
@@ -346,8 +351,13 @@ int main(int, char**) {
                 if (state.focus == 0) { state.focus = state.langIndex; state.prevScreen = state.screen; state.screen = Screen::Language; }
                 else if (state.focus == 1) toast("Account: name@example.com");
                 else if (state.focus == 2) { state.notifOn = !state.notifOn; toast(state.notifOn ? "Notifications ON" : "Notifications OFF"); }
-                else if (state.focus == 3) { state.linked = false; state.code = makeCode(); state.codeUntil = nowSeconds() + 582.0; go(Screen::CodeLink); }
-                else if (state.focus == 4) toast("AddonStation PS4 v0.12 — official app");
+                else if (state.focus == 3) {
+                    state.autoLaunch = !state.autoLaunch;
+                    pkgtest::saveAutoLaunchSetting(state.autoLaunch);
+                    toast(pkgtest::tr(state.autoLaunch ? "autolaunch_on" : "autolaunch_off", currentLang()));
+                }
+                else if (state.focus == 4) { state.linked = false; state.code = makeCode(); state.codeUntil = nowSeconds() + 582.0; go(Screen::CodeLink); }
+                else if (state.focus == 5) toast("AddonStation PS4 v0.12 — official app");
                 else go(Screen::Confirm);
                 break;
             case Screen::Detail:
@@ -425,7 +435,7 @@ int main(int, char**) {
                 break;
             }
             case Screen::Settings: {
-                if (dy != 0) state.focus = std::max(0, std::min(5, state.focus + dy));
+                if (dy != 0) state.focus = std::max(0, std::min(6, state.focus + dy));
                 break;
             }
             case Screen::Confirm: {
@@ -602,13 +612,13 @@ int main(int, char**) {
                     pkgtest::drawChat(engine, state.focus, state.roomOpen, lang);
                     break;
                 case Screen::Settings:
-                    pkgtest::drawSettings(engine, state.focus, state.notifOn, lang);
+                    pkgtest::drawSettings(engine, state.focus, state.notifOn, state.autoLaunch, lang);
                     break;
                 case Screen::Detail:
                     pkgtest::drawInstallDemo(engine, state.demoState, state.progress, lang);
                     break;
                 case Screen::Confirm:
-                    pkgtest::drawSettings(engine, state.focus, state.notifOn, lang);
+                    pkgtest::drawSettings(engine, state.focus, state.notifOn, state.autoLaunch, lang);
                     pkgtest::drawConfirmDialog(engine, "Sign out?",
                                                "You can sign in again any time with a code.",
                                                "Sign out", "Cancel",

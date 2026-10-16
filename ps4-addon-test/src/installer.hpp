@@ -49,8 +49,10 @@ CopyResult copyAddonFolder(const std::string& sourceFolder,
 // 2. Routes to resource_packs, behavior_packs, or minecraftWorlds automatically.
 // 3. If Minecraft is open: installs directly into com.mojang, cleans up any temporary .raw in stageDir,
 //    records in installed.json, and sends the 8-language "Enjoy!" PS4 notification.
-// 4. If Minecraft is closed: stages .raw in stageDir, launches the installed Minecraft CUSAxxxxx automatically,
-//    and once syncPendingAddonsIfMounted() finishes copying to com.mojang, deletes the staged .raw to free HDD space.
+// 4. If Minecraft is closed: stages .raw in stageDir WITHOUT launching the game (mod #4 default).
+//    Pass autoLaunchMinecraft=true (the Settings toggle) to also launch the detected Minecraft
+//    CUSAxxxxx right away so the deferred install completes immediately. Either way, once
+//    syncPendingAddonsIfMounted() finishes copying to com.mojang, the staged .raw is deleted.
 CopyResult installOrQueueAddon(
     const std::string& sourceRawPath,
     const std::string& addonFolderName,
@@ -58,7 +60,13 @@ CopyResult installOrQueueAddon(
     const std::string& preferredMojangDir = "",
     const std::string& targetCategory = "resource_packs",
     const std::string& langCode = "en",
-    ProgressCallback onProgress = nullptr);
+    ProgressCallback onProgress = nullptr,
+    bool autoLaunchMinecraft = false);
+
+// إعداد «تشغيل Minecraft تلقائياً بعد التثبيت» (الافتراضي: إيقاف). يُحفَظ في ملف
+// صغير (/data/AddonStation/autolaunch.cfg) ليبقى بعد إعادة تشغيل التطبيق.
+bool loadAutoLaunchSetting(const std::string& configPath = "/data/AddonStation/autolaunch.cfg");
+bool saveAutoLaunchSetting(bool enabled, const std::string& configPath = "/data/AddonStation/autolaunch.cfg");
 
 // Background watcher: checks if ANY Minecraft com.mojang is mounted, installs pending addons from stageDir,
 // deletes the staged .raw files after copying to free PS4 disk space, and triggers the 8-language notification.

@@ -150,6 +150,32 @@ int main() {
         assert(!fileExists(downloadedRaw));
     }
 
-    std::printf("installer host tests passed (dynamic paths, dual-mode, cleanup, 8-lang).\n");
+    // 6. Auto-launch setting round-trip + opt-in launch of deferred installs
+    {
+        const std::string cfg = root + "/autolaunch.cfg";
+        assert(!pkgtest::loadAutoLaunchSetting(cfg));                 // default OFF
+        assert(pkgtest::saveAutoLaunchSetting(true, cfg));
+        assert(pkgtest::loadAutoLaunchSetting(cfg));
+        assert(pkgtest::saveAutoLaunchSetting(false, cfg));
+        assert(!pkgtest::loadAutoLaunchSetting(cfg));
+
+        // deferred install with autoLaunch=true reports the launch request
+        const std::string autoMojangDir =
+            root + "/auto_mc/CUSA00265/user497444003/games/com.mojang";
+        const pkgtest::CopyResult autoRes = pkgtest::installOrQueueAddon(
+            testRaw, "My Pack 1.0", stageDir, autoMojangDir, "resource_packs", "en", nullptr, true);
+        assert(autoRes.ok);
+        assert(autoRes.queuedForMinecraft);
+        assert(autoRes.launchedMinecraft);   // host stub launch succeeds
+
+        // default (autoLaunch omitted) never launches the game (mod #4)
+        const pkgtest::CopyResult noAutoRes = pkgtest::installOrQueueAddon(
+            testRaw, "My Pack 1.0", stageDir, autoMojangDir, "resource_packs", "en");
+        assert(noAutoRes.ok);
+        assert(noAutoRes.queuedForMinecraft);
+        assert(!noAutoRes.launchedMinecraft);
+    }
+
+    std::printf("installer host tests passed (dynamic paths, dual-mode, cleanup, 8-lang, autolaunch).\n");
     return 0;
 }

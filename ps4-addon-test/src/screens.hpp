@@ -68,7 +68,7 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
 // filterIndex: active Store filter chip 0..2 (Addons Worlds Newest)
 void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langCode);
 void drawChat(UiEngine& e, int focus, bool roomOpen, const std::string& langCode);
-void drawSettings(UiEngine& e, int focus, bool notifOn, const std::string& langCode);
+void drawSettings(UiEngine& e, int focus, bool notifOn, bool autoLaunchOn, const std::string& langCode);
 void drawConfirmDialog(UiEngine& e, const std::string& title, const std::string& sub,
                        const std::string& yesLabel, const std::string& noLabel,
                        int focus, const std::string& langCode);

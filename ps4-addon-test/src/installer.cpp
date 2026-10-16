@@ -716,6 +716,29 @@ bool copyTreeRecursive(const std::string& srcDir,
 // عام (external linkage) — يُستدعى من main.cpp لزر «فتح Minecraft» (△).
 bool launchMinecraftOnPs4() { return launchMinecraftImpl(); }
 
+bool loadAutoLaunchSetting(const std::string& configPath) {
+    std::FILE* fp = std::fopen(configPath.c_str(), "rb");
+    if (!fp) return false;   // الافتراضي: إيقاف (اللعبة لا تُطلق تلقائياً)
+    char v = '0';
+    if (std::fread(&v, 1, 1, fp) != 1) v = '0';
+    std::fclose(fp);
+    return v == '1';
+}
+
+bool saveAutoLaunchSetting(bool enabled, const std::string& configPath) {
+    const std::string parent = configPath.substr(0, configPath.find_last_of('/'));
+    if (!parent.empty()) {
+        int err = 0;
+        ensureDirectory(parent, err);
+    }
+    std::FILE* fp = std::fopen(configPath.c_str(), "wb");
+    if (!fp) return false;
+    const char v = enabled ? '1' : '0';
+    const bool ok = std::fwrite(&v, 1, 1, fp) == 1;
+    std::fclose(fp);
+    return ok;
+}
+
 std::string formatEnjoyNotification(const std::string& addonName, const std::string& langCode) {
     if (langCode == "ar") {
         return "تم تثبيت " + addonName + " — استمتع!";
@@ -854,7 +877,8 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
                                const std::string& preferredMojangDir,
                                const std::string& targetCategory,
                                const std::string& langCode,
-                               ProgressCallback onProgress) {
+                               ProgressCallback onProgress,
+                               bool autoLaunchMinecraft) {
     CopyResult result;
     result.targetCategory = sanitizeTargetCategory(targetCategory);
 
@@ -954,11 +978,12 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
 
     result.ok = true;
     result.queuedForMinecraft = true;
-    // v0.13: اللعبة لا تُطلق تلقائياً بعد التثبيت — اُلغِي الطلب.
-    // الملف يبقى مؤجَّلاً في stageDir وتُكمله المزامنة التلقائية
+    // v0.13: إطلاق Minecraft تلقائياً اختياري — يُفعَّل من الإعدادات
+    // «تشغيل Minecraft تلقائياً بعد التثبيت» (الافتراضي: إيقاف). حتى مع
+    // الإيقاف يبقى الملف مؤجَّلاً في stageDir وتُكمله المزامنة التلقائية
     // (syncPendingAddonsIfMounted) في أول ظهور لمجلد com.mojang، سواء
     // شغّلت Minecraft بنفسك من △ في صفحة الإضافة أو يدوياً من القائمة.
-    result.launchedMinecraft = false;
+    result.launchedMinecraft = autoLaunchMinecraft && launchMinecraftOnPs4();
     result.message = formatInstallPhaseLabel(InstallPhase::Installing, langCode);
     return result;
 }
