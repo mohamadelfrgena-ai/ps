@@ -14,7 +14,7 @@
 
 #include <orbis/ImeDialog.h>
 #include <orbis/UserService.h>
-#include <kernel.h>
+#include <orbis/libkernel.h>
 
 namespace pkgtest {
 namespace {
