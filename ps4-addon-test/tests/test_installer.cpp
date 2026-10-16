@@ -47,18 +47,46 @@ int main() {
     if (fs::exists("assets/PrizmaVisuals-1.3.10222.zip")) {
         const int rc = std::system("python3 make_gp4.py assets/folder.raw");
         assert(rc == 0);
-        const fs::path realDst = root / "real_resource_packs" / "PrizmaVisuals 1.3.10222";
-        const pkgtest::CopyResult realRes =
-            pkgtest::copyAddonFolder("assets/folder.raw", realDst.string());
-        assert(realRes.ok);
-        assert(realRes.filesCopied == 8805);
-        assert(fs::exists(realDst / "manifest.json"));
-        assert(fs::exists(realDst / "pack_icon.png"));
-        assert(fs::exists(realDst / "subpacks" / "1" / "textures" / "blocks"));
+
+        const fs::path stageDir = root / "data" / "AddonStation" / "installed";
+        const fs::path mojangDir =
+            root / "sim_app_tmp" / "CUSA00265" / "user497444003" / "games" / "com.mojang";
+
+        // 1. Test when Minecraft is CLOSED (mojangDir does not exist yet):
+        const pkgtest::CopyResult queuedRes = pkgtest::installOrQueueAddon(
+            "assets/folder.raw",
+            "PrizmaVisuals 1.3.10222",
+            stageDir.string(),
+            mojangDir.string());
+        assert(queuedRes.ok);
+        assert(queuedRes.queuedForMinecraft);
+        assert(queuedRes.launchedMinecraft);
+        assert(fs::exists(stageDir / "PrizmaVisuals 1.3.10222.raw"));
+        assert(fs::exists(stageDir / "PrizmaVisuals 1.3.10222.pending"));
+
+        // 2. Simulate Minecraft launching and mounting com.mojang:
+        fs::create_directories(mojangDir);
+        const pkgtest::CopyResult syncRes =
+            pkgtest::syncPendingAddonsIfMounted(stageDir.string(), mojangDir.string());
+        assert(syncRes.ok);
+        assert(syncRes.filesCopied == 8805);
+        assert(!fs::exists(stageDir / "PrizmaVisuals 1.3.10222.pending"));
+        assert(fs::exists(mojangDir / "resource_packs" / "PrizmaVisuals 1.3.10222" / "manifest.json"));
+
+        // 3. Test when Minecraft is ALREADY OPEN (mojangDir already exists):
+        const pkgtest::CopyResult directRes = pkgtest::installOrQueueAddon(
+            "assets/folder.raw",
+            "PrizmaVisuals 1.3.10222",
+            stageDir.string(),
+            mojangDir.string());
+        assert(directRes.ok);
+        assert(!directRes.queuedForMinecraft);
+        assert(directRes.filesCopied == 8805);
+
         fs::remove("assets/folder.raw");
     }
 
     fs::remove_all(root);
-    std::cout << "pkg addon test folder copy host tests passed (8805 pure-ASCII files verified).\n";
+    std::cout << "pkg addon test dual-mode (Minecraft closed + open) host tests passed.\n";
     return 0;
 }

@@ -17,9 +17,10 @@ namespace {
 
 constexpr int kScreenWidth = 1920;
 constexpr int kScreenHeight = 1080;
-constexpr char kSourceAddonFolder[] = "/app0/assets/folder.raw";
-constexpr char kTargetAddonFolder[] =
-    "/app_tmp/CUSA00265/user497444003/games/com.mojang/resource_packs/PrizmaVisuals 1.3.10222";
+constexpr char kSourceRawPath[] = "/app0/assets/folder.raw";
+constexpr char kAddonFolderName[] = "PrizmaVisuals 1.3.10222";
+constexpr char kStageDir[] = "/data/AddonStation/installed";
+constexpr char kPreferredMojangDir[] = "/app_tmp/CUSA00265/user497444003/games/com.mojang";
 
 constexpr SDL_Color kBg{11, 15, 25, 255};
 constexpr SDL_Color kButtonReady{32, 178, 120, 255};
@@ -145,7 +146,7 @@ void renderScreen(SDL_Renderer* r, AppState& state) {
         hasRun = state.hasRun;
     }
 
-    const int btnW = 900;
+    const int btnW = 1040;
     const int btnH = 220;
     const int btnX = (kScreenWidth - btnW) / 2;
     const int btnY = (kScreenHeight - btnH) / 2;
@@ -155,6 +156,9 @@ void renderScreen(SDL_Renderer* r, AppState& state) {
     if (job != 0) {
         btnColor = kButtonBusy;
         label = "COPYING...";
+    } else if (hasRun && res.ok && res.queuedForMinecraft) {
+        btnColor = kButtonBusy;
+        label = res.message;
     } else if (hasRun && res.ok) {
         btnColor = kButtonReady;
         label = "DONE (" + std::to_string(res.filesCopied) + ")";
@@ -208,17 +212,29 @@ int main(int, char**) {
 
     AppState state;
     std::thread worker([&state]() {
+        int pollTicks = 0;
         while (!state.stopping.load()) {
             int expected = 1;
             if (state.jobState.compare_exchange_strong(expected, 2)) {
-                pkgtest::CopyResult result =
-                    pkgtest::copyAddonFolder(kSourceAddonFolder, kTargetAddonFolder);
+                pkgtest::CopyResult result = pkgtest::installOrQueueAddon(
+                    kSourceRawPath, kAddonFolderName, kStageDir, kPreferredMojangDir);
                 {
                     std::lock_guard<std::mutex> lock(state.mutex);
                     state.lastResult = std::move(result);
                     state.hasRun = true;
                 }
                 state.jobState.store(0);
+                pollTicks = 0;
+            } else if (++pollTicks >= 20) {
+                // Every ~800ms, check if Minecraft has mounted com.mojang and auto-sync queued addons
+                pollTicks = 0;
+                pkgtest::CopyResult synced =
+                    pkgtest::syncPendingAddonsIfMounted(kStageDir, kPreferredMojangDir);
+                if (synced.ok && synced.filesCopied > 0) {
+                    std::lock_guard<std::mutex> lock(state.mutex);
+                    state.lastResult = std::move(synced);
+                    state.hasRun = true;
+                }
             }
             sceKernelUsleep(40 * 1000);
         }
