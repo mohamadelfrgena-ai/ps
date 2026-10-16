@@ -7,6 +7,8 @@
 #include <orbis/Ssl.h>
 #include <orbis/Sysmodule.h>
 
+#include <algorithm>
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -71,7 +73,13 @@ DownloadResult downloadToFile(const std::string& url,
     // Microseconds timeouts (same as ps4/src/orbis_http_transport.cpp)
     sceHttpSetConnectTimeOut(templateId, 20U * 1000U * 1000U);
     sceHttpSetSendTimeOut(templateId, 20U * 1000U * 1000U);
-    sceHttpSetReceiveTimeOut(templateId, 120U * 1000U * 1000U);
+    {
+        // OpenOrbis declares sceHttpSetRecvTimeOut() without args (stub); real ABI
+        // is (int32_t id, uint32_t usec) — same trick as sceSslTerm in the codebase.
+        using SetRecvTimeoutFn = std::int32_t (*)(std::int32_t, std::uint32_t);
+        const auto setRecvTimeout = reinterpret_cast<SetRecvTimeoutFn>(&sceHttpSetRecvTimeOut);
+        setRecvTimeout(templateId, 120U * 1000U * 1000U);
+    }
 
     // GitHub Releases redirect to objects.githubusercontent.com — auto-follow.
     // OpenOrbis declares sceHttpSetAutoRedirect() without args (stub); use the

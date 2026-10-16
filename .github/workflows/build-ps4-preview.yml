@@ -92,7 +92,13 @@ jobs:
           make -C ps4-addon-test clean
           make -C ps4-addon-test host-test
           make -C ps4-addon-test clean
-          make -C ps4-addon-test
+          if ! make -C ps4-addon-test 2>&1 | tee /tmp/pkg-build.log; then
+            echo "::error::pkg addon test build failed — last log lines:"
+            tail -n 30 /tmp/pkg-build.log | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit 1
+          fi
           test -s ps4-addon-test/pkg-addon-test.pkg
           echo "### Standalone pkg addon test built" >> "$GITHUB_STEP_SUMMARY"
           echo "File: ps4-addon-test/pkg-addon-test.pkg" >> "$GITHUB_STEP_SUMMARY"
