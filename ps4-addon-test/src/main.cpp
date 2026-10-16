@@ -1,21 +1,24 @@
 // AddonStation "pkg addon test" PS4 Mini-App — design UI (splash + welcome + installer)
 //
-// Rendering: the UiEngine rasterizes EVERYTHING into its own RGBA framebuffer
-// (proven stb_truetype/stb_image path — no SDL textures, no SDL_RenderCopy),
-// then the frame is blitted into the SDL window surface and presented exactly
-// like the working v0.5 app:
+// Performance: the UiEngine rasterizes into its own RGBA framebuffer (no SDL
+// textures) and each screen is redrawn ONLY when something changes — the frame
+// is then blitted/presented like the working v0.5 app:
 //     SDL_RenderPresent(renderer); SDL_UpdateWindowSurface(window);
 //
-// Dual-mode installer: copies PrizmaVisuals into com.mojang immediately if
-// Minecraft is open; otherwise stages to /data/AddonStation/installed/, launches
-// Minecraft, auto-syncs and deletes the staged .raw afterwards. CUSAxxxxx and
-// userYYYY are always auto-detected.
+// Content: NOTHING is bundled anymore. Pressing Download fetches the .raw from
+// the GitHub Release (Supabase <-> GitHub Releases pipeline) into
+// /data/AddonStation/installed/ and the dual-mode installer takes over:
+// Minecraft open  -> copy into com.mojang immediately + cleanup + notification
+// Minecraft closed-> stage, launch Minecraft, auto-sync, delete the .raw
+// CUSAxxxxx and userYYYY are always auto-detected.
 
+#include "http_download.hpp"
 #include "installer.hpp"
 #include "screens.hpp"
 
 #include <SDL2/SDL.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -27,7 +30,9 @@ namespace {
 
 constexpr const char* kStageDir = "/data/AddonStation/installed";
 constexpr const char* kAddonFolderName = "PrizmaVisuals 1.3.10222";
-constexpr const char* kSourceRaw = "/app0/assets/folder.raw";
+constexpr const char* kDownloadUrl =
+    "https://github.com/mohamadelfrgena-ai/ps/releases/download/"
+    "content-prizmavisuals-1.3.10222/prizmavisuals-1-3-10_3bcccbf1.raw";
 
 const char* kLangCodes[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
 
@@ -40,12 +45,20 @@ struct AppState {
     pkgtest::DemoState demoState = pkgtest::DemoState::Idle;
     int progress = 0;
     std::string toastText;
-    float toastUntil = 0.0f;
+    double toastUntil = 0.0;
     std::atomic<bool> installing{false};
 };
 
-float nowSeconds() {
-    return std::chrono::duration<float>(std::chrono::steady_clock::now().time_since_epoch()).count();
+double nowSeconds() {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+int frameSignature(const AppState& s) {
+    return static_cast<int>(s.screen) * 10000000 +
+           s.focus * 100000 +
+           s.langIndex * 10000 +
+           static_cast<int>(s.demoState) * 100 +
+           (s.progress >= 100 ? 99 : s.progress);
 }
 
 } // namespace
@@ -87,17 +100,13 @@ int main(int, char**) {
     SDL_JoystickEventState(SDL_ENABLE);
 
     pkgtest::UiEngine engine;
-    const bool fontsOk = engine.init("/app0/assets/ui.pak");
-    if (!fontsOk) {
-        std::fprintf(stderr, "ui.pak missing or invalid - fallback font active\n");
-    }
+    engine.init("/app0/assets/ui.pak");
 
     AppState state;
-    const float bootTime = nowSeconds();
-    float splashStart = bootTime;
+    const double bootTime = nowSeconds();
+    double splashStart = bootTime;
     bool firstLaunch = true;
 
-    // Background watcher: keeps auto-syncing staged addons whenever Minecraft mounts com.mojang
     std::thread syncWatcher([&state]() {
         while (true) {
             if (!state.installing.load()) {
@@ -110,6 +119,7 @@ int main(int, char**) {
 
     auto currentLang = [&state]() { return std::string(kLangCodes[state.langIndex]); };
 
+    // Download the .raw from the GitHub Release, then install it (dual-mode)
     auto triggerInstall = [&state, &currentLang]() {
         if (state.installing.load()) return;
         state.installing.store(true);
@@ -117,20 +127,38 @@ int main(int, char**) {
         state.progress = 0;
 
         std::thread([&, lang = currentLang()]() {
+            const std::string rawPath =
+                std::string(kStageDir) + "/" + kAddonFolderName + ".raw";
+
+            const pkgtest::DownloadResult dl = pkgtest::downloadToFile(
+                kDownloadUrl,
+                rawPath,
+                [&](int percent) {
+                    state.demoState = pkgtest::DemoState::Downloading;
+                    state.progress = percent;
+                });
+
+            if (!dl.ok) {
+                state.demoState = pkgtest::DemoState::Idle;
+                state.progress = 0;
+                state.installing.store(false);
+                return;
+            }
+
+            state.demoState = pkgtest::DemoState::Installing;
+            state.progress = 10;
+
             const pkgtest::CopyResult res = pkgtest::installOrQueueAddon(
-                kSourceRaw,
+                rawPath,
                 kAddonFolderName,
                 kStageDir,
                 "",
                 "resource_packs",
                 lang,
                 [&](pkgtest::InstallPhase phase, int percent) {
-                    if (phase == pkgtest::InstallPhase::Downloading) {
-                        state.demoState = pkgtest::DemoState::Downloading;
-                        state.progress = percent;
-                    } else if (phase == pkgtest::InstallPhase::Installing) {
+                    if (phase == pkgtest::InstallPhase::Installing) {
                         state.demoState = pkgtest::DemoState::Installing;
-                        state.progress = percent;
+                        state.progress = std::min(100, 10 + percent * 9 / 10);
                     } else if (phase == pkgtest::InstallPhase::Installed) {
                         state.demoState = pkgtest::DemoState::Installed;
                         state.progress = 100;
@@ -144,7 +172,7 @@ int main(int, char**) {
                 state.demoState = pkgtest::DemoState::Installed;
                 state.progress = 100;
                 state.toastText = pkgtest::formatEnjoyNotification(kAddonFolderName, lang);
-                state.toastUntil = nowSeconds() + 6.0f;
+                state.toastUntil = nowSeconds() + 6.0;
             } else {
                 state.demoState = pkgtest::DemoState::Idle;
                 state.progress = 0;
@@ -155,9 +183,14 @@ int main(int, char**) {
 
     bool running = true;
     SDL_Event ev;
+    int lastSig = -1;
+    bool lastToastVisible = false;
+    long long frameCount = 0;
+
     while (running) {
-        const float t = nowSeconds();
+        const double t = nowSeconds();
         const std::string lang = currentLang();
+        bool stateChanged = false;
 
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT) {
@@ -167,14 +200,15 @@ int main(int, char**) {
                 if (state.screen == Screen::Welcome) {
                     if (hat & SDL_HAT_UP) state.focus = (state.focus + 2) % 3;
                     if (hat & SDL_HAT_DOWN) state.focus = (state.focus + 1) % 3;
+                    stateChanged = true;
                 } else if (state.screen == Screen::Language) {
                     if (hat & SDL_HAT_UP) state.focus = (state.focus + 6) % 8;
                     if (hat & SDL_HAT_DOWN) state.focus = (state.focus + 2) % 8;
                     if (hat & SDL_HAT_LEFT) state.focus = (state.focus + 7) % 8;
                     if (hat & SDL_HAT_RIGHT) state.focus = (state.focus + 1) % 8;
+                    stateChanged = true;
                 }
             } else if (ev.type == SDL_JOYBUTTONDOWN) {
-                // 0=Cross(select/install) 1=Circle(back) 2=Square(language) 3=Triangle
                 const Uint8 b = ev.jbutton.button;
                 if (b == 1) {
                     if (state.screen == Screen::Language || state.screen == Screen::Installing) {
@@ -182,6 +216,7 @@ int main(int, char**) {
                     } else {
                         running = false;
                     }
+                    stateChanged = true;
                 } else if (b == 0 || b == 2) {
                     if (state.screen == Screen::Splash) {
                         state.screen = Screen::Welcome;
@@ -198,6 +233,7 @@ int main(int, char**) {
                     } else if (state.screen == Screen::Installing) {
                         triggerInstall();
                     }
+                    stateChanged = true;
                 }
             } else if (ev.type == SDL_KEYDOWN) {
                 const SDL_Keycode k = ev.key.keysym.sym;
@@ -223,43 +259,56 @@ int main(int, char**) {
                     if (k == SDLK_RETURN || k == SDLK_SPACE) triggerInstall();
                     if (k == SDLK_BACKSPACE) state.screen = Screen::Welcome;
                 }
+                stateChanged = true;
             }
         }
 
         // Auto-advance splash: 8s first launch, 1.5s afterwards
         if (state.screen == Screen::Splash) {
-            const float splashDur = firstLaunch ? 8.0f : 1.5f;
+            const double splashDur = firstLaunch ? 8.0 : 1.5;
             if (t - splashStart > splashDur) {
                 state.screen = Screen::Welcome;
                 firstLaunch = false;
+                stateChanged = true;
             }
         }
 
-        // Render into the engine framebuffer
-        engine.clear(pkgtest::theme::BG);
-        switch (state.screen) {
-            case Screen::Splash:
-                pkgtest::drawSplash(engine, t - splashStart, lang);
-                break;
-            case Screen::Welcome:
-                pkgtest::drawWelcome(engine, state.focus, lang);
-                break;
-            case Screen::Language:
-                pkgtest::drawLanguageDialog(engine, state.focus, lang);
-                break;
-            case Screen::Installing:
-                pkgtest::drawInstallDemo(engine, state.demoState, state.progress, lang);
-                if (state.demoState == pkgtest::DemoState::Installed && !state.toastText.empty() &&
-                    t < state.toastUntil) {
-                    pkgtest::drawToast(engine, state.toastText, lang);
-                }
-                break;
+        // Redraw ONLY when something changed (perf fix):
+        // - static screens (welcome/language/done) render once and reuse the frame
+        // - the animated splash redraws at 30fps while animating
+        const int sig = frameSignature(state);
+        const bool toastVisible = !state.toastText.empty() && t < state.toastUntil;
+        const bool splashAnimating =
+            state.screen == Screen::Splash && (t - splashStart) < 8.2;
+        const bool splashFrame = splashAnimating && (frameCount % 2 == 0);
+
+        if (stateChanged || sig != lastSig || toastVisible != lastToastVisible || splashFrame) {
+            engine.clear(pkgtest::theme::BG);
+            switch (state.screen) {
+                case Screen::Splash:
+                    pkgtest::drawSplash(engine, static_cast<float>(t - splashStart), lang);
+                    break;
+                case Screen::Welcome:
+                    pkgtest::drawWelcome(engine, state.focus, lang);
+                    break;
+                case Screen::Language:
+                    pkgtest::drawLanguageDialog(engine, state.focus, lang);
+                    break;
+                case Screen::Installing:
+                    pkgtest::drawInstallDemo(engine, state.demoState, state.progress, lang);
+                    if (toastVisible) {
+                        pkgtest::drawToast(engine, state.toastText, lang);
+                    }
+                    break;
+            }
+            lastSig = sig;
+            lastToastVisible = toastVisible;
         }
 
-        // Blit + present exactly like the working v0.5 app
         engine.present(windowSurface);
         SDL_RenderPresent(renderer);
         SDL_UpdateWindowSurface(window);
+        ++frameCount;
         SDL_Delay(16);
     }
 

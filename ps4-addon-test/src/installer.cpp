@@ -900,6 +900,10 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
         // Clean up any staged .raw and .pending files so PS4 HDD space is freed immediately!
         ::unlink(pendingFlagPath.c_str());
         ::unlink(stagedRawPath.c_str());
+        // Also delete the downloaded source .raw itself when it lives in stageDir
+        if (sourceRawPath.rfind(stageDir + "/", 0) == 0 && sourceRawPath != stagedRawPath) {
+            ::unlink(sourceRawPath.c_str());
+        }
         recordInstalledAddon(stageDir, addonFolderName);
 
         result.ok = true;

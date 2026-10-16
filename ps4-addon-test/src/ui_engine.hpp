@@ -79,6 +79,11 @@ private:
         int h = 0;
         std::vector<std::uint8_t> rgba;
     };
+    struct ScaledImage {
+        std::vector<std::uint32_t> px;
+        int w = 0;
+        int h = 0;
+    };
     struct TextBitmap {
         std::vector<std::uint32_t> px; // RGBA32
         int w = 0;
@@ -88,6 +93,10 @@ private:
 
     void blendPx(int x, int y, Uint8 r, Uint8 g, Uint8 b, Uint8 a);
     void blendRow(int x0, int x1, int y, Uint8 r, Uint8 g, Uint8 b, Uint8 a);
+    void drawImageCropped(const std::string& name,
+                          int sx0, int sy0, int sw, int sh,
+                          int x, int y, int w, int h,
+                          Uint8 alpha);
     const TextBitmap& getOrBuildText(const std::string& utf8, int pxSize, FontRole role, bool isArabicLang);
     const TextBitmap& buildFallbackText(const std::string& utf8, int pxSize);
 
@@ -96,6 +105,7 @@ private:
     bool fontsLoaded_ = false;
     bool fallbackReady_ = false;
     std::unordered_map<std::string, ImageData> images_;
+    std::unordered_map<std::string, ScaledImage> scaledCache_;
     std::unordered_map<std::string, TextBitmap> textCache_;
 };
 

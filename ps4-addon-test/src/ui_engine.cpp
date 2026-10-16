@@ -406,6 +406,17 @@ void UiEngine::fillRect(int x, int y, int w, int h, SDL_Color c) {
     const int y1 = std::min(kHeight, y + h);
     const int x0 = std::max(0, x);
     const int x1 = std::min(kWidth, x + w);
+    if (x0 >= x1 || y0 >= y1) return;
+    if (c.a >= 255) {
+        // fast opaque path: pack once, fill rows
+        const std::uint32_t v = (255u << 24) | (static_cast<std::uint32_t>(c.r) << 16) |
+                                (static_cast<std::uint32_t>(c.g) << 8) | c.b;
+        for (int yy = y0; yy < y1; ++yy) {
+            std::uint32_t* row = &fb_[static_cast<std::size_t>(yy) * kWidth];
+            std::fill(row + x0, row + x1, v);
+        }
+        return;
+    }
     for (int yy = y0; yy < y1; ++yy) {
         for (int xx = x0; xx < x1; ++xx) blendPx(xx, yy, c.r, c.g, c.b, c.a);
     }
@@ -537,13 +548,100 @@ void UiEngine::drawCircle(int cx, int cy, int radius, SDL_Color c) {
     drawRoundRect(cx - radius, cy - radius, radius * 2, radius * 2, radius, c);
 }
 
+void UiEngine::drawImageCropped(const std::string& name,
+                                int sx0, int sy0, int sw, int sh,
+                                int x, int y, int w, int h,
+                                Uint8 alpha) {
+    auto it = images_.find(name);
+    if (it == images_.end() || w <= 0 || h <= 0 || sw <= 0 || sh <= 0) return;
+    const ImageData& img = it->second;
+
+    // Cache key: source crop + target size (zoom is quantized by the caller)
+    const std::string key = name + "|" + std::to_string(sx0) + "," + std::to_string(sy0) +
+                            "," + std::to_string(sw) + "," + std::to_string(sh) +
+                            "|" + std::to_string(w) + "x" + std::to_string(h);
+    auto sc = scaledCache_.find(key);
+    if (sc == scaledCache_.end()) {
+        if (scaledCache_.size() > 40) scaledCache_.clear();
+        ScaledImage built;
+        built.w = w;
+        built.h = h;
+        built.px.resize(static_cast<std::size_t>(w) * h);
+        // bilinear resample ONCE into RGBA32 cache
+        for (int dy = 0; dy < h; ++dy) {
+            const float sy = sy0 + ((dy + 0.5f) / h) * sh - 0.5f;
+            const int y0 = std::max(0, std::min(img.h - 1, static_cast<int>(std::floor(sy))));
+            const int y1 = std::min(img.h - 1, y0 + 1);
+            const float fy = std::max(0.0f, std::min(1.0f, sy - y0));
+            for (int dx = 0; dx < w; ++dx) {
+                const float sx = sx0 + ((dx + 0.5f) / w) * sw - 0.5f;
+                const int x0 = std::max(0, std::min(img.w - 1, static_cast<int>(std::floor(sx))));
+                const int x1 = std::min(img.w - 1, x0 + 1);
+                const float fx = std::max(0.0f, std::min(1.0f, sx - x0));
+                const std::uint8_t* p00 = &img.rgba[(static_cast<std::size_t>(y0) * img.w + x0) * 4];
+                const std::uint8_t* p10 = &img.rgba[(static_cast<std::size_t>(y0) * img.w + x1) * 4];
+                const std::uint8_t* p01 = &img.rgba[(static_cast<std::size_t>(y1) * img.w + x0) * 4];
+                const std::uint8_t* p11 = &img.rgba[(static_cast<std::size_t>(y1) * img.w + x1) * 4];
+                float sample[4];
+                for (int c = 0; c < 4; ++c) {
+                    const float top = p00[c] * (1.0f - fx) + p10[c] * fx;
+                    const float bot = p01[c] * (1.0f - fx) + p11[c] * fx;
+                    sample[c] = top * (1.0f - fy) + bot * fy;
+                }
+                const std::uint32_t a = static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, sample[3])));
+                built.px[static_cast<std::size_t>(dy) * w + dx] =
+                    (a << 24) |
+                    (static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, sample[0]))) << 16) |
+                    (static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, sample[1]))) << 8) |
+                    static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, sample[2])));
+            }
+        }
+        sc = scaledCache_.emplace(key, std::move(built)).first;
+    }
+
+    // Span blit with alpha (integer math, no function calls)
+    const ScaledImage& scaled = sc->second;
+    const int x0d = std::max(0, x);
+    const int y0d = std::max(0, y);
+    const int x1d = std::min(kWidth, x + w);
+    const int y1d = std::min(kHeight, y + h);
+    for (int dy = y0d; dy < y1d; ++dy) {
+        const std::uint32_t* srow = &scaled.px[static_cast<std::size_t>(dy - y) * scaled.w];
+        std::uint32_t* drow = &fb_[static_cast<std::size_t>(dy) * kWidth];
+        for (int dx = x0d; dx < x1d; ++dx) {
+            const std::uint32_t s = srow[dx - x];
+            int sa = static_cast<int>((s >> 24) & 0xFF);
+            if (sa == 0) continue;
+            if (alpha != 255) {
+                sa = (sa * alpha) / 255;
+                if (sa <= 0) continue;
+            }
+            std::uint32_t& dst = drow[dx];
+            if (sa >= 255) {
+                dst = (255u << 24) | (s & 0x00FFFFFFu);
+            } else {
+                const std::uint32_t dr = (dst >> 16) & 0xFF;
+                const std::uint32_t dg = (dst >> 8) & 0xFF;
+                const std::uint32_t db = dst & 0xFF;
+                const std::uint32_t sr = (s >> 16) & 0xFF;
+                const std::uint32_t sg = (s >> 8) & 0xFF;
+                const std::uint32_t sb = s & 0xFF;
+                const std::uint32_t ia = 255u - static_cast<std::uint32_t>(sa);
+                dst = (255u << 24) |
+                      (((sr * sa + dr * ia) / 255) << 16) |
+                      (((sg * sa + dg * ia) / 255) << 8) |
+                      ((sb * sa + db * ia) / 255);
+            }
+        }
+    }
+}
+
 void UiEngine::drawImage(const std::string& name, int x, int y, int w, int h, Uint8 alpha) {
     auto it = images_.find(name);
     if (it == images_.end() || w <= 0 || h <= 0) return;
     const ImageData& img = it->second;
     if (img.w <= 0 || img.h <= 0) return;
 
-    // aspect-fill crop + bilinear scaling + alpha blend
     const float dstRatio = static_cast<float>(w) / static_cast<float>(h);
     const float srcRatio = static_cast<float>(img.w) / static_cast<float>(img.h);
     int sx0 = 0, sy0 = 0, sw = img.w, sh = img.h;
@@ -554,48 +652,19 @@ void UiEngine::drawImage(const std::string& name, int x, int y, int w, int h, Ui
         sh = static_cast<int>(img.w / dstRatio);
         sy0 = (img.h - sh) / 2;
     }
-
-    for (int dy = 0; dy < h; ++dy) {
-        const float sy = sy0 + ((dy + 0.5f) / h) * sh - 0.5f;
-        const int y0 = std::max(0, std::min(img.h - 1, static_cast<int>(std::floor(sy))));
-        const int y1 = std::min(img.h - 1, y0 + 1);
-        const float fy = std::max(0.0f, std::min(1.0f, sy - y0));
-        for (int dx = 0; dx < w; ++dx) {
-            const float sx = sx0 + ((dx + 0.5f) / w) * sw - 0.5f;
-            const int x0 = std::max(0, std::min(img.w - 1, static_cast<int>(std::floor(sx))));
-            const int x1 = std::min(img.w - 1, x0 + 1);
-            const float fx = std::max(0.0f, std::min(1.0f, sx - x0));
-
-            const std::uint8_t* p00 = &img.rgba[(static_cast<std::size_t>(y0) * img.w + x0) * 4];
-            const std::uint8_t* p10 = &img.rgba[(static_cast<std::size_t>(y0) * img.w + x1) * 4];
-            const std::uint8_t* p01 = &img.rgba[(static_cast<std::size_t>(y1) * img.w + x0) * 4];
-            const std::uint8_t* p11 = &img.rgba[(static_cast<std::size_t>(y1) * img.w + x1) * 4];
-
-            float sample[4];
-            for (int c = 0; c < 4; ++c) {
-                const float top = p00[c] * (1.0f - fx) + p10[c] * fx;
-                const float bot = p01[c] * (1.0f - fx) + p11[c] * fx;
-                sample[c] = top * (1.0f - fy) + bot * fy;
-            }
-            const int sa = static_cast<int>(sample[3] * alpha / 255.0f);
-            if (sa <= 0) continue;
-            blendPx(x + dx, y + dy,
-                    clamp8(static_cast<int>(sample[0])),
-                    clamp8(static_cast<int>(sample[1])),
-                    clamp8(static_cast<int>(sample[2])),
-                    clamp8(sa));
-        }
-    }
+    drawImageCropped(name, sx0, sy0, sw, sh, x, y, w, h, alpha);
 }
 
 void UiEngine::drawImageZoomed(const std::string& name, int x, int y, int w, int h, float zoom, Uint8 alpha) {
     auto it = images_.find(name);
     if (it == images_.end() || w <= 0 || h <= 0) return;
     const ImageData& img = it->second;
-    const float clampedZoom = std::max(1.0f, zoom);
-    const int cropW = static_cast<int>(img.w / clampedZoom);
-    const int cropH = static_cast<int>(img.h / clampedZoom);
-    // reuse drawImage path via temporary crop ratios
+
+    // quantize zoom to 1/20 steps so the animated background reuses cached scales
+    const float zq = std::round(std::max(1.0f, zoom) * 20.0f) / 20.0f;
+    const int cropW = std::max(1, static_cast<int>(img.w / zq));
+    const int cropH = std::max(1, static_cast<int>(img.h / zq));
+
     const float dstRatio = static_cast<float>(w) / static_cast<float>(h);
     const float srcRatio = static_cast<float>(cropW) / static_cast<float>(cropH);
     int sx0 = (img.w - cropW) / 2;
@@ -603,42 +672,13 @@ void UiEngine::drawImageZoomed(const std::string& name, int x, int y, int w, int
     int sw = cropW;
     int sh = cropH;
     if (srcRatio > dstRatio) {
-        sw = static_cast<int>(cropH * dstRatio);
+        sw = std::max(1, static_cast<int>(cropH * dstRatio));
         sx0 = (img.w - sw) / 2;
     } else if (srcRatio < dstRatio) {
-        sh = static_cast<int>(cropW / dstRatio);
+        sh = std::max(1, static_cast<int>(cropW / dstRatio));
         sy0 = (img.h - sh) / 2;
     }
-
-    for (int dy = 0; dy < h; ++dy) {
-        const float sy = sy0 + ((dy + 0.5f) / h) * sh - 0.5f;
-        const int y0 = std::max(0, std::min(img.h - 1, static_cast<int>(std::floor(sy))));
-        const int y1 = std::min(img.h - 1, y0 + 1);
-        const float fy = std::max(0.0f, std::min(1.0f, sy - y0));
-        for (int dx = 0; dx < w; ++dx) {
-            const float sx = sx0 + ((dx + 0.5f) / w) * sw - 0.5f;
-            const int x0 = std::max(0, std::min(img.w - 1, static_cast<int>(std::floor(sx))));
-            const int x1 = std::min(img.w - 1, x0 + 1);
-            const float fx = std::max(0.0f, std::min(1.0f, sx - x0));
-            const std::uint8_t* p00 = &img.rgba[(static_cast<std::size_t>(y0) * img.w + x0) * 4];
-            const std::uint8_t* p10 = &img.rgba[(static_cast<std::size_t>(y0) * img.w + x1) * 4];
-            const std::uint8_t* p01 = &img.rgba[(static_cast<std::size_t>(y1) * img.w + x0) * 4];
-            const std::uint8_t* p11 = &img.rgba[(static_cast<std::size_t>(y1) * img.w + x1) * 4];
-            float sample[4];
-            for (int c = 0; c < 4; ++c) {
-                const float top = p00[c] * (1.0f - fx) + p10[c] * fx;
-                const float bot = p01[c] * (1.0f - fx) + p11[c] * fx;
-                sample[c] = top * (1.0f - fy) + bot * fy;
-            }
-            const int sa = static_cast<int>(sample[3] * alpha / 255.0f);
-            if (sa <= 0) continue;
-            blendPx(x + dx, y + dy,
-                    clamp8(static_cast<int>(sample[0])),
-                    clamp8(static_cast<int>(sample[1])),
-                    clamp8(static_cast<int>(sample[2])),
-                    clamp8(sa));
-        }
-    }
+    drawImageCropped(name, sx0, sy0, sw, sh, x, y, w, h, alpha);
 }
 
 const UiEngine::TextBitmap& UiEngine::buildFallbackText(const std::string& utf8, int pxSize) {
@@ -894,7 +934,7 @@ void UiEngine::present(SDL_Surface* windowSurface) {
             if (gShift >= 0) out |= static_cast<std::uint32_t>(g) << gShift;
             if (bShift >= 0) out |= static_cast<std::uint32_t>(b) << bShift;
             if (aShift >= 0) out |= static_cast<std::uint32_t>(a) << aShift;
-            std::memcpy(dstRow + static_cast<std::size_t>(x) * 4, &out, 4);
+            reinterpret_cast<std::uint32_t*>(dstRow)[x] = out;
         }
     }
 }

@@ -108,14 +108,23 @@ int main() {
         assert(!fileExists(stageDir + "/PrizmaVisuals 1.3.10222.raw"));
         assert(pkgtest::isAddonMarkedInstalled("PrizmaVisuals 1.3.10222", stageDir));
 
-        // Mode 2: Minecraft is ALREADY OPEN
+        // Mode 2: Minecraft is ALREADY OPEN (downloaded source lives in stageDir)
         const std::string openMojangDir =
             root + "/open_mc/CUSA00283/user555666777/games/com.mojang";
         const std::string mkOpenCmd = "mkdir -p \"" + openMojangDir + "\"";
         assert(std::system(mkOpenCmd.c_str()) == 0);
 
+        // simulate a downloaded .raw inside stageDir (store flow)
+        {
+            std::ifstream srcRaw("assets/folder.raw", std::ios::binary);
+            assert(srcRaw.good());
+            std::ofstream dstRaw(stageDir + "/PrizmaVisuals 1.3.10222.raw", std::ios::binary);
+            dstRaw << srcRaw.rdbuf();
+            assert(dstRaw.good());
+        }
+
         const pkgtest::CopyResult immediateRes = pkgtest::installOrQueueAddon(
-            "assets/folder.raw",
+            stageDir + "/PrizmaVisuals 1.3.10222.raw",
             "PrizmaVisuals 1.3.10222",
             stageDir,
             openMojangDir,
@@ -126,6 +135,7 @@ int main() {
         assert(immediateRes.filesCopied == 8805);
         assert(fileExists(openMojangDir + "/resource_packs/PrizmaVisuals 1.3.10222/manifest.json"));
         assert(!fileExists(stageDir + "/PrizmaVisuals 1.3.10222.raw"));
+        assert(pkgtest::isAddonMarkedInstalled("PrizmaVisuals 1.3.10222", stageDir));
     }
 
     std::printf("pkg addon test dual-mode + dynamic CUSA/user + cleanup + 8-lang host tests passed.\n");

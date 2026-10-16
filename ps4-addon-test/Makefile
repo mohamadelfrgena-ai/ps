@@ -1,6 +1,6 @@
 # pkg addon test — Minimalist PS4 Folder Copy Installer (PrizmaVisuals 1.3.10222)
 TITLE       := pkg addon test
-VERSION     := 0.7
+VERSION     := 0.8
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
@@ -37,13 +37,13 @@ PKG_FILES   := eboot.bin \
                sce_sys/about/right.sprx \
                sce_module/libc.prx \
                sce_module/libSceFios2.prx \
-               assets/folder.raw \
                assets/ui.pak
 
-OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/ui_engine.o $(OBJ_DIR)/screens.o $(OBJ_DIR)/jbc.o
+OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/http_download.o \
+               $(OBJ_DIR)/ui_engine.o $(OBJ_DIR)/screens.o $(OBJ_DIR)/jbc.o
 
 LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut \
-               -lScePad -lSceSysmodule -lSDL2
+               -lScePad -lSceSysmodule -lSDL2 -lSceNet -lSceSsl -lSceHttp
 COMMONFLAGS := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
                -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include
 CFLAGS      := $(COMMONFLAGS) -std=c11 -mno-red-zone -D__ORBIS__ -Isrc
@@ -78,6 +78,9 @@ $(OBJ_DIR)/ui_engine.o: src/ui_engine.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/screens.o: src/screens.cpp | $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/http_download.o: src/http_download.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/jbc.o: src/jbc.c | $(OBJ_DIR)
@@ -117,13 +120,10 @@ prepare-runtime: check-toolchain
 	  cp "$$sample/sce_sys/about/right.sprx" sce_sys/about/right.sprx; \
 	  cp "../ps4/sce_sys/icon0.png" sce_sys/icon0.png
 
-assets/folder.raw: assets/PrizmaVisuals-1.3.10222.zip make_gp4.py
-	python3 make_gp4.py assets/folder.raw
-
 assets/ui.pak: tools/build_ui_pak.py assets/font_cjk.ttf
 	python3 tools/build_ui_pak.py assets/ui.pak
 
-$(PKG_FILE): eboot.bin sce_sys/param.sfo assets/folder.raw assets/ui.pak | prepare-runtime
+$(PKG_FILE): eboot.bin sce_sys/param.sfo assets/ui.pak | prepare-runtime
 	$(CREATE_GP4) -out pkg.gp4 --content-id=$(CONTENT_ID) --files="$(PKG_FILES)"
 	$(PKG_TOOL) pkg_build pkg.gp4 .
 	cp "$(RAW_PKG)" "$(PKG_FILE)"
