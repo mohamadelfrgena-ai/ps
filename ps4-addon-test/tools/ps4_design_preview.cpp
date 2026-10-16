@@ -44,17 +44,7 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "WARNING: ui.pak fonts failed to load — using fallback font\n");
     }
 
-    // 1. Splash EN mid-animation
-    engine.clear(theme::BG);
-    drawSplash(engine, 3.35f, "en");
-    savePng(engine, outDir + "/ps4_splash_en.png");
-
-    // 2. Splash AR with loader nearly full
-    engine.clear(theme::BG);
-    drawSplash(engine, 7.4f, "ar");
-    savePng(engine, outDir + "/ps4_splash_ar.png");
-
-    // 3. Welcome EN (focus: sign in with a code)
+    // 1. Welcome EN (focus: sign in with a code) — splash removed entirely (v0.14)
     engine.clear(theme::BG);
     drawWelcome(engine, 0, "en");
     savePng(engine, outDir + "/ps4_welcome_en.png");

@@ -32,7 +32,6 @@ constexpr SDL_Color FOCUS{156, 193, 255, 255};  // #9CC1FF
 } // namespace theme
 
 // t = seconds since splash start. Shows art zoom, icon pop, slogans slide-in, 10 gold loader segments.
-void drawSplash(UiEngine& e, float t, const std::string& langCode);
 
 // focusIndex: 0 = code button, 1 = email button, 2 = guest button
 void drawWelcome(UiEngine& e, int focusIndex, const std::string& langCode);

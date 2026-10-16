@@ -5,7 +5,7 @@
 // is then blitted/presented like the working v0.5 app:
 //     SDL_RenderPresent(renderer); SDL_UpdateWindowSurface(window);
 //
-// Navigation (v0.13): EVERY button has its real action — Welcome (code /
+// Navigation (v0.14): EVERY button has its real action — Welcome (code /
 // email / guest) leads to its own screen; ONLY content cards open the addon
 // install page; category/filter chips apply a filter (visible active chip);
 // banner Back returns; "Shop the sale" opens Deals; L1/R1 switch tabs only
@@ -14,6 +14,9 @@
 // auto-launch Minecraft after install / link console / sign out with confirm
 // dialog), text fields open the PS4 system
 // keyboard (sceImeDialog), Download installs content from the GitHub Release.
+// v0.14: splash screen removed entirely (fast boot straight to Welcome) and
+// ○/ESC never exit the app — they only navigate back inside it (no path to
+// the PS home menu from inside the app).
 
 #include "content_config.hpp"
 #include "http_download.hpp"
@@ -39,12 +42,12 @@ constexpr const char* kStageDir = "/data/AddonStation/installed";
 const char* kLangCodes[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
 
 enum class Screen {
-    Splash, Welcome, CodeLink, Email, Language,
+    Welcome, CodeLink, Email, Language,
     Home, Deals, Store, Chat, Settings, Detail, Confirm
 };
 
 struct AppState {
-    Screen screen = Screen::Splash;
+    Screen screen = Screen::Welcome;   // بدون splash — الإقلاع مباشرة
     Screen prevScreen = Screen::Welcome;
     Screen tabScreen = Screen::Home;   // active L1/R1 tab
     int focus = 0;
@@ -152,8 +155,6 @@ int main(int, char**) {
 
     AppState state;
     const double bootTime = nowSeconds();
-    double splashStart = bootTime;
-    bool firstLaunch = true;
     state.codeUntil = bootTime + 582.0;   // 9:42 like the design
     state.autoLaunch = pkgtest::loadAutoLaunchSetting();
 
@@ -263,7 +264,6 @@ int main(int, char**) {
     // Joystick map (as used by the working v0.5 app): 0=✕ 1=○ 2=□ 3=△ 4=L1 5=R1 6=L2 7=R2
     auto back = [&]() {
         switch (state.screen) {
-            case Screen::Splash: break;
             case Screen::Welcome: break;  // stay (guest entry screen)
             case Screen::CodeLink: go(Screen::Welcome); break;
             case Screen::Email: go(Screen::Welcome); break;
@@ -283,9 +283,6 @@ int main(int, char**) {
     auto activate = [&](int cross) {
         (void)cross;
         switch (state.screen) {
-            case Screen::Splash:
-                go(Screen::Welcome);
-                break;
             case Screen::Welcome:
                 if (state.focus == 0) { state.linked = false; state.code = makeCode(); state.codeUntil = nowSeconds() + 582.0; go(Screen::CodeLink); }
                 else if (state.focus == 1) go(Screen::Email);
@@ -357,7 +354,7 @@ int main(int, char**) {
                     toast(pkgtest::tr(state.autoLaunch ? "autolaunch_on" : "autolaunch_off", currentLang()));
                 }
                 else if (state.focus == 4) { state.linked = false; state.code = makeCode(); state.codeUntil = nowSeconds() + 582.0; go(Screen::CodeLink); }
-                else if (state.focus == 5) toast("AddonStation PS4 v0.13 — official app");
+                else if (state.focus == 5) toast("AddonStation PS4 v0.14 — official app");
                 else go(Screen::Confirm);
                 break;
             case Screen::Detail:
@@ -444,7 +441,6 @@ int main(int, char**) {
             }
             case Screen::Detail:
             case Screen::CodeLink:
-            case Screen::Splash:
                 break;
         }
     };
@@ -484,10 +480,11 @@ int main(int, char**) {
         const double t = nowSeconds();
         const std::string lang = currentLang();
         bool stateChanged = false;
+        bool backRequested = false;
 
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT) {
-                running = false;
+                backRequested = true;   // (○ على السوني) — لا خروج من التطبيق
             } else if (ev.type == SDL_JOYHATMOTION) {
                 const Uint8 hat = ev.jhat.value;
                 if (hat & SDL_HAT_UP) moveFocus(0, -1);
@@ -498,7 +495,7 @@ int main(int, char**) {
             } else if (ev.type == SDL_JOYBUTTONDOWN) {
                 const Uint8 b = ev.jbutton.button;
                 if (b == 0) { activate(1); stateChanged = true; }
-                else if (b == 1) { back(); stateChanged = true; }
+                else if (b == 1) { backRequested = true; }
                 else if (b == 2) { // square - filter / language / save
                     if (state.screen == Screen::Detail) {
                         state.saved = !state.saved;
@@ -536,7 +533,7 @@ int main(int, char**) {
                 }
             } else if (ev.type == SDL_KEYDOWN) {
                 const SDL_Keycode k = ev.key.keysym.sym;
-                if (k == SDLK_ESCAPE) running = false;
+                if (k == SDLK_ESCAPE) { backRequested = true; }
                 if (k == SDLK_UP) moveFocus(0, -1);
                 else if (k == SDLK_DOWN) moveFocus(0, 1);
                 else if (k == SDLK_LEFT) moveFocus(-1, 0);
@@ -558,14 +555,10 @@ int main(int, char**) {
             }
         }
 
-        // Auto-advance splash: 8s first launch, 1.5s afterwards
-        if (state.screen == Screen::Splash) {
-            const double splashDur = firstLaunch ? 8.0 : 1.5;
-            if (t - splashStart > splashDur) {
-                state.screen = Screen::Welcome;
-                firstLaunch = false;
-                stateChanged = true;
-            }
+        // ○ / ESC never exits the app — they only navigate back inside it
+        if (backRequested) {
+            back();
+            stateChanged = true;
         }
 
         // code countdown expiry
@@ -576,18 +569,12 @@ int main(int, char**) {
         // Redraw ONLY when something changed (perf):
         const int sig = frameSignature(state, t);
         const bool toastVisible = !state.toastText.empty() && t < state.toastUntil;
-        const bool splashAnimating =
-            state.screen == Screen::Splash && (t - splashStart) < 8.2;
-        const bool splashFrame = splashAnimating && (frameCount % 2 == 0);
         const bool codeAnim = state.screen == Screen::CodeLink && (frameCount % 20 == 0);
 
         if (stateChanged || sig != lastSig || toastVisible != lastToastVisible ||
-            splashFrame || codeAnim) {
+            codeAnim) {
             engine.clear(pkgtest::theme::BG);
             switch (state.screen) {
-                case Screen::Splash:
-                    pkgtest::drawSplash(engine, static_cast<float>(t - splashStart), lang);
-                    break;
                 case Screen::Welcome:
                     pkgtest::drawWelcome(engine, state.focus, lang);
                     break;
