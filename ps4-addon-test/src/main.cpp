@@ -1,279 +1,256 @@
-#include "installer.hpp"
+// AddonStation "pkg addon test" PS4 Mini-App — design UI (splash + welcome + installer)
+// Dual-mode installer: copies PrizmaVisuals into com.mojang immediately if Minecraft is
+// open; otherwise stages to /data/AddonStation/installed/, launches Minecraft, auto-syncs
+// and deletes the staged .raw afterwards. CUSAxxxxx and userYYYY are always auto-detected.
 
-#include <orbis/libkernel.h>
+#include "installer.hpp"
+#include "screens.hpp"
 
 #include <SDL2/SDL.h>
 
-#include <array>
 #include <atomic>
-#include <cstdint>
+#include <chrono>
 #include <cstdio>
-#include <mutex>
 #include <string>
 #include <thread>
-#include <vector>
 
 namespace {
 
-constexpr int kScreenWidth = 1920;
-constexpr int kScreenHeight = 1080;
-constexpr char kSourceRawPath[] = "/app0/assets/folder.raw";
-constexpr char kAddonFolderName[] = "PrizmaVisuals 1.3.10222";
-constexpr char kStageDir[] = "/data/AddonStation/installed";
-constexpr char kPreferredMojangDir[] = "/app_tmp/CUSA00265/user497444003/games/com.mojang";
+constexpr const char* kStageDir = "/data/AddonStation/installed";
+constexpr const char* kAddonFolderName = "PrizmaVisuals 1.3.10222";
+constexpr const char* kSourceRaw = "/app0/assets/folder.raw";
 
-constexpr SDL_Color kBg{11, 15, 25, 255};
-constexpr SDL_Color kButtonReady{32, 178, 120, 255};
-constexpr SDL_Color kButtonBusy{218, 148, 38, 255};
-constexpr SDL_Color kButtonError{205, 68, 82, 255};
-constexpr SDL_Color kButtonBorder{130, 255, 200, 255};
-constexpr SDL_Color kWhite{242, 246, 255, 255};
+const char* kLangCodes[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
 
-void fillRect(SDL_Renderer* r, int x, int y, int w, int h, SDL_Color c) {
-    SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
-    SDL_Rect rc{x, y, w, h};
-    SDL_RenderFillRect(r, &rc);
-}
-
-void drawBorder(SDL_Renderer* r, int x, int y, int w, int h, int thickness, SDL_Color c) {
-    for (int i = 0; i < thickness; ++i) {
-        SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
-        SDL_Rect rc{x + i, y + i, w - 2 * i, h - 2 * i};
-        SDL_RenderDrawRect(r, &rc);
-    }
-}
-
-std::array<std::uint8_t, 7> glyph(char ch) {
-    switch (ch) {
-        case 'A': return {14, 17, 17, 31, 17, 17, 17};
-        case 'B': return {30, 17, 17, 30, 17, 17, 30};
-        case 'C': return {14, 17, 16, 16, 16, 17, 14};
-        case 'D': return {30, 17, 17, 17, 17, 17, 30};
-        case 'E': return {31, 16, 16, 30, 16, 16, 31};
-        case 'F': return {31, 16, 16, 30, 16, 16, 16};
-        case 'G': return {14, 17, 16, 23, 17, 17, 15};
-        case 'H': return {17, 17, 17, 31, 17, 17, 17};
-        case 'I': return {14, 4, 4, 4, 4, 4, 14};
-        case 'J': return {7, 2, 2, 2, 18, 18, 12};
-        case 'K': return {17, 18, 20, 24, 20, 18, 17};
-        case 'L': return {16, 16, 16, 16, 16, 16, 31};
-        case 'M': return {17, 27, 21, 21, 17, 17, 17};
-        case 'N': return {17, 25, 25, 21, 19, 19, 17};
-        case 'O': return {14, 17, 17, 17, 17, 17, 14};
-        case 'P': return {30, 17, 17, 30, 16, 16, 16};
-        case 'Q': return {14, 17, 17, 17, 21, 18, 13};
-        case 'R': return {30, 17, 17, 30, 20, 18, 17};
-        case 'S': return {15, 16, 16, 14, 1, 1, 30};
-        case 'T': return {31, 4, 4, 4, 4, 4, 4};
-        case 'U': return {17, 17, 17, 17, 17, 17, 14};
-        case 'V': return {17, 17, 17, 17, 17, 10, 4};
-        case 'W': return {17, 17, 17, 21, 21, 21, 10};
-        case 'X': return {17, 17, 10, 4, 10, 17, 17};
-        case 'Y': return {17, 17, 10, 4, 4, 4, 4};
-        case 'Z': return {31, 1, 2, 4, 8, 16, 31};
-        case '0': return {14, 17, 19, 21, 25, 17, 14};
-        case '1': return {4, 12, 4, 4, 4, 4, 14};
-        case '2': return {14, 17, 1, 2, 4, 8, 31};
-        case '3': return {30, 1, 1, 14, 1, 1, 30};
-        case '4': return {2, 6, 10, 18, 31, 2, 2};
-        case '5': return {31, 16, 16, 30, 1, 1, 30};
-        case '6': return {14, 16, 16, 30, 17, 17, 14};
-        case '7': return {31, 1, 2, 4, 8, 8, 8};
-        case '8': return {14, 17, 17, 14, 17, 17, 14};
-        case '9': return {14, 17, 17, 15, 1, 1, 14};
-        case '(': return {2, 4, 8, 8, 8, 4, 2};
-        case ')': return {8, 4, 2, 2, 2, 4, 8};
-        case '[': return {14, 8, 8, 8, 8, 8, 14};
-        case ']': return {14, 2, 2, 2, 2, 2, 14};
-        case '-': return {0, 0, 0, 31, 0, 0, 0};
-        case ' ': return {0, 0, 0, 0, 0, 0, 0};
-        default: return {0, 0, 0, 0, 0, 0, 0};
-    }
-}
-
-std::string sanitizeAscii(const std::string& raw) {
-    std::string out;
-    out.reserve(raw.size());
-    for (unsigned char ch : raw) {
-        if (ch >= 'a' && ch <= 'z') ch = static_cast<unsigned char>(ch - 'a' + 'A');
-        if (ch < 0x20 || ch >= 0x7f) ch = ' ';
-        out.push_back(static_cast<char>(ch));
-    }
-    return out;
-}
-
-int textWidth(const std::string& raw, int scale) {
-    if (raw.empty()) return 0;
-    return static_cast<int>(raw.size()) * 6 * scale - scale;
-}
-
-void drawCenteredText(SDL_Renderer* r, const std::string& raw, int centerX, int y, int scale, SDL_Color color) {
-    const std::string text = sanitizeAscii(raw);
-    const int w = textWidth(text, scale);
-    int cx = centerX - w / 2;
-    SDL_SetRenderDrawColor(r, color.r, color.g, color.b, color.a);
-    const int advance = 6 * scale;
-    for (char ch : text) {
-        const auto rows = glyph(ch);
-        for (int row = 0; row < 7; ++row) {
-            for (int col = 0; col < 5; ++col) {
-                if ((rows[static_cast<std::size_t>(row)] & (1U << (4 - col))) == 0) continue;
-                SDL_Rect px{cx + col * scale, y + row * scale, scale, scale};
-                SDL_RenderFillRect(r, &px);
-            }
-        }
-        cx += advance;
-    }
-}
+enum class Screen { Splash, Welcome, Language, Installing };
 
 struct AppState {
-    std::mutex mutex;
-    pkgtest::CopyResult lastResult;
-    bool hasRun = false;
-    std::atomic<int> jobState{0}; // 0=idle, 1=queued, 2=running
-    std::atomic<bool> stopping{false};
+    Screen screen = Screen::Splash;
+    int focus = 0;              // welcome: 0 code, 1 email, 2 guest; language: 0..7
+    int langIndex = 0;
+    pkgtest::DemoState demoState = pkgtest::DemoState::Idle;
+    int progress = 0;
+    std::string toastText;
+    float toastUntil = 0.0f;
+    std::atomic<bool> installing{false};
 };
 
-void renderScreen(SDL_Renderer* r, AppState& state) {
-    fillRect(r, 0, 0, kScreenWidth, kScreenHeight, kBg);
-
-    pkgtest::CopyResult res;
-    bool hasRun = false;
-    const int job = state.jobState.load();
-    {
-        std::lock_guard<std::mutex> lock(state.mutex);
-        res = state.lastResult;
-        hasRun = state.hasRun;
-    }
-
-    const int btnW = 1040;
-    const int btnH = 220;
-    const int btnX = (kScreenWidth - btnW) / 2;
-    const int btnY = (kScreenHeight - btnH) / 2;
-
-    SDL_Color btnColor = kButtonReady;
-    std::string label = "INSTALL [X]";
-    if (job != 0) {
-        btnColor = kButtonBusy;
-        label = "COPYING...";
-    } else if (hasRun && res.ok && res.queuedForMinecraft) {
-        btnColor = kButtonBusy;
-        label = res.message;
-    } else if (hasRun && res.ok) {
-        btnColor = kButtonReady;
-        label = "DONE (" + std::to_string(res.filesCopied) + ")";
-    } else if (hasRun && !res.ok) {
-        btnColor = kButtonError;
-        label = res.message;
-    }
-
-    fillRect(r, btnX, btnY, btnW, btnH, btnColor);
-    drawBorder(r, btnX, btnY, btnW, btnH, 5, kButtonBorder);
-    drawCenteredText(r, label, kScreenWidth / 2, btnY + (btnH - 42) / 2, 6, kWhite);
+float nowSeconds() {
+    return std::chrono::duration<float>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 } // namespace
 
 int main(int, char**) {
-    setvbuf(stdout, nullptr, _IONBF, 0);
-
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) {
+        std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         return 1;
+    }
+
+    SDL_Joystick* pad = nullptr;
+    if (SDL_NumJoysticks() > 0) {
+        pad = SDL_JoystickOpen(0);
     }
 
     SDL_Window* window = SDL_CreateWindow(
-        "pkg addon test",
-        SDL_WINDOWPOS_UNDEFINED,
-        SDL_WINDOWPOS_UNDEFINED,
-        kScreenWidth,
-        kScreenHeight,
-        0);
-    if (!window) {
-        SDL_Quit();
-        return 1;
-    }
-
-    SDL_Surface* windowSurface = SDL_GetWindowSurface(window);
+        "AddonStation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1920, 1080, 0);
+    SDL_Surface* windowSurface = window ? SDL_GetWindowSurface(window) : nullptr;
     SDL_Renderer* renderer = windowSurface ? SDL_CreateSoftwareRenderer(windowSurface) : nullptr;
     if (!renderer) {
-        SDL_DestroyWindow(window);
-        SDL_Quit();
+        std::fprintf(stderr, "No renderer available\n");
         return 1;
     }
 
-    std::vector<SDL_Joystick*> joysticks;
-    const int numJoy = SDL_NumJoysticks();
-    for (int i = 0; i < numJoy; ++i) {
-        if (SDL_Joystick* joy = SDL_JoystickOpen(i)) {
-            joysticks.push_back(joy);
-        }
+    pkgtest::UiEngine engine;
+    if (!engine.init(renderer, "/app0/assets/ui.pak")) {
+        std::fprintf(stderr, "ui.pak load failed\n");
+        return 1;
     }
-    SDL_JoystickEventState(SDL_ENABLE);
 
     AppState state;
-    std::thread worker([&state]() {
-        int pollTicks = 0;
-        while (!state.stopping.load()) {
-            int expected = 1;
-            if (state.jobState.compare_exchange_strong(expected, 2)) {
-                pkgtest::CopyResult result = pkgtest::installOrQueueAddon(
-                    kSourceRawPath, kAddonFolderName, kStageDir, kPreferredMojangDir);
-                {
-                    std::lock_guard<std::mutex> lock(state.mutex);
-                    state.lastResult = std::move(result);
-                    state.hasRun = true;
-                }
-                state.jobState.store(0);
-                pollTicks = 0;
-            } else if (++pollTicks >= 20) {
-                // Every ~800ms, check if Minecraft has mounted com.mojang and auto-sync queued addons
-                pollTicks = 0;
-                pkgtest::CopyResult synced =
-                    pkgtest::syncPendingAddonsIfMounted(kStageDir, kPreferredMojangDir);
-                if (synced.ok && synced.filesCopied > 0) {
-                    std::lock_guard<std::mutex> lock(state.mutex);
-                    state.lastResult = std::move(synced);
-                    state.hasRun = true;
-                }
+    const float bootTime = nowSeconds();
+    float splashStart = bootTime;
+    bool firstLaunch = true;
+
+    // Background watcher: keeps auto-syncing staged addons whenever Minecraft mounts com.mojang
+    std::thread syncWatcher([&state]() {
+        while (true) {
+            if (!state.installing.load()) {
+                pkgtest::syncPendingAddonsIfMounted(kStageDir);
             }
-            sceKernelUsleep(40 * 1000);
+            std::this_thread::sleep_for(std::chrono::seconds(2));
         }
     });
+    syncWatcher.detach();
 
-    auto triggerInstall = [&state]() {
-        int expected = 0;
-        state.jobState.compare_exchange_strong(expected, 1);
+    auto currentLang = [&state]() { return std::string(kLangCodes[state.langIndex]); };
+
+    auto triggerInstall = [&state, &currentLang]() {
+        if (state.installing.load()) return;
+        if (state.demoState == pkgtest::DemoState::Installed) {
+            // Re-install allowed
+        }
+        state.installing.store(true);
+        state.demoState = pkgtest::DemoState::Downloading;
+        state.progress = 0;
+
+        std::thread([&, lang = currentLang()]() {
+            const pkgtest::CopyResult res = pkgtest::installOrQueueAddon(
+                kSourceRaw,
+                kAddonFolderName,
+                kStageDir,
+                "",
+                "resource_packs",
+                lang,
+                [&](pkgtest::InstallPhase phase, int percent) {
+                    if (phase == pkgtest::InstallPhase::Downloading) {
+                        state.demoState = pkgtest::DemoState::Downloading;
+                        state.progress = percent;
+                    } else if (phase == pkgtest::InstallPhase::Installing) {
+                        state.demoState = pkgtest::DemoState::Installing;
+                        state.progress = percent;
+                    } else if (phase == pkgtest::InstallPhase::Installed) {
+                        state.demoState = pkgtest::DemoState::Installed;
+                        state.progress = 100;
+                    }
+                });
+
+            if (res.ok && res.queuedForMinecraft) {
+                // Minecraft closed: staged + launched — keep "Installing..." until sync watcher finishes
+                state.demoState = pkgtest::DemoState::Installing;
+                state.progress = 75;
+            } else if (res.ok) {
+                state.demoState = pkgtest::DemoState::Installed;
+                state.progress = 100;
+                state.toastText = pkgtest::formatEnjoyNotification(kAddonFolderName, lang);
+                state.toastUntil = nowSeconds() + 6.0f;
+            } else {
+                state.demoState = pkgtest::DemoState::Idle;
+                state.progress = 0;
+            }
+            state.installing.store(false);
+        }).detach();
     };
 
     bool running = true;
+    SDL_Event ev;
     while (running) {
-        SDL_Event ev;
+        const float t = nowSeconds();
+        const std::string lang = currentLang();
+        const bool rtl = lang == "ar";
+
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT) {
                 running = false;
-            } else if (ev.type == SDL_KEYDOWN) {
-                if (ev.key.keysym.sym == SDLK_ESCAPE) running = false;
-                else triggerInstall();
+            } else if (ev.type == SDL_JOYHATMOTION) {
+                const Uint8 hat = ev.jhat.value;
+                if (state.screen == Screen::Welcome) {
+                    if (hat & SDL_HAT_UP) state.focus = (state.focus + 2) % 3;
+                    if (hat & SDL_HAT_DOWN) state.focus = (state.focus + 1) % 3;
+                } else if (state.screen == Screen::Language) {
+                    if (hat & SDL_HAT_UP) state.focus = (state.focus + 6) % 8;
+                    if (hat & SDL_HAT_DOWN) state.focus = (state.focus + 2) % 8;
+                    if (hat & SDL_HAT_LEFT) state.focus = (state.focus + 7) % 8;
+                    if (hat & SDL_HAT_RIGHT) state.focus = (state.focus + 1) % 8;
+                }
             } else if (ev.type == SDL_JOYBUTTONDOWN) {
-                if (ev.jbutton.button == 1) running = false; // Circle exits
-                else if (ev.jbutton.button == 0 || ev.jbutton.button == 2) triggerInstall(); // X or Square installs
+                // 0=Cross(select/install) 1=Circle(back) 2=Square(language) 3=Triangle
+                const Uint8 b = ev.jbutton.button;
+                if (b == 1) {
+                    if (state.screen == Screen::Language) {
+                        state.screen = Screen::Welcome;
+                    } else if (state.screen == Screen::Installing) {
+                        state.screen = Screen::Welcome;
+                    } else if (state.screen == Screen::Welcome && state.focus == 2) {
+                        // guest: go straight to installer demo
+                        state.screen = Screen::Installing;
+                    } else {
+                        running = false;
+                    }
+                } else if (b == 0 || b == 2) {
+                    if (state.screen == Screen::Splash) {
+                        state.screen = Screen::Welcome;
+                    } else if (state.screen == Screen::Welcome) {
+                        if (b == 2) {
+                            state.screen = Screen::Language;
+                            state.focus = state.langIndex;
+                        } else if (state.focus == 2) {
+                            state.screen = Screen::Installing;
+                        } else {
+                            // code / email sign-in not wired yet -> straight to installer demo
+                            state.screen = Screen::Installing;
+                        }
+                    } else if (state.screen == Screen::Language) {
+                        state.langIndex = state.focus;
+                        state.screen = Screen::Welcome;
+                    } else if (state.screen == Screen::Installing) {
+                        triggerInstall();
+                    }
+                }
+            } else if (ev.type == SDL_KEYDOWN) {
+                const SDL_Keycode k = ev.key.keysym.sym;
+                if (k == SDLK_ESCAPE) running = false;
+                if (state.screen == Screen::Splash) {
+                    if (k == SDLK_RETURN || k == SDLK_SPACE) state.screen = Screen::Welcome;
+                } else if (state.screen == Screen::Welcome) {
+                    if (k == SDLK_UP) state.focus = (state.focus + 2) % 3;
+                    if (k == SDLK_DOWN) state.focus = (state.focus + 1) % 3;
+                    if (k == SDLK_RETURN) state.screen = Screen::Installing;
+                    if (k == SDLK_l) state.screen = Screen::Language;
+                } else if (state.screen == Screen::Language) {
+                    if (k == SDLK_UP) state.focus = (state.focus + 6) % 8;
+                    if (k == SDLK_DOWN) state.focus = (state.focus + 2) % 8;
+                    if (k == SDLK_LEFT) state.focus = (state.focus + 7) % 8;
+                    if (k == SDLK_RIGHT) state.focus = (state.focus + 1) % 8;
+                    if (k == SDLK_RETURN) {
+                        state.langIndex = state.focus;
+                        state.screen = Screen::Welcome;
+                    }
+                    if (k == SDLK_BACKSPACE || k == SDLK_ESCAPE) state.screen = Screen::Welcome;
+                } else if (state.screen == Screen::Installing) {
+                    if (k == SDLK_RETURN || k == SDLK_SPACE) triggerInstall();
+                    if (k == SDLK_BACKSPACE) state.screen = Screen::Welcome;
+                }
             }
         }
 
-        renderScreen(renderer, state);
+        // Auto-advance splash: 8s first launch, 1.5s afterwards
+        if (state.screen == Screen::Splash) {
+            const float splashDur = firstLaunch ? 8.0f : 1.5f;
+            if (t - splashStart > splashDur) {
+                state.screen = Screen::Welcome;
+                firstLaunch = false;
+            }
+        }
+
+        // Render
+        engine.fillRect(0, 0, 1920, 1080, pkgtest::theme::BG);
+        switch (state.screen) {
+            case Screen::Splash:
+                pkgtest::drawSplash(engine, t - splashStart, lang);
+                break;
+            case Screen::Welcome:
+                pkgtest::drawWelcome(engine, state.focus, lang);
+                break;
+            case Screen::Language:
+                pkgtest::drawLanguageDialog(engine, state.focus, lang);
+                break;
+            case Screen::Installing:
+                pkgtest::drawInstallDemo(engine, state.demoState, state.progress, lang);
+                if (state.demoState == pkgtest::DemoState::Installed && !state.toastText.empty() &&
+                    t < state.toastUntil) {
+                    pkgtest::drawToast(engine, state.toastText, lang);
+                }
+                break;
+        }
         SDL_RenderPresent(renderer);
-        SDL_UpdateWindowSurface(window);
         SDL_Delay(16);
     }
 
-    state.stopping.store(true);
-    if (worker.joinable()) worker.join();
-
-    for (SDL_Joystick* joy : joysticks) {
-        if (joy) SDL_JoystickClose(joy);
-    }
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
+    engine.shutdown();
+    if (renderer) SDL_DestroyRenderer(renderer);
+    if (window) SDL_DestroyWindow(window);
+    if (pad) SDL_JoystickClose(pad);
     SDL_Quit();
     return 0;
 }

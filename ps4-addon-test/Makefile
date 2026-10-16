@@ -1,6 +1,6 @@
 # pkg addon test — Minimalist PS4 Folder Copy Installer (PrizmaVisuals 1.3.10222)
 TITLE       := pkg addon test
-VERSION     := 0.5
+VERSION     := 0.6
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
@@ -37,9 +37,10 @@ PKG_FILES   := eboot.bin \
                sce_sys/about/right.sprx \
                sce_module/libc.prx \
                sce_module/libSceFios2.prx \
-               assets/folder.raw
+               assets/folder.raw \
+               assets/ui.pak
 
-OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/jbc.o
+OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/ui_engine.o $(OBJ_DIR)/screens.o $(OBJ_DIR)/jbc.o
 
 LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut \
                -lScePad -lSceSysmodule -lSDL2
@@ -71,6 +72,12 @@ $(OBJ_DIR)/main.o: src/main.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/installer.o: src/installer.cpp | $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/ui_engine.o: src/ui_engine.cpp | $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/screens.o: src/screens.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/jbc.o: src/jbc.c | $(OBJ_DIR)
@@ -113,7 +120,10 @@ prepare-runtime: check-toolchain
 assets/folder.raw: assets/PrizmaVisuals-1.3.10222.zip make_gp4.py
 	python3 make_gp4.py assets/folder.raw
 
-$(PKG_FILE): eboot.bin sce_sys/param.sfo assets/folder.raw | prepare-runtime
+assets/ui.pak: tools/build_ui_pak.py assets/font_cjk.ttf
+	python3 tools/build_ui_pak.py assets/ui.pak
+
+$(PKG_FILE): eboot.bin sce_sys/param.sfo assets/folder.raw assets/ui.pak | prepare-runtime
 	$(CREATE_GP4) -out pkg.gp4 --content-id=$(CONTENT_ID) --files="$(PKG_FILES)"
 	$(PKG_TOOL) pkg_build pkg.gp4 .
 	cp "$(RAW_PKG)" "$(PKG_FILE)"

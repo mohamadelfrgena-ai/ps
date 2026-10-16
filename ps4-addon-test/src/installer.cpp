@@ -14,6 +14,7 @@
 #include <cstring>
 #include <dirent.h>
 #include <fcntl.h>
+#include <fstream>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
@@ -84,6 +85,9 @@ void cleanPreviousPackFolders(const std::string& destinationFolder) {
     const std::size_t slash = destinationFolder.rfind('/');
     if (slash == std::string::npos) return;
     const std::string parentDir = destinationFolder.substr(0, slash);
+    const std::string baseName = destinationFolder.substr(slash + 1);
+    if (baseName.rfind("PrizmaVisuals", 0) != 0) return;
+
     DIR* dir = ::opendir(parentDir.c_str());
     if (!dir) return;
     while (dirent* entry = ::readdir(dir)) {
@@ -93,6 +97,37 @@ void cleanPreviousPackFolders(const std::string& destinationFolder) {
         }
     }
     ::closedir(dir);
+}
+
+std::string sanitizeTargetCategory(const std::string& category) {
+    if (category == "behavior_packs" || category == "behavior_pack" || category == "data") {
+        return "behavior_packs";
+    }
+    if (category == "minecraftWorlds" || category == "world" || category == "worlds" || category == "map") {
+        return "minecraftWorlds";
+    }
+    return "resource_packs";
+}
+
+// Auto-detects whether an unpacked folder is a world, behavior pack, or resource pack
+std::string detectCategoryFromExtractedDir(const std::string& dirPath, const std::string& fallback) {
+    if (isRegularFile(dirPath + "/level.dat") || isRegularFile(dirPath + "/levelname.txt")) {
+        return "minecraftWorlds";
+    }
+    const std::string manifestPath = dirPath + "/manifest.json";
+    if (isRegularFile(manifestPath)) {
+        std::ifstream f(manifestPath);
+        std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        if (content.find("\"data\"") != std::string::npos &&
+            content.find("\"resources\"") == std::string::npos) {
+            return "behavior_packs";
+        }
+        if (content.find("\"world_template\"") != std::string::npos) {
+            return "minecraftWorlds";
+        }
+        return "resource_packs";
+    }
+    return sanitizeTargetCategory(fallback);
 }
 
 #ifdef __ORBIS__
@@ -126,12 +161,89 @@ void sendPs4Notification(const std::string& text) {
     sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
 }
 
-bool launchMinecraftOnPs4() {
+int32_t getActivePs4UserId() {
     int32_t userId = 0;
     sceUserServiceInitialize(nullptr);
     if (sceUserServiceGetForegroundUser(&userId) != 0 || userId <= 0) {
         sceUserServiceGetInitialUser(&userId);
     }
+    return userId;
+}
+
+bool fileContainsCaseInsensitive(const std::string& path, const char* needle) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return false;
+    std::string buf((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    std::string lowerBuf = buf;
+    std::transform(lowerBuf.begin(), lowerBuf.end(), lowerBuf.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::string lowerNeedle(needle);
+    std::transform(lowerNeedle.begin(), lowerNeedle.end(), lowerNeedle.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lowerBuf.find(lowerNeedle) != std::string::npos;
+}
+
+// Dynamically discovers installed Minecraft Title IDs (CUSAxxxxx) on the PS4 HDD or external USB.
+std::vector<std::string> detectInstalledMinecraftTitleIds() {
+    std::vector<std::string> found;
+    auto addUnique = [&](const std::string& tid) {
+        if (tid.size() == 9 && tid.rfind("CUSA", 0) == 0) {
+            if (std::find(found.begin(), found.end(), tid) == found.end()) {
+                found.push_back(tid);
+            }
+        }
+    };
+
+    // 1. Check known Minecraft PS4 regional editions if installed on internal or external storage
+    const char* knownMinecraftIds[] = {
+        "CUSA00265", // Europe
+        "CUSA00744", // USA
+        "CUSA00283", // Japan
+        "CUSA00572", // Asia
+        "CUSA04919", // Retail / Bedrock Edition
+        "CUSA05624", // Bedrock Edition
+    };
+    const char* appRoots[] = {
+        "/user/app",
+        "/mnt/ext0/user/app",
+        "/mnt/ext1/user/app",
+        "/system_data/priv/appmeta",
+        "/user/appmeta",
+    };
+    for (const char* tid : knownMinecraftIds) {
+        for (const char* root : appRoots) {
+            if (isDirectory(std::string(root) + "/" + tid)) {
+                addUnique(tid);
+                break;
+            }
+        }
+    }
+
+    // 2. Scan appmeta param.sfo files for any other CUSAxxxxx whose title contains "Minecraft"
+    const char* metaRoots[] = {"/system_data/priv/appmeta", "/user/appmeta"};
+    for (const char* mroot : metaRoots) {
+        DIR* dir = ::opendir(mroot);
+        if (!dir) continue;
+        while (dirent* ent = ::readdir(dir)) {
+            const std::string tid(ent->d_name);
+            if (tid.rfind("CUSA", 0) != 0) continue;
+            const std::string sfoPath = std::string(mroot) + "/" + tid + "/param.sfo";
+            if (isRegularFile(sfoPath) && fileContainsCaseInsensitive(sfoPath, "minecraft")) {
+                addUnique(tid);
+            }
+        }
+        ::closedir(dir);
+    }
+
+    // 3. Fallback list so launch still attempts standard regional IDs if appmeta wasn't readable
+    for (const char* tid : knownMinecraftIds) {
+        addUnique(tid);
+    }
+    return found;
+}
+
+bool launchMinecraftOnPs4() {
+    const int32_t userId = getActivePs4UserId();
 
     LncAppParam param{};
     param.size = sizeof(LncAppParam);
@@ -140,6 +252,8 @@ bool launchMinecraftOnPs4() {
     param.crash_report = 0;
     param.LaunchAppCheck_flag = LaunchApp_None;
     const char* argv[] = {nullptr};
+
+    const std::vector<std::string> candidates = detectInstalledMinecraftTitleIds();
 
     using LncInitFn = int (*)(void);
     using LncLaunchFn = int32_t (*)(const char*, const char**, LncAppParam*);
@@ -154,19 +268,22 @@ bool launchMinecraftOnPs4() {
         }
         if (sceKernelDlsym(sysMod, "sceLncUtilLaunchApp", &launchSym) == 0 && launchSym) {
             auto fn = reinterpret_cast<LncLaunchFn>(launchSym);
-            if (fn("CUSA00265", argv, &param) >= 0) return true;
-            if (fn("CUSA00744", argv, &param) >= 0) return true;
+            for (const std::string& tid : candidates) {
+                if (fn(tid.c_str(), argv, &param) >= 0) return true;
+            }
         }
         if (sceKernelDlsym(sysMod, "sceSystemServiceLaunchApp", &sysLaunchSym) == 0 && sysLaunchSym) {
             auto fn = reinterpret_cast<LncLaunchFn>(sysLaunchSym);
-            if (fn("CUSA00265", argv, &param) >= 0) return true;
-            if (fn("CUSA00744", argv, &param) >= 0) return true;
+            for (const std::string& tid : candidates) {
+                if (fn(tid.c_str(), argv, &param) >= 0) return true;
+            }
         }
     }
     return false;
 }
 #else
 void sendPs4Notification(const std::string&) {}
+int32_t getActivePs4UserId() { return 0; }
 bool launchMinecraftOnPs4() { return true; }
 #endif
 
@@ -205,24 +322,39 @@ bool writeExact(int fd, const void* src, std::size_t len, int& outErrno) {
     return true;
 }
 
-// Finds an actively mounted Minecraft com.mojang directory WITHOUT creating it if Minecraft is closed.
+// Dynamically discovers ANY mounted Minecraft com.mojang directory across any CUSAxxxxx and any userYYYY
+// WITHOUT creating com.mojang if Minecraft is closed.
 std::string findMountedMojangDir(const std::string& preferredMojangDir) {
     if (!preferredMojangDir.empty() && isDirectory(preferredMojangDir)) {
         return preferredMojangDir;
     }
 
-    const char* exactCandidates[] = {
-        "/app_tmp/CUSA00265/user497444003/games/com.mojang",
-        "/user/app_tmp/CUSA00265/user497444003/games/com.mojang",
-        "/app_temp/CUSA00265/user497444003/games/com.mojang",
-    };
-    for (const char* cand : exactCandidates) {
-        if (isDirectory(cand)) {
-            return cand;
+    const int32_t fgUserId = getActivePs4UserId();
+    const std::string preferredUserFolder =
+        (fgUserId > 0) ? ("user" + std::to_string(fgUserId)) : "";
+
+    const char* roots[] = {"/app_tmp", "/user/app_tmp", "/app_temp"};
+
+    // Pass 1: if we know the foreground PS4 user ID, check /app_tmp/CUSA*/user<fgUserId>/games/com.mojang first
+    if (!preferredUserFolder.empty()) {
+        for (const char* root : roots) {
+            DIR* rdir = ::opendir(root);
+            if (!rdir) continue;
+            while (dirent* rent = ::readdir(rdir)) {
+                const std::string cusa(rent->d_name);
+                if (cusa.rfind("CUSA", 0) != 0) continue;
+                const std::string candidate =
+                    std::string(root) + "/" + cusa + "/" + preferredUserFolder + "/games/com.mojang";
+                if (isDirectory(candidate)) {
+                    ::closedir(rdir);
+                    return candidate;
+                }
+            }
+            ::closedir(rdir);
         }
     }
 
-    const char* roots[] = {"/app_tmp", "/user/app_tmp", "/app_temp"};
+    // Pass 2: wildcard scan across ALL /app_tmp/CUSA*/<any_user_dir>/games/com.mojang
     for (const char* root : roots) {
         DIR* rdir = ::opendir(root);
         if (!rdir) continue;
@@ -251,19 +383,55 @@ std::string findMountedMojangDir(const std::string& preferredMojangDir) {
 }
 
 std::string resolveActualDestinationFolder(const std::string& requestedDest) {
-    const std::string exactParent = "/app_tmp/CUSA00265/user497444003/games/com.mojang";
-    const std::string userParent = "/user/app_tmp/CUSA00265/user497444003/games/com.mojang";
-    if (!isDirectory("/app_tmp/CUSA00265") && isDirectory("/user/app_tmp/CUSA00265")) {
-        if (requestedDest.rfind(exactParent, 0) == 0) {
-            return userParent + requestedDest.substr(exactParent.size());
+    // If requestedDest already points inside an existing com.mojang, keep it
+    const std::string marker = "/games/com.mojang/";
+    const std::size_t pos = requestedDest.find(marker);
+    if (pos != std::string::npos) {
+        const std::string reqMojang = requestedDest.substr(0, pos + marker.size() - 1);
+        if (isDirectory(reqMojang)) {
+            return requestedDest;
+        }
+        const std::string suffix = requestedDest.substr(pos + marker.size());
+        const std::string mounted = findMountedMojangDir("");
+        if (!mounted.empty()) {
+            return mounted + "/" + suffix;
         }
     }
     return requestedDest;
 }
 
+void recordInstalledAddon(const std::string& stageDir, const std::string& addonName) {
+    int err = 0;
+    ensureDirectory(stageDir, err);
+    const std::string jsonPath = stageDir + "/installed.json";
+    std::string existing;
+    if (isRegularFile(jsonPath)) {
+        std::ifstream in(jsonPath);
+        existing.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    }
+    const std::string token = "\"" + addonName + "\"";
+    if (existing.find(token) != std::string::npos) {
+        return;
+    }
+    if (existing.empty() || existing.find('[') == std::string::npos) {
+        existing = "[\n  " + token + "\n]\n";
+    } else {
+        const std::size_t closeBracket = existing.rfind(']');
+        if (closeBracket != std::string::npos) {
+            existing = existing.substr(0, closeBracket) + ",\n  " + token + "\n]\n";
+        }
+    }
+    const int fd = ::open(jsonPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd >= 0) {
+        writeExact(fd, existing.data(), existing.size(), err);
+        ::close(fd);
+    }
+}
+
 bool copyFromOpenStream(std::FILE* inFp,
                         const std::string& dstRoot,
-                        CopyResult& result) {
+                        CopyResult& result,
+                        const ProgressCallback& onProgress) {
     int err = 0;
     cleanPreviousPackFolders(dstRoot);
 
@@ -317,6 +485,7 @@ bool copyFromOpenStream(std::FILE* inFp,
         return false;
     }
 
+    int lastReportedPct = -1;
     std::vector<char> buffer(32 * 1024);
     for (std::uint32_t i = 0; i < fileCount; ++i) {
         std::uint16_t pathLen = 0;
@@ -375,25 +544,52 @@ bool copyFromOpenStream(std::FILE* inFp,
 
         ::close(outFd);
         ++result.filesCopied;
+
+        if (onProgress && fileCount > 0) {
+            const int pct = static_cast<int>((static_cast<std::uint64_t>(i + 1) * 100ULL) / fileCount);
+            if (pct != lastReportedPct && (pct % 4 == 0 || i + 1 == fileCount)) {
+                lastReportedPct = pct;
+                onProgress(InstallPhase::Installing, pct);
+            }
+        }
     }
 
     return true;
 }
 
-bool stageStreamToFile(std::FILE* inFp, const std::string& stagedFilePath, int& outErrno) {
+bool stageStreamToFile(std::FILE* inFp,
+                       const std::string& stagedFilePath,
+                       int& outErrno,
+                       const ProgressCallback& onProgress) {
     outErrno = 0;
+    struct stat st {};
+    std::uint64_t totalBytes = 0;
+    if (::fstat(fileno(inFp), &st) == 0 && st.st_size > 0) {
+        totalBytes = static_cast<std::uint64_t>(st.st_size);
+    }
+
     const int outFd = ::open(stagedFilePath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (outFd < 0) {
         outErrno = errno;
         return false;
     }
     std::vector<char> buf(64 * 1024);
+    std::uint64_t written = 0;
+    int lastPct = -1;
     while (true) {
         const std::size_t r = std::fread(buf.data(), 1, buf.size(), inFp);
         if (r > 0) {
             if (!writeExact(outFd, buf.data(), r, outErrno)) {
                 ::close(outFd);
                 return false;
+            }
+            written += r;
+            if (onProgress && totalBytes > 0) {
+                const int pct = static_cast<int>(std::min<std::uint64_t>(100ULL, (written * 100ULL) / totalBytes));
+                if (pct != lastPct && (pct % 5 == 0 || pct == 100)) {
+                    lastPct = pct;
+                    onProgress(InstallPhase::Downloading, pct);
+                }
             }
         }
         if (r < buf.size()) {
@@ -505,6 +701,84 @@ bool copyTreeRecursive(const std::string& srcDir,
 
 } // namespace
 
+std::string formatEnjoyNotification(const std::string& addonName, const std::string& langCode) {
+    if (langCode == "ar") {
+        return "تم تثبيت " + addonName + " — استمتع!";
+    }
+    if (langCode == "fr") {
+        return addonName + " installé — Profitez-en !";
+    }
+    if (langCode == "tr") {
+        return addonName + " yüklendi — Keyfini çıkarın!";
+    }
+    if (langCode == "es") {
+        return addonName + " instalado — ¡Disfruta!";
+    }
+    if (langCode == "ru") {
+        return addonName + " установлен — Приятной игры!";
+    }
+    if (langCode == "pt") {
+        return addonName + " instalado — Aproveite!";
+    }
+    if (langCode == "zh") {
+        return addonName + " 已安装 — 尽情畅玩吧！";
+    }
+    return addonName + " installed — Enjoy!";
+}
+
+std::string formatInstallPhaseLabel(InstallPhase phase, const std::string& langCode) {
+    switch (phase) {
+        case InstallPhase::Downloading:
+            if (langCode == "ar") return "جارٍ التنزيل...";
+            if (langCode == "fr") return "Téléchargement...";
+            if (langCode == "tr") return "İndiriliyor...";
+            if (langCode == "es") return "Descargando...";
+            if (langCode == "ru") return "Загрузка...";
+            if (langCode == "pt") return "Baixando...";
+            if (langCode == "zh") return "下载中...";
+            return "Downloading...";
+        case InstallPhase::Installing:
+            if (langCode == "ar") return "جارٍ التثبيت...";
+            if (langCode == "fr") return "Installation...";
+            if (langCode == "tr") return "Yükleniyor...";
+            if (langCode == "es") return "Instalando...";
+            if (langCode == "ru") return "Установка...";
+            if (langCode == "pt") return "Instalando...";
+            if (langCode == "zh") return "安装中...";
+            return "Installing...";
+        case InstallPhase::Installed:
+            if (langCode == "ar") return "تم التثبيت ✓";
+            if (langCode == "fr") return "Installé ✓";
+            if (langCode == "tr") return "Yüklendi ✓";
+            if (langCode == "es") return "Instalado ✓";
+            if (langCode == "ru") return "Установлено ✓";
+            if (langCode == "pt") return "Instalado ✓";
+            if (langCode == "zh") return "已安装 ✓";
+            return "Installed ✓";
+        case InstallPhase::Failed:
+            if (langCode == "ar") return "إعادة المحاولة";
+            if (langCode == "fr") return "Réessayer";
+            if (langCode == "tr") return "Tekrar dene";
+            if (langCode == "es") return "Reintentar";
+            if (langCode == "ru") return "Повторить";
+            if (langCode == "pt") return "Tentar novamente";
+            if (langCode == "zh") return "重试";
+            return "Retry";
+    }
+    return "Download";
+}
+
+bool isAddonMarkedInstalled(const std::string& addonName, const std::string& stageDir) {
+#ifdef __ORBIS__
+    ScopedRootJailbreak jailbreakGuard;
+#endif
+    const std::string jsonPath = stageDir + "/installed.json";
+    if (!isRegularFile(jsonPath)) return false;
+    std::ifstream in(jsonPath);
+    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    return content.find("\"" + addonName + "\"") != std::string::npos;
+}
+
 CopyResult copyAddonFolder(const std::string& sourceFolder,
                            const std::string& destinationFolder) {
     CopyResult result;
@@ -533,7 +807,7 @@ CopyResult copyAddonFolder(const std::string& sourceFolder,
         ScopedRootJailbreak jailbreakGuard;
 #endif
         const std::string actualDest = resolveActualDestinationFolder(destinationFolder);
-        const bool ok = copyFromOpenStream(inFp, actualDest, result);
+        const bool ok = copyFromOpenStream(inFp, actualDest, result, nullptr);
         std::fclose(inFp);
         if (!ok) {
             return result;
@@ -562,13 +836,21 @@ CopyResult copyAddonFolder(const std::string& sourceFolder,
 CopyResult installOrQueueAddon(const std::string& sourceRawPath,
                                const std::string& addonFolderName,
                                const std::string& stageDir,
-                               const std::string& preferredMojangDir) {
+                               const std::string& preferredMojangDir,
+                               const std::string& targetCategory,
+                               const std::string& langCode,
+                               ProgressCallback onProgress) {
     CopyResult result;
+    result.targetCategory = sanitizeTargetCategory(targetCategory);
+
+    if (onProgress) {
+        onProgress(InstallPhase::Downloading, 10);
+    }
 
     std::FILE* inFp = std::fopen(sourceRawPath.c_str(), "rb");
     if (!inFp) {
         result.errorCode = errno;
-        result.message = "OPEN FAILED (" + std::to_string(result.errorCode) + ")";
+        result.message = formatInstallPhaseLabel(InstallPhase::Failed, langCode);
         return result;
     }
 
@@ -583,61 +865,84 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
     if (!ensureDirectory(stageDir, err)) {
         std::fclose(inFp);
         result.errorCode = err;
-        result.message = "STAGE MKDIR ERR (" + std::to_string(err) + ")";
+        result.message = formatInstallPhaseLabel(InstallPhase::Failed, langCode);
         return result;
     }
 
     const std::string stagedRawPath = stageDir + "/" + addonFolderName + ".raw";
     const std::string pendingFlagPath = stageDir + "/" + addonFolderName + ".pending";
 
-    if (!isRegularFile(stagedRawPath)) {
-        if (!stageStreamToFile(inFp, stagedRawPath, err)) {
-            std::fclose(inFp);
-            result.errorCode = err;
-            result.message = "STAGE WRITE ERR (" + std::to_string(err) + ")";
-            return result;
-        }
-        std::rewind(inFp);
-    }
-
-    // Check if Minecraft's com.mojang folder is currently mounted
+    // Dynamically check if ANY Minecraft CUSAxxxxx/userYYYY/games/com.mojang is mounted right now
     const std::string mountedMojang = findMountedMojangDir(preferredMojangDir);
     if (!mountedMojang.empty()) {
+        result.detectedMojangDir = mountedMojang;
+        if (onProgress) {
+            onProgress(InstallPhase::Installing, 0);
+        }
         const std::string targetPackDir =
-            mountedMojang + "/resource_packs/" + addonFolderName;
-        const bool ok = copyFromOpenStream(inFp, targetPackDir, result);
+            mountedMojang + "/" + result.targetCategory + "/" + addonFolderName;
+        const bool ok = copyFromOpenStream(inFp, targetPackDir, result, onProgress);
         std::fclose(inFp);
         if (!ok) {
             return result;
         }
+
+        // Verify if manifest.json / level.dat inside the unpacked pack belongs in another subfolder
+        const std::string detectedCat = detectCategoryFromExtractedDir(targetPackDir, result.targetCategory);
+        if (detectedCat != result.targetCategory) {
+            const std::string correctedDir = mountedMojang + "/" + detectedCat + "/" + addonFolderName;
+            ensureDirectory(mountedMojang + "/" + detectedCat, err);
+            removeTreeRecursive(correctedDir);
+            ::rename(targetPackDir.c_str(), correctedDir.c_str());
+            result.targetCategory = detectedCat;
+        }
+
+        // Clean up any staged .raw and .pending files so PS4 HDD space is freed immediately!
         ::unlink(pendingFlagPath.c_str());
+        ::unlink(stagedRawPath.c_str());
+        recordInstalledAddon(stageDir, addonFolderName);
+
         result.ok = true;
         result.queuedForMinecraft = false;
-        result.message = "DONE (" + std::to_string(result.filesCopied) + ")";
-        sendPs4Notification("AddonStation: Installed " + addonFolderName + "!");
+        result.message = formatInstallPhaseLabel(InstallPhase::Installed, langCode);
+        if (onProgress) {
+            onProgress(InstallPhase::Installed, 100);
+        }
+        sendPs4Notification(formatEnjoyNotification(addonFolderName, langCode));
         return result;
     }
 
+    // Minecraft is CLOSED: stage the .raw file into /data/AddonStation/installed/
+    if (!stageStreamToFile(inFp, stagedRawPath, err, onProgress)) {
+        std::fclose(inFp);
+        result.errorCode = err;
+        result.message = formatInstallPhaseLabel(InstallPhase::Failed, langCode);
+        return result;
+    }
     std::fclose(inFp);
 
-    // Minecraft is CLOSED: mark pending in stageDir and launch Minecraft automatically!
+    if (onProgress) {
+        onProgress(InstallPhase::Installing, 50);
+    }
+
+    // Store targetCategory + langCode inside the .pending metadata file
+    const std::string metaLine = result.targetCategory + "|" + langCode;
     const int flagFd = ::open(pendingFlagPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (flagFd >= 0) {
-        const char* nameBytes = addonFolderName.c_str();
-        writeExact(flagFd, nameBytes, addonFolderName.size(), err);
+        writeExact(flagFd, metaLine.data(), metaLine.size(), err);
         ::close(flagFd);
     }
 
     result.ok = true;
     result.queuedForMinecraft = true;
     result.launchedMinecraft = launchMinecraftOnPs4();
-    result.message = "QUEUED - OPENING MC";
-    sendPs4Notification("AddonStation: Saved! Opening Minecraft...");
+    result.message = formatInstallPhaseLabel(InstallPhase::Installing, langCode);
     return result;
 }
 
 CopyResult syncPendingAddonsIfMounted(const std::string& stageDir,
-                                      const std::string& preferredMojangDir) {
+                                      const std::string& preferredMojangDir,
+                                      const std::string& langCode) {
     CopyResult result;
 #ifdef __ORBIS__
     ScopedRootJailbreak jailbreakGuard;
@@ -651,6 +956,7 @@ CopyResult syncPendingAddonsIfMounted(const std::string& stageDir,
     if (mountedMojang.empty()) {
         return result;
     }
+    result.detectedMojangDir = mountedMojang;
 
     DIR* dir = ::opendir(stageDir.c_str());
     if (!dir) {
@@ -678,23 +984,49 @@ CopyResult syncPendingAddonsIfMounted(const std::string& stageDir,
             continue;
         }
 
+        std::string itemCategory = "resource_packs";
+        std::string itemLang = langCode;
+        {
+            std::ifstream metaIn(pendingPath);
+            std::string metaStr((std::istreambuf_iterator<char>(metaIn)), std::istreambuf_iterator<char>());
+            const std::size_t bar = metaStr.find('|');
+            if (bar != std::string::npos) {
+                itemCategory = sanitizeTargetCategory(metaStr.substr(0, bar));
+                const std::string savedLang = metaStr.substr(bar + 1);
+                if (!savedLang.empty()) itemLang = savedLang;
+            }
+        }
+
         std::FILE* inFp = std::fopen(rawPath.c_str(), "rb");
         if (!inFp) continue;
 
         std::vector<char> ioBuf(64 * 1024);
         std::setvbuf(inFp, ioBuf.data(), _IOFBF, ioBuf.size());
 
-        const std::string targetPackDir = mountedMojang + "/resource_packs/" + addonName;
+        const std::string targetPackDir = mountedMojang + "/" + itemCategory + "/" + addonName;
         CopyResult singleRes;
-        const bool ok = copyFromOpenStream(inFp, targetPackDir, singleRes);
+        const bool ok = copyFromOpenStream(inFp, targetPackDir, singleRes, nullptr);
         std::fclose(inFp);
         if (ok) {
+            const std::string detectedCat = detectCategoryFromExtractedDir(targetPackDir, itemCategory);
+            if (detectedCat != itemCategory) {
+                int err = 0;
+                const std::string correctedDir = mountedMojang + "/" + detectedCat + "/" + addonName;
+                ensureDirectory(mountedMojang + "/" + detectedCat, err);
+                removeTreeRecursive(correctedDir);
+                ::rename(targetPackDir.c_str(), correctedDir.c_str());
+            }
+
+            // Delete both .pending and the large .raw file to free PS4 HDD space!
             ::unlink(pendingPath.c_str());
+            ::unlink(rawPath.c_str());
+            recordInstalledAddon(stageDir, addonName);
+
             result.ok = true;
             result.filesCopied += singleRes.filesCopied;
             result.bytesCopied += singleRes.bytesCopied;
-            result.message = "DONE (" + std::to_string(result.filesCopied) + ")";
-            sendPs4Notification("AddonStation: Auto-Installed " + addonName + "!");
+            result.message = formatInstallPhaseLabel(InstallPhase::Installed, itemLang);
+            sendPs4Notification(formatEnjoyNotification(addonName, itemLang));
         }
     }
 
