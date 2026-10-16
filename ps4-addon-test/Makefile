@@ -41,7 +41,7 @@ PKG_FILES   := eboot.bin \
 
 OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/jbc.o
 
-LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceSystemService -lSceVideoOut -lSceAudioOut \
+LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut \
                -lScePad -lSceSysmodule -lSDL2
 COMMONFLAGS := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
                -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include

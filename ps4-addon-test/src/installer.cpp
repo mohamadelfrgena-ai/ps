@@ -116,32 +116,9 @@ struct ScopedRootJailbreak {
     }
 };
 
-struct OrbisNotificationRequest {
-    int type;
-    int reqId;
-    int priority;
-    int msgId;
-    int targetId;
-    int userId;
-    int unk1;
-    int unk2;
-    int appId;
-    int errorNum;
-    int unk3;
-    unsigned char useIconImageUri;
-    char message[1024];
-    char iconUri[1024];
-    char unk[1024];
-};
-
-extern "C" int sceKernelSendNotificationRequest(int device,
-                                                OrbisNotificationRequest* req,
-                                                std::size_t size,
-                                                int blocking);
-
 void sendPs4Notification(const std::string& text) {
     OrbisNotificationRequest req{};
-    req.type = 0;
+    req.type = static_cast<OrbisNotificationRequestType>(0);
     req.targetId = -1;
     req.useIconImageUri = 1;
     std::snprintf(req.iconUri, sizeof(req.iconUri), "cxml://psnotification/tex_icon_system");
@@ -166,10 +143,12 @@ bool launchMinecraftOnPs4() {
 
     using LncInitFn = int (*)(void);
     using LncLaunchFn = int32_t (*)(const char*, const char**, LncAppParam*);
-    int sysMod = sceKernelLoadStartModule("/system/common/lib/libSceSystemService.sprx", 0, nullptr, 0, nullptr, nullptr);
+    const int32_t sysMod = static_cast<int32_t>(
+        sceKernelLoadStartModule("/system/common/lib/libSceSystemService.sprx", 0, nullptr, 0, nullptr, nullptr));
     if (sysMod >= 0) {
         void* initSym = nullptr;
         void* launchSym = nullptr;
+        void* sysLaunchSym = nullptr;
         if (sceKernelDlsym(sysMod, "sceLncUtilInitialize", &initSym) == 0 && initSym) {
             reinterpret_cast<LncInitFn>(initSym)();
         }
@@ -178,10 +157,12 @@ bool launchMinecraftOnPs4() {
             if (fn("CUSA00265", argv, &param) >= 0) return true;
             if (fn("CUSA00744", argv, &param) >= 0) return true;
         }
+        if (sceKernelDlsym(sysMod, "sceSystemServiceLaunchApp", &sysLaunchSym) == 0 && sysLaunchSym) {
+            auto fn = reinterpret_cast<LncLaunchFn>(sysLaunchSym);
+            if (fn("CUSA00265", argv, &param) >= 0) return true;
+            if (fn("CUSA00744", argv, &param) >= 0) return true;
+        }
     }
-
-    if (sceSystemServiceLaunchApp("CUSA00265", argv, &param) >= 0) return true;
-    if (sceSystemServiceLaunchApp("CUSA00744", argv, &param) >= 0) return true;
     return false;
 }
 #else
