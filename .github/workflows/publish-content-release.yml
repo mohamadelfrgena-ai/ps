@@ -1,0 +1,119 @@
+name: Publish content release
+
+# يُنشئ/يحدّث GitHub Releases للإضافات والعوالم (Supabase <-> GitHub Releases).
+# يقرأ ملفات content-staging/*.publish.json، يولّد حزم .raw (PVRAW001) و .zip
+# و pack.json عبر tools/pack_addon.py (يحل مشكلة الملفات المتناثرة و pack0/pack1
+# بأسماء <slug>_<uuid8> من manifest header.uuid)، ثم يرفعها على الـ Release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (empty = all manifests in content-staging/)"
+        required: false
+        default: ""
+  push:
+    branches: [arena/5622bbf6-ps]
+    paths:
+      - "content-staging/*.publish.json"
+      - "tools/pack_addon.py"
+      - ".github/workflows/publish-content-release.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out the selected branch
+        uses: actions/checkout@v4
+
+      - name: Install host tools
+        run: |
+          python3 --version
+          sudo apt-get update -qq && sudo apt-get install -y -qq zip >/dev/null
+
+      - name: Pack content and publish release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TAG: ${{ github.event.inputs.tag || '' }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          count=0
+          for manifest in content-staging/*.publish.json; do
+            python3 - "$manifest" <<'PY'
+          import json, os, subprocess, sys, shutil
+
+          manifest_path = sys.argv[1]
+          with open(manifest_path, "r", encoding="utf-8") as f:
+              m = json.load(f)
+
+          tag_filter = os.environ.get("INPUT_TAG", "").strip()
+          if tag_filter and m.get("tag") != tag_filter:
+              print(f"skip {m.get('tag')} (tag filter: {tag_filter})")
+              sys.exit(0)
+
+          tag = m["tag"]
+          name = m["name"]
+          version = m.get("version", "1.0.0")
+          source = m["source"]
+          title = m.get("title", f"AddonStation content: {name} {version}")
+          notes = m.get("notes", "")
+          cover = m.get("cover", "")
+
+          out_dir = f"dist-content/{m.get('slug') or name}"
+          os.makedirs(out_dir, exist_ok=True)
+
+          repo = "mohamadelfrgena-ai/ps"
+          subprocess.check_call([
+              "python3", "tools/pack_addon.py", source,
+              "--name", name, "--version", version,
+              "--repo", repo, "--tag", tag, "--out", out_dir,
+          ])
+
+          if cover and os.path.isfile(cover):
+              shutil.copy(cover, os.path.join(out_dir, os.path.basename(cover)))
+
+          assets = [os.path.join(out_dir, f) for f in sorted(os.listdir(out_dir))
+                    if f.endswith((".raw", ".zip", ".json", ".jpg", ".png"))]
+          if not assets:
+              print("ERROR: no assets produced", file=sys.stderr)
+              sys.exit(1)
+
+          # إنشاء الـ Release إن لم يكن موجوداً (idempotent)
+          r = subprocess.run(["gh", "release", "view", tag, "--repo", repo],
+                             capture_output=True, text=True)
+          if r.returncode != 0:
+              cmd = ["gh", "release", "create", tag, "--repo", repo, "--title", title]
+              if notes:
+                  cmd += ["--notes", notes]
+              else:
+                  cmd += ["--notes", title]
+              subprocess.check_call(cmd)
+              print(f"created release {tag}")
+          else:
+              print(f"release {tag} already exists — updating assets")
+
+          subprocess.check_call(["gh", "release", "upload", tag, "--repo", repo, "--clobber"] + assets)
+          print(f"uploaded {len(assets)} assets to {tag}:")
+          for a in assets:
+              print("  -", a)
+          PY
+            count=$((count + 1))
+          done
+          if [ "$count" -eq 0 ]; then
+            echo "No content-staging manifests found — nothing to publish."
+          fi
+
+      - name: Show published assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          for manifest in content-staging/*.publish.json; do
+            tag=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['tag'])" "$manifest")
+            echo "== $tag =="
+            gh release view "$tag" --repo mohamadelfrgena-ai/ps --json assets --jq '.assets[] | "\(.name)\t\(.size)\t\(.url)"' || true
+          done

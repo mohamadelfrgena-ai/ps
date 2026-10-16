@@ -61,3 +61,15 @@ image-search/
 # Local SDK archives and extracted toolchains (never include in Git)
 /.cache/
 ps4/.agent-deps/
+
+# pkg addon test (build outputs stay local)
+ps4-addon-test/build/
+ps4-addon-test/build-host/
+ps4-addon-test/eboot.bin
+ps4-addon-test/pkg.gp4
+ps4-addon-test/*.pkg
+ps4-addon-test/IV0000-*.pkg
+ps4-addon-test/sce_sys/param.sfo
+ps4-addon-test/sce_sys/about/
+ps4-addon-test/sce_module/
+ps4-addon-test/assets/folder.raw
