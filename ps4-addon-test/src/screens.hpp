@@ -69,7 +69,7 @@ void drawLegendBar(UiEngine& e,
 enum class DemoState { Idle = 0, Downloading = 1, Installing = 2, Installed = 3 };
 void drawInstallDemo(UiEngine& e, DemoState state, int percent, const std::string& langCode);
 
-// Top navigation bar with L1/R1 tabs (Home Deals Store Chat Settings) + bell + AC pill + avatar
+// Top navigation bar with L1/R1 tabs (Home Deals Store Settings) + bell + AC pill + avatar
 void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int acBalance);
 
 // --- interactive screens (every button navigates / acts) ---
@@ -84,7 +84,6 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
 void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langCode);
 // filterIndex: active Store filter chip 0..2 (Addons Worlds Newest)
 void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langCode);
-void drawChat(UiEngine& e, int focus, bool roomOpen, const std::string& langCode);
 void drawSettings(UiEngine& e, int focus, bool autoLaunchOn,
                   const std::string& accountValue, const std::string& langCode);
 void drawConfirmDialog(UiEngine& e, const std::string& title, const std::string& sub,

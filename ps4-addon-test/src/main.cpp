@@ -9,7 +9,7 @@
 // email / guest) leads to its own screen; ONLY content cards open the addon
 // install page; category/filter chips apply a filter (visible active chip);
 // banner Back returns; "Shop the sale" opens Deals; L1/R1 switch tabs only
-// inside the app (Home · Deals · Store · Chat · Settings) and L2/R2 change
+// inside the app (Home · Deals · Store · Settings) and L2/R2 change
 // the Home offer; Settings rows act (language /
 // auto-launch Minecraft after install / link console / sign out with confirm
 // dialog), text fields open the PS4 system
@@ -45,7 +45,7 @@ const char* kLangCodes[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
 
 enum class Screen {
     Welcome, CodeLink, Email, Language,
-    Home, Deals, Store, Chat, Settings, Detail, Confirm
+    Home, Deals, Store, Settings, Detail, Confirm
 };
 
 struct AppState {
@@ -84,7 +84,6 @@ struct AppState {
     int storeFilter = 0;   // Store filter chip 0..2
     int dealsFilter = 0;   // Deals chip 0..4
     bool autoLaunch = false;   // «تشغيل Minecraft تلقائياً بعد التثبيت» (يُقرأ من الإعدادات)
-    bool roomOpen = false;
     bool saved = false;
 
     std::atomic<bool> installing{false};
@@ -524,7 +523,6 @@ int main(int, char**) {
             case Screen::Home:
             case Screen::Deals:
             case Screen::Store:
-            case Screen::Chat:
             case Screen::Settings:
                 go(Screen::Welcome);
                 break;
@@ -620,13 +618,6 @@ int main(int, char**) {
                 else {
                     state.storeFilter = std::min(2, std::max(0, state.focus - 9));
                     toast(std::string("Filter: ") + kStoreFilters[state.storeFilter]);
-                }
-                break;
-            case Screen::Chat:
-                if (!state.roomOpen) { state.roomOpen = true; state.focus = 0; }
-                else {
-                    const std::string t = pkgtest::openImeDialog("Message", "", 120);
-                    if (!t.empty()) toast("Message sent: " + t);
                 }
                 break;
             case Screen::Settings:
@@ -727,11 +718,6 @@ int main(int, char**) {
                 state.focus = row * 5 + col;
                 break;
             }
-            case Screen::Chat: {
-                if (state.roomOpen) break;
-                if (dy != 0) state.focus = std::max(0, std::min(4, state.focus + dy));
-                break;
-            }
             case Screen::Settings: {
                 if (dy != 0) state.focus = std::max(0, std::min(5, state.focus + dy));
                 break;
@@ -747,27 +733,24 @@ int main(int, char**) {
     };
 
     auto switchTab = [&](int dir) {
-        // L1/R1 tabs are ONLY for the app area (Home Deals Store Chat Settings)
+        // L1/R1 tabs are ONLY for the app area (Home Deals Store Settings)
         switch (state.screen) {
             case Screen::Home:
             case Screen::Deals:
             case Screen::Store:
-            case Screen::Chat:
             case Screen::Settings:
             case Screen::Detail:
                 break;
             default:
                 return;
         }
-        static const Screen tabs[5] = {Screen::Home, Screen::Deals, Screen::Store, Screen::Chat, Screen::Settings};
+        static const Screen tabs[4] = {Screen::Home, Screen::Deals, Screen::Store, Screen::Settings};
         int idx = 0;
         if (state.screen == Screen::Deals) idx = 1;
         else if (state.screen == Screen::Store || state.screen == Screen::Detail) idx = 2;
-        else if (state.screen == Screen::Chat) idx = 3;
-        else if (state.screen == Screen::Settings) idx = 4;
-        idx = (idx + dir + 5) % 5;
+        else if (state.screen == Screen::Settings) idx = 3;
+        idx = (idx + dir + 4) % 4;
         state.tabScreen = tabs[idx];
-        state.roomOpen = false;
         go(tabs[idx]);
     };
 
@@ -807,8 +790,7 @@ int main(int, char**) {
                     } else if (state.screen == Screen::Deals) {
                         state.focus = state.dealsFilter;          // jump to filter chips
                         stateChanged = true;
-                    } else if (state.screen == Screen::Home || state.screen == Screen::Welcome ||
-                               state.screen == Screen::Chat) {
+                    } else if (state.screen == Screen::Home || state.screen == Screen::Welcome) {
                         state.prevScreen = state.screen;
                         state.focus = state.langIndex;
                         if (state.screen != Screen::Language) state.screen = Screen::Language;
@@ -939,9 +921,6 @@ int main(int, char**) {
                     break;
                 case Screen::Deals:
                     pkgtest::drawDeals(engine, state.focus, state.dealsFilter, lang);
-                    break;
-                case Screen::Chat:
-                    pkgtest::drawChat(engine, state.focus, state.roomOpen, lang);
                     break;
                 case Screen::Settings:
                     pkgtest::drawSettings(engine, state.focus, state.autoLaunch,

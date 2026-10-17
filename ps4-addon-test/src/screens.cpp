@@ -138,8 +138,6 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
                       {"zh", "最佳附加包与世界最高五折"}}},
         {"nav_store", {{"en", "Store"}, {"ar", "المتجر"}, {"fr", "Boutique"}, {"tr", "Mağaza"},
                        {"es", "Tienda"}, {"ru", "Магазин"}, {"pt", "Loja"}, {"zh", "商店"}}},
-        {"nav_chat", {{"en", "Chat"}, {"ar", "الشات"}, {"fr", "Chat"}, {"tr", "Sohbet"},
-                      {"es", "Chat"}, {"ru", "Чат"}, {"pt", "Chat"}, {"zh", "聊天"}}},
         {"nav_settings", {{"en", "Settings"}, {"ar", "الإعدادات"}, {"fr", "Réglages"}, {"tr", "Ayarlar"},
                           {"es", "Ajustes"}, {"ru", "Настройки"}, {"pt", "Ajustes"}, {"zh", "设置"}}},
         {"choose_language", {{"en", "Choose app language"}, {"ar", "اختر لغة التطبيق"},
@@ -775,10 +773,10 @@ void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int acB
 
     // tabs
     struct Tab { const char* key; };
-    const char* keys[5] = {"nav_home", "nav_deals", "nav_store", "nav_chat", "nav_settings"};
+    const char* keys[4] = {"nav_home", "nav_deals", "nav_store", "nav_settings"};
     int x = bx + 76 + e.measureText("ADDONSTATION", 22, FontRole::Pixel, false) + 48;
     x += drawBtn(e, "L1", x + 26, 60, 36) / 2 + 36;
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 4; ++i) {
         const std::string label = tr(keys[i], langCode);
         const int tw = e.measureText(label, 30, FontRole::Body, langCode == "ar");
         const bool on = (i == activeTab);
@@ -823,7 +821,7 @@ void drawCodeLink(UiEngine& e, const std::string& code, int secondsLeft,
                   bool linked, const std::string& langCode) {
     const bool rtl = langCode == "ar";
     e.clear(kBG);
-    drawTopNav(e, 4, langCode, 1250);
+    drawTopNav(e, 3, langCode, 1250);
 
     // headline + steps (left)
     e.drawText(tr("sign_in_code", langCode), 96, 170, 54, kWHT, FontRole::Pixel, false, rtl, 800);
@@ -1029,10 +1027,9 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     }
 
     // chips row (top 700) — one active filter at a time
-    const char* chipKeys[7] = {"open", "nav_store", "nav_home", "installed", "nav_deals", "nav_settings", "nav_chat"};
     const char* chipLbls[7] = {"All", "Addons", "Worlds", "Free", "Epic", "Legendary", "New"};
     int cxp = 96;
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < 7; ++i) {
         const int cw = e.measureText(chipLbls[i], 24, FontRole::Body, false) + 56;
         const bool active = (i == filterIndex);
         if (active) {
@@ -1222,68 +1219,11 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
                       {"\xE2\x96\xA1", "filter"}, {"\xE2\x96\xB3", "sort"}}, langCode);
 }
 
-void drawChat(UiEngine& e, int focus, bool roomOpen, const std::string& langCode) {
-    const bool rtl = langCode == "ar";
-    e.clear(kBG);
-    drawTopNav(e, 3, langCode, 1250);
-
-    e.drawText("Community", 96, 150, 44, kWHT, FontRole::Pixel, false, false);
-    e.drawText("Community rules - Breaking them can lead to a mute or a ban", 96, 210, 22,
-               SDL_Color{240, 194, 94, 220}, FontRole::Body, false, false);
-
-    struct Room { const char* name; const char* art; int online; };
-    const Room rooms[5] = {
-        {"General", "cover_0", 12}, {"Minecraft", "cover_1", 8},
-        {"Creator", "cover_2", 12}, {"Support", "cover_3", 3},
-        {"Social Media Makers", "cover_4", 6},
-    };
-    const int listX = 96, listW = 760;
-    for (int i = 0; i < 5; ++i) {
-        const int y = 260 + i * 118;
-        e.drawRoundRect(listX, y, listW, 100, 22, kSF);
-        e.drawRoundBorder(listX, y, listW, 100, 22, 2, kBD);
-        e.drawImageRounded(rooms[i].art, listX + 14, y + 14, 72, 72, 36);
-        e.drawText(rooms[i].name, listX + 110, y + 18, 28, kWHT, FontRole::Body, false, false);
-        e.drawText("[Name]: [Last message]", listX + 110, y + 58, 20, kMU,
-                   FontRole::Body, false, false);
-        e.drawText("12:41", listX + listW - 90, y + 20, 20, kMU, FontRole::Body, false, false);
-        if (focus == i && !roomOpen) focusRing(e, listX, y, listW, 100, 22);
-    }
-
-    // room panel (right)
-    const int rx = 900, rw = 1920 - 96 - rx;
-    e.drawRoundRect(rx, 260, rw, 590, 36, kSF);
-    e.drawRoundBorder(rx, 260, rw, 590, 36, 2, kBD);
-    e.drawImageRounded("cover_0", rx + 24, 284, 78, 78, 39);
-    e.drawText(roomOpen ? "General" : "General", rx + 126, 292, 34, kWHT, FontRole::Pixel, false, false);
-    e.drawText("12 online", rx + 126, 336, 22, kGRN2, FontRole::Body, false, false);
-    // pinned
-    e.drawRoundRect(rx + 24, 392, rw - 48, 58, 20, SDL_Color{240, 194, 94, 26});
-    e.drawRoundBorder(rx + 24, 392, rw - 48, 58, 20, 2, SDL_Color{240, 194, 94, 100});
-    e.drawText("[Pinned message text]", rx + 50, 404, 24, SDL_Color{234, 217, 168, 255},
-               FontRole::Body, false, false);
-    // messages
-    e.drawText("[Name]", rx + 60, 500, 22, kGRN2, FontRole::Body, false, false);
-    e.drawRoundRect(rx + 40, 532, 520, 76, 28, SDL_Color{14, 21, 38, 255});
-    e.drawRoundBorder(rx + 40, 532, 520, 76, 28, 2, kBD);
-    e.drawText("[Message text]   12:41", rx + 66, 554, 24, SDL_Color{213, 224, 242, 255},
-               FontRole::Body, false, false);
-    e.drawRoundGradD(rx + rw - 420, 640, 380, 76, 28, kBL, kBL2);
-    e.drawText("[Message text]   12:41", rx + rw - 394, 662, 24, kWHT, FontRole::Body, false, false);
-    // composer
-    e.drawRoundRect(rx + 24, 760, rw - 48, 66, 33, SDL_Color{14, 21, 38, 255});
-    e.drawRoundBorder(rx + 24, 760, rw - 48, 66, 33, 2, kBD);
-    e.drawText("Write a message to the room", rx + 54, 776, 24, kMU, FontRole::Body, false, false);
-    if (roomOpen) focusRing(e, rx + 24, 760, rw - 48, 66, 33);
-
-    drawLegendBar(e, {{"\xE2\x9C\x95", roomOpen ? "select" : "open"}, {"\xE2\x97\x8B", "back"}}, langCode);
-}
-
 void drawSettings(UiEngine& e, int focus, bool autoLaunchOn,
                   const std::string& accountValue, const std::string& langCode) {
     const bool rtl = langCode == "ar";
     e.clear(kBG);
-    drawTopNav(e, 4, langCode, 1250);
+    drawTopNav(e, 3, langCode, 1250);
 
     e.drawText("Settings", 96, 150, 44, kWHT, FontRole::Pixel, false, false);
 

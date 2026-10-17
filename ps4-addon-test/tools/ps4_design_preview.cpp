@@ -106,10 +106,6 @@ int main(int argc, char** argv) {
     drawStore(engine, 0, 1, "en");
     savePng(engine, outDir + "/ps4_store_en.png");
 
-    // 15. Chat rooms
-    engine.clear(theme::BG);
-    drawChat(engine, 0, false, "en");
-    savePng(engine, outDir + "/ps4_chat_en.png");
 
     // 16. Settings
     engine.clear(theme::BG);
