@@ -10,7 +10,7 @@
 // install page; category/filter chips apply a filter (visible active chip);
 // banner Back returns; "Shop the sale" opens Deals; L1/R1 switch tabs only
 // inside the app (Home · Deals · Store · Chat · Settings) and L2/R2 change
-// the Home offer; Settings rows act (language / notifications toggle /
+// the Home offer; Settings rows act (language /
 // auto-launch Minecraft after install / link console / sign out with confirm
 // dialog), text fields open the PS4 system
 // keyboard (sceImeDialog), Download installs content from the GitHub Release.
@@ -83,7 +83,6 @@ struct AppState {
     int filterIndex = 0;   // Home category chip 0..6
     int storeFilter = 0;   // Store filter chip 0..2
     int dealsFilter = 0;   // Deals chip 0..4
-    bool notifOn = true;
     bool autoLaunch = false;   // «تشغيل Minecraft تلقائياً بعد التثبيت» (يُقرأ من الإعدادات)
     bool roomOpen = false;
     bool saved = false;
@@ -128,7 +127,7 @@ int frameSignature(const AppState& s, double t) {
               (linkDone ? 11 : (codeSecs % 60));
     sig += s.heroIndex * 31337 + s.filterIndex * 2711 +
            s.storeFilter * 397 + s.dealsFilter * 53 +
-           (s.autoLaunch ? 31 : 0) + (s.notifOn ? 17 : 0) +
+           (s.autoLaunch ? 31 : 0) +
            s.contentStamp * 7919;
     return sig;
 }
@@ -637,14 +636,13 @@ int main(int, char**) {
                     toast(state.haveSession ? ("Account: " + state.sessionName)
                                             : std::string("Account: name@example.com"));
                 }
-                else if (state.focus == 2) { state.notifOn = !state.notifOn; toast(state.notifOn ? "Notifications ON" : "Notifications OFF"); }
-                else if (state.focus == 3) {
+                else if (state.focus == 2) {
                     state.autoLaunch = !state.autoLaunch;
                     pkgtest::saveAutoLaunchSetting(state.autoLaunch);
                     toast(pkgtest::tr(state.autoLaunch ? "autolaunch_on" : "autolaunch_off", currentLang()));
                 }
-                else if (state.focus == 4) { requestNewCode(); go(Screen::CodeLink); }
-                else if (state.focus == 5) toast("AddonStation PS4 v0.21 — official app");
+                else if (state.focus == 3) { requestNewCode(); go(Screen::CodeLink); }
+                else if (state.focus == 4) toast("AddonStation PS4 v0.21 — official app");
                 else go(Screen::Confirm);
                 break;
             case Screen::Detail:
@@ -735,7 +733,7 @@ int main(int, char**) {
                 break;
             }
             case Screen::Settings: {
-                if (dy != 0) state.focus = std::max(0, std::min(6, state.focus + dy));
+                if (dy != 0) state.focus = std::max(0, std::min(5, state.focus + dy));
                 break;
             }
             case Screen::Confirm: {
@@ -946,14 +944,14 @@ int main(int, char**) {
                     pkgtest::drawChat(engine, state.focus, state.roomOpen, lang);
                     break;
                 case Screen::Settings:
-                    pkgtest::drawSettings(engine, state.focus, state.notifOn, state.autoLaunch,
+                    pkgtest::drawSettings(engine, state.focus, state.autoLaunch,
                                           accountCopy, lang);
                     break;
                 case Screen::Detail:
                     pkgtest::drawInstallDemo(engine, state.demoState, state.progress, lang);
                     break;
                 case Screen::Confirm:
-                    pkgtest::drawSettings(engine, state.focus, state.notifOn, state.autoLaunch,
+                    pkgtest::drawSettings(engine, state.focus, state.autoLaunch,
                                           accountCopy, lang);
                     pkgtest::drawConfirmDialog(engine, "Sign out?",
                                                "You can sign in again any time with a code.",

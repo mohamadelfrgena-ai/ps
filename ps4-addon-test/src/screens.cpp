@@ -167,10 +167,6 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
                                {"pt", "Idioma do aplicativo"}, {"zh", "应用语言"}}},
         {"settings_account", {{"en", "Account"}, {"ar", "الحساب"}, {"fr", "Compte"}, {"tr", "Hesap"},
                               {"es", "Cuenta"}, {"ru", "Аккаунт"}, {"pt", "Conta"}, {"zh", "账户"}}},
-        {"settings_notifications", {{"en", "Notifications"}, {"ar", "الإشعارات"},
-                                    {"fr", "Notifications"}, {"tr", "Bildirimler"},
-                                    {"es", "Notificaciones"}, {"ru", "Уведомления"},
-                                    {"pt", "Notificações"}, {"zh", "通知"}}},
         {"settings_link", {{"en", "Link a console"}, {"ar", "ربط جهاز"}, {"fr", "Lier une console"},
                            {"tr", "Konsol bağla"}, {"es", "Vincular una consola"},
                            {"ru", "Привязать консоль"}, {"pt", "Vincular um console"}, {"zh", "绑定主机"}}},
@@ -1036,7 +1032,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     const char* chipKeys[7] = {"open", "nav_store", "nav_home", "installed", "nav_deals", "nav_settings", "nav_chat"};
     const char* chipLbls[7] = {"All", "Addons", "Worlds", "Free", "Epic", "Legendary", "New"};
     int cxp = 96;
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 6; ++i) {
         const int cw = e.measureText(chipLbls[i], 24, FontRole::Body, false) + 56;
         const bool active = (i == filterIndex);
         if (active) {
@@ -1283,7 +1279,7 @@ void drawChat(UiEngine& e, int focus, bool roomOpen, const std::string& langCode
     drawLegendBar(e, {{"\xE2\x9C\x95", roomOpen ? "select" : "open"}, {"\xE2\x97\x8B", "back"}}, langCode);
 }
 
-void drawSettings(UiEngine& e, int focus, bool notifOn, bool autoLaunchOn,
+void drawSettings(UiEngine& e, int focus, bool autoLaunchOn,
                   const std::string& accountValue, const std::string& langCode) {
     const bool rtl = langCode == "ar";
     e.clear(kBG);
@@ -1292,17 +1288,16 @@ void drawSettings(UiEngine& e, int focus, bool notifOn, bool autoLaunchOn,
     e.drawText("Settings", 96, 150, 44, kWHT, FontRole::Pixel, false, false);
 
     struct Row { std::string label; std::string value; bool danger; int toggle; };
-    const Row rows[7] = {
+    const Row rows[6] = {
         {tr("settings_language", langCode), "English >", false, 0},
         {tr("settings_account", langCode), accountValue, false, 0},
-        {tr("settings_notifications", langCode), "", false, 1},
-        {tr("autolaunch", langCode), "", false, 2},
+        {tr("autolaunch", langCode), "", false, 1},
         {tr("settings_link", langCode), "1 device >", false, 0},
         {tr("settings_about", langCode), ">", false, 0},
         {tr("settings_signout", langCode), ">", true, 0},
     };
     const int listX = 96, listW = 900;
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 6; ++i) {
         const int y = 230 + i * 100;
         e.drawRoundRect(listX, y, listW, 92, 26, kSF);
         e.drawRoundBorder(listX, y, listW, 92, 26, 2, kBD);
@@ -1310,7 +1305,7 @@ void drawSettings(UiEngine& e, int focus, bool notifOn, bool autoLaunchOn,
                    rows[i].danger ? SDL_Color{255, 135, 145, 255} : kWHT,
                    FontRole::Body, false, rtl, 560);
         if (rows[i].toggle) {
-            const bool on = rows[i].toggle == 1 ? notifOn : autoLaunchOn;
+            const bool on = autoLaunchOn;
             const int tx = listX + listW - 120;
             e.drawRoundRect(tx, y + 24, 84, 44, 22, on ? kBL : kBD);
             e.drawCircle(tx + (on ? 62 : 22), y + 46, 18, kWHT);
