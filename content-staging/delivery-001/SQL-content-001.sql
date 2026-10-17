@@ -1,7 +1,7 @@
 -- ============================================================================
---  AddonStation — إضافة أول محتوى: Sulfur Cars (content-001)
---  الصق هذا الملف كاملاً في: Supabase Dashboard → SQL Editor → Run
---  آمن لإعادة التنفيذ (upsert على slug).
+--  AddonStation — first content item: Sulfur Cars (content-001)
+--  Paste this file in: Supabase Dashboard -> SQL Editor -> Run
+--  Safe to re-run (upsert on slug).
 -- ============================================================================
 
 insert into public.content_items
@@ -56,5 +56,5 @@ on conflict (slug) do update
       exclusive_slot = excluded.exclusive_slot,
       updated_at    = now();
 
--- تحقق سريع: يجب أن يظهر صف Sulfur Cars
+-- Quick check: the Sulfur Cars row must appear
 select slug, title, ps4_raw_url from public.content_items where slug = 'sulfur-cars';
