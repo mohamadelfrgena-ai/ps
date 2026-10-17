@@ -644,7 +644,7 @@ int main(int, char**) {
                     toast(pkgtest::tr(state.autoLaunch ? "autolaunch_on" : "autolaunch_off", currentLang()));
                 }
                 else if (state.focus == 4) { requestNewCode(); go(Screen::CodeLink); }
-                else if (state.focus == 5) toast("AddonStation PS4 v0.19 — official app");
+                else if (state.focus == 5) toast("AddonStation PS4 v0.20 — official app");
                 else go(Screen::Confirm);
                 break;
             case Screen::Detail:

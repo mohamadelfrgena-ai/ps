@@ -1,7 +1,7 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
-# AddonStation PS4 Mini-App — v0.19 test build (new pixel PS button icons, natural sizes)
-VERSION     := 0.19
+# AddonStation PS4 Mini-App — v0.20 test build (CE-34878 keyboard crash fix)
+VERSION     := 0.20
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
