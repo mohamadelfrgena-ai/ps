@@ -1,7 +1,7 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
-# AddonStation PS4 Mini-App — v0.20 test build (CE-34878 keyboard crash fix)
-VERSION     := 0.20
+# AddonStation PS4 Mini-App — v0.21 test build (black Home/Store screen fix)
+VERSION     := 0.21
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
@@ -50,6 +50,7 @@ COMMONFLAGS := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
                -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include
 CFLAGS      := $(COMMONFLAGS) -std=c11 -mno-red-zone -D__ORBIS__ -Isrc
 CXXFLAGS    := $(COMMONFLAGS) -std=c++17 -fexceptions -D_POSIX_C_SOURCE=200809L -D_GNU_SOURCE -D__ORBIS__ \
+               -Werror=switch \
                -isystem $(TOOLCHAIN)/include/c++/v1 -Isrc
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr \
                -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o

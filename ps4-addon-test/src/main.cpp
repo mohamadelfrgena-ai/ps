@@ -644,7 +644,7 @@ int main(int, char**) {
                     toast(pkgtest::tr(state.autoLaunch ? "autolaunch_on" : "autolaunch_off", currentLang()));
                 }
                 else if (state.focus == 4) { requestNewCode(); go(Screen::CodeLink); }
-                else if (state.focus == 5) toast("AddonStation PS4 v0.20 — official app");
+                else if (state.focus == 5) toast("AddonStation PS4 v0.21 — official app");
                 else go(Screen::Confirm);
                 break;
             case Screen::Detail:
@@ -933,7 +933,11 @@ int main(int, char**) {
                 case Screen::Language:
                     pkgtest::drawLanguageDialog(engine, state.focus, lang);
                     break;
+                case Screen::Home:
                     pkgtest::drawHome(engine, state.focus, state.heroIndex, state.filterIndex, lang);
+                    break;
+                case Screen::Store:
+                    pkgtest::drawStore(engine, state.focus, state.storeFilter, lang);
                     break;
                 case Screen::Deals:
                     pkgtest::drawDeals(engine, state.focus, state.dealsFilter, lang);
