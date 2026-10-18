@@ -240,7 +240,7 @@ class ContentRepository(
     suspend fun download(context: android.content.Context, item: ContentItem): Result<DownloadedFile> = runCatching {
         val result = supabase.rpc("record_content_download", params("p_item_id" to p(item.id)), signedOnly = true)
         val outcome = result.toOutcome()
-        if (!outcome.ok) throw ApiError(ApiErrorKind.NO_PERMISSION, outcome.message)
+        if (!outcome.ok) throw com.addonstation.mobile.data.apiErrorFromMessage(outcome.message)
         val bucket = outcome.data.str("bucket") ?: "content-files"
         val path = outcome.data.str("path") ?: item.filePath
             ?: throw ApiError(ApiErrorKind.FILE_NOT_UPLOADED)
@@ -257,7 +257,7 @@ class ContentRepository(
     /** فتح قفل عنصر بالعملات AC (للمحتوى المدفوع بـ AC). */
     suspend fun unlockWithAc(itemId: String): Result<Int> = runCatching {
         val outcome = supabase.rpc("ac_unlock_content", params("p_item_id" to p(itemId)), signedOnly = true).toOutcome()
-        if (!outcome.ok) throw ApiError(ApiErrorKind.NOT_ENOUGH_AC, outcome.message)
+        if (!outcome.ok) throw com.addonstation.mobile.data.apiErrorFromMessage(outcome.message)
         outcome.data.num("charged") ?: 0
     }
 

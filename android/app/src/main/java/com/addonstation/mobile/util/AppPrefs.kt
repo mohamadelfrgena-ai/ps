@@ -14,6 +14,7 @@ object AppPrefs {
     private const val KEY_NOTIF_ASKED = "notif_asked"
     private const val KEY_SPLASH_COMPLETED = "splash_completed"
     private const val KEY_SPLASH_APP_VERSION = "splash_app_version"
+    private const val KEY_CONSOLE_LINK_OPENED = "console_link_opened"
 
     private fun sp(context: Context) =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -41,6 +42,14 @@ object AppPrefs {
 
     fun writeDark(context: Context, dark: Boolean) {
         sp(context).edit().putBoolean(KEY_DARK, dark).apply()
+    }
+
+    /** The Settings NEW badge disappears permanently after this feature is opened. */
+    fun consoleLinkOpened(context: Context): Boolean =
+        sp(context).getBoolean(KEY_CONSOLE_LINK_OPENED, false)
+
+    fun markConsoleLinkOpened(context: Context) {
+        sp(context).edit().putBoolean(KEY_CONSOLE_LINK_OPENED, true).apply()
     }
 
     /**

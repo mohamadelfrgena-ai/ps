@@ -32,8 +32,6 @@ import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Devices
-import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Visibility
@@ -194,10 +192,21 @@ fun SettingsScreen(
     var deleteInfo by remember { mutableStateOf(false) }
     var onlineBusy by remember { mutableStateOf(false) }
     var onlineNote by remember { mutableStateOf<ApiErrorKind?>(null) }
+    var linkedConsoleCount by remember { mutableStateOf<Int?>(null) }
+    var showConsoleNew by remember { mutableStateOf(!AppPrefs.consoleLinkOpened(context)) }
     val signedOut = !signedIn
 
     LaunchedEffect(profile?.username) {
         profile?.username?.let { username = it }
+    }
+    LaunchedEffect(signedIn) {
+        linkedConsoleCount = if (signedIn && container.supabase.session() != null) {
+            runCatching {
+                withContext(Dispatchers.IO) { container.consoleLinks.linkedConsoles().size }
+            }.getOrNull()
+        } else {
+            0
+        }
     }
     LaunchedEffect(signedIn, profileRetryTick) {
         if (signedIn && container.state.currentProfile == null) {
@@ -296,6 +305,21 @@ fun SettingsScreen(
             )
             SettingsPlanCard(profile = profile, onOpenPlans = onOpenPlans)
 
+            // DEVICES sits above Account exactly as in the supplied phone design.
+            // This adds console icons only; the app's existing Settings icon is preserved.
+            ConsoleSettingsSection(
+                linkedCount = linkedConsoleCount,
+                showNewBadge = showConsoleNew,
+                onOpenLink = {
+                    AppPrefs.markConsoleLinkOpened(context)
+                    showConsoleNew = false
+                    if (signedIn) onOpenConsoleLink() else onLogin()
+                },
+                onOpenConsoles = {
+                    if (signedIn) onOpenLinkedConsoles() else onLogin()
+                },
+            )
+
             // 1 · ACCOUNT
             AuthSettingsSectionLabel(stringResource(R.string.set_account), AppColors.AuthAccentBlue)
             AuthSettingsGroupCard {
@@ -332,24 +356,6 @@ fun SettingsScreen(
                             onClick = { if (signedOut) onLogin() else requestPasswordReset() },
                         )
                     },
-                )
-                AuthSettingsDivider()
-                AuthSettingsRow(
-                    title = stringResource(R.string.console_link_title),
-                    subtitle = stringResource(R.string.console_link_settings_subtitle),
-                    tile = { AuthSettingsIconTile(Icons.Outlined.Link, AppColors.AuthAccentBlue) },
-                    clickable = true,
-                    onClick = onOpenConsoleLink,
-                    chevron = true,
-                )
-                AuthSettingsDivider()
-                AuthSettingsRow(
-                    title = stringResource(R.string.console_devices_title),
-                    subtitle = stringResource(R.string.console_devices_settings_subtitle),
-                    tile = { AuthSettingsIconTile(Icons.Outlined.Devices, AppColors.AuthGreen) },
-                    clickable = true,
-                    onClick = onOpenLinkedConsoles,
-                    chevron = true,
                 )
                 if ((profileLoadStatus == ProfileLoadStatus.FAILED || profileLoadStatus == ProfileLoadStatus.MISSING) && signedIn && profile == null) {
                     ErrorState(onRetry = { profileRetryTick += 1 })

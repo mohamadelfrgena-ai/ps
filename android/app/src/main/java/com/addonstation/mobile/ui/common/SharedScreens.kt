@@ -60,6 +60,7 @@ import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
+import java.util.Locale
 
 /** شاشة عامة لقائمة محتوى (مفضلتي / تحميلاتي / الحصريات / محتوى مبدع…). */
 @Composable
@@ -114,9 +115,13 @@ fun planLabelOf(plan: String): String = when (plan) {
     else -> stringResource(R.string.plan_free_name)
 }
 
-/** سطر إحصاءات مبني بدون مفاتيح جديدة: تنزيلات · مشاهدات · تقييم. */
+/**
+ * Compact legacy metadata for surfaces that have not adopted the visual stat row.
+ * Emoji are deliberately excluded; Store and item screens use the supplied
+ * vector stat icons so their appearance is identical on every phone.
+ */
 fun metaOf(item: ContentItem): String =
-    "📥 ${item.downloadsCount} · 👁 ${item.viewsCount}" + if (item.rating > 0) " · ⭐ %.1f".format(item.rating) else ""
+    "${item.downloadsCount} · ${item.viewsCount}" + if (item.rating > 0) " · %.1f".format(Locale.US, item.rating) else ""
 
 /** عارض صورة بملء الشاشة مع تكبير/تحريك وزر إغلاق. */
 @Composable

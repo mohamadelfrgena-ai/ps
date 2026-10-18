@@ -31,14 +31,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -65,29 +61,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
-import com.addonstation.mobile.data.ApiError
 import com.addonstation.mobile.data.model.ContentItem
-import com.addonstation.mobile.data.toApiError
-import com.addonstation.mobile.ui.apiErrorText
 import com.addonstation.mobile.ui.assetUrl
-import com.addonstation.mobile.ui.components.AvatarImage
-import com.addonstation.mobile.ui.components.CoinIcon
 import com.addonstation.mobile.ui.components.CoverImage
-import com.addonstation.mobile.ui.components.EmptyState
-import com.addonstation.mobile.ui.components.FilterChip
-import com.addonstation.mobile.ui.components.GhostButton
-import com.addonstation.mobile.ui.components.GlassCard
-import com.addonstation.mobile.ui.components.GradientButton
-import com.addonstation.mobile.ui.components.LoadingBox
-import com.addonstation.mobile.ui.components.PixelTopBar
-import com.addonstation.mobile.ui.components.RankBadge
-import com.addonstation.mobile.ui.components.SectionHeader
-import com.addonstation.mobile.ui.components.SubScreenHeader
 import com.addonstation.mobile.ui.common.metaOf
 import com.addonstation.mobile.ui.common.planLabelOf
 import com.addonstation.mobile.ui.rememberContainer
-import com.addonstation.mobile.ui.theme.AppColors
-import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.ui.theme.PixelFont
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -130,7 +109,9 @@ fun StoreScreen(
     var reloadTick by remember { mutableStateOf(0) }
     var items by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
     var favourites by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var creatorNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var creatorProfiles by remember {
+        mutableStateOf<Map<String, com.addonstation.mobile.data.model.Profile>>(emptyMap())
+    }
 
     suspend fun reload() {
         loading = true
@@ -160,12 +141,8 @@ fun StoreScreen(
     LaunchedEffect(type, sort, query, reloadTick, signedIn) { reload() }
     LaunchedEffect(items) {
         val ids = items.mapNotNull { it.createdBy }.distinct()
-        creatorNames = if (ids.isEmpty()) emptyMap() else runCatching {
-            withContext(Dispatchers.IO) {
-                container.profile.loadProfiles(ids).mapValues { (_, profile) ->
-                    profile.username ?: profile.displayName.orEmpty()
-                }
-            }
+        creatorProfiles = if (ids.isEmpty()) emptyMap() else runCatching {
+            withContext(Dispatchers.IO) { container.profile.loadProfiles(ids) }
         }.getOrDefault(emptyMap())
     }
     LaunchedEffect(failed, items.isNotEmpty()) {
@@ -211,7 +188,7 @@ fun StoreScreen(
                 Spacer(Modifier.height(8.dp))
                 val sorts = listOf(
                     "newest" to stringResource(R.string.store_sort_newest),
-                    "downloads" to stringResource(R.string.store_sort_downloads),
+                    "popular" to stringResource(R.string.store_sort_downloads),
                     "views" to stringResource(R.string.store_sort_views),
                     "rating" to stringResource(R.string.store_sort_rating),
                 )
@@ -251,18 +228,31 @@ fun StoreScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
-                                .height((rowCount * 214 + (rowCount - 1).coerceAtLeast(0) * 12).dp),
+                                .height((rowCount * 226 + (rowCount - 1).coerceAtLeast(0) * 12).dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             userScrollEnabled = false,
                         ) {
                             items(items, key = { it.id }) { item ->
-                                StoreContentCard(
+                                DesignedStoreContentCard(
                                     item = item,
                                     coverUrl = assetUrl(container, item.coverUrl),
                                     favourite = favourites.contains(item.id),
-                                    creatorName = item.createdBy?.let(creatorNames::get)?.takeIf(String::isNotBlank),
+                                    creator = item.createdBy?.let(creatorProfiles::get),
                                     onClick = { onOpenItem(item) },
+                                    onToggleFavourite = {
+                                        if (container.supabase.session() == null) {
+                                            scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_sign_in_needed)) }
+                                        } else {
+                                            scope.launch {
+                                                container.content.toggleFavorite(item.id)
+                                                    .onSuccess { saved ->
+                                                        favourites = if (saved) favourites + item.id else favourites - item.id
+                                                    }
+                                                    .onFailure { snackbarHostState.showSnackbar(networkErrorText) }
+                                            }
+                                        }
+                                    },
                                     palette = homePalette,
                                 )
                             }
@@ -664,31 +654,10 @@ private fun StoreState(
     }
 }
 
-/** نصوص الأخطاء المجمّعة (تُقرأ مرة واحدة خارج اللامبدات لأن stringResource دالة Composable). */
-private data class DetailTexts(
-    val signIn: String,
-    val failed: String,
-    val noPermission: String,
-    val fileMissing: String,
-    val notEnoughAc: String,
-    val downloadLimit: String,
-    val downloading: String,
-    val fileSavedAt: String,
-)
-
-private fun errorMessageOf(error: Throwable, texts: DetailTexts): String =
-    when (error.toApiError().kind) {
-        com.addonstation.mobile.data.ApiErrorKind.NOT_SIGNED_IN -> texts.signIn
-        com.addonstation.mobile.data.ApiErrorKind.FILE_NOT_UPLOADED -> texts.fileMissing
-        com.addonstation.mobile.data.ApiErrorKind.NO_PERMISSION -> texts.noPermission
-        com.addonstation.mobile.data.ApiErrorKind.NOT_ENOUGH_AC -> texts.notEnoughAc
-        com.addonstation.mobile.data.ApiErrorKind.DOWNLOAD_LIMIT -> texts.downloadLimit
-        else -> texts.failed
-    }
-
 /**
- * شاشة تفاصيل المحتوى: غلاف 195dp، الإحصاءات، الوصف، أزرار التحميل/الحفظ، ومحتوى مشابه.
- * زر التحميل يُظهر القفل المناسب قبل الضغط («🔒 يتطلب Epic 💎» / «🔒 يتطلب Legendary 👑»).
+ * Item detail entry point. The complete phone design lives in
+ * [DesignedContentDetailScreen] so store browsing and item state handling stay
+ * separated and testable.
  */
 @Composable
 fun ContentDetailScreen(
@@ -700,214 +669,17 @@ fun ContentDetailScreen(
     onOpenSimilar: (ContentItem) -> Unit,
     onOpenCreatorProfile: (String) -> Unit,
 ) {
-    val container = rememberContainer()
-    val context = LocalContext.current
-    val profile by container.state.profile.collectAsState()
-    val signedIn by container.state.signedIn.collectAsState()
-    val scope = rememberCoroutineScope()
-
-    var item by remember { mutableStateOf<ContentItem?>(null) }
-    var creator by remember { mutableStateOf<com.addonstation.mobile.data.model.Profile?>(null) }
-    var similar by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
-    var favourite by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    var unlocked by remember { mutableStateOf(false) }
-
-    val texts = DetailTexts(
-        signIn = stringResource(R.string.msg_sign_in_needed),
-        failed = stringResource(R.string.item_download_failed),
-        noPermission = stringResource(R.string.item_no_permission),
-        fileMissing = stringResource(R.string.item_file_missing),
-        notEnoughAc = stringResource(R.string.ac_not_enough),
-        downloadLimit = stringResource(R.string.plan_download_limit),
-        downloading = stringResource(R.string.item_downloading_plain),
-        fileSavedAt = stringResource(R.string.item_downloading_plain),
+    // Keep the existing navigation contract. Creator rows intentionally open
+    // the creator profile route; onOpenProfile remains for binary/source
+    // compatibility with callers that still pass it.
+    @Suppress("UNUSED_VARIABLE")
+    val preservedProfileRoute = onOpenProfile
+    DesignedContentDetailScreen(
+        itemId = itemId,
+        onBack = onBack,
+        onUpgrade = onUpgrade,
+        onLogin = onLogin,
+        onOpenSimilar = onOpenSimilar,
+        onOpenCreatorProfile = onOpenCreatorProfile,
     )
-    val addedFav = stringResource(R.string.item_added_fav_plain)
-    val removedFav = stringResource(R.string.item_removed_fav)
-
-    LaunchedEffect(itemId) {
-        val loaded = container.content.byId(itemId)
-        item = loaded
-        if (loaded != null) {
-            container.content.recordView(loaded.id)
-            similar = container.content.similar(loaded)
-            creator = loaded.createdBy?.let { container.profile.loadProfile(it) }
-            unlocked = container.ac.unlockedItemIds().contains(loaded.id)
-        }
-        favourite = container.content.isFavorite(itemId)
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.nav_store), onBack = onBack)
-        val current = item
-        if (current == null) {
-            LoadingBox(text = stringResource(R.string.common_loading))
-            return@Column
-        }
-        Column(
-            Modifier
-                .fillMaxSize()
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp),
-        ) {
-            Box {
-                CoverImage(
-                    url = assetUrl(container, current.coverUrl),
-                    radius = 20.dp,
-                    // صفحة العنصر: صورة واحدة على الشاشة ⇒ تُعرض بحركتها كاملة
-                    animate = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(195.dp),
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                        .clip(CircleShape)
-                        .background(AppColors.Gold)
-                        .padding(horizontal = 9.dp, vertical = 3.dp),
-                ) {
-                    Text(planLabelOf(current.plan), style = AppText.tiny, color = AppColors.Bg)
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-            Text(current.title, style = AppText.pageTitle, color = AppColors.Text)
-            Spacer(Modifier.height(4.dp))
-            Text(metaOf(current), style = AppText.bodySmall, color = AppColors.Muted)
-
-            creator?.let { creatorProfile ->
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AvatarImage(url = assetUrl(container, creatorProfile.avatarUrl), size = 34.dp)
-                    Text(
-                        stringResource(R.string.item_by, creatorProfile.username ?: ""),
-                        style = AppText.bodySmall,
-                        color = AppColors.Muted,
-                    )
-                    RankBadge(role = creatorProfile.role, plan = creatorProfile.effectivePlan)
-                    Text(
-                        text = "← " + stringResource(R.string.item_view_plain),
-                        style = AppText.bodySmall,
-                        color = AppColors.Blue,
-                        modifier = Modifier.clickable { onOpenCreatorProfile(creatorProfile.id) },
-                    )
-                }
-            }
-
-            SectionHeader(title = stringResource(R.string.item_description), leadingEmoji = "📝")
-            GlassCard {
-                Text(
-                    current.description?.takeIf { it.isNotBlank() } ?: stringResource(R.string.common_none),
-                    style = AppText.bodySmall,
-                    color = AppColors.Muted,
-                )
-            }
-
-            Spacer(Modifier.height(14.dp))
-            val access = container.content.accessState(
-                item = current,
-                plan = profile?.effectivePlan ?: "free",
-                isOwner = current.createdBy != null && current.createdBy == profile?.id,
-                isAdmin = profile?.role == "admin",
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                when {
-                    !signedIn -> GradientButton(
-                        text = stringResource(R.string.item_download_plain),
-                        onClick = onLogin,
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Filled.FileDownload,
-                    )
-                    access is com.addonstation.mobile.data.repo.AccessState.RequiresEpic -> GradientButton(
-                        text = stringResource(R.string.item_requires_epic_plain),
-                        onClick = onUpgrade,
-                        modifier = Modifier.weight(1f),
-                        colors = listOf(AppColors.Purple, AppColors.Purple.copy(alpha = 0.65f)),
-                        textColor = Color.Black,
-                    )
-                    access is com.addonstation.mobile.data.repo.AccessState.RequiresLegendary -> GradientButton(
-                        text = stringResource(R.string.item_requires_legendary_plain),
-                        onClick = onUpgrade,
-                        modifier = Modifier.weight(1f),
-                        colors = listOf(AppColors.GoldLight, AppColors.GoldDark),
-                        textColor = AppColors.GoldText,
-                    )
-                    else -> GradientButton(
-                        text = if (current.acPrice > 0 && !unlocked)
-                            stringResource(R.string.item_unlock_ac, current.acPrice)
-                        else stringResource(R.string.item_download_plain),
-                        leading = if (current.acPrice > 0 && !unlocked) ({ CoinIcon(size = 18.dp) }) else null,
-                        onClick = {
-                            scope.launch {
-                                busy = true
-                                message = texts.downloading
-                                container.content.download(context, current)
-                                    .onSuccess {
-                                        message = "${texts.downloading} → ${it.file.absolutePath}"
-                                        unlocked = true
-                                        container.profile.refreshWallet()
-                                    }
-                                    .onFailure { e -> message = errorMessageOf(e, texts) }
-                                busy = false
-                            }
-                        },
-                        enabled = !busy,
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Filled.FileDownload,
-                    )
-                }
-                GhostButton(
-                    text = if (favourite) stringResource(R.string.item_saved_plain) else stringResource(R.string.item_save_plain),
-                    onClick = {
-                        scope.launch {
-                            if (container.supabase.session() == null) {
-                                message = texts.signIn
-                                return@launch
-                            }
-                            container.content.toggleFavorite(current.id)
-                                .onSuccess { value ->
-                                    favourite = value
-                                    message = if (value) addedFav else removedFav
-                                }
-                                .onFailure { e -> message = errorMessageOf(e, texts) }
-                        }
-                    },
-                    icon = if (favourite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                )
-            }
-
-            if (busy) {
-                Spacer(Modifier.height(10.dp))
-                LoadingBox(text = stringResource(R.string.item_downloading_plain))
-            }
-            message?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, style = AppText.bodySmall, color = AppColors.Green)
-            }
-
-            SectionHeader(title = stringResource(R.string.item_similar), leadingEmoji = "🧩")
-            if (similar.isEmpty()) {
-                EmptyState(stringResource(R.string.item_no_similar))
-            } else {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(similar, key = { it.id }) { sim ->
-                        com.addonstation.mobile.ui.components.ContentCard(
-                            title = sim.title,
-                            coverUrl = assetUrl(container, sim.coverUrl),
-                            planLabel = planLabelOf(sim.plan),
-                            metaLine = metaOf(sim),
-                            onClick = { onOpenSimilar(sim) },
-                            large = true,
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(96.dp))
-        }
-    }
 }

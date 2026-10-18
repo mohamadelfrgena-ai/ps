@@ -75,6 +75,15 @@ class ConsoleLinkRepository(private val supabase: SupabaseClient) {
         return refreshed
     }
 
+    /** Removes every console visible to the current user; RLS keeps the delete user-scoped. */
+    suspend fun unlinkAllAndReload(): List<LinkedConsole> {
+        if (supabase.session() == null) throw ApiError(ApiErrorKind.NOT_SIGNED_IN)
+        supabase.delete("linked_consoles", "id=not.is.null")
+        val refreshed = linkedConsoles()
+        if (refreshed.isNotEmpty()) throw IllegalStateException("console_unlink_all_failed")
+        return refreshed
+    }
+
     companion object {
         const val CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
         const val CODE_LENGTH = 6
@@ -83,6 +92,7 @@ class ConsoleLinkRepository(private val supabase: SupabaseClient) {
         const val MESSAGE_INVALID_CODE = "invalid_code"
         const val MESSAGE_CODE_NOT_FOUND = "code_not_found"
         const val MESSAGE_CODE_EXPIRED = "code_expired"
+        const val MESSAGE_TOO_MANY_ATTEMPTS = "too_many_attempts"
 
         /** إزالة الفراغات والشرطات وتوحيد حالة الأحرف قبل التحقق أو الإرسال. */
         fun normalizeCode(input: String): String = input

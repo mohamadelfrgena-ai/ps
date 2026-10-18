@@ -77,8 +77,9 @@ if not re.search(r"animate:\s*Boolean\s*=\s*false", common):
 
 # 4) المعاينات المفردة تُبقي الحركة
 store = read(os.path.join(SRC, "ui", "store", "StoreScreens.kt"))
-if not re.search(r"animate\s*=\s*true", strip_comments(store)):
-    problems.append("ui/store/StoreScreens.kt: صفحة العنصر لم تعد تعرض الصورة بحركتها (animate = true)")
+store_design = read(os.path.join(SRC, "ui", "store", "StorePhoneDesign.kt"))
+if not re.search(r"animate\s*=\s*true", strip_comments(store + "\n" + store_design)):
+    problems.append("ui/store: صفحة العنصر لم تعد تعرض الصورة بحركتها (animate = true)")
 
 profile = read(os.path.join(SRC, "ui", "profile", "ProfileScreens.kt"))
 # بانر الملف الشخصي في وثيقة AddonStation_profiles صار في مكوّن مشترك
