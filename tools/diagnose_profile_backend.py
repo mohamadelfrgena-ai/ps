@@ -165,8 +165,23 @@ def main() -> int:
         except Exception:
             users = []
         auth_ids = {str(user.get("id")) for user in users if isinstance(user, dict) and user.get("id")}
+        # Prefer the server-side base table when available. New opaque server
+        # keys may be accepted by Auth Admin while PostgREST still maps them to
+        # a role without base-table grants; the public safe view is authoritative
+        # enough for this existence-only comparison and exposes no row values.
+        if 200 <= server_profiles.status < 300:
+            comparable_ids = profile_ids
+            comparison_source = "profiles"
+        else:
+            comparable_ids = {
+                str(row.get("id")) for row in public_view_rows if row.get("id")
+            }
+            comparison_source = "visible_profiles"
         print(f"Auth users sampled: {len(auth_ids)}")
-        print(f"Auth users missing a profile row: {len(auth_ids - profile_ids)}")
+        print(
+            "Auth users missing a profile row: "
+            f"{len(auth_ids - comparable_ids)} (source={comparison_source})"
+        )
     else:
         print(f"Auth users comparison: HTTP {auth_response.status}; {safe_error(auth_response.body)}")
 
