@@ -183,6 +183,24 @@ jobs:
             exit "$code"
           fi
 
+      # Artifact storage can temporarily reach its GitHub quota. Keep the APK
+      # deliverable available by recording the successful build directly on the
+      # current session branch before optional artifact uploads run.
+      - name: Record freshly built APK in the branch
+        if: success()
+        run: |
+          set -euo pipefail
+          APK=$(find android/app/build/outputs/apk/debug -maxdepth 1 -name "*.apk" | head -1)
+          [ -n "$APK" ] || { echo "::error::Built APK was not found"; exit 1; }
+          cp "$APK" apk-debug.apk
+          sha256sum apk-debug.apk
+          ls -lh apk-debug.apk
+          git config user.name "AddonStation CI"
+          git config user.email "ci@users.noreply.github.com"
+          git add -f apk-debug.apk
+          git commit -m "APK: debug build $(date -u +%Y-%m-%dT%H:%MZ) ($(du -h apk-debug.apk | cut -f1))"
+          git push origin HEAD:${{ github.ref_name }}
+
       - name: نشر قائمة الأخطاء كتعليق على العمولة
         if: failure()
         env:
@@ -206,6 +224,7 @@ jobs:
 
       - name: Upload build log
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: gradle-build-log
@@ -214,6 +233,7 @@ jobs:
 
       - name: Upload APK
         if: success()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: addonstation-debug-apk
