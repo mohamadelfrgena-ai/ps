@@ -15,9 +15,7 @@ import com.addonstation.mobile.data.model.ProfileStats
 import com.addonstation.mobile.data.model.SiteAsset
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -33,6 +31,15 @@ class ProfileRepository(
 
     private val uid: String? get() = supabase.session()?.userId
     private val refreshMutex = Mutex()
+
+    /**
+     * 40_admin_asset_privacy يسحب القراءة المباشرة من profiles ويقدّم هذا العرض.
+     * الرجوع المؤقت يبقي التطبيق عاملاً إلى أن يُنشر SQL، ثم ينقّح AppState القيم
+     * المعروفة دفاعياً كي لا تظهر أصول admin أثناء فترة الانتقال.
+     */
+    private suspend fun selectProfiles(query: String): JsonElement =
+        runCatching { supabase.select("visible_profiles", query) }
+            .getOrElse { supabase.select("profiles", query) }
 
     // ------------------------------------------------------------------ قراءة
 
@@ -73,8 +80,8 @@ class ProfileRepository(
 
     suspend fun loadProfile(userId: String): Profile? = withContext(Dispatchers.IO) {
         supabase.decodeOne<Profile>(
-            supabase.select("profiles", "select=*&id=eq.$userId&limit=1")
-        )
+            selectProfiles("select=*&id=eq.$userId&limit=1")
+        )?.let(state::redactAdminAssets)
     }
 
     suspend fun loadProfiles(ids: Collection<String>): Map<String, Profile> = withContext(Dispatchers.IO) {
@@ -82,8 +89,8 @@ class ProfileRepository(
         val list = ids.distinct().chunked(60).flatMap { chunk ->
             val filter = chunk.joinToString(",")
             supabase.decodeList<Profile>(
-                supabase.select("profiles", "select=*&id=in.($filter)")
-            )
+                selectProfiles("select=*&id=in.($filter)")
+            ).map(state::redactAdminAssets)
         }
         list.associateBy { it.id }
     }
@@ -110,21 +117,18 @@ class ProfileRepository(
     suspend fun searchUsers(query: String, limit: Int = 30): List<Profile> {
         val q = query.trim()
         val filter = if (q.isBlank()) "" else "&or=(username.ilike.*$q*,display_name.ilike.*$q*)"
-        return supabase.decodeList(
-            supabase.select("profiles", "select=*&order=created_at.desc&limit=$limit$filter")
-        )
+        return supabase.decodeList<Profile>(
+            selectProfiles("select=*&order=created_at.desc&limit=$limit$filter")
+        ).map(state::redactAdminAssets)
     }
 
     /** مبدعون منشور لهم محتوى (يُستخدم في شاشة المبدعين وقسم "أفضل المبدعين"). */
     suspend fun creators(query: String = "", limit: Int = 30): List<Profile> {
         val q = query.trim()
         val filter = if (q.isBlank()) "" else "&username=ilike.*$q*"
-        return supabase.decodeList(
-            supabase.select(
-                "profiles",
-                "select=*&role=eq.creator$filter&order=user_level.desc&limit=$limit",
-            )
-        )
+        return supabase.decodeList<Profile>(
+            selectProfiles("select=*&role=eq.creator$filter&order=user_level.desc&limit=$limit")
+        ).map(state::redactAdminAssets)
     }
 
     suspend fun featuredCreatorIds(): List<String> = supabase.decodeList<com.addonstation.mobile.data.model.FeaturedCreator>(
@@ -197,15 +201,8 @@ class ProfileRepository(
         Unit
     }
 
-    suspend fun setEquippedItem(itemId: String?): Result<Unit> = runCatching {
-        val id = uid ?: return@runCatching
-        supabase.update(
-            "profiles",
-            "id=eq.$id",
-            buildJsonObject { put("equipped_item_id", itemId?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull) },
-        )
-        Unit
-    }
+    suspend fun setEquippedItem(itemId: String?): Result<Unit> =
+        setProfileAsset("item", itemId ?: "none")
 
     /** RPCs return HTTP 200 for business-rule failures, so turn `{ ok: false }` into a Result failure. */
     private fun requireRpcSuccess(response: JsonElement?) {
@@ -285,11 +282,12 @@ class ProfileRepository(
             supabase.select("site_assets", "select=*&enabled=eq.true&order=sort_order.asc")
         )
         state.setSiteAssets(list)
-        return list
+        return state.visibleAssets(list)
     }
 
     fun canUseAsset(requiredPlan: String, profile: Profile?): Boolean =
-        planRank(requiredPlan) <= planRank(profile?.effectivePlan ?: "free")
+        if (requiredPlan.equals("admin", ignoreCase = true)) profile?.role == "admin"
+        else planRank(requiredPlan) <= planRank(profile?.effectivePlan ?: "free")
 
     /** ترتيب الخطط للمقارنة: free < epic < legendary. */
     fun planRank(plan: String?): Int = when (plan) {

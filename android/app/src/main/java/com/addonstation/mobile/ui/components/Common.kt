@@ -330,6 +330,13 @@ fun roomIconRes(channelId: String): Int = when (channelId) {
 private val missingThumbUrls: MutableSet<String> =
     java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
+/** الرمز الموقّع خاص بمسار واحد؛ لا يجوز إلحاق .thumb.jpg به لمسار آخر. */
+private fun assetThumbUrl(url: String?, animate: Boolean = false): String? {
+    if (url.isNullOrBlank() || animate || !url.contains(".gif", ignoreCase = true)) return null
+    if (url.contains("/object/sign/admin-assets/", ignoreCase = true)) return null
+    return "$url.thumb.jpg"
+}
+
 private val ASSET_FREE_DEFAULT = listOf("profiles/profiles/onefree.png", "profiles/onefree.png")
 private val ASSET_AUTH_DEFAULT = listOf("profiles/profiles/default-profile.jpg")
 
@@ -469,9 +476,7 @@ fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier, animate: B
             //
             // animate = true (الغلاف المختار في المعاينة) يُبقي GIF متحرّكاً: صورة
             // واحدة فقط على الشاشة فلا خطر على الذاكرة.
-            val thumb = remember(url, animate) {
-                if (!animate && url.contains(".gif", ignoreCase = true)) "$url.thumb.jpg" else null
-            }
+            val thumb = remember(url, animate) { assetThumbUrl(url, animate) }
             // غياب اللقطة يُسجَّل في ذاكرة الجلسة (لا تُفقد مع إعادة تدوير الخلية)
             var thumbFailed by remember(url, animate) {
                 mutableStateOf(thumb == null || thumb in missingThumbUrls)
@@ -521,9 +526,7 @@ fun BannerThumb(
             .background(AppColors.Elevated2),
     ) {
         if (!url.isNullOrBlank()) {
-            val thumb = remember(url, animate) {
-                if (!animate && url.contains(".gif", ignoreCase = true)) "$url.thumb.jpg" else null
-            }
+            val thumb = remember(url, animate) { assetThumbUrl(url, animate) }
             var thumbFailed by remember(url, animate) {
                 mutableStateOf(thumb == null || thumb in missingThumbUrls)
             }
@@ -611,9 +614,7 @@ fun CoverImage(
     animate: Boolean = false,
     backgroundColor: Color = AppColors.Elevated2,
 ) {
-    val thumbCandidate = remember(url, animate) {
-        if (url?.contains(".gif", ignoreCase = true) == true) "$url.thumb.jpg" else null
-    }
+    val thumbCandidate = remember(url, animate) { assetThumbUrl(url) }
     // غياب اللقطة يُسجَّل في ذاكرة الجلسة (لا تُفقد مع إعادة تدوير الخلية)
     var thumbMissing by remember(url) {
         mutableStateOf(thumbCandidate == null || thumbCandidate in missingThumbUrls)

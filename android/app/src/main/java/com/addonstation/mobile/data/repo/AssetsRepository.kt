@@ -1,7 +1,10 @@
 package com.addonstation.mobile.data.repo
 
+import com.addonstation.mobile.data.ADMIN_ASSETS_BUCKET
+import com.addonstation.mobile.data.ADMIN_PRIVATE_PREFIX
 import com.addonstation.mobile.data.AppState
 import com.addonstation.mobile.data.SupabaseClient
+import com.addonstation.mobile.data.isPrivateAdminAssetPath
 import com.addonstation.mobile.data.model.SiteAsset
 import com.addonstation.mobile.util.shrinkImageBytes
 import com.addonstation.mobile.data.model.StickerPack
@@ -12,12 +15,26 @@ import kotlinx.serialization.json.put
 
 /**
  * إدارة الأصول من لوحة الإدارة: أفاتارات، بانرات، ملصقات وحزمها، وأدوات الشات.
- * الملفات تُرفع إلى مخزن site-assets العام، والسجلات في جدول site_assets.
+ * الأصول العادية في site-assets العام، وأصول required_plan=admin في admin-assets الخاص.
  */
 class AssetsRepository(
     private val supabase: SupabaseClient,
     private val state: AppState,
 ) {
+
+    /** يجهّز روابط قصيرة العمر للملفات الخاصة؛ سياسة Storage ترفضها لغير admin. */
+    private suspend fun refreshPrivateUrls(assets: List<SiteAsset>, replace: Boolean = false) {
+        val resolved = buildMap {
+            assets.asSequence()
+                .filter { isPrivateAdminAssetPath(it.fileUrl) }
+                .forEach { asset ->
+                    runCatching {
+                        supabase.signedUrl(ADMIN_ASSETS_BUCKET, asset.fileUrl.trimStart('/'), 3_600)
+                    }.getOrNull()?.let { put(asset.fileUrl.trimStart('/'), it) }
+                }
+        }
+        state.setPrivateAssetUrls(resolved, replace = replace)
+    }
 
     suspend fun all(): List<SiteAsset> = runCatching {
         val assets = runCatching {
@@ -30,6 +47,7 @@ class AssetsRepository(
                 supabase.select("site_assets", "select=*&order=sort_order.asc&limit=1000")
             )
         }
+        refreshPrivateUrls(assets, replace = true)
         state.setSiteAssets(assets)
         assets
     }.getOrElse { emptyList() }
@@ -41,7 +59,9 @@ class AssetsRepository(
     private val typeCache = mutableMapOf<String, List<SiteAsset>>()
 
     suspend fun byType(type: String): List<SiteAsset> {
-        synchronized(typeCache) { typeCache[type] }?.let { if (it.isNotEmpty()) return it }
+        synchronized(typeCache) { typeCache[type] }?.let {
+            if (it.isNotEmpty()) return state.visibleAssets(it)
+        }
         // على خيط الشبكة: كان الفكّ يجري على خيط الواجهة فيجمّد الشاشة عند فتح القائمة
         return withContext(Dispatchers.IO) {
             val list = runCatching {
@@ -65,8 +85,9 @@ class AssetsRepository(
                     )
                 }
             }.getOrElse { emptyList() }
+            refreshPrivateUrls(list)
             if (list.isNotEmpty()) synchronized(typeCache) { typeCache[type] = list }
-            list
+            state.visibleAssets(list)
         }
     }
 
@@ -88,10 +109,17 @@ class AssetsRepository(
             var done = 0
             for (asset in list) {
                 val path = cfg.normalizeStoragePath(asset.fileUrl)
+                val privateAdmin = isPrivateAdminAssetPath(path)
+                val bucket = if (privateAdmin) ADMIN_ASSETS_BUCKET else "site-assets"
                 val lower = path.lowercase()
                 if (lower.endsWith(".svg")) continue
                 val original = runCatching {
-                    supabase.downloadBytes(cfg.publicUrl("site-assets", asset.fileUrl))
+                    val sourceUrl = if (privateAdmin) {
+                        supabase.signedUrl(bucket, path, 3_600)
+                    } else {
+                        cfg.publicUrl(bucket, path)
+                    }
+                    supabase.downloadBytes(sourceUrl)
                 }.getOrNull() ?: continue
                 // **المتحرّكة (GIF)**: لا نلمس الأصل (حركته مرغوبة)، بل نولّد لقطة
                 // ثابتة بجانبه بنفس المسار + ‎.thumb.jpg‎ تستعملها شبكة الأصول،
@@ -100,7 +128,7 @@ class AssetsRepository(
                     val frame = shrinkImageBytes(original, maxSide = 384, jpegQuality = 82, forceJpeg = true)
                     if (frame != null) {
                         runCatching {
-                            supabase.upload("site-assets", "$path.thumb.jpg", frame.bytes, "image/jpeg", upsert = true)
+                            supabase.upload(bucket, "$path.thumb.jpg", frame.bytes, "image/jpeg", upsert = true)
                         }.onSuccess { done++ }
                     }
                     continue
@@ -116,7 +144,7 @@ class AssetsRepository(
                     continue
                 }
                 val ok = runCatching {
-                    supabase.upload("site-assets", path, shrunk.bytes, shrunk.mime, upsert = true)
+                    supabase.upload(bucket, path, shrunk.bytes, shrunk.mime, upsert = true)
                 }.isSuccess
                 if (ok) done++
             }
@@ -150,8 +178,11 @@ class AssetsRepository(
                 "item" -> "items"
                 else -> "misc"
             }
-            val path = "$folder/${System.currentTimeMillis()}-$fileName"
-            supabase.upload("site-assets", path, bytes, mime)
+            val privateAdmin = requiredPlan.equals("admin", ignoreCase = true)
+            val relativePath = "$folder/${System.currentTimeMillis()}-$fileName"
+            val path = if (privateAdmin) "$ADMIN_PRIVATE_PREFIX$relativePath" else relativePath
+            val bucket = if (privateAdmin) ADMIN_ASSETS_BUCKET else "site-assets"
+            supabase.upload(bucket, path, bytes, mime)
             val body = buildJsonObject {
                 put("asset_type", assetType)
                 put("name", name)
@@ -162,6 +193,12 @@ class AssetsRepository(
                 if (packId != null) put("sticker_pack", packId)
             }
             supabase.insert("site_assets", body)
+            synchronized(typeCache) { typeCache.remove(assetType) }
+            if (privateAdmin) {
+                runCatching { supabase.signedUrl(bucket, path, 3_600) }.getOrNull()?.let {
+                    state.setPrivateAssetUrls(mapOf(path to it), replace = false)
+                }
+            }
             path
         }
     }
@@ -203,11 +240,18 @@ class AssetsRepository(
 
     suspend fun setRequiredPlan(asset: SiteAsset, plan: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
+            // تبديل أصل عام إلى admin (أو العكس) يحتاج نقل بايتات بين المخزنين؛
+            // لا نغيّر الوسم وحده حتى لا يبقى ملف خاص في رابط عام.
+            val wantsAdmin = plan.equals("admin", ignoreCase = true)
+            require(wantsAdmin == isPrivateAdminAssetPath(asset.fileUrl)) {
+                "admin_asset_storage_mismatch"
+            }
             supabase.update(
                 "site_assets",
                 "id=eq.${asset.id}",
                 buildJsonObject { put("required_plan", plan) },
             )
+            synchronized(typeCache) { typeCache.remove(asset.assetType) }
             Unit
         }
     }

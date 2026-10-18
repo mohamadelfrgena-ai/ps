@@ -45,7 +45,7 @@ class AppContainer(context: Context) {
 
     /** الإشعارات الفورية: تسجيل الجهاز · التفضيلات · إشعار تجريبي · نبضة الحضور. */
     val push = PushRepository(supabase)
-    val creators = CreatorRepository(supabase)
+    val creators = CreatorRepository(supabase, state)
     val admin = AdminRepository(supabase)
     val assets = AssetsRepository(supabase, state)
 
@@ -66,12 +66,18 @@ class AppContainer(context: Context) {
 
     fun currentConfig(): SupabaseConfig? = config
 
-    /** رابط عام لملف داخل مخزن site-assets (الصور الرمزية والأغلفة والأدوات والملصقات). */
+    /**
+     * رابط أصل واجهة. الأصول العادية من site-assets العام؛ أما المسار المحجوز
+     * admin-private/ فلا يُرجع إلا رابطاً موقّعاً سبق أن حصل عليه حساب admin.
+     */
     fun siteAssetUrl(path: String?): String? {
         if (path.isNullOrBlank()) return null
+        val clean = path.trim().trimStart('/')
+        if (!state.isAdmin && state.isAdminOnlyAssetValue(clean)) return null
         if (path.startsWith("http://") || path.startsWith("https://")) return path
+        if (isPrivateAdminAssetPath(clean)) return state.privateAssetUrl(clean)
         val cfg = config ?: return null
-        return cfg.publicUrl("site-assets", path)
+        return cfg.publicUrl("site-assets", clean)
     }
 }
 
