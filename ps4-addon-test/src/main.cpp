@@ -890,6 +890,7 @@ int main(int, char**) {
     SDL_Event ev;
     int lastSig = -1;
     bool lastToastVisible = false;
+    bool frameDirty = true;   // first frame must present
     long long frameCount = 0;
 
     while (running) {
@@ -1115,13 +1116,19 @@ int main(int, char**) {
             }
             lastSig = sig;
             lastToastVisible = toastVisible;
+            frameDirty = true;
         }
 
-        engine.present(windowSurface);
-        SDL_RenderPresent(renderer);
-        SDL_UpdateWindowSurface(window);
+        // Present ONLY when the frame actually changed — idle frames cost nothing
+        // (PS-menu feel: controller polls fast, CPU stays quiet).
+        if (frameDirty) {
+            engine.present(windowSurface);
+            SDL_RenderPresent(renderer);
+            SDL_UpdateWindowSurface(window);
+            frameDirty = false;
+        }
         ++frameCount;
-        SDL_Delay(16);
+        SDL_Delay(8);   // 120Hz command polling -> snappy navigation
     }
 
     state.installing.store(true);

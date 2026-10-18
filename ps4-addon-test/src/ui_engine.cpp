@@ -831,7 +831,7 @@ void UiEngine::drawImageCropped(const std::string& name,
                             "|" + std::to_string(w) + "x" + std::to_string(h);
     auto sc = scaledCache_.find(key);
     if (sc == scaledCache_.end()) {
-        if (scaledCache_.size() > 40) scaledCache_.clear();
+        if (scaledCache_.size() > 160) scaledCache_.clear();
         ScaledImage built;
         built.w = w;
         built.h = h;
@@ -1293,9 +1293,17 @@ void UiEngine::present(SDL_Surface* windowSurface) {
     const int copyW = std::min(kWidth, windowSurface->w);
     const int copyH = std::min(kHeight, windowSurface->h);
 
+    // FAST PATH: window already in0xAARRGGBB byte layout (B,G,R,A) like fb_ -> row copies
+    const bool argbMatch = (fmt->Rmask == 0x00FF0000u && fmt->Gmask == 0x0000FF00u &&
+                            fmt->Bmask == 0x000000FFu);
+
     for (int y = 0; y < copyH; ++y) {
         const std::uint32_t* srcRow = &fb_[static_cast<std::size_t>(y) * kWidth];
         Uint8* dstRow = dstBase + static_cast<std::size_t>(y) * pitch;
+        if (argbMatch) {
+            std::memcpy(dstRow, srcRow, static_cast<std::size_t>(copyW) * 4);
+            continue;
+        }
         for (int x = 0; x < copyW; ++x) {
             const std::uint32_t px = srcRow[x];
             const Uint8 r = static_cast<Uint8>((px >> 16) & 0xFF);
