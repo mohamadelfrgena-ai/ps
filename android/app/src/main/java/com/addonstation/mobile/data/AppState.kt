@@ -159,7 +159,7 @@ class AppState(private val container: AppContainer) {
     val loadError: StateFlow<ApiError?> = _loadError.asStateFlow()
 
     val currentProfile: Profile? get() = _profile.value
-    val currentUserId: String? get() = container.supabase.session()?.userId
+    val currentUserId: String? get() = container.supabase.currentUserId()
     val isAdmin: Boolean get() = _profile.value?.role == "admin"
 
     fun setProfile(value: Profile?) {

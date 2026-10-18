@@ -29,42 +29,38 @@ class ProfileRepository(
     private val state: AppState,
 ) {
 
-    private val uid: String? get() = supabase.session()?.userId
+    private val uid: String? get() = supabase.currentUserId()
     private val refreshMutex = Mutex()
 
     /**
-     * 40_admin_asset_privacy يسحب القراءة المباشرة من profiles ويقدّم هذا العرض.
-     * ملفات الأعضاء العامة تفضّل العرض الآمن، مع رجوع مؤقت للقاعدة القديمة إلى
-     * أن يُنشر SQL؛ ثم ينقّح AppState القيم المعروفة دفاعياً أثناء فترة الانتقال.
+     * `visible_profiles` is intentionally readable with the publishable key and
+     * already redacts private admin assets. Read it anonymously first so an
+     * expired/invalid user JWT cannot turn a public profile into the generic
+     * Network error screen. This is also the exact access path verified against
+     * the live backend by the read-only profile diagnostic.
+     *
+     * Older servers may not have the view yet, so the remaining attempts keep
+     * backward compatibility. Cancellation is never swallowed.
      */
-    private suspend fun selectProfiles(query: String): JsonElement = try {
-        supabase.select("visible_profiles", query)
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (_: Throwable) {
-        supabase.select("profiles", query)
-    }
-
-    /**
-     * ملف صاحب الجلسة مسار توافق مستقل: إصدارات الخادم الحالية تسمح بقراءته
-     * من profiles، بينما 40_admin_asset_privacy ينقل القراءة إلى visible_profiles.
-     * البدء بالمسار الحالي يعيد فتح «ملفي» فوراً ولا يجعل غياب العرض الجديد
-     * يحبس الشاشة خلف Network error / Retry؛ وبعد نشر 40 يعمل الرجوع الآمن.
-     * الاستعلام مقيّد دائماً بمعرّف صاحب الجلسة، فلا يوسّع قراءة ملفات الآخرين.
-     */
-    private suspend fun selectOwnProfile(query: String): JsonElement = try {
-        supabase.select("profiles", query)
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (baseError: Throwable) {
-        try {
-            supabase.select("visible_profiles", query)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (viewError: Throwable) {
-            viewError.addSuppressed(baseError)
-            throw viewError
+    private suspend fun selectProfiles(query: String): JsonElement {
+        val sessionToken = supabase.session()?.accessToken?.takeIf(String::isNotBlank)
+        val sources = listOf(
+            "visible_profiles" to null,
+            "visible_profiles" to sessionToken,
+            "profiles" to sessionToken,
+            "profiles" to null,
+        ).distinct()
+        var lastError: Throwable? = null
+        for ((table, token) in sources) {
+            try {
+                return supabase.select(table, query, token = token)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                lastError = error
+            }
         }
+        throw lastError ?: IllegalStateException("profile_source_unavailable")
     }
 
     // ------------------------------------------------------------------ قراءة
@@ -106,8 +102,7 @@ class ProfileRepository(
 
     suspend fun loadProfile(userId: String): Profile? = withContext(Dispatchers.IO) {
         val query = "select=*&id=eq.$userId&limit=1"
-        val rows = if (userId == uid) selectOwnProfile(query) else selectProfiles(query)
-        supabase.decodeOne<Profile>(rows)?.let(state::redactAdminAssets)
+        supabase.decodeOne<Profile>(selectProfiles(query))?.let(state::redactAdminAssets)
     }
 
     suspend fun loadProfiles(ids: Collection<String>): Map<String, Profile> = withContext(Dispatchers.IO) {

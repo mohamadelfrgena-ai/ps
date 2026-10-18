@@ -63,6 +63,20 @@ class SupabaseClient(
 
     fun session(): Session? = sessionStore.current()
 
+    /**
+     * Stable account id for profile reads. Very old/recovery-created local
+     * sessions can contain a blank stored userId even though the access JWT has
+     * a valid `sub`; recover it locally without sending or exposing the token.
+     */
+    fun currentUserId(): String? {
+        val current = sessionStore.current() ?: return null
+        return current.userId.trim().takeIf(String::isNotBlank)
+            ?: jwtClaims(current.accessToken)
+                ?.get("sub")
+                ?.jsonPrimitive
+                ?.contentOrNull()
+    }
+
     fun isSignedIn(): Boolean = sessionStore.current() != null
 
     // ------------------------------------------------------------------ Auth
