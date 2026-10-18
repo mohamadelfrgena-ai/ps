@@ -99,13 +99,37 @@ def probe_table(base: str, key: str, table: str, label: str) -> tuple[Response, 
     return response, rows
 
 
+def build_defaults() -> dict[str, str]:
+    """Read the public build defaults when equivalent Actions secrets are absent."""
+    values: dict[str, str] = {}
+    path = os.path.join("android", "gradle.properties")
+    try:
+        with open(path, encoding="utf-8") as source:
+            for raw_line in source:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                name, value = line.split("=", 1)
+                values[name.strip()] = value.strip()
+    except OSError:
+        pass
+    return values
+
+
 def main() -> int:
-    base = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
-    public_key = os.environ.get("SUPABASE_PUBLIC_KEY", "").strip()
+    defaults = build_defaults()
+    base = (
+        os.environ.get("SUPABASE_URL", "").strip()
+        or defaults.get("ADDONSTATION_SUPABASE_URL", "")
+    ).rstrip("/")
+    public_key = (
+        os.environ.get("SUPABASE_PUBLIC_KEY", "").strip()
+        or defaults.get("ADDONSTATION_SUPABASE_ANON_KEY", "")
+    )
     secret_key = os.environ.get("SUPABASE_SECRET_KEY", "").strip()
 
     if not base or not public_key:
-        print("ERROR: SUPABASE_URL or SUPABASE_PUBLIC_KEY is missing.")
+        print("ERROR: Supabase public build configuration is missing.")
         return 2
 
     print("Profile backend diagnostic (read-only; aggregate output only)")
