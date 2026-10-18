@@ -45,7 +45,8 @@ const char* kLangCodes[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
 
 enum class Screen {
     Welcome, CodeLink, Email, Language,
-    Home, Deals, Store, Settings, Detail, Confirm
+    Home, Deals, Store, Settings, Detail, Confirm,
+    Search, Profile, Wallet, Plans
 };
 
 struct AppState {
@@ -66,6 +67,14 @@ struct AppState {
     std::string pollToken;
     bool haveSession = false;
     std::string sessionName;
+    std::string sessionPlan;
+    long sessionAc = 0;
+
+    // v2 screens (search / profile / wallet / plans / triangle menu)
+    std::string searchQuery;
+    int searchFilter = 0;
+    bool menuOpen = false;
+    int menuFocus = 0;
 
     // محتوى Supabase المرتبط (بانرات + عناصر منشورة)
     std::vector<pkgtest::BannerData> banners;
@@ -97,6 +106,34 @@ const char* kHomeChips[7] = {"All", "Addons", "Worlds", "Free", "Epic", "Legenda
 const char* kStoreFilters[3] = {"Addons", "Worlds", "Newest"};
 const char* kDealsChips[5] = {"All", "Addons", "Worlds", "Under 100 AC", "Biggest discount"};
 
+std::string toLowerCopy(const std::string& v) {
+    std::string o;
+    for (unsigned char c : v) o += static_cast<char>(std::tolower(c));
+    return o;
+}
+
+int planIndexFrom(const std::string& plan) {
+    if (plan == "epic") return 1;
+    if (plan == "legendary") return 2;
+    return 0;
+}
+
+// indices into state.items matching the search query + filter chip (All/Addons/Worlds)
+std::vector<int> searchMatchIdx(const std::vector<pkgtest::ItemData>& items,
+                                const std::string& query, int filterIndex) {
+    std::vector<int> out;
+    const std::string q = toLowerCopy(query);
+    for (int i = 0; i < static_cast<int>(items.size()) && static_cast<int>(out.size()) < 5; ++i) {
+        const pkgtest::ItemData& it = items[i];
+        const bool isWorld = (it.contentType == "world" || it.contentType == "map");
+        if (filterIndex == 1 && isWorld) continue;
+        if (filterIndex == 2 && !isWorld) continue;
+        if (!q.empty() && toLowerCopy(it.title).find(q) == std::string::npos) continue;
+        out.push_back(i);
+    }
+    return out;
+}
+
 std::string makeCode() {
     static const char* alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     std::string c;
@@ -127,6 +164,8 @@ int frameSignature(const AppState& s, double t) {
     sig += s.heroIndex * 31337 + s.filterIndex * 2711 +
            s.storeFilter * 397 + s.dealsFilter * 53 +
            (s.autoLaunch ? 31 : 0) +
+           (s.menuOpen ? 101 : 0) + s.searchFilter * 37 +
+           static_cast<int>(s.searchQuery.size()) * 11 +
            s.contentStamp * 7919;
     return sig;
 }
@@ -183,6 +222,8 @@ int main(int, char**) {
         if (sess.valid) {
             state.haveSession = true;
             state.sessionName = sess.displayName.empty() ? sess.username : sess.displayName;
+            state.sessionPlan = sess.plan;
+            state.sessionAc = sess.acBalance;
         }
     }
 
@@ -276,6 +317,8 @@ int main(int, char**) {
                     state.linked = true;
                     state.haveSession = true;
                     state.sessionName = name;
+                    state.sessionPlan = s.plan;
+                    state.sessionAc = s.acBalance;
                 }
                 toast(pkgtest::tr("link_linked", currentLang()));
             } else if (status == "expired") {
@@ -346,6 +389,15 @@ int main(int, char**) {
                 break;
             }
             ++n;
+        }
+    };
+    auto selectDetailAbs = [&state](int absIdx) {
+        std::lock_guard<std::mutex> lk(gLinkMx);
+        state.detailItemId.clear();
+        state.detailTitle.clear();
+        if (absIdx >= 0 && absIdx < static_cast<int>(state.items.size())) {
+            state.detailItemId = state.items[absIdx].id;
+            state.detailTitle = state.items[absIdx].title;
         }
     };
 
@@ -515,6 +567,7 @@ int main(int, char**) {
     // ---- input helpers -------------------------------------------------
     // Joystick map (as used by the working v0.5 app): 0=✕ 1=○ 2=□ 3=△ 4=L1 5=R1 6=L2 7=R2
     auto back = [&]() {
+        if (state.menuOpen) { state.menuOpen = false; return; }
         switch (state.screen) {
             case Screen::Welcome: break;  // stay (guest entry screen)
             case Screen::CodeLink: go(Screen::Welcome); break;
@@ -526,13 +579,27 @@ int main(int, char**) {
             case Screen::Settings:
                 go(Screen::Welcome);
                 break;
-            case Screen::Detail: go(state.tabScreen); break;
+            case Screen::Detail: go(state.prevScreen == Screen::Detail ? state.tabScreen : state.prevScreen); break;
+            case Screen::Search:
+            case Screen::Profile:
+            case Screen::Wallet:
+            case Screen::Plans:
+                go(state.prevScreen == state.screen ? Screen::Home : state.prevScreen);
+                break;
             case Screen::Confirm: go(Screen::Settings); break;
         }
     };
 
     auto activate = [&](int cross) {
         (void)cross;
+        if (state.menuOpen) {
+            state.menuOpen = false;
+            if (state.menuFocus == 0) go(Screen::Profile);
+            else if (state.menuFocus == 1) go(Screen::Wallet);
+            else if (state.menuFocus == 2) go(Screen::Plans);
+            else go(Screen::Search);
+            return;
+        }
         switch (state.screen) {
             case Screen::Welcome:
                 if (state.focus == 0) { requestNewCode(); go(Screen::CodeLink); }
@@ -579,6 +646,8 @@ int main(int, char**) {
                                 std::lock_guard<std::mutex> lk(gLinkMx);
                                 state.haveSession = true;
                                 state.sessionName = auth.displayName;
+                                state.sessionPlan = "free";
+                                state.sessionAc = 0;
                             }
                             state.emailError = false;
                             state.tabScreen = Screen::Home;
@@ -639,6 +708,36 @@ int main(int, char**) {
             case Screen::Detail:
                 triggerInstall();
                 break;
+            case Screen::Search: {
+                if (state.focus == 0) {
+                    const std::string q = pkgtest::openImeDialog("Search", state.searchQuery, 80);
+                    if (!q.empty()) state.searchQuery = q;
+                } else if (state.focus <= 3) {
+                    state.searchFilter = state.focus - 1;
+                    toast(std::string("Filter: ") + (state.searchFilter == 0 ? "All" :
+                          (state.searchFilter == 1 ? "Addons" : "Worlds")));
+                } else {
+                    std::vector<int> hits;
+                    {
+                        std::lock_guard<std::mutex> lk(gLinkMx);
+                        hits = searchMatchIdx(state.items, state.searchQuery, state.searchFilter);
+                    }
+                    const int j = state.focus - 4;
+                    if (j < static_cast<int>(hits.size())) {
+                        selectDetailAbs(hits[j]);
+                        go(Screen::Detail);
+                    }
+                }
+                break;
+            }
+            case Screen::Profile:
+                if (state.focus == 0) go(Screen::Wallet);
+                else if (state.focus == 1) go(Screen::Plans);
+                else { state.tabScreen = Screen::Settings; go(Screen::Settings); }
+                break;
+            case Screen::Wallet:
+            case Screen::Plans:
+                break;  // view-only screens
             case Screen::Confirm:
                 if (state.focus == 0) go(Screen::Settings);
                 else {
@@ -650,6 +749,8 @@ int main(int, char**) {
                         std::lock_guard<std::mutex> lk(gLinkMx);
                         state.haveSession = false;
                         state.sessionName.clear();
+                        state.sessionPlan.clear();
+                        state.sessionAc = 0;
                         state.linked = false;
                         state.pollToken.clear();
                     }
@@ -660,6 +761,10 @@ int main(int, char**) {
     };
 
     auto moveFocus = [&](int dx, int dy) {
+        if (state.menuOpen) {
+            if (dy != 0) state.menuFocus = (state.menuFocus + (dy > 0 ? 1 : 3)) % 4;
+            return;
+        }
         switch (state.screen) {
             case Screen::Welcome: {
                 if (dy != 0) state.focus = (state.focus + (dy > 0 ? 1 : 2)) % 3;
@@ -726,6 +831,32 @@ int main(int, char**) {
                 if (dy != 0) state.focus = 1 - state.focus;
                 break;
             }
+            case Screen::Search: {
+                // rows: field[0] | filter chips[1-3] | result cards[4-8]
+                if (dy != 0) {
+                    int row = (state.focus == 0) ? 0 : (state.focus <= 3 ? 1 : 2);
+                    row = std::max(0, std::min(2, row + dy));
+                    if (row == 0) state.focus = 0;
+                    else if (row == 1) state.focus = 1 + std::min(2, (state.focus <= 3 ? state.focus - 1 : 0));
+                    else state.focus = 4 + std::min(4, (state.focus >= 4 ? state.focus - 4 : 0));
+                } else if (dx != 0 && state.focus >= 1) {
+                    if (state.focus <= 3) state.focus = 1 + ((state.focus - 1 + dx + 3) % 3);
+                    else state.focus = 4 + ((state.focus - 4 + dx + 5) % 5);
+                }
+                break;
+            }
+            case Screen::Profile: {
+                if (dy != 0) state.focus = std::max(0, std::min(2, state.focus + dy));
+                break;
+            }
+            case Screen::Wallet: {
+                if (dy != 0) state.focus = std::max(0, std::min(5, state.focus + dy));
+                break;
+            }
+            case Screen::Plans: {
+                if (dy != 0) state.focus = std::max(0, std::min(2, state.focus + dy));
+                break;
+            }
             case Screen::Detail:
             case Screen::CodeLink:
                 break;
@@ -733,6 +864,7 @@ int main(int, char**) {
     };
 
     auto switchTab = [&](int dir) {
+        if (state.menuOpen) return;
         // L1/R1 tabs are ONLY for the app area (Home Deals Store Settings)
         switch (state.screen) {
             case Screen::Home:
@@ -780,28 +912,31 @@ int main(int, char**) {
                 const Uint8 b = ev.jbutton.button;
                 if (b == 0) { activate(1); stateChanged = true; }
                 else if (b == 1) { backRequested = true; }
-                else if (b == 2) { // square - filter / language / save
+                else if (b == 2) { // square - language on Welcome, favorite on Detail, Search elsewhere
                     if (state.screen == Screen::Detail) {
                         state.saved = !state.saved;
                         toast(state.saved ? "Saved to your favorites" : "Removed from favorites");
-                    } else if (state.screen == Screen::Store) {
-                        state.focus = 9 + state.storeFilter;      // jump to filter chips
-                        stateChanged = true;
-                    } else if (state.screen == Screen::Deals) {
-                        state.focus = state.dealsFilter;          // jump to filter chips
-                        stateChanged = true;
-                    } else if (state.screen == Screen::Home || state.screen == Screen::Welcome) {
+                    } else if (state.screen == Screen::Welcome) {
                         state.prevScreen = state.screen;
                         state.focus = state.langIndex;
                         if (state.screen != Screen::Language) state.screen = Screen::Language;
-                        stateChanged = true;
+                    } else {
+                        state.focus = 0;
+                        go(Screen::Search);
                     }
-                } else if (b == 3) { // triangle - open Minecraft / sort
+                    stateChanged = true;
+                } else if (b == 3) { // triangle - menu overlay (open Minecraft on Detail)
                     if (state.screen == Screen::Detail) {
                         toast("Opening Minecraft\xE2\x80\xA6");
                         pkgtest::launchMinecraftOnPs4();
-                    } else if (state.screen == Screen::Deals) toast("Sorted by biggest discount");
-                    else if (state.screen == Screen::Store) toast("Sorted by newest");
+                    } else if (state.menuOpen) {
+                        state.menuOpen = false;
+                    } else if (state.screen != Screen::Welcome && state.screen != Screen::CodeLink &&
+                               state.screen != Screen::Email && state.screen != Screen::Language &&
+                               state.screen != Screen::Confirm) {
+                        state.menuOpen = true;
+                        state.menuFocus = 0;
+                    }
                     stateChanged = true;
                 } else if (b == 4) { switchTab(-1); stateChanged = true; }             // L1
                 else if (b == 5) { switchTab(1); stateChanged = true; }                // R1
@@ -858,6 +993,9 @@ int main(int, char**) {
         if (stateChanged || sig != lastSig || toastVisible != lastToastVisible ||
             codeAnim) {
             std::string accountCopy;
+            std::string sessionPlanCopy;
+            long sessionAcCopy = 0;
+            bool searchNoResults = false;
             pkgtest::HeroInfo heroInfos[3];
             pkgtest::CardInfo exInfos[3];
             pkgtest::CardInfo gridInfos[5];
@@ -865,6 +1003,8 @@ int main(int, char**) {
                 std::lock_guard<std::mutex> lk(gLinkMx);
                 accountCopy = state.haveSession ? state.sessionName
                                                 : std::string("name@example.com");
+                sessionPlanCopy = state.sessionPlan;
+                sessionAcCopy = state.sessionAc;
                 for (int i = 0; i < 3 && i < static_cast<int>(state.banners.size()); ++i) {
                     const pkgtest::BannerData& b = state.banners[i];
                     heroInfos[i].title = pkgtest::i18nPick(b.titleI18n, lang);
@@ -881,6 +1021,18 @@ int main(int, char**) {
                     c.price = std::to_string(it.saleAcPrice >= 0 ? it.saleAcPrice : it.acPrice);
                     if (it.isExclusive && exN < 3) exInfos[exN++] = c;
                     if (gridN < 5) gridInfos[gridN++] = c;
+                }
+                if (state.screen == Screen::Search) {
+                    const std::vector<int> hits =
+                        searchMatchIdx(state.items, state.searchQuery, state.searchFilter);
+                    for (int j = 0; j < 5; ++j) gridInfos[j] = pkgtest::CardInfo{};
+                    for (int j = 0; j < 5 && j < static_cast<int>(hits.size()); ++j) {
+                        const pkgtest::ItemData& it = state.items[hits[j]];
+                        gridInfos[j].title = it.title;
+                        gridInfos[j].price = std::to_string(it.saleAcPrice >= 0 ? it.saleAcPrice
+                                                                                : it.acPrice);
+                    }
+                    searchNoResults = !state.searchQuery.empty() && hits.empty();
                 }
             }
             pkgtest::setServerContent(heroInfos, exInfos, gridInfos);
@@ -937,6 +1089,26 @@ int main(int, char**) {
                                                "Sign out", "Cancel",
                                                state.focus, lang);
                     break;
+                case Screen::Search:
+                    pkgtest::drawSearch(engine, state.focus, state.searchQuery,
+                                        state.searchFilter, searchNoResults, lang);
+                    break;
+                case Screen::Profile:
+                    pkgtest::drawProfile(engine, state.focus, accountCopy,
+                                         planIndexFrom(sessionPlanCopy),
+                                         static_cast<int>(sessionAcCopy), 24, 8, 5, lang);
+                    break;
+                case Screen::Wallet:
+                    pkgtest::drawWallet(engine, state.focus,
+                                        static_cast<int>(sessionAcCopy), lang);
+                    break;
+                case Screen::Plans:
+                    pkgtest::drawPlans(engine, state.focus,
+                                       planIndexFrom(sessionPlanCopy), lang);
+                    break;
+            }
+            if (state.menuOpen) {
+                pkgtest::drawMenuOverlay(engine, state.menuFocus, lang);
             }
             if (toastVisible) {
                 pkgtest::drawToast(engine, state.toastText, lang);

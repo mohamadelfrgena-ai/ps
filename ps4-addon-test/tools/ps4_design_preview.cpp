@@ -119,5 +119,41 @@ int main(int argc, char** argv) {
                       "Sign out", "Cancel", 0, "en");
     savePng(engine, outDir + "/ps4_confirm_en.png");
 
+    // 18. Search — typed query with results
+    engine.clear(theme::BG);
+    drawSearch(engine, 5, "car", 0, false, "en");
+    savePng(engine, outDir + "/ps4_search_en.png");
+
+    // 19. Search — empty (popular terms)
+    engine.clear(theme::BG);
+    drawSearch(engine, 0, "", 0, false, "en");
+    savePng(engine, outDir + "/ps4_search_empty_en.png");
+
+    // 20. Search — no results
+    engine.clear(theme::BG);
+    drawSearch(engine, 0, "zzz", 0, true, "en");
+    savePng(engine, outDir + "/ps4_search_noresults_en.png");
+
+    // 21. Profile
+    engine.clear(theme::BG);
+    drawProfile(engine, 1, "name@example.com", 1, 1250, 24, 8, 5, "en");
+    savePng(engine, outDir + "/ps4_profile_en.png");
+
+    // 22. Wallet (view-only)
+    engine.clear(theme::BG);
+    drawWallet(engine, 2, 1250, "en");
+    savePng(engine, outDir + "/ps4_wallet_en.png");
+
+    // 23. Plans (view-only + QR)
+    engine.clear(theme::BG);
+    drawPlans(engine, 1, 1, "en");
+    savePng(engine, outDir + "/ps4_plans_en.png");
+
+    // 24. Triangle menu overlay over Home
+    engine.clear(theme::BG);
+    drawHome(engine, 0, 0, 0, "en");
+    drawMenuOverlay(engine, 0, "en");
+    savePng(engine, outDir + "/ps4_menu_en.png");
+
     return 0;
 }

@@ -4,6 +4,7 @@
 #include "ui_engine.hpp"
 
 #include <string>
+#include <vector>
 
 namespace pkgtest {
 
@@ -69,7 +70,7 @@ void drawLegendBar(UiEngine& e,
 enum class DemoState { Idle = 0, Downloading = 1, Installing = 2, Installed = 3 };
 void drawInstallDemo(UiEngine& e, DemoState state, int percent, const std::string& langCode);
 
-// Top navigation bar with L1/R1 tabs (Home Deals Store Settings) + bell + AC pill + avatar
+// Top navigation: L1/R1 tabs Home(0) Deals(1) Store(2) Settings(3); any other activeTab = none. AC pill + avatar, no chat, no bell
 void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int acBalance);
 
 // --- interactive screens (every button navigates / acts) ---
@@ -84,8 +85,27 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
 void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langCode);
 // filterIndex: active Store filter chip 0..2 (Addons Worlds Newest)
 void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langCode);
-void drawSettings(UiEngine& e, int focus, bool autoLaunchOn,
+// ---- Settings (no notifications row). Rows: 0 language, 1 account, 2 auto-launch, 3 link a console, 4 about, 5 sign out
+void drawSettings(UiEngine& e, int focus, bool autoLaunchOn, const std::string& accountValue,
+                  const std::string& langCode);
+// Deprecated (old 7-row call with the notifications toggle) — remaps to the 6-row screen.
+void drawSettings(UiEngine& e, int focus, bool notifOn, bool autoLaunchOn,
                   const std::string& accountValue, const std::string& langCode);
+
+// ---- New screens (opened with  []=Search  /  triangle=Menu) -----------------------------------
+// focus: 0 search field, 1..3 filter chips (All/Addons/Worlds), 4..8 result cards
+void drawSearch(UiEngine& e, int focus, const std::string& query, int filterIndex, bool noResults,
+                const std::string& langCode);
+// focus: 0 AC wallet, 1 plans, 2 settings.  planIndex: 0 Free, 1 Epic, 2 Legendary
+void drawProfile(UiEngine& e, int focus, const std::string& name, int planIndex, int acBalance,
+                 int downloads, int saved, int installed, const std::string& langCode);
+// View-only wallet. focus = highlighted history row 0..5 (-1 none)
+void drawWallet(UiEngine& e, int focus, int acBalance, const std::string& langCode);
+// View-only plans + QR (image "qr_app" in ui.pak). focus 0..2, currentPlan 0..2
+void drawPlans(UiEngine& e, int focus, int currentPlan, const std::string& langCode);
+// Triangle menu: draw the current screen first, then this on top. focus 0 Profile, 1 Wallet, 2 Plans, 3 Search
+void drawMenuOverlay(UiEngine& e, int focus, const std::string& langCode);
+
 void drawConfirmDialog(UiEngine& e, const std::string& title, const std::string& sub,
                        const std::string& yesLabel, const std::string& noLabel,
                        int focus, const std::string& langCode);

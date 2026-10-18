@@ -1,7 +1,7 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
-# AddonStation PS4 Mini-App — v0.21 test build (black Home/Store screen fix)
-VERSION     := 0.21
+# AddonStation PS4 Mini-App — v0.22 test build (UI v2 redesign)
+VERSION     := 0.22
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 

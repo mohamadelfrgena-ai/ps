@@ -920,13 +920,31 @@ void UiEngine::drawImageCropped(const std::string& name,
     const int y0d = std::max(0, y);
     const int x1d = std::min(kWidth, x + w);
     const int y1d = std::min(kHeight, y + h);
+    // Rounded-corner mask (anti-aliased). Before this fix the `radius`
+    // argument was accepted but never applied, so every cover/avatar was square.
+    const int rr = std::max(0, std::min(radius, std::min(w, h) / 2));
     for (int dy = y0d; dy < y1d; ++dy) {
         const std::uint32_t* srow = &scaled.px[static_cast<std::size_t>(dy - y) * scaled.w];
         std::uint32_t* drow = &fb_[static_cast<std::size_t>(dy) * kWidth];
+        const int ly = dy - y;
+        const bool yCorner = rr > 0 && (ly < rr || ly >= h - rr);
         for (int dx = x0d; dx < x1d; ++dx) {
             const std::uint32_t s = srow[dx - x];
             int sa = static_cast<int>((s >> 24) & 0xFF);
             if (sa == 0) continue;
+            if (yCorner) {
+                const int lx = dx - x;
+                if (lx < rr || lx >= w - rr) {
+                    const float ccx = lx < rr ? static_cast<float>(rr) : static_cast<float>(w - rr);
+                    const float ccy = ly < rr ? static_cast<float>(rr) : static_cast<float>(h - rr);
+                    const float ddx = lx + 0.5f - ccx;
+                    const float ddy = ly + 0.5f - ccy;
+                    float cov = static_cast<float>(rr) - std::sqrt(ddx * ddx + ddy * ddy) + 0.5f;
+                    cov = cov < 0.0f ? 0.0f : (cov > 1.0f ? 1.0f : cov);
+                    sa = static_cast<int>(sa * cov);
+                    if (sa <= 0) continue;
+                }
+            }
             if (alpha != 255) {
                 sa = (sa * alpha) / 255;
                 if (sa <= 0) continue;
