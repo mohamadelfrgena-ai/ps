@@ -6,3 +6,8 @@
 
 [functions.send-push]
 verify_jwt = false
+
+# PlayStation consoles authenticate with a one-time code and an opaque console
+# token, not a Supabase JWT. The function validates both server-side.
+[functions.console-session]
+verify_jwt = false

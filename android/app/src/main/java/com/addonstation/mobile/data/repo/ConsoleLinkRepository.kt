@@ -1,10 +1,11 @@
 package com.addonstation.mobile.data.repo
 
-import android.net.Uri
 import com.addonstation.mobile.data.ApiError
 import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.SupabaseClient
+import com.addonstation.mobile.data.apiErrorFromMessage
 import com.addonstation.mobile.data.model.LinkedConsole
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -13,36 +14,57 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.util.Locale
 
 /**
- * ربط أجهزة PlayStation. إنشاء الأكواد واستطلاعها مسؤولية جهاز PlayStation فقط؛
- * التطبيق يستدعي claim_console_link_code ويقرأ/يحذف صفوف linked_consoles عبر RLS.
+ * Secure PlayStation linking contract.
+ *
+ * The phone only looks up and approves a one-time code. It never sends its
+ * access token or refresh token in an RPC body. Code creation, poll-secret
+ * verification, and console credential issuance belong to the trusted Edge
+ * Function defined by the server deployment.
  */
 class ConsoleLinkRepository(private val supabase: SupabaseClient) {
 
-    suspend fun claimCode(rawCode: String): ConsoleLinkClaim {
-        // لا تُرسل أي RPC لزائر غير مسجّل، حتى لو استدعى الشاشة خارج مسار الإعدادات.
-        var session = supabase.session()
-            ?: return ConsoleLinkClaim(ok = false, message = MESSAGE_SIGN_IN_REQUIRED)
+    suspend fun lookupCode(rawCode: String): ConsoleCodeLookup {
+        if (supabase.session() == null) {
+            return ConsoleCodeLookup(ok = false, message = MESSAGE_SIGN_IN_REQUIRED)
+        }
+
+        val code = normalizeCode(rawCode)
+        if (!isValidCode(code)) {
+            return ConsoleCodeLookup(ok = false, message = MESSAGE_INVALID_CODE)
+        }
+
+        val result = supabase.rpc(
+            "console_code_lookup",
+            params = mapOf("p_code" to JsonPrimitive(code)),
+            signedOnly = true,
+        ) as? JsonObject ?: return ConsoleCodeLookup(ok = false, message = "unknown_error")
+
+        return ConsoleCodeLookup(
+            ok = result["ok"]?.jsonPrimitive?.booleanOrNull == true,
+            message = result["message"]?.jsonPrimitive?.contentOrNull,
+            code = result["code"]?.jsonPrimitive?.contentOrNull ?: code,
+            platform = result["platform"]?.jsonPrimitive?.contentOrNull,
+            deviceName = result["device_name"]?.jsonPrimitive?.contentOrNull,
+            appVersion = result["app_version"]?.jsonPrimitive?.contentOrNull,
+            requestedAt = result["requested_at"]?.jsonPrimitive?.contentOrNull,
+            expiresAt = result["expires_at"]?.jsonPrimitive?.contentOrNull,
+        )
+    }
+
+    suspend fun approveCode(rawCode: String): ConsoleLinkClaim {
+        if (supabase.session() == null) {
+            return ConsoleLinkClaim(ok = false, message = MESSAGE_SIGN_IN_REQUIRED)
+        }
 
         val code = normalizeCode(rawCode)
         if (!isValidCode(code)) {
             return ConsoleLinkClaim(ok = false, message = MESSAGE_INVALID_CODE)
         }
 
-        // إن كانت الجلسة توشك على الانتهاء، حدّثها أولاً حتى يطابق Bearer
-        // في الترويسة التوكنين المرسلين إلى جهاز PlayStation داخل body.
-        val now = System.currentTimeMillis() / 1000L
-        if (session.expiresAtEpochSeconds <= now + 30L) {
-            if (supabase.refreshSession()) session = supabase.session() ?: return ConsoleLinkClaim(false, MESSAGE_SIGN_IN_REQUIRED)
-        }
-
-        val result = supabase.rpcWithToken(
-            function = "claim_console_link_code",
-            accessToken = session.accessToken,
-            params = mapOf(
-                "p_code" to JsonPrimitive(code),
-                "p_access_token" to JsonPrimitive(session.accessToken),
-                "p_refresh_token" to JsonPrimitive(session.refreshToken),
-            ),
+        val result = supabase.rpc(
+            "console_code_approve",
+            params = mapOf("p_code" to JsonPrimitive(code)),
+            signedOnly = true,
         ) as? JsonObject ?: return ConsoleLinkClaim(ok = false, message = "unknown_error")
 
         return ConsoleLinkClaim(
@@ -53,32 +75,41 @@ class ConsoleLinkRepository(private val supabase: SupabaseClient) {
         )
     }
 
-    /** القراءة مباشرة من linked_consoles فقط؛ RLS يقيّد الصفوف بحساب الجلسة الحالية. */
     suspend fun linkedConsoles(): List<LinkedConsole> {
-        val session = supabase.session() ?: throw ApiError(ApiErrorKind.NOT_SIGNED_IN)
-        val response = supabase.select(
-            table = "linked_consoles",
-            query = "select=id,device_name,platform,created_at,last_seen_at&order=created_at.desc.nullslast",
-            token = session.accessToken,
-        )
+        if (supabase.session() == null) throw ApiError(ApiErrorKind.NOT_SIGNED_IN)
+        val response = supabase.rpc(
+            "console_list",
+            signedOnly = true,
+        ) ?: JsonArray(emptyList())
         return supabase.decodeList(response)
     }
 
-    /** يحذف الجهاز المحدد ثم يعيد القائمة من الخادم كي تظهر الحالة الجديدة فوراً. */
     suspend fun unlinkAndReload(id: String): List<LinkedConsole> {
         if (supabase.session() == null) throw ApiError(ApiErrorKind.NOT_SIGNED_IN)
         val cleanId = id.trim()
         require(cleanId.isNotEmpty()) { "console_id_required" }
-        supabase.delete("linked_consoles", "id=eq.${Uri.encode(cleanId)}")
+        val result = supabase.rpc(
+            "console_unlink",
+            params = mapOf("p_id" to JsonPrimitive(cleanId)),
+            signedOnly = true,
+        ) as? JsonObject ?: throw ApiError(ApiErrorKind.GENERIC, "console_unlink_failed")
+        if (result["ok"]?.jsonPrimitive?.booleanOrNull != true) {
+            throw apiErrorFromMessage(result["message"]?.jsonPrimitive?.contentOrNull)
+        }
         val refreshed = linkedConsoles()
         if (refreshed.any { it.id == cleanId }) throw IllegalStateException("console_unlink_failed")
         return refreshed
     }
 
-    /** Removes every console visible to the current user; RLS keeps the delete user-scoped. */
     suspend fun unlinkAllAndReload(): List<LinkedConsole> {
         if (supabase.session() == null) throw ApiError(ApiErrorKind.NOT_SIGNED_IN)
-        supabase.delete("linked_consoles", "id=not.is.null")
+        val result = supabase.rpc(
+            "console_unlink_all",
+            signedOnly = true,
+        ) as? JsonObject ?: throw ApiError(ApiErrorKind.GENERIC, "console_unlink_all_failed")
+        if (result["ok"]?.jsonPrimitive?.booleanOrNull != true) {
+            throw apiErrorFromMessage(result["message"]?.jsonPrimitive?.contentOrNull)
+        }
         val refreshed = linkedConsoles()
         if (refreshed.isNotEmpty()) throw IllegalStateException("console_unlink_all_failed")
         return refreshed
@@ -94,7 +125,6 @@ class ConsoleLinkRepository(private val supabase: SupabaseClient) {
         const val MESSAGE_CODE_EXPIRED = "code_expired"
         const val MESSAGE_TOO_MANY_ATTEMPTS = "too_many_attempts"
 
-        /** إزالة الفراغات والشرطات وتوحيد حالة الأحرف قبل التحقق أو الإرسال. */
         fun normalizeCode(input: String): String = input
             .uppercase(Locale.ROOT)
             .filterNot { it.isWhitespace() || it == '-' }
@@ -103,6 +133,17 @@ class ConsoleLinkRepository(private val supabase: SupabaseClient) {
             code.length == CODE_LENGTH && code.all { it in CODE_ALPHABET }
     }
 }
+
+data class ConsoleCodeLookup(
+    val ok: Boolean,
+    val message: String? = null,
+    val code: String? = null,
+    val platform: String? = null,
+    val deviceName: String? = null,
+    val appVersion: String? = null,
+    val requestedAt: String? = null,
+    val expiresAt: String? = null,
+)
 
 data class ConsoleLinkClaim(
     val ok: Boolean,

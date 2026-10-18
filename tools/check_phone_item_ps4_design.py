@@ -22,6 +22,9 @@ repo = read("android/app/src/main/java/com/addonstation/mobile/data/repo/Console
 content_repo = read("android/app/src/main/java/com/addonstation/mobile/data/repo/ContentRepository.kt")
 manifest = read("android/app/src/main/AndroidManifest.xml")
 main_tab = read("android/app/src/main/java/com/addonstation/mobile/ui/nav/MainTab.kt")
+console_sql = read("supabase/41_console_link_codes.sql")
+console_edge = read("supabase/functions/console-session/index.ts")
+supabase_config = read("supabase/config.toml")
 
 checks = [
     ("redesigned two-column store cards are wired", "DesignedStoreContentCard(" in store_entry),
@@ -36,13 +39,25 @@ checks = [
     ("Devices section appears before Account", settings.find("ConsoleSettingsSection(") < settings.find("// 1 · ACCOUNT")),
     ("NEW badge is persisted after opening", "markConsoleLinkOpened" in settings and "showNewBadge" in settings_section),
     ("existing Settings navigation icon is preserved", "Icons.Filled.Settings, Icons.Outlined.Settings" in main_tab),
-    ("approval is explicit before the existing claim RPC", console.find("pendingApproval = normalized") < console.find("claimCode(approvedCode)")),
+    ("server lookup precedes explicit approval", 0 <= console.find("lookupCode(normalized)") < console.find("pendingApproval = lookup") < console.find("approveCode(approvedCode)")),
     ("console code stays six-character LTR", "CODE_LENGTH" in console and "LayoutDirection.Ltr" in console),
     ("Android never reads console_link_codes directly", "console_link_codes" not in console + repo),
-    ("console calls remain session-gated", "supabase.session()" in repo and "rpcWithToken" in repo),
-    ("linked consoles can be listed, unlinked, and unlinked all", all(x in console + repo for x in (
-        "linkedConsoles", "unlinkAndReload", "unlinkAllAndReload",
+    ("phone never sends session tokens in RPC bodies", "rpcWithToken" not in repo and "p_access_token" not in repo and "p_refresh_token" not in repo),
+    ("console calls remain session-gated", "supabase.session()" in repo and "signedOnly = true" in repo),
+    ("linked consoles use list and revocation RPCs", all(name in repo for name in (
+        '"console_list"', '"console_unlink"', '"console_unlink_all"',
     ))),
+    ("link-code table stores a hash rather than session tokens", "poll_secret_hash" in console_sql and not re.search(r"(?m)^\s*(access_token|refresh_token)\s+", console_sql)),
+    ("code creation and consumption are service-role only", all(name in console_sql for name in (
+        "grant execute on function public.console_code_create", "grant execute on function public.console_code_consume",
+        "to service_role;",
+    ))),
+    ("console Edge Function issues only an opaque token", "console_token" in console_edge and "access_token" not in console_edge and "refresh_token" not in console_edge),
+    ("console Edge Function performs create, exchange, and heartbeat", all(action in console_edge for action in (
+        'action === "create"', 'action === "exchange"', 'action === "heartbeat"',
+    ))),
+    ("console Edge Function owns authentication instead of JWT middleware", "[functions.console-session]" in supabase_config and "verify_jwt = false" in supabase_config),
+    ("new console SQL is English-only", not re.search(r"[\u0600-\u06ff]", console_sql)),
     ("download failures retain server error kinds", "apiErrorFromMessage(outcome.message)" in content_repo),
     ("downloaded files use a read-only FileProvider", "androidx.core.content.FileProvider" in manifest and "android:grantUriPermissions=\"true\"" in manifest),
 ]

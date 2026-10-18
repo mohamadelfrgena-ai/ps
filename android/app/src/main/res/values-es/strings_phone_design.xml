@@ -52,6 +52,7 @@
     <string name="phone_console_manage">Administrar consolas</string>
     <string name="phone_console_allow_title">¿Permitir que esta PS4 inicie sesión?</string>
     <string name="phone_console_requested_now">AddonStation PS4 · solicitado ahora</string>
+    <string name="phone_console_requested_version">Versión %1$s · solicitado ahora</string>
     <string name="phone_console_signed_in_as">Iniciará sesión como</string>
     <string name="phone_console_can_browse">Navegar, descargar y chatear</string>
     <string name="phone_console_can_use_ac">Usar tu saldo de AC</string>

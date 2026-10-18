@@ -2,7 +2,7 @@
 --  AddonStation Mobile — ٩٩) فاحص القاعدة: «هل نُفِّذ كل SQL كما نريد؟»
 -- ============================================================================
 --
---  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 40) بنداً بنداً، ويطبع
+--  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 41) بنداً بنداً، ويطبع
 --  جدولاً واحداً: كل صف = بند · العمود «الحالة» ✅ أو ❌ · والعمود «التفاصيل»
 --  يقول لك ما هو الناقص بالاسم بالضبط.
 --
@@ -301,6 +301,22 @@ with checks(n, file_, item, ok, detail) as (
   select 61, '38_user_mute · 39_notif_revert', 'كتم عضو بزر واحد والإشعارات كما كانت بلا إسقاط',
          public.diag_text($q$select ((select count(*) from information_schema.tables where table_schema = 'public' and table_name = 'user_mutes') = 1 and (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('can_mute_members', 'user_mute', 'user_unmute', 'my_muted_users', 'i_muted_user')) = 5 and (select count(*) from pg_trigger where not tgisinternal and tgname = 'trg_push_drop_muted_actor') = 0 and (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'push_prefs' and column_name = 'muted_users') = 0 and (select count(*) from pg_policies where schemaname = 'public' and tablename = 'user_mutes' and policyname = 'user_mutes_read') = 1)::text$q$) = 'true',
          coalesce(public.diag_text($q$select 'الجدول: ' || (select count(*) from information_schema.tables where table_schema = 'public' and table_name = 'user_mutes')::text || '/1 ' || '· الدوال: ' || (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('can_mute_members', 'user_mute', 'user_unmute', 'my_muted_users', 'i_muted_user'))::text || '/5 ' || '· المكتومون: ' || (select count(*) from public.user_mutes)::text$q$), 'مفقود')
+  union all
+  select 62, '41_console_link_codes', 'Secure console-link tables exist (3/3)',
+         public.diag_text($q$select (count(*) = 3)::text from information_schema.tables where table_schema = 'public' and table_name in ('linked_consoles', 'console_link_codes', 'console_link_audit')$q$) = 'true',
+         coalesce(public.diag_text($q$select count(*)::text || '/3' from information_schema.tables where table_schema = 'public' and table_name in ('linked_consoles', 'console_link_codes', 'console_link_audit')$q$), 'مفقود')
+  union all
+  select 63, '41_console_link_codes', 'Secure console-link RPCs exist (12/12)',
+         public.diag_text($q$select (count(distinct p.proname) = 12)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('console_private_normalize_code', 'console_private_random_code', 'console_code_create', 'console_code_lookup', 'console_code_approve', 'console_code_consume', 'console_code_complete', 'console_list', 'console_unlink', 'console_unlink_all', 'console_session_touch', 'console_link_cleanup')$q$) = 'true',
+         coalesce(public.diag_text($q$select count(distinct p.proname)::text || '/12' from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('console_private_normalize_code', 'console_private_random_code', 'console_code_create', 'console_code_lookup', 'console_code_approve', 'console_code_consume', 'console_code_complete', 'console_list', 'console_unlink', 'console_unlink_all', 'console_session_touch', 'console_link_cleanup')$q$), 'مفقود')
+  union all
+  select 64, '41_console_link_codes', 'Codes store only a poll-secret hash, never session tokens',
+         public.diag_text($q$select (((select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'console_link_codes' and column_name = 'poll_secret_hash') = 1 and (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'console_link_codes' and (column_name = concat('access', '_token') or column_name = concat('refresh', '_token'))) = 0))::text$q$) = 'true',
+         coalesce(public.diag_text($q$select string_agg(column_name, ' · ' order by column_name) from information_schema.columns where table_schema = 'public' and table_name = 'console_link_codes' and (column_name = 'poll_secret_hash' or column_name = concat('access', '_token') or column_name = concat('refresh', '_token'))$q$), 'مفقود')
+  union all
+  select 65, '41_console_link_codes', 'Owner-only linked-console RLS policy exists',
+         public.diag_text($q$select (count(*) = 1)::text from pg_policies where schemaname = 'public' and tablename = concat('linked', '_consoles') and policyname = 'linked_consoles_select_own'$q$) = 'true',
+         coalesce(public.diag_text($q$select count(*)::text || '/1' from pg_policies where schemaname = 'public' and tablename = concat('linked', '_consoles') and policyname = 'linked_consoles_select_own'$q$), 'مفقود')
 
 )
 select n                                  as "#",
@@ -325,7 +341,7 @@ select 999999,
 
 -- ---------------------------------------------------------------------------
 --  ماذا بعد؟
---   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 40).
+--   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 41).
 --   • الصف الأخير (المجموع) يسرد أسماء الملفات التي فيها بند ❌ — لا يعني أن
 --     الملفات نفسها ناقصة، بل أن بنداً واحداً فيها لم يتحقّق: راجع عموده.
 --   • ظهر ❌ في ملف معيّن ⇒ نفّذ ذلك الملف من `supabase/` في SQL Editor

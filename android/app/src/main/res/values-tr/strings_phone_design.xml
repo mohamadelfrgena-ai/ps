@@ -52,6 +52,7 @@
     <string name="phone_console_manage">Konsolları yönet</string>
     <string name="phone_console_allow_title">Bu PS4’ün oturum açmasına izin verilsin mi?</string>
     <string name="phone_console_requested_now">AddonStation PS4 · şimdi istedi</string>
+    <string name="phone_console_requested_version">Sürüm %1$s · şimdi istendi</string>
     <string name="phone_console_signed_in_as">Şu hesapla oturum açacak</string>
     <string name="phone_console_can_browse">Göz atma, indirme ve sohbet</string>
     <string name="phone_console_can_use_ac">AC bakiyenizi kullanma</string>

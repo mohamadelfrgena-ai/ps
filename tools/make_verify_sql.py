@@ -770,13 +770,61 @@ add("38_user_mute · 39_notif_revert", "كتم عضو بزر واحد والإش
          "|| '· المكتومون: ' || (select count(*) from public.user_mutes)::text"))
 
 # ═══════════════════════════════════════════════════════════════════════════
+#  41_console_link_codes.sql — secure PlayStation device linking
+# ═══════════════════════════════════════════════════════════════════════════
+CONSOLE_TABLES = ["linked_consoles", "console_link_codes", "console_link_audit"]
+add("41_console_link_codes", "Secure console-link tables exist (3/3)",
+    q_ok("select (count(*) = 3)::text from information_schema.tables "
+         "where table_schema = 'public' and table_name in "
+         "('linked_consoles', 'console_link_codes', 'console_link_audit')", "true"),
+    qdet("select count(*)::text || '/3' from information_schema.tables "
+         "where table_schema = 'public' and table_name in "
+         "('linked_consoles', 'console_link_codes', 'console_link_audit')"))
+
+CONSOLE_FUNCTIONS = [
+    "console_private_normalize_code", "console_private_random_code",
+    "console_code_create", "console_code_lookup", "console_code_approve",
+    "console_code_consume", "console_code_complete", "console_list",
+    "console_unlink", "console_unlink_all", "console_session_touch",
+    "console_link_cleanup",
+]
+add("41_console_link_codes", "Secure console-link RPCs exist (12/12)",
+    q_ok("select (count(distinct p.proname) = 12)::text from pg_proc p "
+         "join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname in (" +
+         ", ".join("'%s'" % name for name in CONSOLE_FUNCTIONS) + ")", "true"),
+    qdet("select count(distinct p.proname)::text || '/12' from pg_proc p "
+         "join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname in (" +
+         ", ".join("'%s'" % name for name in CONSOLE_FUNCTIONS) + ")"))
+
+add("41_console_link_codes", "Codes store only a poll-secret hash, never session tokens",
+    q_ok("select (((select count(*) from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'console_link_codes' and column_name = 'poll_secret_hash') = 1 "
+         "and (select count(*) from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'console_link_codes' and (column_name = concat('access', '_token') "
+         "or column_name = concat('refresh', '_token'))) = 0))::text", "true"),
+    qdet("select string_agg(column_name, ' · ' order by column_name) from information_schema.columns "
+         "where table_schema = 'public' and table_name = 'console_link_codes' "
+         "and (column_name = 'poll_secret_hash' or column_name = concat('access', '_token') "
+         "or column_name = concat('refresh', '_token'))"))
+
+add("41_console_link_codes", "Owner-only linked-console RLS policy exists",
+    q_ok("select (count(*) = 1)::text from pg_policies where schemaname = 'public' "
+         "and tablename = concat('linked', '_consoles') "
+         "and policyname = 'linked_consoles_select_own'", "true"),
+    qdet("select count(*)::text || '/1' from pg_policies where schemaname = 'public' "
+         "and tablename = concat('linked', '_consoles') "
+         "and policyname = 'linked_consoles_select_own'"))
+
+# ═══════════════════════════════════════════════════════════════════════════
 #  كتابة الملف
 # ═══════════════════════════════════════════════════════════════════════════
 HEAD = r'''-- ============================================================================
 --  AddonStation Mobile — ٩٩) فاحص القاعدة: «هل نُفِّذ كل SQL كما نريد؟»
 -- ============================================================================
 --
---  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 40) بنداً بنداً، ويطبع
+--  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 41) بنداً بنداً، ويطبع
 --  جدولاً واحداً: كل صف = بند · العمود «الحالة» ✅ أو ❌ · والعمود «التفاصيل»
 --  يقول لك ما هو الناقص بالاسم بالضبط.
 --
@@ -857,7 +905,7 @@ select 999999,
 
 -- ---------------------------------------------------------------------------
 --  ماذا بعد؟
---   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 40).
+--   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 41).
 --   • الصف الأخير (المجموع) يسرد أسماء الملفات التي فيها بند ❌ — لا يعني أن
 --     الملفات نفسها ناقصة، بل أن بنداً واحداً فيها لم يتحقّق: راجع عموده.
 --   • ظهر ❌ في ملف معيّن ⇒ نفّذ ذلك الملف من `supabase/` في SQL Editor

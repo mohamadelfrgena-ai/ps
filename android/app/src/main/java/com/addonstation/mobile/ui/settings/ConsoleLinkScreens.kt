@@ -77,6 +77,7 @@ import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.model.LinkedConsole
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.parseIsoMillis
+import com.addonstation.mobile.data.repo.ConsoleCodeLookup
 import com.addonstation.mobile.data.repo.ConsoleLinkRepository
 import com.addonstation.mobile.data.toApiError
 import com.addonstation.mobile.ui.apiErrorText
@@ -112,7 +113,7 @@ fun ConsoleLinkScreen(
 
     var code by remember { mutableStateOf("") }
     var submitting by remember { mutableStateOf(false) }
-    var pendingApproval by remember { mutableStateOf<String?>(null) }
+    var pendingApproval by remember { mutableStateOf<ConsoleCodeLookup?>(null) }
     var codeError by remember { mutableStateOf<ConsoleCodeError?>(null) }
     var apiErrorKind by remember { mutableStateOf<ApiErrorKind?>(null) }
     var linkedDeviceName by remember { mutableStateOf<String?>(null) }
@@ -124,6 +125,15 @@ fun ConsoleLinkScreen(
         ConsoleCodeError.SIGN_IN -> stringResource(R.string.console_link_sign_in_required)
         ConsoleCodeError.GENERIC -> apiErrorKind?.let { apiErrorText(it) } ?: stringResource(R.string.msg_generic_error)
         null -> null
+    }
+
+    fun errorFor(message: String?): ConsoleCodeError = when (message) {
+        ConsoleLinkRepository.MESSAGE_SIGN_IN_REQUIRED -> ConsoleCodeError.SIGN_IN
+        ConsoleLinkRepository.MESSAGE_INVALID_CODE -> ConsoleCodeError.INVALID
+        ConsoleLinkRepository.MESSAGE_CODE_NOT_FOUND -> ConsoleCodeError.WRONG
+        ConsoleLinkRepository.MESSAGE_CODE_EXPIRED -> ConsoleCodeError.EXPIRED
+        ConsoleLinkRepository.MESSAGE_TOO_MANY_ATTEMPTS -> ConsoleCodeError.TOO_MANY
+        else -> ConsoleCodeError.GENERIC
     }
 
     fun requestApproval() {
@@ -140,37 +150,49 @@ fun ConsoleLinkScreen(
         code = normalized
         codeError = null
         apiErrorKind = null
-        pendingApproval = normalized
+        submitting = true
+        scope.launch {
+            try {
+                val lookup = withContext(Dispatchers.IO) { container.consoleLinks.lookupCode(normalized) }
+                if (lookup.ok) {
+                    pendingApproval = lookup
+                } else {
+                    codeError = errorFor(lookup.message)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                apiErrorKind = error.toApiError().kind
+                codeError = if (apiErrorKind == ApiErrorKind.NOT_SIGNED_IN) ConsoleCodeError.SIGN_IN else ConsoleCodeError.GENERIC
+            } finally {
+                submitting = false
+            }
+        }
     }
 
-    fun approveCode(approvedCode: String) {
+    fun approveCode(approval: ConsoleCodeLookup) {
         if (submitting) return
         if (!hasSession || container.supabase.session() == null) {
             pendingApproval = null
             codeError = ConsoleCodeError.SIGN_IN
             return
         }
+        val approvedCode = approval.code ?: code
         submitting = true
         codeError = null
         apiErrorKind = null
         scope.launch {
             try {
-                val result = withContext(Dispatchers.IO) { container.consoleLinks.claimCode(approvedCode) }
+                val result = withContext(Dispatchers.IO) { container.consoleLinks.approveCode(approvedCode) }
                 pendingApproval = null
                 if (result.ok) {
                     linkedDeviceName = result.deviceName?.takeIf { it.isNotBlank() }
+                        ?: approval.deviceName?.takeIf { it.isNotBlank() }
                         ?: result.platform?.takeIf { it.isNotBlank() }
                         ?: "PS4"
                     code = ""
                 } else {
-                    codeError = when (result.message) {
-                        ConsoleLinkRepository.MESSAGE_SIGN_IN_REQUIRED -> ConsoleCodeError.SIGN_IN
-                        ConsoleLinkRepository.MESSAGE_INVALID_CODE -> ConsoleCodeError.INVALID
-                        ConsoleLinkRepository.MESSAGE_CODE_NOT_FOUND -> ConsoleCodeError.WRONG
-                        ConsoleLinkRepository.MESSAGE_CODE_EXPIRED -> ConsoleCodeError.EXPIRED
-                        ConsoleLinkRepository.MESSAGE_TOO_MANY_ATTEMPTS -> ConsoleCodeError.TOO_MANY
-                        else -> ConsoleCodeError.GENERIC
-                    }
+                    codeError = errorFor(result.message)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -272,17 +294,19 @@ fun ConsoleLinkScreen(
         }
     }
 
-    pendingApproval?.let { approvedCode ->
+    pendingApproval?.let { approval ->
         ModalBottomSheet(
             onDismissRequest = { if (!submitting) pendingApproval = null },
             containerColor = AppColors.AuthSurface,
         ) {
             ConsoleApprovalSheet(
-                code = approvedCode,
+                code = approval.code ?: code,
+                deviceName = approval.deviceName,
+                appVersion = approval.appVersion,
                 profile = profile,
                 avatarUrl = profile?.avatarUrl?.let { assetUrl(container, it) },
                 busy = submitting,
-                onAllow = { approveCode(approvedCode) },
+                onAllow = { approveCode(approval) },
                 onCancel = { if (!submitting) pendingApproval = null },
             )
         }
@@ -516,6 +540,8 @@ private fun ConsolePrimaryButton(
 @Composable
 private fun ConsoleApprovalSheet(
     code: String,
+    deviceName: String?,
+    appVersion: String?,
     profile: Profile?,
     avatarUrl: String?,
     busy: Boolean,
@@ -549,8 +575,19 @@ private fun ConsoleApprovalSheet(
                 Icon(painterResource(R.drawable.ic_phone_pad), null, tint = AppColors.AuthBlueLight, modifier = Modifier.size(24.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.phone_console_ps4_name), color = AppColors.AuthText, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
-                Text(stringResource(R.string.phone_console_requested_now), color = AppColors.AuthMuted, fontSize = 11.sp)
+                Text(
+                    deviceName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.phone_console_ps4_name),
+                    color = AppColors.AuthText,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                val version = appVersion?.takeIf { it.isNotBlank() }
+                val requestLabel = if (version != null) {
+                    stringResource(R.string.phone_console_requested_version, version)
+                } else {
+                    stringResource(R.string.phone_console_requested_now)
+                }
+                Text(requestLabel, color = AppColors.AuthMuted, fontSize = 11.sp)
             }
             Text(
                 code.take(3) + " " + code.drop(3),

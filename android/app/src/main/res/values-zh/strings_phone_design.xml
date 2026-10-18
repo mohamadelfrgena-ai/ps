@@ -52,6 +52,7 @@
     <string name="phone_console_manage">管理主机</string>
     <string name="phone_console_allow_title">允许这台 PS4 登录吗？</string>
     <string name="phone_console_requested_now">AddonStation PS4 · 刚刚请求</string>
+    <string name="phone_console_requested_version">版本 %1$s · 刚刚请求</string>
     <string name="phone_console_signed_in_as">将登录为</string>
     <string name="phone_console_can_browse">浏览、下载和聊天</string>
     <string name="phone_console_can_use_ac">使用你的 AC 余额</string>

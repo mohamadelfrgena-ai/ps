@@ -52,6 +52,7 @@
     <string name="phone_console_manage">إدارة الأجهزة</string>
     <string name="phone_console_allow_title">السماح لهذا الـ PS4 بتسجيل الدخول؟</string>
     <string name="phone_console_requested_now">AddonStation PS4 · طُلب الآن</string>
+    <string name="phone_console_requested_version">الإصدار %1$s · طُلب الآن</string>
     <string name="phone_console_signed_in_as">سيتم تسجيل الدخول باسم</string>
     <string name="phone_console_can_browse">التصفح والتحميل والدردشة</string>
     <string name="phone_console_can_use_ac">استخدام رصيد AC</string>

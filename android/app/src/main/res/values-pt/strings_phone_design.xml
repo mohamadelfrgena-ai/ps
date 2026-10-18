@@ -52,6 +52,7 @@
     <string name="phone_console_manage">Gerenciar consoles</string>
     <string name="phone_console_allow_title">Permitir que este PS4 entre?</string>
     <string name="phone_console_requested_now">AddonStation PS4 · solicitado agora</string>
+    <string name="phone_console_requested_version">Versão %1$s · solicitado agora</string>
     <string name="phone_console_signed_in_as">Ele entrará como</string>
     <string name="phone_console_can_browse">Navegar, baixar e conversar</string>
     <string name="phone_console_can_use_ac">Usar seu saldo de AC</string>

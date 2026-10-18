@@ -52,6 +52,7 @@
     <string name="phone_console_manage">Управление консолями</string>
     <string name="phone_console_allow_title">Разрешить этой PS4 войти?</string>
     <string name="phone_console_requested_now">AddonStation PS4 · запрос только что</string>
+    <string name="phone_console_requested_version">Версия %1$s · запрос только что</string>
     <string name="phone_console_signed_in_as">Будет выполнен вход как</string>
     <string name="phone_console_can_browse">Просматривать, скачивать и общаться</string>
     <string name="phone_console_can_use_ac">Использовать ваш баланс AC</string>
