@@ -689,6 +689,9 @@ void chipRow(UiEngine& e, const Lay& L, int xl, int y, const std::vector<std::st
     }
 }
 
+// Store-wide creator signature: every addon by-line shows exactly this (user rule).
+static const char* const kStoreBy = "by sliver fox";
+
 struct CardArgs {
     const char* art = "cover_0";
     std::string title, creator, price, oldPrice, badge;
@@ -1130,7 +1133,7 @@ CardArgs gridCard(int i, const std::string& lang, bool deal) {
     a.art = kCoverNames[i % 5];
     const CardInfo& g = gridAt(i);
     a.title = g.title.empty() ? "[Addon name]" : g.title;
-    a.creator = g.creator.empty() ? tr("by", lang) + " [Creator]" : g.creator;
+    a.creator = kStoreBy;  // any addon -> "by sliver fox"
     if (deal) {
         a.badge = g.badge.empty() ? badgesDeal[i] : g.badge;
         a.badgeCol = SDL_Color{255, 92, 122, 255};
@@ -1343,7 +1346,7 @@ void drawInstallDemo(UiEngine& e, DemoState state, int percent, const std::strin
 
     const int rx0 = lx + lw + 56, rw = 1824 - rx0;
     boxText(e, L, gDetailTitle.empty() ? tr("install_demo_title", langCode) : gDetailTitle, rx0, rw, ly + 4, 46, kWHT, FontRole::Pixel);
-    boxText(e, L, tr("by", langCode) + " [Creator]", rx0, rw, ly + 76, 26, kMU);
+    boxText(e, L, kStoreBy, rx0, rw, ly + 76, 26, kMU);
     // stats chips
     {
         int cx = rx0;

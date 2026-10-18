@@ -13,7 +13,7 @@ values
   (
     'Sulfur Cars',
     'sulfur-cars',
-    'Driveable cars addon (SUV, truck, van, sport car, crossover) by Marketplace Trader.',
+    'Driveable cars addon (SUV, truck, van, sport car, crossover) by sliver fox.',
     'addon',
     'other',
     'free',
