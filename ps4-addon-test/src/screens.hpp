@@ -111,6 +111,8 @@ void drawConfirmDialog(UiEngine& e, const std::string& title, const std::string&
                        int focus, const std::string& langCode);
 
 std::string tr(const std::string& key, const std::string& langCode);
+// Appends " by sliver fox" to an addon name (idempotent) — user rule for all names.
+std::string brandTitle(const std::string& title);
 
 } // namespace pkgtest
 

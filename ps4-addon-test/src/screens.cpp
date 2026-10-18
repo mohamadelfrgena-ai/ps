@@ -1132,7 +1132,7 @@ CardArgs gridCard(int i, const std::string& lang, bool deal) {
     CardArgs a;
     a.art = kCoverNames[i % 5];
     const CardInfo& g = gridAt(i);
-    a.title = g.title.empty() ? "[Addon name]" : g.title;
+    a.title = brandTitle(g.title.empty() ? "[Addon name]" : g.title);
     a.creator = kStoreBy;  // any addon -> "by sliver fox"
     if (deal) {
         a.badge = g.badge.empty() ? badgesDeal[i] : g.badge;
@@ -1240,7 +1240,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
         chipBox(e, prx, ex.y + 12, pw, 40, SDL_Color{10, 20, 44, 200}, SDL_Color{255, 255, 255, 40});
         e.drawImage("icon_coin", L.rtl ? prx + pw - 36 : prx + 8, ex.y + 17, 30, 30);
         e.drawText(price, L.rtl ? prx + 14 : prx + 44, ex.y + 17, 24, kWHT, FontRole::Body, false, false);
-        boxText(e, L, exAt(i).title.empty() ? ex.title : exAt(i).title, xl + 20, ex.w - 40, ex.y + ex.h - 52, 26, kWHT);
+        boxText(e, L, brandTitle(exAt(i).title.empty() ? ex.title : exAt(i).title), xl + 20, ex.w - 40, ex.y + ex.h - 52, 26, kWHT);
         if (focus == 2 + i) focusRing(e, rx, ex.y, ex.w, ex.h, 28);
     }
 
@@ -1345,7 +1345,7 @@ void drawInstallDemo(UiEngine& e, DemoState state, int percent, const std::strin
     }
 
     const int rx0 = lx + lw + 56, rw = 1824 - rx0;
-    boxText(e, L, gDetailTitle.empty() ? tr("install_demo_title", langCode) : gDetailTitle, rx0, rw, ly + 4, 46, kWHT, FontRole::Pixel);
+    boxText(e, L, brandTitle(gDetailTitle.empty() ? tr("install_demo_title", langCode) : gDetailTitle), rx0, rw, ly + 4, 46, kWHT, FontRole::Pixel);
     boxText(e, L, kStoreBy, rx0, rw, ly + 76, 26, kMU);
     // stats chips
     {
@@ -1861,6 +1861,13 @@ void drawConfirmDialog(UiEngine& e, const std::string& title, const std::string&
     e.drawRoundBorder(bx, y + 500, bw, 96, 28, 3, SDL_Color{255, 107, 120, 255});
     e.drawTextCentered(tYes, 960, y + 500 + 48, 32, kERT, FontRole::Body, L.rtl);
     if (focus == 1) focusRing(e, bx, y + 500, bw, 96, 28);
+}
+
+// Any addon NAME display carries the store signature too (user rule:
+// "by sliver fox" in all names + all details containing "by").
+std::string brandTitle(const std::string& title) {
+    if (title.find("sliver fox") != std::string::npos) return title;
+    return title + " by sliver fox";
 }
 
 } // namespace pkgtest

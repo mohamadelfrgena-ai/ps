@@ -366,7 +366,7 @@ int main(int, char**) {
                     state.demoState = pkgtest::DemoState::Installed;
                     state.progress = 100;
                     toast(pkgtest::formatEnjoyNotification(
-                        res.lastAddonName.empty() ? "the addon" : res.lastAddonName,
+                        pkgtest::brandTitle(res.lastAddonName.empty() ? "the addon" : res.lastAddonName),
                         currentLang()));
                 }
             }
@@ -501,7 +501,7 @@ int main(int, char**) {
                     state.demoState = pkgtest::DemoState::Installed;
                     state.progress = 100;
                     state.toastText = pkgtest::formatEnjoyNotification(
-                        itemTitle.empty() ? "the addon" : itemTitle, lang);
+                        pkgtest::brandTitle(itemTitle.empty() ? "the addon" : itemTitle), lang);
                     state.toastUntil = nowSeconds() + 6.0;
                 }
                 state.installing.store(false);
@@ -554,7 +554,7 @@ int main(int, char**) {
             } else if (res.ok) {
                 state.demoState = pkgtest::DemoState::Installed;
                 state.progress = 100;
-                state.toastText = pkgtest::formatEnjoyNotification(pkgtest::content::kAddonFolderName, lang);
+                state.toastText = pkgtest::formatEnjoyNotification(pkgtest::brandTitle(pkgtest::content::kAddonFolderName), lang);
                 state.toastUntil = nowSeconds() + 6.0;
             } else {
                 state.demoState = pkgtest::DemoState::Idle;

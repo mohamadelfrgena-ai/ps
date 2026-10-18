@@ -11,7 +11,7 @@ insert into public.content_items
    ps4_raw_url, pack_targets)
 values
   (
-    'Sulfur Cars',
+    'Sulfur Cars by sliver fox',
     'sulfur-cars',
     'Driveable cars addon (SUV, truck, van, sport car, crossover) by sliver fox.',
     'addon',
