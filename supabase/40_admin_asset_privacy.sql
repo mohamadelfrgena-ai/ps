@@ -1,24 +1,29 @@
 -- ============================================================================
---  AddonStation Mobile — 40) خصوصية أصول الأدمن
+--  AddonStation Mobile - 40) Admin Asset Privacy
 --
---  القاعدة:
---    • الأصل ذو required_plan = 'admin' لا يظهر في كتالوج أي مستخدم عادي.
---    • إن اختار الأدمن أفاتاراً/غلافاً/أداة خاصة، تُحجب قيمتها عن بقية الحسابات.
---    • ملفات الأدمن الجديدة تُحفظ في admin-assets الخاص، ولا تُقرأ إلا بدور admin.
---    • الملفات الشخصية وصور المستخدمين العاديين تبقى ظاهرة كما كانت.
+--  Policy:
+--    * Assets with required_plan = 'admin' are hidden from regular users.
+--    * If an admin selects a private avatar, banner, or item, its value is
+--      redacted from every non-admin account.
+--    * New admin files are stored in the private admin-assets bucket and can
+--      only be read by users with the admin role.
+--    * Regular user profiles and assets remain visible as before.
 --
---  ترتيب النشر:
---    وزّع أولاً نسخة التطبيق التي تقرأ visible_profiles (وفيها fallback للقاعدة
---    القديمة)، ثم نفّذ هذا الملف؛ فالنسخ الأقدم كانت تقرأ profiles مباشرة.
+--  Deployment order:
+--    First distribute an app version that reads visible_profiles (with its
+--    legacy-schema fallback), and then run this file. Older app versions read
+--    profiles directly.
 --
---  مهم للأصول القديمة:
---    هذا الملف يحجب الصفوف والقيم فوراً، لكنه لا يستطيع نقل بايتات Storage بين
---    المخازن. شغّل tools/migrate_admin_assets_private.py بعده لنقل الملفات القديمة
---    من site-assets العام إلى admin-assets الخاص وحذف النسخة العامة بأمان.
+--  Important for legacy assets:
+--    This file hides rows and profile values immediately, but SQL cannot move
+--    Storage object bytes between buckets. Run
+--    tools/migrate_admin_assets_private.py afterward to move legacy files from
+--    the public site-assets bucket to the private admin-assets bucket and
+--    safely remove the public copies.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
--- 1) كتالوج الأصول: صفوف admin لا يقرأها إلا الأدمن
+-- 1) Asset catalog: only admins can read admin rows
 -- ---------------------------------------------------------------------------
 drop policy if exists assets_read on public.site_assets;
 create policy assets_read on public.site_assets
@@ -28,11 +33,12 @@ create policy assets_read on public.site_assets
   );
 
 -- ---------------------------------------------------------------------------
--- 2) مسار قانوني ثابت للأصول الخاصة
+-- 2) Stable canonical path for private assets
 --
---    نحدّث مراجع الحساب أولاً ثم صف الكتالوج. هكذا تبقى إعادة 00_ALL_IN_ONE
---    آمنة حتى بعد نقل الملفات: 15/27 قد يعيدان المسار العام، و40 يعيده دائماً
---    إلى admin-private/... بينما يبقى الملف الفعلي في admin-assets.
+--    Update profile references before the catalog row. This keeps rerunning
+--    00_ALL_IN_ONE safe after file migration: migrations 15/27 may restore the
+--    public path, while migration 40 always restores admin-private/... and the
+--    physical file remains in admin-assets.
 -- ---------------------------------------------------------------------------
 update public.profiles p
    set avatar_url = 'admin-private/' || ltrim(p.avatar_url, '/')
@@ -55,7 +61,7 @@ update public.profiles p
         and a.file_url = p.banner_url
    );
 
--- نسخ قديمة جداً كانت تحفظ مسار الأداة بدلاً من اسمها.
+-- Very old app versions stored the item path instead of its name.
 update public.profiles p
    set equipped_item_id = 'admin-private/' || ltrim(p.equipped_item_id, '/')
  where p.equipped_item_id not like 'admin-private/%'
@@ -72,9 +78,10 @@ update public.site_assets
    and file_url not like 'admin-private/%';
 
 -- ---------------------------------------------------------------------------
--- 3) دالة داخلية تعرف هل القيمة أفاتار/غلاف/أداة خاصة بالأدمن
---    SECURITY DEFINER مطلوب لأن غير الأدمن لا يستطيع قراءة صف admin نفسه.
---    لا تُمنح للمستخدمين مباشرة؛ يستعملها العرض الآمن فقط.
+-- 3) Internal function that detects an admin-only avatar, banner, or item
+--    SECURITY DEFINER is required because non-admin users cannot read the
+--    underlying admin asset row. The function is not granted directly to
+--    users; only the safe view calls it.
 -- ---------------------------------------------------------------------------
 create or replace function public.is_admin_only_profile_asset(
   p_kind text,
@@ -101,13 +108,14 @@ revoke all on function public.is_admin_only_profile_asset(text, text) from publi
 revoke all on function public.is_admin_only_profile_asset(text, text) from anon, authenticated;
 
 comment on function public.is_admin_only_profile_asset(text, text) is
-  'داخلي: يفحص إن كانت قيمة ملف شخصي تشير إلى أصل admin؛ يستعمله visible_profiles لحجبها.';
+  'Internal: detects whether a profile value references an admin-only asset; visible_profiles uses it for redaction.';
 
 -- ---------------------------------------------------------------------------
--- 4) عرض الملفات الشخصية العام: نفس الأعمدة، مع تنقيح أصول admin فقط
+-- 4) Public profile view: the same columns with admin-only assets redacted
 --
---    العرض يعمل بصلاحية مالكه حتى يستطيع قراءة profiles بعد سحب SELECT المباشر،
---    لكنه يقرر الإظهار بهوية المستدعي الفعلية عبر auth.uid()/public.is_admin().
+--    The view runs with owner privileges so it can read profiles after direct
+--    SELECT is revoked, but visibility is evaluated for the actual caller via
+--    auth.uid()/public.is_admin().
 -- ---------------------------------------------------------------------------
 create or replace view public.visible_profiles
 with (security_barrier = true)
@@ -148,18 +156,19 @@ select
 from public.profiles p;
 
 comment on view public.visible_profiles is
-  'واجهة القراءة العامة للملفات الشخصية؛ تحجب أفاتار/غلاف/أداة admin عن غير الأدمن.';
+  'Public profile read interface; redacts admin-only avatars, banners, and items from non-admin users.';
 
 revoke all on public.visible_profiles from public;
 grant select on public.visible_profiles to anon, authenticated;
 
--- لا نسمح بتجاوز العرض عبر REST إلى الجدول الأساسي، ولا بتعيين أداة مباشرة
--- متجاوزاً set_profile_asset وفحص required_plan.
+-- Prevent REST clients from bypassing the view through the base table, and
+-- prevent direct item assignment that bypasses set_profile_asset and its
+-- required_plan validation.
 revoke select on public.profiles from public, anon, authenticated;
 revoke update (equipped_item_id) on public.profiles from authenticated;
 
 -- ---------------------------------------------------------------------------
--- 5) مخزن خاص لأصول الأدمن (المسار المحجوز داخل التطبيق: admin-private/...)
+-- 5) Private admin asset bucket (reserved app path: admin-private/...)
 -- ---------------------------------------------------------------------------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -195,11 +204,12 @@ create policy "admin_assets_delete" on storage.objects
   for delete to authenticated
   using (bucket_id = 'admin-assets' and public.is_admin());
 
--- اجعل PostgREST يرى visible_profiles مباشرة بعد التنفيذ.
+-- Make visible_profiles available to PostgREST immediately after execution.
 notify pgrst, 'reload schema';
 
 -- ---------------------------------------------------------------------------
--- 6) تحقق وصفي (لا يفشل إن كانت الأصول القديمة لم تُنقل بعد؛ يعرض عددها)
+-- 6) Informational verification
+--    This does not fail while legacy assets await migration; it reports them.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -225,11 +235,11 @@ begin
        )
      );
 
-  raise notice '✅ خصوصية كتالوج الأدمن مفعلة: % أصل مخفي عن غير الأدمن.', v_hidden;
+  raise notice 'Admin catalog privacy is active: % asset(s) hidden from non-admin users.', v_hidden;
   if v_pending > 0 then
-    raise notice 'ℹ % ملف admin قديم ينتظر النقل للمخزن الخاص عبر tools/migrate_admin_assets_private.py.', v_pending;
+    raise notice '% legacy admin file(s) await migration to private storage via tools/migrate_admin_assets_private.py.', v_pending;
   else
-    raise notice '✅ كل ملفات admin مسجلة بمسارات المخزن الخاص.';
+    raise notice 'All admin files are registered with private storage paths.';
   end if;
 end;
 $$;
