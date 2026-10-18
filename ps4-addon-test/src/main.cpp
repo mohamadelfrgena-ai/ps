@@ -702,7 +702,7 @@ int main(int, char**) {
                     toast(pkgtest::tr(state.autoLaunch ? "autolaunch_on" : "autolaunch_off", currentLang()));
                 }
                 else if (state.focus == 3) { requestNewCode(); go(Screen::CodeLink); }
-                else if (state.focus == 4) toast("AddonStation PS4 v0.21 — official app");
+                else if (state.focus == 4) toast("AddonStation PS4 v0.22 — official app");
                 else go(Screen::Confirm);
                 break;
             case Screen::Detail:
