@@ -96,7 +96,18 @@ jobs:
           SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_PUBLIC_KEY: ${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
-        run: python3 tools/diagnose_profile_backend.py
+        run: |
+          set -o pipefail
+          python3 tools/diagnose_profile_backend.py | tee /tmp/profile-diagnostic.txt
+          {
+            echo "### Profile backend diagnostic"
+            echo '```text'
+            cat /tmp/profile-diagnostic.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=Profile backend::$line"
+          done < /tmp/profile-diagnostic.txt
 
   # ==========================================================================
   # 1) بناء التطبيق (debug APK)
