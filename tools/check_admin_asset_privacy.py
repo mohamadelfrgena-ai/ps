@@ -64,8 +64,13 @@ checks = [
      "if (privateAdmin) ADMIN_ASSETS_BUCKET" in assets
      and 'supabase.signedUrl(ADMIN_ASSETS_BUCKET' in assets
      and 'requiredPlan.equals("admin"' in assets),
-    ("كل قراءات الملفات الشخصية تفضّل visible_profiles",
-     all('supabase.select("visible_profiles"' in text for text in (profile, creator, admin))),
+    ("قراءات ملفات الآخرين تفضّل visible_profiles",
+     all('supabase.select("visible_profiles"' in text for text in (profile, creator, admin))
+     and "private suspend fun selectProfiles" in profile),
+    ("ملفي يتوافق مع الخادم الحالي ثم visible_profiles",
+     "private suspend fun selectOwnProfile" in profile
+     and 'supabase.select("profiles", query)' in profile
+     and 'val rows = if (userId == uid) selectOwnProfile(query) else selectProfiles(query)' in profile),
     ("النسخة الاحتياطية تنقّح القيم القديمة",
      ".map(state::redactAdminAssets)" in profile
      and ".map(state::redactAdminAssets)" in creator),

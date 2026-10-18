@@ -34,12 +34,38 @@ class ProfileRepository(
 
     /**
      * 40_admin_asset_privacy يسحب القراءة المباشرة من profiles ويقدّم هذا العرض.
-     * الرجوع المؤقت يبقي التطبيق عاملاً إلى أن يُنشر SQL، ثم ينقّح AppState القيم
-     * المعروفة دفاعياً كي لا تظهر أصول admin أثناء فترة الانتقال.
+     * ملفات الأعضاء العامة تفضّل العرض الآمن، مع رجوع مؤقت للقاعدة القديمة إلى
+     * أن يُنشر SQL؛ ثم ينقّح AppState القيم المعروفة دفاعياً أثناء فترة الانتقال.
      */
-    private suspend fun selectProfiles(query: String): JsonElement =
-        runCatching { supabase.select("visible_profiles", query) }
-            .getOrElse { supabase.select("profiles", query) }
+    private suspend fun selectProfiles(query: String): JsonElement = try {
+        supabase.select("visible_profiles", query)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Throwable) {
+        supabase.select("profiles", query)
+    }
+
+    /**
+     * ملف صاحب الجلسة مسار توافق مستقل: إصدارات الخادم الحالية تسمح بقراءته
+     * من profiles، بينما 40_admin_asset_privacy ينقل القراءة إلى visible_profiles.
+     * البدء بالمسار الحالي يعيد فتح «ملفي» فوراً ولا يجعل غياب العرض الجديد
+     * يحبس الشاشة خلف Network error / Retry؛ وبعد نشر 40 يعمل الرجوع الآمن.
+     * الاستعلام مقيّد دائماً بمعرّف صاحب الجلسة، فلا يوسّع قراءة ملفات الآخرين.
+     */
+    private suspend fun selectOwnProfile(query: String): JsonElement = try {
+        supabase.select("profiles", query)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (baseError: Throwable) {
+        try {
+            supabase.select("visible_profiles", query)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (viewError: Throwable) {
+            viewError.addSuppressed(baseError)
+            throw viewError
+        }
+    }
 
     // ------------------------------------------------------------------ قراءة
 
@@ -79,9 +105,9 @@ class ProfileRepository(
     }
 
     suspend fun loadProfile(userId: String): Profile? = withContext(Dispatchers.IO) {
-        supabase.decodeOne<Profile>(
-            selectProfiles("select=*&id=eq.$userId&limit=1")
-        )?.let(state::redactAdminAssets)
+        val query = "select=*&id=eq.$userId&limit=1"
+        val rows = if (userId == uid) selectOwnProfile(query) else selectProfiles(query)
+        supabase.decodeOne<Profile>(rows)?.let(state::redactAdminAssets)
     }
 
     suspend fun loadProfiles(ids: Collection<String>): Map<String, Profile> = withContext(Dispatchers.IO) {
