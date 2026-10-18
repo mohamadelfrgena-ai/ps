@@ -6,6 +6,7 @@
 #         task: apk            ← ابنِ APK
 #         task: assets-upload  ← ارفع الأصول الـ311
 #         task: assets-dry-run ← تجربة رفع بلا كتابة
+#         task: profile-diagnostic ← فحص قراءة البروفايل فقط، بلا كتابة أو نشر
 #     ثم يُدفع الالتزام. لا تُشترط أي كلمة في تعليق الالتزام — الملف وحده هو المُحكَم،
 #     فإن كان فيه «none» لا يُبنى شيء مهما كان التعليق.
 #
@@ -42,6 +43,7 @@ on:
         options:
           - apk
           - apk-commit
+          - profile-diagnostic
           - assets-dry-run
           - assets-upload
   # هذا المحفّز لا يعمل إلا إذا تغيّر ملف طلب البناء (.build-request).
@@ -78,6 +80,23 @@ jobs:
           echo "task=$TASK" >> "$GITHUB_OUTPUT"
           echo "### المهمّة المطلوبة: **$TASK** (المصدر: $SOURCE)" >> "$GITHUB_STEP_SUMMARY"
           echo "المهمّة: $TASK"
+
+  # ==========================================================================
+  # 0b) تشخيص قراءة ملفات المستخدمين — قراءة فقط، بلا SQL أو نشر أو كتابة بيانات
+  # ==========================================================================
+  profile-diagnostic:
+    needs: request
+    if: needs.request.outputs.task == 'profile-diagnostic'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Diagnose profile endpoints safely
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_PUBLIC_KEY: ${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: python3 tools/diagnose_profile_backend.py
 
   # ==========================================================================
   # 1) بناء التطبيق (debug APK)
