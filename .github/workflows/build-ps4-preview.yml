@@ -85,6 +85,7 @@ jobs:
           path: ps4/IV0000-ASTN00001_00-ADDONSTATION0000.pkg
           if-no-files-found: error
           retention-days: 30
+        continue-on-error: true   # artifact quota must never block the real publish step
 
       - name: Build standalone pkg addon test PKG
         run: |
@@ -110,6 +111,7 @@ jobs:
           path: ps4-addon-test/pkg-addon-test.pkg
           if-no-files-found: error
           retention-days: 30
+        continue-on-error: true   # artifact quota must never block the real publish step
 
       - name: Publish pkg-addon-test.pkg to ps4/downloads
         run: |
