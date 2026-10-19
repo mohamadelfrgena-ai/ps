@@ -133,8 +133,10 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: ${{ vars.ADDONSTATION_PROJECT_REF }}
         run: |
+          set +e
           set -o pipefail
-          python3 tools/apply_visible_profiles_access_fix.py --apply | tee /tmp/profile-access-fix.txt
+          python3 tools/apply_visible_profiles_access_fix.py --apply 2>&1 | tee /tmp/profile-access-fix.txt
+          code=${PIPESTATUS[0]}
           {
             echo "### Visible profile access fix"
             echo '```text'
@@ -144,6 +146,11 @@ jobs:
           while IFS= read -r line; do
             [ -n "$line" ] && echo "::notice title=Profile access fix::$line"
           done < /tmp/profile-access-fix.txt
+          if [ "$code" -ne 0 ]; then
+            detail=$(tail -12 /tmp/profile-access-fix.txt | tr '\n' '|' | cut -c1-900)
+            echo "::error title=Profile access fix failed::$detail"
+          fi
+          exit "$code"
 
   # ==========================================================================
   # 1) بناء التطبيق (debug APK)
