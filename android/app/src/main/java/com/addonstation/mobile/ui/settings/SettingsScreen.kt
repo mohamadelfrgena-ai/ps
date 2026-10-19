@@ -193,7 +193,6 @@ fun SettingsScreen(
     var onlineBusy by remember { mutableStateOf(false) }
     var onlineNote by remember { mutableStateOf<ApiErrorKind?>(null) }
     var linkedConsoleCount by remember { mutableStateOf<Int?>(null) }
-    var showConsoleNew by remember { mutableStateOf(!AppPrefs.consoleLinkOpened(context)) }
     val signedOut = !signedIn
 
     LaunchedEffect(profile?.username) {
@@ -309,10 +308,7 @@ fun SettingsScreen(
             // This adds console icons only; the app's existing Settings icon is preserved.
             ConsoleSettingsSection(
                 linkedCount = linkedConsoleCount,
-                showNewBadge = showConsoleNew,
                 onOpenLink = {
-                    AppPrefs.markConsoleLinkOpened(context)
-                    showConsoleNew = false
                     if (signedIn) onOpenConsoleLink() else onLogin()
                 },
                 onOpenConsoles = {

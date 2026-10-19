@@ -7,6 +7,7 @@
 #         task: assets-upload  ← ارفع الأصول الـ311
 #         task: assets-dry-run ← تجربة رفع بلا كتابة
 #         task: profile-diagnostic ← فحص قراءة البروفايل فقط، بلا كتابة أو نشر
+#         task: profile-access-fix ← تطبيق إصلاح visible_profiles المحدد والتحقق منه
 #     ثم يُدفع الالتزام. لا تُشترط أي كلمة في تعليق الالتزام — الملف وحده هو المُحكَم،
 #     فإن كان فيه «none» لا يُبنى شيء مهما كان التعليق.
 #
@@ -44,6 +45,7 @@ on:
           - apk
           - apk-commit
           - profile-diagnostic
+          - profile-access-fix
           - assets-dry-run
           - assets-upload
   # هذا المحفّز لا يعمل إلا إذا تغيّر ملف طلب البناء (.build-request).
@@ -108,6 +110,40 @@ jobs:
           while IFS= read -r line; do
             [ -n "$line" ] && echo "::notice title=Profile backend::$line"
           done < /tmp/profile-diagnostic.txt
+
+  # ==========================================================================
+  # 0c) إصلاح قراءة visible_profiles المحدد — لا يشغّل أي بناء أو نشر آخر
+  # ==========================================================================
+  profile-access-fix:
+    needs: request
+    if: needs.request.outputs.task == 'profile-access-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify profile privacy and chat metadata paths
+        run: |
+          python3 tools/check_admin_asset_privacy.py
+          python3 tools/check_chat_message_header.py
+
+      - name: Apply and verify the focused profile access migration
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_PUBLIC_KEY: ${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.ADDONSTATION_PROJECT_REF }}
+        run: |
+          set -o pipefail
+          python3 tools/apply_visible_profiles_access_fix.py --apply | tee /tmp/profile-access-fix.txt
+          {
+            echo "### Visible profile access fix"
+            echo '```text'
+            cat /tmp/profile-access-fix.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=Profile access fix::$line"
+          done < /tmp/profile-access-fix.txt
 
   # ==========================================================================
   # 1) بناء التطبيق (debug APK)
@@ -197,6 +233,11 @@ jobs:
 
       - name: حارس الإشعارات الحقيقية قبل البناء (لا عودة لإشعارات تجريبية)
         run: python3 tools/check_push_live.py
+
+      - name: حارس بيانات البروفايل في الإعدادات والشات
+        run: |
+          python3 tools/check_admin_asset_privacy.py
+          python3 tools/check_chat_message_header.py
 
       - name: Build debug APK
         working-directory: android

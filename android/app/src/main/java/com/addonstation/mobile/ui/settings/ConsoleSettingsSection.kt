@@ -24,7 +24,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,7 +39,6 @@ import com.addonstation.mobile.ui.theme.Spec
 @Composable
 internal fun ConsoleSettingsSection(
     linkedCount: Int?,
-    showNewBadge: Boolean,
     onOpenLink: () -> Unit,
     onOpenConsoles: () -> Unit,
 ) {
@@ -86,18 +84,6 @@ internal fun ConsoleSettingsSection(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                if (showNewBadge) {
-                    Text(
-                        stringResource(R.string.phone_store_new),
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(7.dp))
-                            .background(Color(0xFFFF5F78))
-                            .padding(horizontal = 7.dp, vertical = 3.dp),
-                    )
-                }
             }
             Text(
                 stringResource(R.string.phone_console_settings_subtitle),

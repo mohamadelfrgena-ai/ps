@@ -17,6 +17,9 @@ def read(relative: str) -> str:
 
 problems: list[str] = []
 sql = read("supabase/40_admin_asset_privacy.sql")
+hotfix_sql = read("supabase/42_visible_profiles_access.sql")
+view_sql = sql.split("create or replace view public.visible_profiles", 1)[-1].split("comment on view", 1)[0]
+hotfix_view_sql = hotfix_sql.split("create or replace view public.visible_profiles", 1)[-1].split("comment on view", 1)[0]
 rls = read("supabase/04_rls.sql")
 all_sql = read("supabase/00_ALL_IN_ONE.sql")
 privacy = read("android/app/src/main/java/com/addonstation/mobile/data/AdminAssetPrivacy.kt")
@@ -38,10 +41,19 @@ checks = [
      "update public.site_assets" in sql
      and "'admin-private/' || ltrim(file_url" in sql
      and "update public.profiles" in sql),
-    ("visible_profiles ينقّح الأفاتار والغلاف والأداة",
+    ("visible_profiles ينقّح الأفاتار والغلاف والأداة بلا صلاحية EXECUTE عامة",
      "create or replace view public.visible_profiles" in sql
-     and sql.count("is_admin_only_profile_asset(") >= 4
-     and "else 'none'" in sql),
+     and all(f"a.asset_type = '{kind}'" in view_sql for kind in ("avatar", "banner", "item"))
+     and view_sql.count("a.required_plan = 'admin'") == 3
+     and "is_admin_only_profile_asset(" not in view_sql
+     and "else 'none'" in view_sql
+     and "revoke all on function public.is_admin_only_profile_asset" in sql),
+    ("ترحيل إصلاح القراءة يحافظ على التنقيح نفسه",
+     "create or replace view public.visible_profiles" in hotfix_sql
+     and all(f"a.asset_type = '{kind}'" in hotfix_view_sql for kind in ("avatar", "banner", "item"))
+     and hotfix_view_sql.count("a.required_plan = 'admin'") == 3
+     and "is_admin_only_profile_asset(" not in hotfix_view_sql
+     and "grant select on public.visible_profiles to anon, authenticated" in hotfix_sql),
     ("لا تجاوز مباشر لجدول profiles أو equipped_item_id",
      "revoke select on public.profiles from public, anon, authenticated" in sql
      and "revoke update (equipped_item_id)" in sql

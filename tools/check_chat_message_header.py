@@ -25,8 +25,18 @@ CHAT = os.path.join(ROOT, "android", "app", "src", "main", "java", "com",
 
 problems = []
 chat = io.open(CHAT, encoding="utf-8").read() if os.path.exists(CHAT) else ""
+view_model_path = os.path.join(ROOT, "android", "app", "src", "main", "java", "com",
+                               "addonstation", "mobile", "ui", "chat", "ChatViewModel.kt")
+profile_repo_path = os.path.join(ROOT, "android", "app", "src", "main", "java", "com",
+                                 "addonstation", "mobile", "data", "repo", "ProfileRepository.kt")
+view_model = io.open(view_model_path, encoding="utf-8").read() if os.path.exists(view_model_path) else ""
+profile_repo = io.open(profile_repo_path, encoding="utf-8").read() if os.path.exists(profile_repo_path) else ""
 if not chat:
     problems.append("ChatScreen.kt مفقود")
+if not view_model:
+    problems.append("ChatViewModel.kt مفقود")
+if not profile_repo:
+    problems.append("ProfileRepository.kt مفقود")
 
 
 def branch(text: str, marker: str) -> str:
@@ -62,6 +72,24 @@ if "val showAuthorHeader = !isMine && !grouped" not in chat:
 if "currentProfile = profile" not in chat or \
         "currentProfile?.takeIf { isMine && it.id == myId }" not in chat:
     problems.append("رسالة المالك لا تستخدم ملف الجلسة كبديل إذا غاب المؤلف من الخريطة")
+
+# Metadata is a single required path: the safe view supplies name/rank/item, and
+# a transient failure must be retried instead of becoming an empty map forever.
+metadata_retry_ok = all(token in view_model for token in (
+    "private suspend fun loadAuthorProfiles(",
+    "repeat(3)",
+    "container.profile.loadProfiles(",
+    "val a = async { loadAuthorProfiles(userIds) }",
+))
+profile_source_ok = all(token in profile_repo for token in (
+    '"visible_profiles" to null',
+    'selectProfiles("select=*&id=in.($filter)")',
+    "supabase.decodeList<Profile>",
+))
+if not metadata_retry_ok:
+    problems.append("تحميل اسم/رتبة/أداة كتّاب الشات لا يعيد المحاولة عبر loadAuthorProfiles")
+if not profile_source_ok:
+    problems.append("بيانات كتّاب الشات لا تُفك كاملة من visible_profiles الآمن")
 
 # 1) الاسم واللقب في عمود واحد: الاسم فوق، واللقب تحته
 if not name_col:
@@ -141,6 +169,8 @@ rows = [
     ("بيانات المرسل تستعين بملفه الحالي عند الحاجة",
      "currentProfile = profile" in chat
      and "currentProfile?.takeIf { isMine && it.id == myId }" in chat),
+    ("اسم/رتبة/أداة الكاتب تُحمّل مع إعادة محاولة", metadata_retry_ok),
+    ("مصدر بيانات الكاتب visible_profiles الكامل والآمن", profile_source_ok),
     ("خلفية الأداة شفافة بلا إطار مضاف", "backgroundColor = Color.Transparent" in (header or "")),
     ("عمود الرسالة يعكس جهة رسائلي", "horizontalAlignment = if (isMine) Alignment.End else Alignment.Start" in chat),
     ("فقاعة النص الصادر عند نهاية السطر", "horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End)" in chat),

@@ -2079,7 +2079,9 @@ private fun MessageBlock(
                 )
                 Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
-                        text = author?.displayName ?: author?.username ?: "—",
+                        text = author?.displayName?.takeIf(String::isNotBlank)
+                            ?: author?.username?.takeIf(String::isNotBlank)
+                            ?: "—",
                         style = Spec.msgAuthor,
                         color = roleColorOf(author?.role, author?.effectivePlan, message.userId),
                         maxLines = 1,

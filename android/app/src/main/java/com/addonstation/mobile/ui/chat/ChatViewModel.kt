@@ -1,5 +1,6 @@
 package com.addonstation.mobile.ui.chat
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -210,6 +211,29 @@ class ChatViewModel(private val container: AppContainer) {
         }
     }
 
+    /**
+     * Profile metadata is what supplies the chat name, rank, avatar, and equipped
+     * item. Keep messages non-blocking, but retry this one shared request instead
+     * of permanently turning a transient profile failure into an empty author map.
+     */
+    private suspend fun loadAuthorProfiles(userIds: Collection<String>): Map<String, Profile> {
+        val wanted = userIds.filter(String::isNotBlank).distinct()
+        if (wanted.isEmpty()) return emptyMap()
+        var profiles = emptyMap<String, Profile>()
+        repeat(3) { attempt ->
+            try {
+                profiles = profiles + container.profile.loadProfiles(wanted - profiles.keys)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                // Retry below; chat messages remain usable while metadata recovers.
+            }
+            if (profiles.keys.containsAll(wanted)) return profiles
+            if (attempt < 2) delay(600L * (attempt + 1))
+        }
+        return profiles
+    }
+
     /** Non-essential authors/reactions are merged after the messages are already visible. */
     private fun loadInitialMetadata(
         channelId: String,
@@ -223,9 +247,7 @@ class ChatViewModel(private val container: AppContainer) {
 
         scope.launch {
             val (profiles, reactions, myReactions) = coroutineScope {
-                val a = async {
-                    runCatching { container.profile.loadProfiles(userIds) }.getOrDefault(emptyMap())
-                }
+                val a = async { loadAuthorProfiles(userIds) }
                 val b = async {
                     runCatching { container.chat.reactionsFor(messageIds) }.getOrDefault(emptyMap())
                 }
@@ -447,7 +469,7 @@ class ChatViewModel(private val container: AppContainer) {
     private suspend fun toUi(message: ChatMessage): ChatMessageUi {
         val profiles = _authors.value.toMutableMap()
         if (profiles[message.userId] == null) {
-            container.profile.loadProfile(message.userId)?.let { profiles[message.userId] = it }
+            profiles.putAll(loadAuthorProfiles(listOf(message.userId)))
             _authors.value = profiles
         }
         val reply = message.replyToId?.let { id -> _messages.value.firstOrNull { it.message.id == id }?.message }
@@ -471,7 +493,7 @@ class ChatViewModel(private val container: AppContainer) {
             val older = container.chat.messages(channel.id, beforeId = firstId, limit = 100)
                 .filterNot { it.userId in _blockedIds.value || it.userId in _mutedIds.value }
             if (older.isEmpty()) return@launch
-            val profiles = container.profile.loadProfiles(older.map { it.userId })
+            val profiles = loadAuthorProfiles(older.map { it.userId })
             _authors.value = _authors.value + profiles
             _messages.value = older.map { toUi(it) } + _messages.value
         }

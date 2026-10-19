@@ -80,8 +80,9 @@ update public.site_assets
 -- ---------------------------------------------------------------------------
 -- 3) Internal function that detects an admin-only avatar, banner, or item
 --    SECURITY DEFINER is required because non-admin users cannot read the
---    underlying admin asset row. The function is not granted directly to
---    users; only the safe view calls it.
+--    underlying admin asset row. It remains available only to privileged
+--    maintenance code. The public view inlines this check because PostgreSQL
+--    otherwise requires callers to have EXECUTE on every function it invokes.
 -- ---------------------------------------------------------------------------
 create or replace function public.is_admin_only_profile_asset(
   p_kind text,
@@ -126,13 +127,29 @@ select
   p.display_name,
   case
     when public.is_admin()
-      or not public.is_admin_only_profile_asset('avatar', p.avatar_url)
+      or coalesce(p.avatar_url, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'avatar'
+           and (a.file_url = p.avatar_url or a.name = p.avatar_url)
+      )
       then p.avatar_url
     else null
   end as avatar_url,
   case
     when public.is_admin()
-      or not public.is_admin_only_profile_asset('banner', p.banner_url)
+      or coalesce(p.banner_url, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'banner'
+           and (a.file_url = p.banner_url or a.name = p.banner_url)
+      )
       then p.banner_url
     else null
   end as banner_url,
@@ -145,7 +162,15 @@ select
   p.user_level,
   case
     when public.is_admin()
-      or not public.is_admin_only_profile_asset('item', p.equipped_item_id)
+      or coalesce(p.equipped_item_id, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'item'
+           and (a.file_url = p.equipped_item_id or a.name = p.equipped_item_id)
+      )
       then p.equipped_item_id
     else 'none'
   end as equipped_item_id,
