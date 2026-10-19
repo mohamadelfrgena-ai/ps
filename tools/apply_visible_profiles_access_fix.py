@@ -40,6 +40,22 @@ REQUIRED_COLUMNS = {
 }
 
 
+def public_build_defaults() -> dict[str, str]:
+    """Read non-secret Android defaults when equivalent Actions secrets are absent."""
+    values: dict[str, str] = {}
+    path = ROOT / "android" / "gradle.properties"
+    try:
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            name, value = line.split("=", 1)
+            values[name.strip()] = value.strip()
+    except OSError:
+        pass
+    return values
+
+
 def project_ref(url: str, explicit: str) -> str:
     if explicit.strip():
         return explicit.strip()
@@ -198,8 +214,15 @@ def main() -> int:
         print("Dry run only: pass --apply to execute the focused migration")
         return 0
 
-    base = os.environ.get("SUPABASE_URL", "").strip()
-    public_key = os.environ.get("SUPABASE_PUBLIC_KEY", "").strip()
+    defaults = public_build_defaults()
+    base = (
+        os.environ.get("SUPABASE_URL", "").strip()
+        or defaults.get("ADDONSTATION_SUPABASE_URL", "")
+    )
+    public_key = (
+        os.environ.get("SUPABASE_PUBLIC_KEY", "").strip()
+        or defaults.get("ADDONSTATION_SUPABASE_ANON_KEY", "")
+    )
     access_token = os.environ.get("SUPABASE_ACCESS_TOKEN", "").strip()
     if not base.startswith("https://"):
         raise RuntimeError("SUPABASE_URL is missing or invalid")
