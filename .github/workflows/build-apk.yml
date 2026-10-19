@@ -193,7 +193,22 @@ jobs:
               print(f'ASSET {path.name}: size={len(data)} sha256={hashlib.sha256(data).hexdigest()} magic={data[:24].hex()}')
               print(f'ZIP={zipfile.is_zipfile(path)}')
               if not zipfile.is_zipfile(path):
-                  print(f'HEAD={data[:160]!r}')
+                  import re
+                  import struct
+                  strings = [match.decode('ascii') for match in re.findall(rb'[ -~]{4,}', data)]
+                  signatures = {
+                      label: [offset for offset in range(len(data)) if data.startswith(signature, offset)][:12]
+                      for label, signature in {
+                          'zip_local': bytes.fromhex('504b0304'),
+                          'zip_empty': bytes.fromhex('504b0506'),
+                          'json_object': b'{',
+                          'manifest': b'manifest.json',
+                      }.items()
+                  }
+                  print(f'HEAD_HEX={data[:256].hex()}')
+                  print(f'HEADER_U32_LE={[struct.unpack_from("<I", data, offset)[0] for offset in range(8, min(40, len(data) - 3), 4)]}')
+                  print(f'ASCII_STRINGS={strings[:40]}')
+                  print(f'SIGNATURE_OFFSETS={signatures}')
                   continue
               with zipfile.ZipFile(path) as archive:
                   names = archive.namelist()
@@ -219,7 +234,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           while IFS= read -r line; do
             [ -n "$line" ] && echo "::notice title=Content package::$line"
-          done < <(grep -E '^(ASSET|ZIP=|ENTRIES=|MANIFESTS=|MANIFEST )' /tmp/content-diagnostic.txt)
+          done < <(grep -E '^(ASSET|ZIP=|HEAD_HEX=|HEADER_U32_LE=|ASCII_STRINGS=|SIGNATURE_OFFSETS=|ENTRIES=|MANIFESTS=|MANIFEST )' /tmp/content-diagnostic.txt)
 
   # ==========================================================================
   # 0e) تصريف Kotlin فقط — يتحقق من الواجهة ولا ينشئ أو يسجّل APK
