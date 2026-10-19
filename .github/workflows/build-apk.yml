@@ -336,6 +336,7 @@ jobs:
           python3 tools/check_screen_backgrounds.py
           python3 tools/check_content_download.py
           python3 tools/check_jank_guard.py
+          python3 tools/check_bulk_content_import.py
 
       - name: Compile debug Kotlin without building an APK
         working-directory: android

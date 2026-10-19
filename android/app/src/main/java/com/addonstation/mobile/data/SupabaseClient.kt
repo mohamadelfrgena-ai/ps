@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -20,12 +21,20 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import okio.BufferedSink
+import java.io.File
+import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * عميل Supabase خفيف مبني على OkHttp (بدون مكتبات خارجية إضافية):
@@ -52,6 +61,18 @@ class SupabaseClient(
         .writeTimeout(60, TimeUnit.SECONDS)
         .callTimeout(90, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
+        .build()
+
+    /**
+     * Separate client for admin bulk imports. Content objects can be hundreds
+     * of MiB, so the normal 90-second request cap is intentionally unsuitable.
+     * The call is still cancellable and has bounded connect/read/write timeouts.
+     */
+    private val largeUploadHttp: OkHttpClient = http.newBuilder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.MINUTES)
+        .writeTimeout(45, TimeUnit.MINUTES)
+        .callTimeout(0, TimeUnit.MILLISECONDS)
         .build()
 
     private val refreshMutex = Mutex()
@@ -441,6 +462,92 @@ class SupabaseClient(
         }
     }
 
+    /**
+     * Stream a large file directly from disk to Storage without ever creating a
+     * ByteArray of the whole addon/world. This is the upload path used by ZIP
+     * batch imports (individual objects are capped by the bucket at 512 MiB).
+     */
+    suspend fun uploadFile(
+        bucket: String,
+        path: String,
+        file: File,
+        contentType: String,
+        upsert: Boolean = true,
+        onProgress: (sent: Long, total: Long) -> Unit = { _, _ -> },
+    ) = withContext(Dispatchers.IO) {
+        require(file.isFile && file.length() > 0L) { "upload_file_missing" }
+        val cfg = config()
+        val media = contentType.toMediaType()
+        val expectedLength = file.length()
+        val body = object : RequestBody() {
+            override fun contentType() = media
+            override fun contentLength(): Long = expectedLength
+
+            override fun writeTo(sink: BufferedSink) {
+                var sent = 0L
+                var lastReported = 0L
+                var lastReportAt = 0L
+                val buffer = ByteArray(256 * 1024)
+                file.inputStream().buffered(buffer.size).use { input ->
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        if (read == 0) continue
+                        sink.write(buffer, 0, read)
+                        sent += read
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (sent == expectedLength || sent - lastReported >= 512 * 1024 || now - lastReportAt >= 250L) {
+                            onProgress(sent, expectedLength)
+                            lastReported = sent
+                            lastReportAt = now
+                        }
+                    }
+                }
+                if (sent != expectedLength) throw IOException("upload_file_size_changed:$sent/$expectedLength")
+            }
+        }
+
+        val session = sessionStore.current() ?: throw ApiError(ApiErrorKind.NOT_SIGNED_IN)
+        if (session.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 120L) {
+            refreshSession()
+        }
+
+        fun request(token: String?): Request = Request.Builder()
+            .url("${cfg.storageUrl}/object/$bucket/${path.trimStart('/')}")
+            .header("apikey", cfg.anonKey)
+            .apply {
+                token?.takeIf(String::isNotBlank)?.let { header("Authorization", "Bearer $it") }
+            }
+            .header("Content-Type", contentType)
+            .header("x-upsert", upsert.toString())
+            .header("cache-control", "3600")
+            .post(body)
+            .build()
+
+        var result = executeLargeUpload(request(sessionStore.current()?.accessToken))
+        if (result.code == 401 && refreshSession()) {
+            result = executeLargeUpload(request(sessionStore.current()?.accessToken))
+        }
+        if (result.code !in 200..299) {
+            throw apiErrorFromMessage(extractMessage(result.body), result.code)
+        }
+    }
+
+    /** Remove uploaded batch objects after a confirmed pre-commit failure/cancel. */
+    suspend fun removeObjects(bucket: String, paths: List<String>) {
+        paths.filter(String::isNotBlank).distinct().chunked(100).forEach { chunk ->
+            val body = buildJsonObject {
+                put("prefixes", JsonArray(chunk.map { JsonPrimitive(it) }))
+            }
+            exec(
+                method = "DELETE",
+                url = "${config().storageUrl}/object/$bucket",
+                token = sessionStore.current()?.accessToken,
+                body = body.toString().toRequestBody(JSON_MEDIA),
+            )
+        }
+    }
+
     /** رابط موقّع قصير العمر (60 ثانية للمحتوى والإيصالات، 300 لوسائط الشات). */
     suspend fun signedUrl(bucket: String, path: String, expiresInSeconds: Int = 60): String = withContext(Dispatchers.IO) {
         val body = buildJsonObject { put("expiresIn", expiresInSeconds) }
@@ -543,6 +650,31 @@ class SupabaseClient(
     }
 
     // ------------------------------------------------------------------ HTTP
+
+    private data class UploadHttpResult(val code: Int, val body: String)
+
+    /** Async OkHttp bridge: coroutine cancellation immediately cancels a long upload socket. */
+    private suspend fun executeLargeUpload(request: Request): UploadHttpResult =
+        suspendCancellableCoroutine { continuation ->
+            val call = largeUploadHttp.newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, error: IOException) {
+                    if (continuation.isActive) continuation.resumeWithException(error)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    try {
+                        val result = response.use {
+                            UploadHttpResult(it.code, it.body?.string().orEmpty())
+                        }
+                        if (continuation.isActive) continuation.resume(result)
+                    } catch (error: Throwable) {
+                        if (continuation.isActive) continuation.resumeWithException(error)
+                    }
+                }
+            })
+        }
 
     /** @param token توكن المستخدم (JWT) فقط — لا تُمرّر مفاتيح المشروع هنا. null = طلب عام بهوية anon. */
     private suspend fun exec(

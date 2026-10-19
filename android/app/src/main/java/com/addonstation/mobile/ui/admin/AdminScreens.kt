@@ -143,6 +143,7 @@ fun AdminPanelScreen(
     onBackToApp: () -> Unit,
     onOpenChat: () -> Unit,
     onOpenContent: () -> Unit,
+    onOpenBulkImport: () -> Unit,
     onEditContent: (ContentItem) -> Unit,
     onOpenPayments: () -> Unit,
     onOpenModeration: () -> Unit,
@@ -360,6 +361,7 @@ fun AdminPanelScreen(
                         failed = failed,
                         onRetry = { reloadTick += 1 },
                         onOpenContentAdmin = onOpenContent,
+                        onOpenBulkImport = onOpenBulkImport,
                         onEditContent = onEditContent,
                         onDeleteContent = { item -> pendingDeleteContent = item },
                         onRefresh = { reloadTick += 1 },
@@ -1024,6 +1026,7 @@ private fun ContentTab(
     failed: Boolean = false,
     onRetry: () -> Unit = {},
     onOpenContentAdmin: () -> Unit,
+    onOpenBulkImport: () -> Unit,
     onEditContent: (ContentItem) -> Unit,
     onDeleteContent: (ContentItem) -> Unit,
     onRefresh: () -> Unit,
@@ -1062,13 +1065,22 @@ private fun ContentTab(
             }
         }
         item(key = "add-content") {
-            AdminPrimaryButton(
-                text = stringResource(R.string.admin_add_content_plain),
-                onClick = onOpenContentAdmin,
-                palette = palette,
-                modifier = Modifier.fillMaxWidth(),
-                height = 44.dp,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AdminPrimaryButton(
+                    text = stringResource(R.string.admin_add_content_plain),
+                    onClick = onOpenContentAdmin,
+                    palette = palette,
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 44.dp,
+                )
+                AdminOutlineButton(
+                    text = stringResource(R.string.admin_bulk_import_nav_title),
+                    onClick = onOpenBulkImport,
+                    palette = palette,
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 44.dp,
+                )
+            }
         }
         item(key = "published-heading") {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

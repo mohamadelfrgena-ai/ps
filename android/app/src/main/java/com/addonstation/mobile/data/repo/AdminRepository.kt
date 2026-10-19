@@ -1,5 +1,7 @@
 package com.addonstation.mobile.data.repo
 
+import android.content.Context
+import android.net.Uri
 import com.addonstation.mobile.data.ApiError
 import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.SupabaseClient
@@ -11,6 +13,7 @@ import com.addonstation.mobile.data.model.CreatorTip
 import com.addonstation.mobile.data.model.PaymentOrder
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.SubscriptionPlan
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
@@ -23,6 +26,8 @@ import kotlinx.serialization.json.JsonPrimitive
  * أي محاولة من غير الأدمن تُرفض من قاعدة البيانات.
  */
 class AdminRepository(private val supabase: SupabaseClient) {
+
+    private val bulkContentImporter = BulkContentImporter(supabase)
 
     private suspend fun selectProfiles(query: String): JsonElement =
         runCatching { supabase.select("visible_profiles", query) }
@@ -177,6 +182,33 @@ class AdminRepository(private val supabase: SupabaseClient) {
             supabase.upload(bucket, path, bytes, mime)
             path
         }
+    }
+
+    /** Copy and validate a selected ZIP without loading it into memory. */
+    suspend fun inspectBulkContentArchive(
+        context: Context,
+        uri: Uri,
+        contentType: String,
+        onProgress: (BulkImportProgress) -> Unit,
+    ): Result<BulkArchiveInspection> = try {
+        Result.success(bulkContentImporter.inspect(context, uri, contentType, onProgress))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        Result.failure(failure)
+    }
+
+    /** Upload every validated folder, then register the whole batch atomically. */
+    suspend fun importBulkContentArchive(
+        inspection: BulkArchiveInspection,
+        options: BulkImportOptions,
+        onProgress: (BulkImportProgress) -> Unit,
+    ): Result<BulkImportResult> = try {
+        Result.success(bulkContentImporter.import(inspection, options, onProgress))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        Result.failure(failure)
     }
 
     // -------------------------------------------------------------- المدفوعات

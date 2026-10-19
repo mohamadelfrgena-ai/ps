@@ -412,6 +412,7 @@ internal fun AdminFilterChip(
     palette: HomePalette = LocalHomePalette.current,
     height: Dp = 40.dp,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val shape = RoundedCornerShape(height / 2)
     Box(
@@ -423,7 +424,7 @@ internal fun AdminFilterChip(
                 if (selected) Modifier.background(Brush.linearGradient(listOf(palette.blue, palette.accentBlue)))
                 else Modifier.background(palette.surface).border(1.dp, palette.border, shape),
             )
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -439,6 +440,7 @@ internal fun AdminSegmentTab(
     palette: HomePalette = LocalHomePalette.current,
     modifier: Modifier = Modifier,
     fontSize: TextUnit = 14.sp,
+    enabled: Boolean = true,
 ) {
     Box(
         modifier
@@ -449,7 +451,7 @@ internal fun AdminSegmentTab(
                 if (selected) Modifier.background(Brush.linearGradient(listOf(palette.blue, palette.accentBlue)))
                 else Modifier,
             )
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(

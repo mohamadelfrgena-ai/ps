@@ -137,6 +137,7 @@ object Routes {
     fun userProfile(id: String) = "user/$id"
     const val ADMIN = "admin"
     const val ADMIN_CONTENT = "admin-content"
+    const val ADMIN_BULK_IMPORT = "admin-content/bulk-import"
     const val ADMIN_CONTENT_EDIT = "admin-content/{contentId}"
     fun adminContentEdit(id: String) = "admin-content/$id"
     const val ADMIN_ASSETS = "admin-assets"
@@ -987,6 +988,7 @@ private fun MainNavigation(
                         onBackToApp = { goTab(MainTab.Home) },
                         onOpenChat = { go(Routes.ADMIN_CHAT) },
                         onOpenContent = { go(Routes.ADMIN_CONTENT) },
+                        onOpenBulkImport = { go(Routes.ADMIN_BULK_IMPORT) },
                         onEditContent = { item -> go(Routes.adminContentEdit(item.id)) },
                         onOpenPayments = { },
                         onOpenModeration = { },
@@ -1013,6 +1015,20 @@ private fun MainNavigation(
                         },
                     ) {
                         com.addonstation.mobile.ui.admin.AdminContentEditorScreen(onBack = { back() })
+                    }
+                }
+                composable(Routes.ADMIN_BULK_IMPORT) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = 3,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
+                        com.addonstation.mobile.ui.admin.AdminBulkContentImportScreen(onBack = { back() })
                     }
                 }
                 composable(

@@ -2,7 +2,7 @@
 --  AddonStation Mobile — ٩٩) فاحص القاعدة: «هل نُفِّذ كل SQL كما نريد؟»
 -- ============================================================================
 --
---  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 46) بنداً بنداً، ويطبع
+--  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 47) بنداً بنداً، ويطبع
 --  جدولاً واحداً: كل صف = بند · العمود «الحالة» ✅ أو ❌ · والعمود «التفاصيل»
 --  يقول لك ما هو الناقص بالاسم بالضبط.
 --
@@ -59,9 +59,9 @@ $revoke$;
 
 with checks(n, file_, item, ok, detail) as (
 
-  select 1, '01_schema', 'الجداول الأساسية (33)',
-         (select count(*) from unnest(array['profiles', 'subscription_plans', 'payment_method_settings', 'payment_orders', 'content_items', 'content_favorites', 'content_downloads', 'ac_wallets', 'ac_transactions', 'ac_tasks', 'ac_task_claims', 'ac_events', 'chat_channels', 'chat_messages', 'chat_reactions', 'chat_mutes', 'chat_bans', 'chat_reports', 'chat_notifications', 'chat_read_state', 'chat_typing', 'chat_rules', 'chat_rule_acceptances', 'user_friends', 'creator_applications', 'creator_submissions', 'featured_creators', 'creator_follows', 'creator_tips', 'site_assets', 'sticker_packs', 'app_settings', 'admin_audit_log']) t where to_regclass('public.' || t) is null) = 0,
-         coalesce((select 'المفقود: ' || string_agg(t, ' · ') from unnest(array['profiles', 'subscription_plans', 'payment_method_settings', 'payment_orders', 'content_items', 'content_favorites', 'content_downloads', 'ac_wallets', 'ac_transactions', 'ac_tasks', 'ac_task_claims', 'ac_events', 'chat_channels', 'chat_messages', 'chat_reactions', 'chat_mutes', 'chat_bans', 'chat_reports', 'chat_notifications', 'chat_read_state', 'chat_typing', 'chat_rules', 'chat_rule_acceptances', 'user_friends', 'creator_applications', 'creator_submissions', 'featured_creators', 'creator_follows', 'creator_tips', 'site_assets', 'sticker_packs', 'app_settings', 'admin_audit_log']) t where to_regclass('public.' || t) is null), '33/33 موجودة')
+  select 1, '01_schema', 'الجداول الأساسية (34)',
+         (select count(*) from unnest(array['profiles', 'subscription_plans', 'payment_method_settings', 'payment_orders', 'content_items', 'content_favorites', 'content_downloads', 'ac_wallets', 'ac_transactions', 'ac_tasks', 'ac_task_claims', 'ac_events', 'chat_channels', 'chat_messages', 'chat_reactions', 'chat_mutes', 'chat_bans', 'chat_reports', 'chat_notifications', 'chat_read_state', 'chat_typing', 'chat_rules', 'chat_rule_acceptances', 'user_friends', 'creator_applications', 'creator_submissions', 'featured_creators', 'creator_follows', 'creator_tips', 'site_assets', 'sticker_packs', 'app_settings', 'admin_audit_log', 'content_import_batches']) t where to_regclass('public.' || t) is null) = 0,
+         coalesce((select 'المفقود: ' || string_agg(t, ' · ') from unnest(array['profiles', 'subscription_plans', 'payment_method_settings', 'payment_orders', 'content_items', 'content_favorites', 'content_downloads', 'ac_wallets', 'ac_transactions', 'ac_tasks', 'ac_task_claims', 'ac_events', 'chat_channels', 'chat_messages', 'chat_reactions', 'chat_mutes', 'chat_bans', 'chat_reports', 'chat_notifications', 'chat_read_state', 'chat_typing', 'chat_rules', 'chat_rule_acceptances', 'user_friends', 'creator_applications', 'creator_submissions', 'featured_creators', 'creator_follows', 'creator_tips', 'site_assets', 'sticker_packs', 'app_settings', 'admin_audit_log', 'content_import_batches']) t where to_regclass('public.' || t) is null), '34/34 موجودة')
   union all
   select 2, '01_schema', 'عمودا التقسيم في site_assets (collection · collection_order)',
          public.diag_text($q$select (count(*) = 2)::text from information_schema.columns where table_schema = 'public' and table_name = 'site_assets' and column_name in ('collection', 'collection_order')$q$) = 'true',
@@ -342,6 +342,14 @@ with checks(n, file_, item, ok, detail) as (
   select 71, '44_fix_profile_asset_guard', 'trusted profile RPCs pass the strict protected-column trigger',
          public.diag_text($q$select ((position('app.allow_profile_write' in pg_get_functiondef('public.guard_profile_update()'::regprocedure)) > 0) and (position('app.allow_profile_write' in pg_get_functiondef('public.set_profile_asset(text,text)'::regprocedure)) > 0) and (position('app.allow_profile_write' in pg_get_functiondef('public.update_my_profile(text,text,text,boolean,text)'::regprocedure)) > 0))::text$q$) = 'true',
          coalesce(public.diag_text($q$select 'guard/RPCs: ' || (position('app.allow_profile_write' in pg_get_functiondef('public.guard_profile_update()'::regprocedure)) > 0)::text || '/' || (position('app.allow_profile_write' in pg_get_functiondef('public.set_profile_asset(text,text)'::regprocedure)) > 0)::text || '/' || (position('app.allow_profile_write' in pg_get_functiondef('public.update_my_profile(text,text,text,boolean,text)'::regprocedure)) > 0)::text$q$), 'مفقود')
+  union all
+  select 72, '47_bulk_content_import', 'سجل دفعات الاستيراد محميّ بـRLS والقراءة للأدمن فقط',
+         public.diag_text($q$select (to_regclass('public.content_import_batches') is not null and (select relrowsecurity from pg_class where oid = 'public.content_import_batches'::regclass) and (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'content_import_batches') = 13 and (select count(*) from pg_policies where schemaname = 'public' and tablename = 'content_import_batches' and policyname = 'content_import_batches_admin_read') = 1 and has_table_privilege('authenticated', 'public.content_import_batches', 'select') and not has_table_privilege('authenticated', 'public.content_import_batches', 'insert,update,delete') and not has_table_privilege('anon', 'public.content_import_batches', 'select'))::text$q$) = 'true',
+         coalesce(public.diag_text($q$select 'columns: ' || (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'content_import_batches')::text || '/13 · policies: ' || (select count(*) from pg_policies where schemaname = 'public' and tablename = 'content_import_batches' and policyname = 'content_import_batches_admin_read')::text || '/1'$q$), 'مفقود')
+  union all
+  select 73, '47_bulk_content_import', 'RPC جماعي أمني وذري وidempotent مع تحقق Storage',
+         public.diag_text($q$select (to_regprocedure('public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)') is not null and (select prosecdef from pg_proc where oid = 'public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)'::regprocedure) and has_function_privilege('authenticated', 'public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)', 'execute') and not has_function_privilege('anon', 'public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)', 'execute') and position('pg_advisory_xact_lock' in pg_get_functiondef('public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)'::regprocedure)) > 0 and position('storage.objects' in pg_get_functiondef('public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)'::regprocedure)) > 0 and regexp_count(pg_get_functiondef('public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)'::regprocedure), 'jsonb_array_elements') = 2 and position('insert into public.content_import_batches' in pg_get_functiondef('public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)'::regprocedure)) > 0 and position('insert into public.admin_audit_log' in pg_get_functiondef('public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)'::regprocedure)) > 0)::text$q$) = 'true',
+         coalesce(public.diag_text($q$select 'security definer: ' || (select prosecdef from pg_proc where oid = 'public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)'::regprocedure)::text || ' · validation passes: ' || regexp_count(pg_get_functiondef('public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)'::regprocedure), 'jsonb_array_elements')::text || '/2'$q$), 'مفقود')
 
 )
 select n                                  as "#",
@@ -366,7 +374,7 @@ select 999999,
 
 -- ---------------------------------------------------------------------------
 --  ماذا بعد؟
---   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 41).
+--   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 47).
 --   • الصف الأخير (المجموع) يسرد أسماء الملفات التي فيها بند ❌ — لا يعني أن
 --     الملفات نفسها ناقصة، بل أن بنداً واحداً فيها لم يتحقّق: راجع عموده.
 --   • ظهر ❌ في ملف معيّن ⇒ نفّذ ذلك الملف من `supabase/` في SQL Editor

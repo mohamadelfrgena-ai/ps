@@ -6,7 +6,7 @@
 الملف 99 هو ما يلصقه المالك في Supabase ليتأكّد أن **كل** ملفات SQL نُفِّذت.
 هذا الفاحص يحرسه من الداخل:
 
-  ١) موجود ويحوي بنداً لكل ملف ترحيل (01 → 46)؛
+  ١) موجود ويحوي بنداً لكل ملف ترحيل (01 → 47)؛
   ٢) **لا يكتب شيئاً**: لا insert/update/delete/drop/alter/truncate — قراءة فقط
      (الاستثناء الوحيد: إنشاء دالة التشخيص `public.diag_text`)؛
   ٣) كل جدول/دالة/سياسة/زناد/تسلسل/مخزن **يذكره** موجود فعلاً في ملفات
@@ -243,9 +243,9 @@ def main() -> int:
     #     post_permission = 'admin' والصحيح 'admin_only').
     migrations_text = "".join(read(p2) for p2 in sorted(SUPABASE.glob("*.sql"))
                               if p2.name not in ("00_ALL_IN_ONE.sql", "99_VERIFY_ALL.sql"))
-    CATALOG_KEYS = {"schemaname", "table_schema", "table_name", "column_name", "policyname",
-                    "tgname", "indexname", "sequencename", "pubname", "relname", "proname",
-                    "column_default"}
+    CATALOG_KEYS = {"schemaname", "table_schema", "table_name", "tablename", "column_name",
+                    "policyname", "tgname", "indexname", "sequencename", "pubname", "relname",
+                    "proname", "oid", "column_default"}
     bad_values = []
     for key, val in comparisons(sql):
         if key in CATALOG_KEYS or val in ("public", "storage", "true", "false"):
