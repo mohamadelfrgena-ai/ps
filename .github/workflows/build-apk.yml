@@ -9,6 +9,7 @@
 #         task: profile-diagnostic ← فحص قراءة البروفايل فقط، بلا كتابة أو نشر
 #         task: profile-access-fix ← تطبيق إصلاح visible_profiles المحدد والتحقق منه
 #         task: content-diagnostic ← يفحص حزمة Sulfur Cars المصدرية فقط، بلا رفع أو APK
+#         task: content-repair ← يعيد حزمة Sulfur Cars الموثوقة ويرفعها، بلا APK
 #         task: kotlin-check   ← تصريف Kotlin فقط للتحقق، بلا إنشاء APK
 #     ثم يُدفع الالتزام. لا تُشترط أي كلمة في تعليق الالتزام — الملف وحده هو المُحكَم،
 #     فإن كان فيه «none» لا يُبنى شيء مهما كان التعليق.
@@ -49,6 +50,7 @@ on:
           - profile-diagnostic
           - profile-access-fix
           - content-diagnostic
+          - content-repair
           - kotlin-check
           - assets-dry-run
           - assets-upload
@@ -157,12 +159,12 @@ jobs:
           exit "$code"
 
   # ==========================================================================
-  # 0d) فحص حزمة Sulfur Cars المصدرية من إصدار GitHub العام — قراءة فقط
-  #     لا يرفع إلى Supabase، ولا يغيّر البيانات، ولا يبني APK.
+  # 0d) فحص/استعادة حزمة Sulfur Cars من إصدار GitHub العام الموثوق.
+  #     content-diagnostic للقراءة فقط؛ content-repair يحوّل ويرفع الملف، وكلاهما بلا APK.
   # ==========================================================================
   content-diagnostic:
     needs: request
-    if: needs.request.outputs.task == 'content-diagnostic'
+    if: needs.request.outputs.task == 'content-diagnostic' || needs.request.outputs.task == 'content-repair'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -235,6 +237,48 @@ jobs:
           while IFS= read -r line; do
             [ -n "$line" ] && echo "::notice title=Content package::$line"
           done < <(grep -E '^(ASSET|ZIP=|HEAD_HEX=|HEADER_U32_LE=|ASCII_STRINGS=|SIGNATURE_OFFSETS=|ENTRIES=|MANIFESTS=|MANIFEST )' /tmp/content-diagnostic.txt)
+
+      - name: Rebuild the verified Minecraft addon
+        if: needs.request.outputs.task == 'content-repair'
+        run: |
+          set -euo pipefail
+          python3 tools/convert_pvraw_to_mcaddon.py \
+            /tmp/sulfur-cars/sulfur-cars_ff44ec0a.raw \
+            /tmp/sulfur-cars/sulfur-cars_ffe0c865.raw \
+            --output /tmp/sulfur-cars/sulfur-cars_ffe0c865.mcaddon \
+            --report /tmp/sulfur-cars/package-report.json \
+            | tee /tmp/sulfur-cars/package-output.txt
+          unzip -t /tmp/sulfur-cars/sulfur-cars_ffe0c865.mcaddon
+          {
+            echo '### Rebuilt Sulfur Cars mcaddon'
+            echo '```json'
+            cat /tmp/sulfur-cars/package-report.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          python3 - <<'PY'
+          import json
+          report = json.load(open('/tmp/sulfur-cars/package-report.json', encoding='utf-8'))
+          print(f"::notice title=Rebuilt mcaddon::size={report['size']} sha256={report['sha256']} packs={len(report['packs'])}")
+          for pack in report['packs']:
+              print(f"::notice title=Minecraft pack::{pack['kind']} uuid={pack['uuid']} files={pack['files']} sha256={pack['mcpack_sha256']}")
+          PY
+
+      - name: Upload the rebuilt addon to protected storage
+        if: needs.request.outputs.task == 'content-repair'
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_URL" || { echo '::error::Missing Supabase URL secret'; exit 1; }
+          test -n "$SUPABASE_SECRET_KEY" || { echo '::error::Missing Supabase server key secret'; exit 1; }
+          python3 tools/upload_storage_object.py \
+            --bucket content-files \
+            --path content-001/sulfur-cars_ffe0c865.mcaddon \
+            --file /tmp/sulfur-cars/sulfur-cars_ffe0c865.mcaddon \
+            --content-type application/zip \
+            | tee /tmp/sulfur-cars/upload-result.json
+          echo '::notice title=Protected content upload::Uploaded content-001/sulfur-cars_ffe0c865.mcaddon; database metadata is updated separately after object verification.'
 
   # ==========================================================================
   # 0e) تصريف Kotlin فقط — يتحقق من الواجهة ولا ينشئ أو يسجّل APK

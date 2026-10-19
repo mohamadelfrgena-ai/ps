@@ -8,6 +8,7 @@
 #   task: assets-dry-run  ← تجربة رفع بلا كتابة
 #   task: kotlin-check    ← تصريف Kotlin للتحقق فقط، بلا APK
 #   task: content-diagnostic ← فحص حزمة Sulfur Cars فقط، بلا رفع أو APK
+#   task: content-repair  ← إعادة حزمة Sulfur Cars الموثوقة ورفعها، بلا APK
 #
 # لا تُشترط أي كلمة في تعليق الالتزام. الملف وحده يقرّر.
 #
@@ -38,9 +39,9 @@
 # اكتمل تسجيل APK التشخيصي للتنزيل؛ إيقاف طلب البناء.
 # بناء APK بطلب المالك بعد إصلاح انهيار Android 12 في طلب إذن الإشعارات.
 # اكتمل تسجيل APK إصلاح Android 12؛ أوقف طلب البناء.
-task: content-diagnostic
-run: 141
-# فحص ترويسة حزمة Sulfur Cars من إصدار GitHub الموثوق؛ بلا رفع وبلا APK.
+task: content-repair
+run: 142
+# إعادة بناء حزمة Sulfur Cars من الأصلين الموثوقين ورفعها إلى التخزين الخاص؛ بلا APK.
 # نجح تصريف شاشة Splash الجديدة بلا إنشاء APK؛ لا يوجد طلب بناء.
 # اكتمل بناء إصلاح البروفايل المؤكد وسُجّل APK عند 2c603ec.
 # بناء APK بعد الإصلاح المؤكد: قراءة visible_profiles العامة بلا JWT تالف.
