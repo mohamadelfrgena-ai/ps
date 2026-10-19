@@ -113,7 +113,7 @@ if "fun localDayKey(" not in fmt:
 # 6) البداية: النصوص في كل وضع، والتقدم مربوط بمراحل الإقلاع والجاهزية
 splash = read("ui/splash/SplashScreen.kt")
 for token, description in (
-    ("FULL_TIMELINE_MS = 6_600", "مدة المقدمة الأولى 6.6s"),
+    ("FULL_TIMELINE_MS = 5_200", "مدة المقدمة الجديدة 5.2s"),
     ("COMPACT_LOOP_MS = 1_500", "حلقة التشغيلات التالية 1.5s"),
     ("MIN_SPLASH_MS = 1_500L", "الحد الأدنى لعرض البداية 1.5s"),
     ("LaunchedEffect(introComplete, skipRequested, startupReady)", "الخروج مرتبط باكتمال الحركة وجاهزية الإقلاع"),
@@ -123,7 +123,7 @@ for token, description in (
     ("AppPrefs.splashCompleted(context)", "تذكّر اكتمال أول تشغيل"),
     ("waitingPulse.animateTo(", "نبض متحرك لشريط التحميل"),
     ("ProgressBarRangeInfo(semanticProgress", "التقدم متاح لقارئات الشاشة"),
-    ("ramp(p, 0.6143f, 0.8714f)", "حدّ زمني أدنى وفق المقدمة"),
+    ("if (compactMode) 0.14f else 0.61f", "حدّ زمني أدنى وفق المقدمة الجديدة"),
     ("startupReady || skipRequested -> 1f", "اكتمال الشريط عند الجاهزية أو التخطي"),
 ):
     if token not in splash:
@@ -156,5 +156,5 @@ if problems:
     print(f"\n✗ عاد {len(problems)} سبباً من أسباب التقطيع/الثِقَل — أصلحها قبل البناء.")
     sys.exit(1)
 print("🟢 لا توليف فرعي في القوائم · الجلسة من الذاكرة · فهرس أدوات O(1) ·")
-print("   الرئيسية كسولة · فاصل التاريخ مرة واحدة · المقدمة 6.6s والحلقة 1.5s،")
+print("   الرئيسية كسولة · فاصل التاريخ مرة واحدة · المقدمة الجديدة 5.2s والحلقة 1.5s،")
 print("   العبارات المترجمة ظاهرة في كل تشغيل · الشريط يعكس تقدم الإقلاع وينبض حتى الجاهزية · المهلة والتخطي يمنعان الانتظار المفتوح.")

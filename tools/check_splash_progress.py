@@ -41,11 +41,11 @@ checks = {
             "(!startupReady && !skipRequested)",
         )
     ),
-    "loading bar uses staged progress and the intro timeline": all(
+    "loading bar uses staged progress and the redesigned intro timeline": all(
         token in SPLASH
         for token in (
             "ProgressBarRangeInfo(semanticProgress, 0f..1f)",
-            "ramp(p, 0.6143f, 0.8714f)",
+            "if (compactMode) 0.14f else 0.61f",
             "maxOf(safeProgress, timeMinimum).coerceAtMost(0.80f)",
         )
     ),
@@ -55,6 +55,22 @@ checks = {
             "while (true)",
             "waitingPulse.animateTo(",
             "startupReady || skipRequested -> 1f",
+        )
+    ),
+    "the new cave artwork replaces the complete legacy splash stack": (
+        "R.drawable.splash_cave_chase" in SPLASH
+        and all(old not in SPLASH for old in (
+            "splash_bg_original", "splash_timeline_bg", "splash_logo", "splash_bg_legacy"
+        ))
+    ),
+    "DREAM / BUILD / CREATE retain sequential reveal and scene colours": all(
+        token in SPLASH
+        for token in (
+            "R.string.splash_dream_it",
+            "R.string.splash_build_it",
+            "R.string.splash_create_it",
+            "SceneDiamond",
+            "SceneLava",
         )
     ),
 }

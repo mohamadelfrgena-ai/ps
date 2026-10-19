@@ -8,6 +8,7 @@
 #         task: assets-dry-run ← تجربة رفع بلا كتابة
 #         task: profile-diagnostic ← فحص قراءة البروفايل فقط، بلا كتابة أو نشر
 #         task: profile-access-fix ← تطبيق إصلاح visible_profiles المحدد والتحقق منه
+#         task: kotlin-check   ← تصريف Kotlin فقط للتحقق، بلا إنشاء APK
 #     ثم يُدفع الالتزام. لا تُشترط أي كلمة في تعليق الالتزام — الملف وحده هو المُحكَم،
 #     فإن كان فيه «none» لا يُبنى شيء مهما كان التعليق.
 #
@@ -46,6 +47,7 @@ on:
           - apk-commit
           - profile-diagnostic
           - profile-access-fix
+          - kotlin-check
           - assets-dry-run
           - assets-upload
   # هذا المحفّز لا يعمل إلا إذا تغيّر ملف طلب البناء (.build-request).
@@ -151,6 +153,49 @@ jobs:
             echo "::error title=Profile access fix failed::$detail"
           fi
           exit "$code"
+
+  # ==========================================================================
+  # 0d) تصريف Kotlin فقط — يتحقق من الواجهة ولا ينشئ أو يسجّل APK
+  # ==========================================================================
+  kotlin-check:
+    needs: request
+    if: needs.request.outputs.task == 'kotlin-check'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0 platform-tools'
+          log-accepted-android-sdk-licenses: false
+
+      - name: Write public Android configuration
+        working-directory: android
+        run: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          echo "ADDONSTATION_SUPABASE_URL=${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}" >> local.properties
+          echo "ADDONSTATION_SUPABASE_ANON_KEY=${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}" >> local.properties
+
+      - name: Verify redesigned splash resources and behavior
+        run: |
+          python3 tools/check_resources.py
+          python3 tools/check_kotlin_health.py
+          python3 tools/check_kotlin_refs.py
+          python3 tools/check_splash_progress.py
+          python3 tools/check_screen_backgrounds.py
+          python3 tools/check_jank_guard.py
+
+      - name: Compile debug Kotlin without building an APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace
 
   # ==========================================================================
   # 1) بناء التطبيق (debug APK)
