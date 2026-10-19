@@ -1400,9 +1400,8 @@ fun DiscordProfileCardSheet(
                                     url = itemImg,
                                     radius = 4.dp,
                                     modifier = Modifier.size(16.dp),
+                                    animate = true,
                                 )
-                            } else {
-                                Text("🎖", style = AppText.tiny)
                             }
                             Text(
                                 profile.equippedItemId,

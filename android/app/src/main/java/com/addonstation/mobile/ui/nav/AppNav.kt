@@ -386,7 +386,7 @@ private fun MainNavigation(
 
     /**
      * الوجهة التي أرادها المستخدم قبل أن نوقفه عند شاشة الدخول — نعود إليها
-     * بعد نجاح الدخول مباشرةً، سواء كانت شاتاً أو إحدى واجهات الاشتراك.
+     * بعد نجاح الدخول مباشرةً، سواء كانت شاتاً أو محفظةً أو واجهة اشتراك.
      */
     var afterLoginRoute by remember { mutableStateOf<String?>(null) }
 
@@ -401,6 +401,10 @@ private fun MainNavigation(
             destination == Routes.CHECKOUT ||
             destination.startsWith("checkout/")
 
+    /** المحفظة وسجل AC بيانات حساب، فلا يراهما الضيف. */
+    fun isWalletRoute(destination: String): Boolean =
+        destination == Routes.WALLET || destination == Routes.AC_HISTORY
+
     /** يطابق المسار الفعلي نمط Compose ذي الوسيط عند الوقوف عليه. */
     fun matchesIntendedRoute(current: String?, intended: String): Boolean =
         current == intended ||
@@ -408,8 +412,8 @@ private fun MainNavigation(
             (current == Routes.CHECKOUT && intended.startsWith("checkout/"))
 
     /**
-     * بوابة موحّدة للشاشات المحمية: لا تُركّب واجهة الشات أو الاشتراك للضيف،
-     * بل ينتقل إلى الدخول ثم يعود إلى وجهته المقصودة بعد نجاح المصادقة.
+     * بوابة موحّدة للشاشات المحمية: لا تُركّب واجهة الشات أو المحفظة أو
+     * الاشتراك للضيف، بل ينتقل إلى الدخول ثم يعود إلى وجهته بعد المصادقة.
      */
     fun requireSignIn(intended: String) {
         afterLoginRoute = intended
@@ -444,7 +448,7 @@ private fun MainNavigation(
     }
 
     fun go(route: String) {
-        if (!signedIn && (isChatRoute(route) || isPlanRoute(route))) {
+        if (!signedIn && (isChatRoute(route) || isPlanRoute(route) || isWalletRoute(route))) {
             requireSignIn(route)
             return
         }
@@ -850,13 +854,25 @@ private fun MainNavigation(
 
                 // الحساب والمحفظة والإشعارات
                 composable(Routes.WALLET) {
-                    com.addonstation.mobile.ui.account.AcWalletScreen(
-                        onBack = { back() },
-                        onOpenHistory = { go(Routes.AC_HISTORY) },
-                    )
+                    SignInGate(
+                        signedIn = signedIn,
+                        intended = Routes.WALLET,
+                        onRequireSignIn = { intended -> requireSignIn(intended) },
+                    ) {
+                        com.addonstation.mobile.ui.account.AcWalletScreen(
+                            onBack = { back() },
+                            onOpenHistory = { go(Routes.AC_HISTORY) },
+                        )
+                    }
                 }
                 composable(Routes.AC_HISTORY) {
-                    com.addonstation.mobile.ui.account.AcTransactionHistoryScreen(onBack = { back() })
+                    SignInGate(
+                        signedIn = signedIn,
+                        intended = Routes.AC_HISTORY,
+                        onRequireSignIn = { intended -> requireSignIn(intended) },
+                    ) {
+                        com.addonstation.mobile.ui.account.AcTransactionHistoryScreen(onBack = { back() })
+                    }
                 }
                 composable(Routes.NOTIFICATIONS) {
                     com.addonstation.mobile.ui.account.NotificationsScreen(
@@ -1226,7 +1242,7 @@ private fun MainNavigation(
 }
 
 /**
- * بوابة الوجهات المحمية: لا تُركّب واجهة الشات أو الاشتراك قبل تسجيل الدخول.
+ * بوابة الوجهات المحمية: لا تُركّب واجهة الشات أو المحفظة أو الاشتراك قبل الدخول.
  * وُضعت في التنقّل نفسه لتغطي الضغطة العادية، والرابط المباشر، والرجوع،
  * واستعادة حالة التنقّل بعد قتل العملية بلا إظهار المحتوى للضيف ولو للحظة.
  */

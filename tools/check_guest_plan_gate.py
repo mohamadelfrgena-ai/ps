@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static guard: guests must never see or enter subscription-plan UI."""
+"""Static guard: guests must never enter wallet or subscription-plan UI."""
 
 from __future__ import annotations
 
@@ -40,6 +40,11 @@ def main() -> None:
     notifications = read("settings/NotificationSettingsScreen.kt")
     home = read("home/HomeScreen.kt")
     nav = read("nav/AppNav.kt")
+    wallet_surfaces = {
+        "settings top bar": read("components/AuthSettingsUi.kt"),
+        "pixel top bar": read("components/PixelTopBar.kt"),
+        "store header": read("store/StoreScreens.kt"),
+    }
 
     # Settings remains available to a guest, so every plan-specific element in
     # it needs its own explicit signed-in branch.
@@ -80,8 +85,8 @@ def main() -> None:
     # Internal clicks are redirected immediately; route-level gates remain the
     # final barrier for state restoration and any direct navigation attempt.
     require(
-        "if (!signedIn && (isChatRoute(route) || isPlanRoute(route)))" in nav,
-        "plan links are not redirected to authentication before navigation",
+        "if (!signedIn && (isChatRoute(route) || isPlanRoute(route) || isWalletRoute(route)))" in nav,
+        "wallet/plan links are not redirected to authentication before navigation",
     )
     plan_route = balanced_block(nav, "composable(Routes.PLANS) {")
     checkout_start = nav.find("route = Routes.CHECKOUT,")
@@ -89,16 +94,30 @@ def main() -> None:
     require(checkout_start >= 0 and checkout_end > checkout_start, "checkout route block is missing")
     checkout_route = nav[checkout_start:checkout_end]
     orders_route = balanced_block(nav, "composable(Routes.ORDERS) {")
+    wallet_route = balanced_block(nav, "composable(Routes.WALLET) {")
+    history_route = balanced_block(nav, "composable(Routes.AC_HISTORY) {")
     for label, block, screen in (
         ("plans", plan_route, "PlansScreen("),
         ("checkout", checkout_route, "CheckoutScreen("),
         ("orders", orders_route, "MyOrdersScreen("),
+        ("wallet", wallet_route, "AcWalletScreen("),
+        ("AC history", history_route, "AcTransactionHistoryScreen("),
     ):
         require("SignInGate(" in block, f"the direct {label} route has no SignInGate")
         require(block.index("SignInGate(") < block.index(screen),
                 f"the {label} screen is composed before its SignInGate")
 
-    print("guest plan gate: OK")
+    for label, surface in wallet_surfaces.items():
+        require(
+            '(walletBalance ?: 0).toString()' in surface,
+            f"{label} does not show 0 while the AC balance is unavailable",
+        )
+        require(
+            'walletBalance?.toString() ?: "—"' not in surface,
+            f"{label} brought back the misleading dash AC balance",
+        )
+
+    print("guest plan/wallet gate: OK")
 
 
 if __name__ == "__main__":

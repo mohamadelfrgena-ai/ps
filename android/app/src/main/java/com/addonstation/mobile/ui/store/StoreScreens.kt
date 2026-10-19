@@ -336,7 +336,7 @@ private fun StoreHeader(
                 modifier = Modifier.size(24.dp),
             )
             Text(
-                walletBalance?.toString() ?: "—",
+                (walletBalance ?: 0).toString(),
                 style = androidx.compose.ui.text.TextStyle(
                     fontFamily = com.addonstation.mobile.ui.theme.NumberFont,
                     fontSize = 14.sp,

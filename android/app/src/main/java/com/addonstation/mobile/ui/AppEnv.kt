@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.addonstation.mobile.AddonStationApp
 import com.addonstation.mobile.data.AppContainer
 import com.addonstation.mobile.data.model.SiteAsset
+import java.util.Locale
 
 /** وصول مختصر لحاوية التطبيق من أي شاشة. */
 @Composable
@@ -59,12 +60,17 @@ fun sectionFromPath(path: String?): String? {
  * رابط صورة الأداة المجهّزة: الملف الشخصي يحفظ **اسم** الأداة، فنبحث عن ملفها
  * في أصول الواجهة ثم نحوّله إلى رابط عام — لتظهر الأداة (متحرّكة إن كانت GIF) بجانب الاسم.
  */
-fun equippedItemUrl(container: AppContainer, name: String?): String? {
+fun equippedItemUrl(
+    container: AppContainer,
+    name: String?,
+    itemUrlIndex: Map<String, String> = container.state.itemUrlIndex.value,
+): String? {
     val clean = name?.trim().orEmpty()
     if (clean.isEmpty() || clean.equals("none", ignoreCase = true)) return null
-    // بحث O(1) في فهرس جاهز بدل مسح ٤٩٢ أصلاً في كل نداء (كان داخل تركيب كل
-    // رسالة في الشات ⇒ آلاف المقارنات في الإطار الواحد = تقطيع أثناء التمرير).
-    return container.state.itemUrlIndex.value[clean]
+    // بحث O(1) في فهرس جاهز بدل مسح مئات الأصول داخل كل رسالة. ندعم الاسم
+    // والمسار/المعرّف وكذلك اختلاف حالة الأحرف لأن ملفات قديمة خزّنت قيماً
+    // بصيغ مختلفة قبل أن يوحّد RPC قيمة الأداة على اسمها.
+    return itemUrlIndex[clean] ?: itemUrlIndex[clean.lowercase(Locale.ROOT)]
 }
 
 /** أول حرف/حرفان من الاسم لعرضها في الصور البديلة. */

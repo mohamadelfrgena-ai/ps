@@ -122,7 +122,9 @@ import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.util.TimeFormat
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
@@ -186,6 +188,25 @@ fun ChatScreen(
     val profile by container.state.profile.collectAsState()
     val signedIn by container.state.signedIn.collectAsState()
     val chatStatus by container.state.chatStatus.collectAsState()
+    // فهرس الأدوات حالة Compose مشتركة: وصول الأصول بعد فتح الغرفة يعيد تركيب
+    // الترويسات فوراً، بدلاً من بقاء رمز بديل حتى إغلاق الشات وإعادة فتحه.
+    val itemUrlIndex by container.state.itemUrlIndex.collectAsState()
+    val itemUrlResolver: (String?) -> String? = remember(container, itemUrlIndex) {
+        { value -> com.addonstation.mobile.ui.equippedItemUrl(container, value, itemUrlIndex) }
+    }
+    val equippedAuthorItems = remember(authors) {
+        authors.values
+            .map(Profile::equippedItemId)
+            .filterNot { it.isBlank() || it.equals("none", ignoreCase = true) }
+            .distinct()
+    }
+    LaunchedEffect(equippedAuthorItems, itemUrlIndex) {
+        // قد تُفتح الغرفة قبل اكتمال تحميل مكتبة الأصول. محاولة واحدة مشتركة
+        // تكفي لكل الكتّاب، ولا نجري طلباً داخل كل رسالة أو كل إعادة تركيب.
+        if (equippedAuthorItems.any { itemUrlResolver(it) == null }) {
+            withContext(Dispatchers.IO) { container.assets.all() }
+        }
+    }
     // **القراءة فقط**: في الغرف المقفلة أو التي صلاحيتها admin_only لا يملك
     // المستخدم حق الكتابة ⇒ نُخفي عنه شريط الكتابة بالكامل (بما فيه زر الإرسال).
     val readOnlyRoom = isReadOnlyFor(channel, profile?.role)
@@ -654,6 +675,7 @@ fun ChatScreen(
                                 memberCardProfile = authors[userId] ?: profile?.takeIf { it.id == userId }
                             },
                             stickerUrlResolver = stickerUrlResolver,
+                            equippedItemUrlResolver = itemUrlResolver,
                             onPlayVideo = {
                                 // رابط الفيديو يُوقَّع عند الضغط (صالح دقائق) ثم يُشغَّل
                                 scope.launch {
@@ -1961,6 +1983,7 @@ private fun MessageBlock(
     onOpenImage: (String) -> Unit,
     onOpenUser: (String) -> Unit,
     stickerUrlResolver: (String) -> String?,
+    equippedItemUrlResolver: (String?) -> String?,
     /** ضغطة على بطاقة الفيديو ⇒ تشغيله (بعد توقيع رابطه). */
     onPlayVideo: () -> Unit = {},
     /** إعادة إرسال رسالة فاشلة من مكانها (تبقى ظاهرة حتى تنجح). */
@@ -2091,17 +2114,34 @@ private fun MessageBlock(
                         RankBadge(role = author.role, plan = author.effectivePlan)
                     }
                 }
-                if (author?.equippedItemId != null && author.equippedItemId != "none") {
-                    val itemImg = com.addonstation.mobile.ui.equippedItemUrl(container, author.equippedItemId)
+                val equippedItem = author?.equippedItemId
+                    ?.takeUnless { it.isBlank() || it.equals("none", ignoreCase = true) }
+                if (equippedItem != null) {
+                    val itemImg = equippedItemUrlResolver(equippedItem)
                     if (itemImg != null) {
                         com.addonstation.mobile.ui.components.CoverImage(
                             url = itemImg,
                             radius = 8.dp,
                             modifier = Modifier.size(32.dp),
+                            animate = true,
                             backgroundColor = Color.Transparent,
                         )
                     } else {
-                        Text("🎖", style = AppText.body.copy(fontSize = 22.sp))
+                        // لا نعرض إيموجي ميدالية لا علاقة له بالأداة. إذا تعذّر
+                        // رابط الصورة بعد إعادة تحميل الأصول، يبقى اسم الأداة
+                        // الحقيقي ظاهراً بدلاً من معلومة مضللة.
+                        Text(
+                            text = equippedItem,
+                            style = AppText.tiny,
+                            color = AppColors.Muted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .widthIn(max = 82.dp)
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(AppColors.Elevated)
+                                .padding(horizontal = 6.dp, vertical = 3.dp),
+                        )
                     }
                 }
             }

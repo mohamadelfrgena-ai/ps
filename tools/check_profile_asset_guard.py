@@ -12,6 +12,8 @@ FUNCTIONS = ROOT / "supabase/02_functions_core.sql"
 GRANTS = ROOT / "supabase/11_grants.sql"
 BUNDLE = ROOT / "supabase/00_ALL_IN_ONE.sql"
 MIGRATION = ROOT / "supabase/44_fix_profile_asset_guard.sql"
+SUPABASE_CONFIG = ROOT / "android/app/src/main/java/com/addonstation/mobile/data/SupabaseConfig.kt"
+PROFILE_EDITOR = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/profile/EditProfileEditor.kt"
 
 PROTECTED_COLUMNS = (
     "role",
@@ -45,6 +47,8 @@ def main() -> None:
     grants = GRANTS.read_text(encoding="utf-8")
     bundle = BUNDLE.read_text(encoding="utf-8")
     migration = MIGRATION.read_text(encoding="utf-8")
+    supabase_config = SUPABASE_CONFIG.read_text(encoding="utf-8")
+    profile_editor = PROFILE_EDITOR.read_text(encoding="utf-8")
 
     guard = function_body(schema, "create or replace function public.guard_profile_update()", "drop trigger if exists trg_guard_profile_update")
     require("current_setting('app.allow_profile_write', true)" in guard,
@@ -102,6 +106,21 @@ def main() -> None:
             "all-in-one bundle is not synchronized with trusted RPC writes")
     require("current_setting('app.allow_profile_write', true)" in bundle,
             "all-in-one bundle is not synchronized with the guard")
+
+    # Storage object names are authoritative. The real Profiles/Default pack
+    # lives under profiles/profiles/*, so collapsing repeated folders creates
+    # a different (missing) object URL and leaves every editor preview blank.
+    require("fun normalizeStoragePath(path: String): String = path.trim().trimStart('/')" in supabase_config,
+            "public asset URLs no longer preserve the stored object path")
+    require("parts.drop(1)" not in supabase_config,
+            "repeated real storage folders are being collapsed again")
+    for token in (
+        "val previewAvatarUrl = assetUrl(container, selectedAvatar)",
+        "val previewBannerUrl = assetUrl(container, selectedBanner)",
+        "avatarUrl = previewAvatarUrl",
+        "bannerUrl = previewBannerUrl",
+    ):
+        require(token in profile_editor, f"profile editor preview wiring is missing: {token}")
 
     print("profile asset guard: OK")
 

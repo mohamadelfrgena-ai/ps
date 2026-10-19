@@ -338,7 +338,7 @@ fun AuthSettingsTopBar(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     CoinIcon(size = 16.dp)
-                    Text(walletBalance?.toString() ?: "—", style = Spec.rowValue, color = AppColors.AuthText)
+                    Text((walletBalance ?: 0).toString(), style = Spec.rowValue, color = AppColors.AuthText)
                     Text("AC", style = TextStyle(fontSize = 10.sp), color = AppColors.AuthMuted)
                 }
             }

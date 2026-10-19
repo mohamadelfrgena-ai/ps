@@ -130,8 +130,12 @@ else:
 
 # 3) الأداة بجانبهما (خارج العمود) وبمقاسها الجديد
 if header:
-    if "equippedItemUrl" not in header:
-        problems.append("الأداة المجهّزة غير معروضة في الترويسة")
+    if "equippedItemUrlResolver" not in header:
+        problems.append("الأداة المجهّزة لا تستخدم محلّل رابطها في الترويسة")
+    if "🎖" in header or "🎖" in sheets:
+        problems.append("عاد إيموجي الميدالية بديلاً مضللاً عن صورة الأداة")
+    if "itemUrlIndex.collectAsState()" not in chat or "container.assets.all()" not in chat:
+        problems.append("أداة الشات لا تعيد التركيب/تحميل الأصول عند غياب رابط الصورة")
     # الأداة تُقاس بـ Modifier.size(32.dp) والصورة بمعامل size = 40.dp
     if not re.search(r"size\(\s*%d\.dp\s*\)" % ITEM_DP, header):
         problems.append("حجم الأداة ليس %ddp" % ITEM_DP)
@@ -172,6 +176,9 @@ rows = [
     ("اسم/رتبة/أداة الكاتب تُحمّل مع إعادة محاولة", metadata_retry_ok),
     ("مصدر بيانات الكاتب visible_profiles الكامل والآمن", profile_source_ok),
     ("خلفية الأداة شفافة بلا إطار مضاف", "backgroundColor = Color.Transparent" in (header or "")),
+    ("لا ميدالية بديلة؛ صورة الأداة أو اسمها", "🎖" not in (header or "") and "🎖" not in sheets),
+    ("فهرس الأداة تفاعلي ويُعاد تحميله عند الحاجة",
+     "itemUrlIndex.collectAsState()" in chat and "container.assets.all()" in chat),
     ("عمود الرسالة يعكس جهة رسائلي", "horizontalAlignment = if (isMine) Alignment.End else Alignment.Start" in chat),
     ("فقاعة النص الصادر عند نهاية السطر", "horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End)" in chat),
     ("كل أنواع الوسائط بمحاذاة جهة المرسل", chat.count("horizontalAlignment = if (isMine) Alignment.End else Alignment.Start") >= 5),
@@ -185,4 +192,4 @@ if problems:
         print("✗", p)
     print(f"\n✗ عدد المشاكل: {len(problems)}")
     sys.exit(1)
-print("🟢 ترويسة الشات: صورة 40 · اسم · لقبه تحته (إن كان مشتركاً أو صاحب رتبة) · وأداة 32 بجانبهما — والمجّاني بلا سطر تحت اسمه.")
+print("🟢 ترويسة الشات: صورة 40 · اسم · لقبه تحته · وصورة الأداة 32 (أو اسمها عند تعذرها) بلا ميدالية مضللة.")

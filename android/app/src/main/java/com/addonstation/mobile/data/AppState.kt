@@ -9,6 +9,7 @@ import com.addonstation.mobile.data.model.SiteAsset
 import com.addonstation.mobile.data.model.StickerPack
 import com.addonstation.mobile.data.model.SubscriptionPlan
 import com.addonstation.mobile.data.model.UnreadCount
+import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -80,12 +81,19 @@ class AppState(private val container: AppContainer) {
     val itemUrlIndex: StateFlow<Map<String, String>> = _itemUrlIndex.asStateFlow()
 
     private fun buildItemUrlIndex(assets: List<SiteAsset>): Map<String, String> {
-        val out = HashMap<String, String>(assets.size)
+        val out = HashMap<String, String>(assets.size * 4)
         assets.forEach { asset ->
-            if (asset.assetType != "item") return@forEach
-            val name = asset.name.trim()
-            if (name.isEmpty() || out.containsKey(name)) return@forEach
-            container.siteAssetUrl(asset.fileUrl)?.let { out[name] = it }
+            if (!asset.assetType.equals("item", ignoreCase = true)) return@forEach
+            val url = container.siteAssetUrl(asset.fileUrl) ?: return@forEach
+            val aliases = buildList {
+                asset.name.trim().takeIf(String::isNotEmpty)?.let { add(it) }
+                asset.fileUrl.trim().trimStart('/').takeIf(String::isNotEmpty)?.let { add(it) }
+                asset.id.takeIf { it > 0L }?.toString()?.let { add(it) }
+            }
+            aliases.forEach { alias ->
+                out.putIfAbsent(alias, url)
+                out.putIfAbsent(alias.lowercase(Locale.ROOT), url)
+            }
         }
         return out
     }
