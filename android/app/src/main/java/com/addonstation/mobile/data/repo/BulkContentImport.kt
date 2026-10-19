@@ -18,7 +18,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -476,8 +475,14 @@ internal class BulkContentImporter(private val supabase: SupabaseClient) {
                 inspection.pendingRegistration = null
                 throw BulkImportException(BulkImportError.SERVER_REJECTED, outcome.message)
             }
-            val imported = outcome.data["count"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-                ?: payload.size
+            val returnedBatch = (outcome.data["batch_id"] as? JsonPrimitive)?.contentOrNull
+            val imported = (outcome.data["count"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull()
+                ?: throw BulkImportException(BulkImportError.REGISTRATION_UNCERTAIN, "invalid_response")
+            if (returnedBatch != inspection.batchId || imported != payload.size) {
+                // A missing/malformed success payload cannot prove that the
+                // transaction committed. Keep the exact retry manifest.
+                throw BulkImportException(BulkImportError.REGISTRATION_UNCERTAIN, "invalid_response")
+            }
             inspection.pendingRegistration = null
             inspection.cleanup()
             onProgress(BulkImportProgress(BulkImportStage.COMPLETE, 1f, itemCount = imported))
