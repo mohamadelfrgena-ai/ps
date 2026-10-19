@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.sp
 import com.addonstation.mobile.R
 import com.addonstation.mobile.ui.nav.MainTab
 import com.addonstation.mobile.ui.theme.HomePalette
-import com.addonstation.mobile.ui.theme.HomePalettes
 import com.addonstation.mobile.ui.theme.LocalHomePalette
 import com.addonstation.mobile.ui.theme.NunitoFont
 import com.addonstation.mobile.ui.theme.TajawalFont
@@ -72,11 +71,9 @@ fun BottomNavBar(
     chatUnreadCount: Int = 0,
     hasPendingFriendRequests: Boolean = false,
 ) {
-    val palette = if (current == MainTab.Settings || current == MainTab.Community || current == MainTab.Profile) {
-        HomePalettes.Dark
-    } else {
-        LocalHomePalette.current
-    }
+    // Follow the selected app theme on every tab. Individual destinations must not
+    // force the shared navigation chrome back to the dark palette.
+    val palette = LocalHomePalette.current
     Box(Modifier.fillMaxWidth().background(palette.bg)) {
         Column(
             Modifier
@@ -184,8 +181,8 @@ private fun NavItem(
                                     elevation = 18.dp,
                                     shape = CircleShape,
                                     clip = false,
-                                    ambientColor = Color.Black.copy(alpha = 0.50f),
-                                    spotColor = Color.Black.copy(alpha = 0.50f),
+                                    ambientColor = palette.barShadow,
+                                    spotColor = palette.barShadow,
                                 )
                             },
                         )

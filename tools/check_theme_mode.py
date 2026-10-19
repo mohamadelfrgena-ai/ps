@@ -10,6 +10,7 @@ NAV = (SRC / "ui/nav/AppNav.kt").read_text(encoding="utf-8")
 COLORS = (SRC / "ui/theme/Color.kt").read_text(encoding="utf-8")
 SPEC = (SRC / "ui/theme/Spec.kt").read_text(encoding="utf-8")
 CHAT = (SRC / "ui/chat/ChatScreen.kt").read_text(encoding="utf-8")
+BOTTOM_NAV = (SRC / "ui/components/BottomNav.kt").read_text(encoding="utf-8")
 
 rows = []
 row_start = SETTINGS.find('title = stringResource(R.string.set_theme)')
@@ -31,6 +32,21 @@ rows.append(("auth/settings colors follow the selected palette",
 rows.append(("home/chat/profile design tokens have adaptive light values",
              "private val homePalette: HomePalette" in SPEC
              and "get() = if (AppColors.isDark) HomePalettes.Dark else HomePalettes.Light" in SPEC))
+rows.append(("bottom navigation always consumes the active palette",
+             "val palette = LocalHomePalette.current" in BOTTOM_NAV
+             and "HomePalettes.Dark" not in BOTTOM_NAV))
+rows.append(("bottom navigation surfaces, borders, icons, and badges use that palette",
+             all(token in BOTTOM_NAV for token in (
+                 ".background(palette.bg)",
+                 ".background(palette.barSurface.copy(alpha = 0.96f))",
+                 ".border(1.dp, palette.border, shape)",
+                 "else palette.inactive",
+                 ".background(palette.notificationBadge)",
+             ))))
+rows.append(("bottom navigation shadow adapts in light mode",
+             "ambientColor = palette.barShadow" in BOTTOM_NAV
+             and "spotColor = palette.barShadow" in BOTTOM_NAV
+             and "Color.Black.copy(alpha = 0.50f)" not in BOTTOM_NAV))
 rows.append(("picker is laid out after the composer, not over the chat",
              CHAT.find("EmojiStickerPanel(") > CHAT.find("ChatInputBar(")
              and CHAT.find("EmojiStickerPanel(") < CHAT.find("actionsFor?.let { ui ->")))
