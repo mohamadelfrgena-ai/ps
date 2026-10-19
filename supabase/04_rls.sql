@@ -258,7 +258,10 @@ create policy tips_admin_write on public.creator_tips
 -- ---------------------------------------------------------------------------
 drop policy if exists assets_read on public.site_assets;
 create policy assets_read on public.site_assets
-  for select using (enabled = true or public.is_admin());
+  for select using (
+    public.is_admin()
+    or (enabled = true and required_plan <> 'admin')
+  );
 
 drop policy if exists assets_admin on public.site_assets;
 create policy assets_admin on public.site_assets
@@ -300,5 +303,18 @@ revoke insert, update, delete on public.creator_submissions from anon, authentic
 revoke insert, update, delete on public.creator_applications from anon, authenticated;
 revoke insert, update, delete on public.user_friends from anon, authenticated;
 
-grant select on public.profiles to anon, authenticated;
+-- بعد تنفيذ 40_admin_asset_privacy تُقرأ الملفات الشخصية من العرض المنقّح فقط.
+-- نبقي توافق الإعداد الأول: إن لم يُنشأ العرض بعد، تعمل النسخ القديمة مؤقتاً؛
+-- وإعادة تنفيذ هذا الملف لاحقاً لا تعيد فتح الجدول الأساسي بالخطأ.
+do $$
+begin
+  if to_regclass('public.visible_profiles') is not null then
+    revoke select on public.profiles from public, anon, authenticated;
+    grant select on public.visible_profiles to anon, authenticated;
+  else
+    grant select on public.profiles to anon, authenticated;
+  end if;
+end;
+$$;
+
 grant update (bio, custom_status, show_online_status, last_seen_at, country, display_name) on public.profiles to authenticated;

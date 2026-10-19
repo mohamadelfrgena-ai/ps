@@ -19,8 +19,12 @@ from collections import defaultdict
 ROOT = sys.argv[1] if len(sys.argv) > 1 else "."
 KOTLIN = os.path.join(ROOT, "android/app/src/main/java")
 BASE_PKG = "com.addonstation.mobile"
-# أصناف يولّدها المترجم (ليست في الشيفرة المصدرية)
+# رموز يوفرها نظام Android/Kotlin ولا يلزم أن يعرّفها المشروع أو يستوردها.
 GENERATED = {"R", "BuildConfig"}
+KOTLIN_BUILTINS = {
+    "Any", "Boolean", "Byte", "Char", "CharSequence", "Double", "Float",
+    "Int", "Long", "Nothing", "Short", "String", "Unit",
+}
 
 DECL_RE = re.compile(
     r"^(?:@\w+(?:\([^)]*\))?\s*)*"
@@ -139,7 +143,7 @@ def main() -> int:
         # 2) أسماء بسيطة معرّفة في المشروع لكن غير مستوردة
         for m in re.finditer(r"(?<![\w.])([A-Z][A-Za-z0-9_]*)\s*[({]", src):
             name = m.group(1)
-            if name not in symbols or name in imported_names:
+            if name not in symbols or name in imported_names or name in GENERATED or name in KOTLIN_BUILTINS:
                 continue
             if pkg in symbols[name]:
                 continue

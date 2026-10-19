@@ -63,6 +63,20 @@ class SupabaseClient(
 
     fun session(): Session? = sessionStore.current()
 
+    /**
+     * Stable account id for profile reads. Very old/recovery-created local
+     * sessions can contain a blank stored userId even though the access JWT has
+     * a valid `sub`; recover it locally without sending or exposing the token.
+     */
+    fun currentUserId(): String? {
+        val current = sessionStore.current() ?: return null
+        return current.userId.trim().takeIf(String::isNotBlank)
+            ?: jwtClaims(current.accessToken)
+                ?.get("sub")
+                ?.jsonPrimitive
+                ?.contentOrNull()
+    }
+
     fun isSignedIn(): Boolean = sessionStore.current() != null
 
     // ------------------------------------------------------------------ Auth
@@ -107,7 +121,14 @@ class SupabaseClient(
         )
     }
 
-    /** تحديث الجلسة بالـ refresh token. */
+    /**
+     * تحديث الجلسة بالـ refresh token.
+     *
+     * **لا نُسجّل خروج المستخدم تلقائياً** إذا فشل التجديد، حتى لو رفض الخادم
+     * التوكن: لا يُمسح المخزن ولا تتغيّر حالة الحساب إلا بطلب خروج صريح من صاحبه.
+     * قد تفشل بعض الطلبات المحمية ما دام الخادم لا يقبل التوكن، لكن يبقى الحساب
+     * محفوظاً على الجهاز ويمكن إعادة المحاولة أو الخروج يدوياً.
+     */
     suspend fun refreshSession(): Boolean = refreshMutex.withLock {
         val current = sessionStore.current() ?: return false
         return try {
@@ -117,7 +138,8 @@ class SupabaseClient(
             val access = obj["access_token"]?.jsonPrimitive?.contentOrNull() ?: return false
             storeSession(obj, access, fallbackEmail = current.email)
             true
-        } catch (t: Throwable) {
+        } catch (_: Throwable) {
+            // لا نمسح جلسة الحساب ولا نُخرجه تلقائياً عند أي فشل في التجديد.
             false
         }
     }
@@ -146,6 +168,24 @@ class SupabaseClient(
             put("redirect_to", RECOVERY_REDIRECT)
         }
         authPost("recover", body, token = null)
+    }
+
+    /**
+     * إعادة إرسال رسالة تأكيد البريد.
+     *
+     * لماذا؟ إن كان «Confirm email» مفعّلاً في Supabase (وهو الافتراضي) فلا
+     * تُرجِع `signup` جلسة، ويبقى المستخدم خارج التطبيق حتى يفتح رابط البريد.
+     * هذه الدالة تُمكّنه من طلب رسالة جديدة من داخل التطبيق بدل البحث في البريد.
+     */
+    suspend fun resendConfirmation(email: String) {
+        authPost(
+            "resend",
+            buildJsonObject {
+                put("type", "signup")
+                put("email", email)
+            },
+            token = null,
+        )
     }
 
     suspend fun updatePassword(newPassword: String) {
@@ -355,6 +395,29 @@ class SupabaseClient(
         val text = exec(
             "POST", "${config().restUrl}/rpc/$function", token,
             body.toString().toRequestBody(JSON_MEDIA),
+        )
+        if (text.isBlank() || text == "null") null else json.parseToJsonElement(text)
+    }
+
+    /**
+     * RPC يستعمل لقطة جلسة محدّدة في الترويسة دون استبدالها تلقائياً عند 401.
+     * يفيد العمليات التي تحمل access/refresh tokens نفسها داخل body.
+     */
+    suspend fun rpcWithToken(
+        function: String,
+        params: Map<String, JsonElement?>,
+        accessToken: String,
+    ): JsonElement? = withContext(Dispatchers.IO) {
+        if (accessToken.isBlank()) throw ApiError(ApiErrorKind.NOT_SIGNED_IN)
+        val body = buildJsonObject {
+            params.forEach { (key, value) -> put(key, value ?: JsonNull) }
+        }
+        val text = exec(
+            method = "POST",
+            url = "${config().restUrl}/rpc/$function",
+            token = accessToken,
+            body = body.toString().toRequestBody(JSON_MEDIA),
+            allowRefresh = false,
         )
         if (text.isBlank() || text == "null") null else json.parseToJsonElement(text)
     }

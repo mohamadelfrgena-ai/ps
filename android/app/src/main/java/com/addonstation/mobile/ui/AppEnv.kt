@@ -62,10 +62,9 @@ fun sectionFromPath(path: String?): String? {
 fun equippedItemUrl(container: AppContainer, name: String?): String? {
     val clean = name?.trim().orEmpty()
     if (clean.isEmpty() || clean.equals("none", ignoreCase = true)) return null
-    val asset = container.state.siteAssets.value.firstOrNull {
-        it.assetType == "item" && it.name == clean
-    } ?: return null
-    return container.siteAssetUrl(asset.fileUrl)
+    // بحث O(1) في فهرس جاهز بدل مسح ٤٩٢ أصلاً في كل نداء (كان داخل تركيب كل
+    // رسالة في الشات ⇒ آلاف المقارنات في الإطار الواحد = تقطيع أثناء التمرير).
+    return container.state.itemUrlIndex.value[clean]
 }
 
 /** أول حرف/حرفان من الاسم لعرضها في الصور البديلة. */

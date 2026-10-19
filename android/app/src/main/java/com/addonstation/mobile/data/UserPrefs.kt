@@ -34,6 +34,22 @@ class UserPrefs(private val context: Context) {
     }
     suspend fun setCachedProfile(json: String) = context.dataStore.edit { it[K_PROFILE] = json }
 
+    /**
+     * مكتومون عندي (كتم **محلي** على هذا الجهاز): تُخفى رسائلهم من الشات بلا
+     * حظر متقابل — بند «Mute this user» في بطاقة السلامة (وثيقة شاشات الملف).
+     * الحظر (`user_blocks`) يبقى على الخادم لأن أثره متقابل؛ أمّا الكتم فقرار
+     * عرضٍ شخصيّ لا يخصّ أحداً سواي ⇒ لا حاجة لجدول على الخادم.
+     */
+    val mutedUsers: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        (prefs[K_MUTED] ?: "").split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    /** قراءة مرة واحدة (للشاشات التي تحتاج القائمة الآن لا تدفّقاً). */
+    suspend fun readMutedUsers(): Set<String> = mutedUsers.first()
+
+    suspend fun setMutedUsers(ids: Set<String>) =
+        context.dataStore.edit { it[K_MUTED] = ids.filter { id -> id.isNotBlank() }.joinToString(",") }
+
     suspend fun pushRecentEmoji(emoji: String) {
         context.dataStore.edit { prefs ->
             val current = (prefs[K_EMOJI] ?: "").split(' ').filter { it.isNotBlank() }
@@ -56,5 +72,6 @@ class UserPrefs(private val context: Context) {
         val K_KEY = stringPreferencesKey("supabase_anon_key")
         val K_EMOJI = stringPreferencesKey("recent_emojis")
         val K_PROFILE = stringPreferencesKey("cached_profile")
+        val K_MUTED = stringPreferencesKey("muted_users")
     }
 }

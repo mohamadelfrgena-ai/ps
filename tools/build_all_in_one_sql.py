@@ -52,6 +52,13 @@ ORDER = [
     "32_onefree_canonical_path.sql",
     "33_user_block.sql",
     "34_push_notifications.sql",
+    "35_push_live.sql",
+    "36_profile_stats.sql",
+    "37_profile_reports.sql",
+    "38_user_mute.sql",
+    "39_notif_revert.sql",
+    "40_admin_asset_privacy.sql",
+    "41_console_link_codes.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -76,6 +83,8 @@ HEADER = """-- =================================================================
 --      → 26_fix_site_assets_sequence (صلاحية تسلسل site_assets للتسجيل عبر REST)
 --      → 27_admin_only_assets (Enchanted Bedrock · PFP 4 · أغلفة الأدمن = admin فقط)
 --      → 28_chat_cleanup (تنظيف غرف الشات: حذف/إخفاء الرسائل — أقسام اختيارية)
+--      → 40_admin_asset_privacy (أصول الأدمن لا تظهر لغيره + مخزن خاص)
+--      → 41_console_link_codes (ربط PlayStation الآمن برمز مؤقت وموافقة صريحة)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --

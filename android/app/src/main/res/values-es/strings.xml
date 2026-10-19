@@ -7,9 +7,10 @@
     <string name="brand_tagline">AddonStation Mobile · v1.2</string>
     <string name="brand_platform">Plataforma de addons y mundos para Minecraft Bedrock</string>
     <string name="brand_rights">© 2026 AddonStation — Todos los derechos reservados</string>
-    <string name="splash_dream_it">SUÉÑALO.</string>
-    <string name="splash_build_it">CONSTRÚYELO.</string>
-    <string name="splash_create_it">CRÉALO.</string>
+    <string name="splash_dream_it">SUEÑA.</string>
+    <string name="splash_build_it">CONSTRUYE.</string>
+    <string name="splash_create_it">CREA.</string>
+    <string name="splash_skip">Toca para omitir</string>
 
     <string name="nav_home">Inicio</string>
     <string name="nav_store">Tienda</string>
@@ -114,7 +115,7 @@
     <string name="common_none">Ninguno</string>
     <string name="common_yes">Sí</string>
     <string name="common_no">No</string>
-    <string name="common_guest">Invitado</string>
+    <string name="common_guest">Usuario</string>
     <string name="common_soon">Próximamente</string>
     <string name="common_log_out">Cerrar sesión</string>
     <string name="common_sign_in">Iniciar sesión</string>
@@ -631,4 +632,226 @@
     <string name="profile_item_equipped">Equipado</string>
     <string name="profile_content_section">Contenido</string>
     <string name="profile_no_content_published">Aún no hay contenido publicado</string>
+    <string name="auth_confirm_title">Tu cuenta está creada ✓</string>
+    <string name="auth_confirm_text">Enviamos un enlace de confirmación a tu correo. Ábrelo y toca el botón de abajo.</string>
+    <string name="auth_confirm_retry">Confirmé — iniciar sesión</string>
+    <string name="auth_confirm_resend">Reenviar el enlace de confirmación</string>
+    <string name="auth_confirm_resent">Enlace de confirmación reenviado ✓</string>
+    <string name="auth_confirm_hint">¿No la encuentras? Revisa también la carpeta de spam.</string>
+    <string name="notif_prompt_title">Activar notificaciones</string>
+    <string name="notif_prompt_text">Recibe mensajes del chat, menciones y nuevos addons aunque la app esté cerrada. Puedes ajustar cada categoría luego en Ajustes.</string>
+    <string name="notif_prompt_allow">Activar ahora</string>
+    <string name="notif_prompt_later">Más tarde</string>
+    <string name="home_hero_slogan">SUÉÑALO.
+CONSTRÚYELO.
+CRÉALO.</string>
+    <string name="home_hero_subtitle">Addons y mundos listos para tu aventura</string>
+    <string name="home_hero_start">Empezar ahora</string>
+    <string name="home_hero_family">Únete a la familia</string>
+    <string name="home_plan_current">Tu plan actual</string>
+    <string name="home_plan_free_desc">Contenido gratis · Acceso básico · Sin suscripción</string>
+    <string name="home_legend_title">ÚNETE A LEGENDARY</string>
+    <string name="home_legend_text">Addons legendarios · Mundos legendarios · Acceso prioritario</string>
+    <string name="home_legend_view">Ver</string>
+    <string name="home_chip_all">Todo</string>
+    <string name="home_chip_addons">Addons</string>
+    <string name="home_chip_worlds">Mundos</string>
+    <string name="home_chip_favorites">Favoritos</string>
+    <string name="home_latest_addons">Últimos addons</string>
+    <string name="home_most_downloaded">Más descargados</string>
+    <string name="home_featured_creators">Creadores destacados</string>
+    <string name="home_creators_caption">Selección especial de AddonStation</string>
+    <string name="home_no_content">Aún no hay contenido publicado</string>
+    <string name="home_error">Algo salió mal</string>
+    <string name="home_error_tap">Toca para reintentar</string>
+    <string name="comm_all_rooms">Todas las salas</string>
+    <string name="comm_rules_banner">⚠️ Reglas de la comunidad · Las infracciones pueden causar silencio o expulsión</string>
+    <string name="comm_members_only">El chat es solo para miembros — entra para acceder a las salas</string>
+    <string name="chat_online">%1$d en línea</string>
+    <string name="chat_pinned_strip">Mensajes fijados · %1$s</string>
+    <string name="home_by_creator">Por %1$s</string>
+    <string name="chat_nobody_online">Nadie está en línea ahora</string>
+    <string name="badge_premium">Miembro premium</string>
+    <string name="badge_creator">Creador</string>
+    <string name="badge_admin">ADMIN</string>
+    <string name="badge_mod">MOD</string>
+    <string name="badge_level">Nivel %1$d</string>
+    <string name="profile_no_bio">Este miembro aún no ha añadido una biografía.</string>
+    <string name="profile_stats_friends">Amigos</string>
+    <string name="profile_wallet_title">Cartera AC</string>
+    <string name="profile_daily_reward">Recompensa diaria</string>
+    <string name="profile_daily_claimed">Reclamada hoy</string>
+    <string name="profile_day_streak">%1$d días seguidos</string>
+    <string name="profile_logout">Cerrar sesión</string>
+    <string name="profile_orders">Mis pedidos</string>
+    <string name="profile_view_as_others">Ver como otros</string>
+    <string name="profile_hidden_from_others">Oculto para otros usuarios</string>
+    <string name="profile_safety">Seguridad</string>
+    <string name="profile_moderation">Moderación</string>
+    <string name="profile_msg_user">Mensaje a %1$s</string>
+    <string name="profile_friend_request">Solicitud de amistad</string>
+    <string name="profile_request_sent">Solicitud enviada</string>
+    <string name="profile_friends_state">Amigos ✓</string>
+    <string name="profile_accept">Aceptar</string>
+    <string name="profile_reject">Rechazar</string>
+    <string name="profile_status_online">En línea</string>
+    <string name="profile_status_away">Ausente</string>
+    <string name="profile_status_offline">Desconectado</string>
+    <string name="profile_ban_user">Banear usuario</string>
+    <string name="profile_ban_confirm">¿Seguro que quieres banear a %1$s? Ya no podrá acceder al chat.</string>
+    <string name="profile_delete_message">Eliminar mensaje</string>
+    <string name="profile_as_others_title">Mi perfil como lo ven otros</string>
+    <string name="profile_member_since_label">MIEMBRO DESDE</string>
+    <string name="chat_unmute_user">Reactivar a este usuario</string>
+    <string name="profile_action_done">Hecho ✓</string>
+    <string name="profile_action_failed">No se pudo completar — inténtalo de nuevo.</string>
+    <string name="profile_mute_done">Silenciado — sus mensajes ya no se muestran.</string>
+    <string name="profile_unmute_done">Reactivado — sus mensajes vuelven a mostrarse.</string>
+    <string name="common_more">Más</string>
+    <string name="profile_blocked_state">No puedes interactuar con este miembro</string>
+    <string name="profile_unfriend">Eliminar amigo</string>
+    <string name="profile_unfriend_confirm">¿Eliminar a este miembro de tus amigos?</string>
+    <string name="mute_member_locked">Legendary</string>
+    <string name="mute_member_needs_plan">Silenciar miembros es una función Legendary — abriendo la suscripción.</string>
+
+    <!-- AddonStation auth/settings redesign -->
+    <string name="auth_email_placeholder">name@example.com</string>
+    <string name="auth_password_placeholder">••••••••</string>
+    <string name="settings_my_plan">Mi plan</string>
+    <string name="settings_your_plan">Tu plan: %1$s</string>
+    <string name="settings_expires_on">Caduca el %1$s</string>
+    <string name="settings_upgrade">Mejorar plan</string>
+    <string name="settings_sections_five">5 SECCIONES</string>
+    <string name="settings_admin_tools">Herramientas de administración</string>
+    <string name="settings_admin_visible">Visible solo para cuentas de administrador</string>
+    <string name="settings_open_dashboard">Abrir panel</string>
+    <string name="settings_account_actions">Acciones de la cuenta</string>
+    <string name="settings_footer">© 2026 AddonStation — Todos los derechos reservados</string>
+    <string name="auth_username_placeholder">tu_usuario</string>
+
+    <!-- Edit profile detail screen -->
+    <string name="profile_edit_plain">Editar perfil</string>
+    <string name="edit_profile_preview">Vista previa</string>
+    <string name="edit_profile_counter">%1$d/%2$d</string>
+    <string name="edit_profile_discard_title">¿Descartar los cambios?</string>
+    <string name="edit_profile_discard_body">Perderás los cambios.</string>
+    <string name="edit_profile_discard">Descartar</string>
+    <string name="edit_profile_keep_editing">Seguir editando</string>
+    <string name="edit_profile_saved">Perfil guardado</string>
+    <string name="edit_profile_status_hint">¿Qué tienes en mente?</string>
+    <string name="edit_profile_avatar_label">Avatar</string>
+    <string name="edit_profile_epic_item">Objeto Epic</string>
+    <string name="edit_profile_golden_item">Objeto dorado</string>
+    <string name="edit_profile_no_items">Aún no hay objetos disponibles en esta sección.</string>
+    <string name="edit_profile_no_results">No hay imágenes coincidentes.</string>
+    <string name="cd_avatar_selected">%1$s, seleccionado</string>
+    <string name="cd_avatar_locked">%1$s, bloqueado. Requiere %2$s</string>
+    <string name="plan_locked_avatars_plain">Los avatares bloqueados se desbloquean con Epic o Legendary.</string>
+    <string name="plan_locked_items_plain">Los objetos de chat bloqueados requieren el plan adecuado.</string>
+    <string name="plan_locked_online_plain">El estado en línea está disponible para suscriptores Legendary.</string>
+    <string name="plan_locked_banner_note_plain">Todos los banners están bloqueados; desbloquéalos con una suscripción Epic o Legendary.</string>
+    <string name="profile_banner_none_plain">Aún no tienes banner: elige uno de las secciones de abajo</string>
+    <string name="profile_about_plain">Biografía</string>
+    <string name="msg_username_taken">Ese nombre de usuario ya está en uso.</string>
+
+    <!-- Crash report -->
+    <string name="crash_report_title">Informe de cierre inesperado</string>
+    <string name="crash_report_body">La aplicación se detuvo inesperadamente en el inicio anterior. Copia este informe y envíalo al soporte para que podamos identificar la causa.</string>
+    <string name="crash_report_copy">Copiar informe de cierre</string>
+    <string name="crash_report_copied">Informe copiado. Pégalo en este chat.</string>
+    <string name="crash_report_continue">Intentar abrir la aplicación</string>
+
+    <!-- Home v2 sections -->
+
+    <!-- Imported missing localized resources from AddonStation_chat_panels_store -->
+
+    <!-- Imported missing localized resources from AddonStation_profile_wallet_admin -->
+
+    <!-- Imported missing localized resources from AddonStation_creators_pages -->
+    <string name="profile_remove_favorite">Quitar de favoritos</string>
+
+    <!-- Creator form labels -->
+    <string name="creator_file_types">Cualquier tipo de archivo (*/*)</string>
+    <string name="creator_optional_details">Detalles opcionales</string>
+    <string name="creator_required_fields">Completa los campos obligatorios y acepta ambas confirmaciones.</string>
+    <string name="creator_category_adventure">Aventura</string>
+    <string name="creator_category_survival">Supervivencia</string>
+    <string name="creator_category_pvp">JcJ</string>
+    <string name="creator_category_building">Construcción</string>
+    <string name="creator_category_skins">Aspectos</string>
+    <string name="creator_category_other">Otro</string>
+
+    <!-- Admin asset confirmations and progress -->
+    <string name="admin_delete_asset">Eliminar recurso</string>
+    <string name="admin_asset_reading">Preparando imagen…</string>
+    <string name="admin_asset_read_failed">No se pudo leer el archivo seleccionado.</string>
+    <string name="admin_asset_uploading">Subiendo imagen… (%1$d KB)</string>
+    <string name="admin_asset_uploaded">Se subió %1$s (%2$d KB)</string>
+    <string name="admin_asset_upload_failed">Error al subir: %1$s</string>
+    <string name="admin_asset_resize_running">Redimensionando imágenes… No cierres esta pantalla.</string>
+    <string name="admin_asset_resize_done">Se redimensionaron %1$d imágenes.</string>
+    <string name="admin_asset_resize_failed">Error al redimensionar: %1$s</string>
+
+    <!-- Plain plan feature labels -->
+    <string name="plan_free_features_plain">Contenido gratis · Descargas básicas · Sin suscripción</string>
+    <string name="creator_confirm_required">Acepta ambas confirmaciones antes de enviar.</string>
+
+    <!-- Admin creator tip review -->
+    <string name="admin_tip_from_to">%1$s → %2$s</string>
+    <string name="admin_tip_approve_confirm">¿Aprobar el apoyo de %1$s LYD de %2$s para %3$s?</string>
+    <string name="admin_tip_reject_confirm">¿Rechazar el apoyo de %1$s LYD de %2$s para %3$s?</string>
+    <string name="admin_tip_reject_reason">El recibo no se pudo verificar</string>
+    <string name="admin_tip_approved">Apoyo aprobado.</string>
+    <string name="admin_tip_rejected">Apoyo rechazado.</string>
+    <string name="admin_tip_review_failed">No se pudo actualizar el apoyo: %1$s</string>
+    <string name="admin_tip_receipt_missing">Este apoyo no tiene un recibo adjunto.</string>
+    <string name="admin_tip_status_pending">Pendiente</string>
+    <string name="admin_tip_status_approved">Aprobado</string>
+    <string name="admin_tip_status_rejected">Rechazado</string>
+
+    <!-- Creator moderation copy -->
+    <string name="creator_status_pending">Pendiente</string>
+    <string name="creator_status_approved">Aprobado</string>
+    <string name="creator_status_rejected">Rechazado</string>
+    <string name="admin_creator_more_info">Pedir más información</string>
+    <string name="admin_creator_more_info_note">Envía más detalles, por favor.</string>
+    <string name="admin_creator_approved">Solicitud de creador aprobada.</string>
+    <string name="admin_creator_rejected">Solicitud de creador rechazada.</string>
+    <string name="admin_creator_more_info_sent">Se solicitó más información.</string>
+    <string name="admin_creator_review_failed">No se pudo actualizar la solicitud: %1$s</string>
+    <string name="admin_submission_approved">Contenido aprobado.</string>
+    <string name="admin_submission_rejected">Contenido rechazado.</string>
+    <string name="admin_submission_review_failed">No se pudo actualizar el contenido: %1$s</string>
+    <string name="admin_creator_reject_reason">Aún no cumple los requisitos.</string>
+    <string name="admin_submission_reject_reason">El contenido necesita cambios.</string>
+    <string name="creator_status_more_info">Se solicitó más información.</string>
+    <string name="chat_admin_only_short">Solo administrador</string>
+    <string name="edit_profile_tab_item">Objeto</string>
+    <string name="edit_profile_tab_about">Acerca de</string>
+    <string name="edit_profile_message_preview">[Texto del mensaje]</string>
+
+    <!-- PlayStation console linking -->
+    <string name="console_link_title">Vincular dispositivo PlayStation</string>
+    <string name="console_link_settings_subtitle">Vincula una PlayStation con un código de un solo uso</string>
+    <string name="console_devices_title">Dispositivos vinculados</string>
+    <string name="console_devices_settings_subtitle">Consulta tus consolas vinculadas y desvincúlalas</string>
+    <string name="console_link_help">Genera un código de 6 caracteres en tu PlayStation. Caduca en 10 minutos y solo se puede usar una vez.</string>
+    <string name="console_link_code_label">Código de 6 caracteres</string>
+    <string name="console_link_action">Vincular dispositivo</string>
+    <string name="console_link_success">Dispositivo vinculado ✓ — %1$s</string>
+    <string name="console_link_invalid_code">Código no válido — introduce 6 caracteres del alfabeto permitido.</string>
+    <string name="console_link_code_not_found">Código incorrecto. Revísalo e inténtalo de nuevo.</string>
+    <string name="console_link_code_expired">Caducado o ya utilizado — solicita un código nuevo.</string>
+    <string name="console_link_sign_in_required">Inicia sesión antes de vincular una PlayStation.</string>
+    <string name="console_link_sign_in_action">Iniciar sesión</string>
+    <string name="console_link_view_devices">Ver dispositivos vinculados</string>
+    <string name="console_devices_empty">Aún no hay dispositivos vinculados.</string>
+    <string name="console_devices_load_failed">No se pudieron cargar tus dispositivos vinculados.</string>
+    <string name="console_device_linked_at">Vinculado: %1$s</string>
+    <string name="console_device_last_seen">Última actividad: %1$s</string>
+    <string name="console_device_unlink">Desvincular</string>
+    <string name="console_device_unlink_confirm_title">¿Desvincular este dispositivo?</string>
+    <string name="console_device_unlink_confirm_message">¿Quieres quitar %1$s de tus dispositivos vinculados?</string>
+    <string name="console_device_unlink_success">Dispositivo desvinculado.</string>
+    <string name="console_device_unlink_failed">No se pudo desvincular el dispositivo.</string>
 </resources>

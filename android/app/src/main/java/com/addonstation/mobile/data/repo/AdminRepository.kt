@@ -24,6 +24,10 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class AdminRepository(private val supabase: SupabaseClient) {
 
+    private suspend fun selectProfiles(query: String): JsonElement =
+        runCatching { supabase.select("visible_profiles", query) }
+            .getOrElse { supabase.select("profiles", query) }
+
     /**
      * بوابة لوحة الإدارة: يتحقق **الخادم** أن الدور admin (لا الواجهة فقط)، ويُسجّل
      * فتح اللوحة في سجلّ التدقيق. أي رد غير ناجح = الباب مغلق.
@@ -69,7 +73,7 @@ class AdminRepository(private val supabase: SupabaseClient) {
                 }
                 if (!role.isNullOrBlank() && role != "all") filters.append("&role=eq.$role")
                 filters.append("&order=created_at.desc&limit=$limit")
-                supabase.decodeList<Profile>(supabase.select("profiles", filters.toString()))
+                supabase.decodeList<Profile>(selectProfiles(filters.toString()))
             }.getOrElse { emptyList() }
         }
 
@@ -102,6 +106,12 @@ class AdminRepository(private val supabase: SupabaseClient) {
             supabase.select("content_items", "select=*&order=created_at.desc&limit=$limit")
         )
     }.getOrElse { emptyList() }
+
+    suspend fun contentById(id: String): ContentItem? = runCatching {
+        supabase.decodeList<ContentItem>(
+            supabase.select("content_items", "select=*&id=eq.$id&limit=1")
+        ).firstOrNull()
+    }.getOrNull()
 
     suspend fun upsertContent(
         id: String?,

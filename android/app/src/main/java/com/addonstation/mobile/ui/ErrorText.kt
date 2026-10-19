@@ -22,7 +22,7 @@ fun apiErrorText(kind: ApiErrorKind): String = when (kind) {
     ApiErrorKind.NOT_ENOUGH_AC -> stringResource(R.string.ac_not_enough)
     ApiErrorKind.DOWNLOAD_LIMIT -> stringResource(R.string.plan_download_limit)
     ApiErrorKind.FILE_NOT_UPLOADED -> stringResource(R.string.item_file_missing)
-    ApiErrorKind.NOT_FOUND -> stringResource(R.string.item_not_found)
+    ApiErrorKind.NOT_FOUND -> stringResource(R.string.item_not_found_plain)
     ApiErrorKind.PLAN_UNAVAILABLE -> stringResource(R.string.plan_unavailable)
     ApiErrorKind.METHOD_DISABLED -> stringResource(R.string.plan_payment_note)
     ApiErrorKind.TOO_MANY_ORDERS -> stringResource(R.string.msg_generic_error)

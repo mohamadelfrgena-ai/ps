@@ -26,6 +26,8 @@ ADMIN_SCREENS = os.path.join(ROOT, "android", "app", "src", "main", "java", "com
                              "addonstation", "mobile", "ui", "admin", "AdminScreens.kt")
 ADMIN_REPO = os.path.join(ROOT, "android", "app", "src", "main", "java", "com",
                           "addonstation", "mobile", "data", "repo", "AdminRepository.kt")
+SETTINGS = os.path.join(ROOT, "android", "app", "src", "main", "java", "com",
+                        "addonstation", "mobile", "ui", "settings", "SettingsScreen.kt")
 RES = os.path.join(ROOT, "android", "app", "src", "main", "res")
 
 problems = []
@@ -44,6 +46,7 @@ nav = read(NAV)
 gate = read(GATE)
 screens = read(ADMIN_SCREENS)
 repo = read(ADMIN_REPO)
+settings = read(SETTINGS)
 
 # 1) القاعدة: بوابة الدخول + التسجيل + سحب تنفيذ الزائر
 if "create or replace function public.admin_panel_access()" not in guard:
@@ -83,6 +86,17 @@ for name, ok in checks:
     if not ok:
         problems.append(f"AdminGate: ناقص — {name}")
 
+settings_admin_condition = re.search(
+    r'val adminToolsVisible = signedIn\s*&&\s*'
+    r'profileLoadStatus == ProfileLoadStatus\.READY\s*&&\s*'
+    r'profile\?\.id == container\.state\.currentUserId\s*&&\s*'
+    r'profile\?\.role == "admin"',
+    settings,
+)
+settings_admin_only = settings_admin_condition is not None and "if (adminToolsVisible)" in settings
+if not settings_admin_only:
+    problems.append("SettingsScreen: رابط الإدارة يجب أن يكون مخفياً إلا لجلسة أدمن محمّلة ومطابقة للمستخدم الحالي")
+
 if "admin_panel_access" not in repo:
     problems.append("AdminRepository: لا يستدعي admin_panel_access")
 
@@ -116,6 +130,7 @@ rows = [
     ("الملف 19 داخل الجامع", "19_admin_panel_guard.sql" in all_in_one),
     (f"كل مسارات اللوحة محمية ({gated}/{len(admin_routes)})", gated >= len(admin_routes) and gated > 0),
     ("الدور + الخادم + كلمة المرور + القفل", all(ok for _, ok in checks)),
+    ("رابط الإعدادات محصور بأدمن الجلسة الحالية", settings_admin_only),
     ("نصوص البوابة في 8 لغات", not missing),
 ]
 for name, ok in rows:

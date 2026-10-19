@@ -155,13 +155,13 @@ create or replace function public.my_blocked_users()
 returns table (
   user_id    uuid,
   username   text,
-  full_name  text,
+  display_name text,
   avatar_url text,
   blocked_at timestamptz
 )
 language sql stable security definer set search_path = public
 as $$
-  select b.blocked_id, p.username, p.full_name, p.avatar_url, b.created_at
+  select b.blocked_id, p.username, p.display_name, p.avatar_url, b.created_at
     from public.user_blocks b
     join public.profiles p on p.id = b.blocked_id
    where b.blocker_id = auth.uid()

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_filter_unread">Unread</string>
+    <string name="chat_search_members">Search members</string>
+    <string name="chat_last_seen">Last seen %1$s</string>
+    <string name="cd_scroll_to_bottom">Scroll to the latest messages</string>
+    <string name="cd_search_rooms">Search rooms</string>
+    <string name="chat_members_no_results">No members match your search.</string>
+</resources>

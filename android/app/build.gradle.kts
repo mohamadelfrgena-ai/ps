@@ -20,7 +20,8 @@ val localProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 fun configValue(key: String): String =
-    (localProps.getProperty(key) ?: project.findProperty(key)?.toString() ?: "").trim()
+    localProps.getProperty(key)?.trim()?.takeIf(String::isNotBlank)
+        ?: project.findProperty(key)?.toString()?.trim().orEmpty()
 
 // ---------------------------------------------------------------------------
 // حماية إلزامية: المفتاح السري (sb_secret_… / service_role) لا يدخل BuildConfig

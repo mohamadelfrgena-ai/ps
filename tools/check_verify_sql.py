@@ -43,6 +43,9 @@ def read(path: Path) -> str:
 def catalog():
     tables, funcs, policies, triggers, indexes, sequences, buckets = (set(), set(), set(),
                                                                      set(), set(), set(), set())
+    # كائنات تُسقطها الترحيلات عمداً (مثل 39: إرجاع الإشعارات كما كانت) —
+    # يجوز أن يذكرها الفاحص 99 للتأكد من غيابها.
+    dropped_triggers = set()
     for p in sorted(SUPABASE.glob("*.sql")):
         if p.name in ("00_ALL_IN_ONE.sql", "99_VERIFY_ALL.sql"):
             continue
@@ -52,10 +55,12 @@ def catalog():
         policies |= set(re.findall(r"create policy\s+\"?([A-Za-z_]+)\"?\s+on\s+"
                                    r"(?:public\.|storage\.)?([a-z_]+)", s))
         triggers |= set(re.findall(r"create trigger\s+([a-z_]+)", s))
+        dropped_triggers |= set(re.findall(r"drop trigger if exists\s+([a-z_]+)", s))
         indexes |= set(re.findall(r"create (?:unique )?index(?: if not exists)?\s+([a-z_]+)", s))
         sequences |= set(re.findall(r"sequence\s+public\.([a-z_]+)", s))
         buckets |= set(re.findall(r"\(\s*'([a-z-]+)',\s*'[a-z-]+',\s*(?:true|false),", s))
     return dict(tables=tables, funcs=funcs, policies=policies, triggers=triggers,
+                dropped_triggers=dropped_triggers,
                 indexes=indexes, sequences=sequences, buckets=buckets)
 
 
@@ -190,7 +195,8 @@ def main() -> int:
     rows.append(("لا سياسة مذكورة بغير اسمها الصحيح", not bad_pol, " · ".join(bad_pol)))
 
     # الأزرار (triggers) والتسلسلات والفهارس
-    bad_trig = [t for t in re.findall(r"tgname = '([a-z_]+)'", sql) if t not in cat["triggers"]]
+    bad_trig = [t for t in re.findall(r"tgname = '([a-z_]+)'", sql)
+                if t not in cat["triggers"] and t not in cat["dropped_triggers"]]
     rows.append(("لا زناد مذكوراً بغير اسمه الصحيح", not bad_trig, " · ".join(bad_trig)))
     bad_seq = [t for t in re.findall(r"sequencename = '([a-z_]+)'", sql)
                if t not in cat["sequences"] and t not in ("site_assets_id_seq",)]

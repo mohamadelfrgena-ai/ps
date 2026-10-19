@@ -33,6 +33,8 @@ class AddonStationApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // احفظ سبب أي انهيار محلياً كي يستطيع صاحب الهاتف مشاركته دون ADB.
+        com.addonstation.mobile.util.CrashDiagnostics.install(this)
         container = AppContainer(this)
         // الإشعارات: نُسجّل الحاوية (تحتاجها خدمة FCM) وننشئ القنوات الخمس
         // (رسائل · محتوى · اجتماعي · حساب · تذكير) فتظهر بأسماء بلغة المستخدم.

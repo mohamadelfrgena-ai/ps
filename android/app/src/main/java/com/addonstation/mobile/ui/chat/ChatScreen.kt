@@ -4,6 +4,7 @@ package com.addonstation.mobile.ui.chat
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -15,14 +16,19 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
@@ -32,26 +38,38 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -61,8 +79,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -77,12 +109,15 @@ import com.addonstation.mobile.data.model.ChatMessageUi
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.repo.ChatRepository
 import com.addonstation.mobile.ui.apiErrorText
+import com.addonstation.mobile.ui.components.SpecPrimaryButton
+import com.addonstation.mobile.ui.theme.Spec
 import com.addonstation.mobile.ui.assetUrl
 import com.addonstation.mobile.ui.community.isReadOnlyFor
 import com.addonstation.mobile.ui.components.EmptyState
 import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.RoomIcon
 import com.addonstation.mobile.ui.components.LoadingBox
+import com.addonstation.mobile.ui.components.RankBadge
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
@@ -132,12 +167,16 @@ fun ChatScreen(
     val container = rememberContainer()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val vm = remember(channel.id) { ChatViewModel(container) }
 
     val messages by vm.messages.collectAsState()
     val authors by vm.authors.collectAsState()
     val loading by vm.loading.collectAsState()
     val newBelow by vm.newMessagesBelow.collectAsState()
+    val newDividerId by vm.newDividerId.collectAsState()
     /** من حظرتُهم — يُقرأ من القاعدة ويُحدَّث فوراً عند الحظر/الإلغاء في هذه الشاشة. */
     val blockedIds by vm.blockedIds.collectAsState()
     val scrollTick by vm.scrollTick.collectAsState()
@@ -173,10 +212,14 @@ fun ChatScreen(
      */
     var pendingSticker by remember { mutableStateOf<String?>(null) }
     var showEmoji by remember { mutableStateOf(false) }
+    var reactionTargetMessageId by remember { mutableStateOf<Long?>(null) }
     var showAttach by remember { mutableStateOf(false) }
     var showMembers by remember { mutableStateOf(false) }
+    var memberCardProfile by remember { mutableStateOf<Profile?>(null) }
+    var memberCardRefresh by remember { mutableIntStateOf(0) }
     var showPinned by remember { mutableStateOf(false) }
     var actionsFor by remember { mutableStateOf<ChatMessageUi?>(null) }
+    var actionAnchor by remember { mutableStateOf<Rect?>(null) }
     var mediaSheet by remember { mutableStateOf(false) }
     var imageViewerUrl by remember { mutableStateOf<String?>(null) }
     // فتح صورة/ملصق بالحجم الكامل — دالة واحدة يستعملها كل نداء (لا يُشار إليها من
@@ -197,14 +240,19 @@ fun ChatScreen(
     BackHandler(enabled = showAttach) { showAttach = false }
     BackHandler(enabled = showMembers) { showMembers = false }
     BackHandler(enabled = showPinned) { showPinned = false }
-    BackHandler(enabled = actionsFor != null) { actionsFor = null }
-    BackHandler(enabled = showEmoji) { showEmoji = false }
+    BackHandler(enabled = actionsFor != null) { actionsFor = null; actionAnchor = null }
+    BackHandler(enabled = showEmoji) {
+        showEmoji = false
+        reactionTargetMessageId = null
+    }
     BackHandler(enabled = imageViewerUrl != null) { imageViewerUrl = null }
 
     var statusMessage by remember { mutableStateOf<String?>(null) }
     /** سبب فشل الإرسال (يُترجَم في الشاشة) — لا نعرض رمز الخادم الخام. */
     var statusError by remember { mutableStateOf<ApiErrorKind?>(null) }
-    var pinnedMessages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
+    // المثبّتات: من الـViewModel (تُجلب عند الدخول ليظهر الشريط الذهبي فوراً)
+    val pinnedMessages by vm.pinned.collectAsState()
+    val online by vm.online.collectAsState()
     val listState = rememberLazyListState()
 
     // نصوص تُستخدم داخل لامبدات (stringResource دالة Composable فلا تُستدعى داخل اللامبدا)
@@ -233,6 +281,8 @@ fun ChatScreen(
     LaunchedEffect(channel.id) {
         // الرسائل أولاً (دخول الغرفة أسرع): الجلب لا ينتظر طلباً آخر.
         vm.open(channel)
+        // شريط المثبّتات (§٤٫٢): يُجلب مع الدخول لا عند الضغط فقط
+        vm.loadPinned(channel.id)
         // نطاق الإشراف يُجلب مع كل دخول غرفة: فإن منح الأدمن مشرفاً غرفةً
         // جديدة (أو سحبها) تظهر أزراره الصحيحة بعد لحظة من فتح الغرفة.
         runCatching { container.chat.refreshMyStatus() }
@@ -248,6 +298,21 @@ fun ChatScreen(
 
     // هل العرض ملتصق بالأسفل؟ (= المستخدم يقرأ آخر الرسائل)
     var atBottom by remember { mutableStateOf(true) }
+    val farFromBottom by remember(listState, messages.size) {
+        derivedStateOf {
+            val visible = listState.layoutInfo.visibleItemsInfo
+            val lastVisible = visible.lastOrNull()?.index ?: messages.lastIndex
+            messages.isNotEmpty() && messages.lastIndex - lastVisible > visible.size.coerceAtLeast(1)
+        }
+    }
+    val unreadBelowCount = remember(messages, newDividerId, newBelow) {
+        val dividerIndex = newDividerId?.let { id -> messages.indexOfFirst { it.message.id == id } } ?: -1
+        when {
+            dividerIndex >= 0 -> (messages.size - dividerIndex).coerceAtLeast(1)
+            newBelow -> 1
+            else -> 0
+        }
+    }
 
     // تمرير تلقائي للأسفل: دائماً إن كان ملتصقاً بالأسفل، أو لم تُرفع شارة «رسائل بالأسفل» بعد
     LaunchedEffect(messages.size) {
@@ -442,6 +507,8 @@ fun ChatScreen(
         val sticker = pendingSticker
         val replySnapshot = replyTo
         if (body.isEmpty() && attach == null && sticker == null) return
+        showEmoji = false
+        reactionTargetMessageId = null
         text = ""                // مسح فوري: الفقاعة تظهر الآن، ولا يمكن إرسالها مرّتين
         pendingSticker = null
         replyTo = null
@@ -479,12 +546,26 @@ fun ChatScreen(
 
     val isMuted = chatStatus?.muted == true
     val isBanned = chatStatus?.banned == true
+    /**
+     * معرّف المستخدم الحالي **مرة واحدة لكل تركيبة شاشة** (لا داخل كل عنصر
+     * رسالة كما كان): قراءة الجلسة كانت تُنادى لكل رسالة في كل إطار.
+     */
+    val myId = container.supabase.session()?.userId
+    /**
+     * محلّل روابط الملصقات بمرجع **ثابت** (remember): لامبدا جديدة في كل
+     * تركيبة تمنع Compose من تخطّي إعادة تركيب عناصر الرسائل ⇒ ترميم كل
+     * العناصر المرئية مع كل تحديث.
+     */
+    val stickerUrlResolver = remember(container) { { path: String -> container.siteAssetUrl(path) } }
     val roomLocked = channel.isLocked
     val canPost = signedIn && !isMuted && !isBanned && !roomLocked
 
+    BoxWithConstraints(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
+            // خلفية الشاشة الداكنة (§١: bg = #0A0F1C)
+            .background(Spec.bg)
             // الأسفل = الأكبر بين شريط التنقّل ولوحة المفاتيح: يبقى مربع الإرسال فوق
             // شريط النظام حين تُغلق اللوحة، وفوق اللوحة حين تُفتح — بلا تداخل ولا فراغ.
             .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
@@ -493,27 +574,45 @@ fun ChatScreen(
             channel = channel,
             onBack = onBack,
             onMembers = { showMembers = true },
-            onPinned = {
-                scope.launch {
-                    pinnedMessages = container.chat.pinned(channel.id)
-                    showPinned = true
-                }
-            },
+            onPinned = { showPinned = true },
             onSettings = onOpenSettings,
+            online = online,
+            pinnedCount = pinnedMessages.size,
+            // ترس الإدارة للمشرف/الأدمن فقط (زائر ومستخدم عادي: الوثيقة تعرض زرّين)
+            showSettings = canModerateRoom,
         )
 
-        // فاصل تواريخ الرسائل: نصّان من الموارد (كانا مكتوبين عربي/إنجليزي فقط)
-        val todayLabel = stringResource(R.string.chat_today)
-        val yesterdayLabel = stringResource(R.string.chat_yesterday)
+        // ── شريط المثبّتات (§٤٫٢): يظهر فقط حين يوجد شيء مثبَّت
+        pinnedMessages.firstOrNull()?.let { pinned ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Spec.goldDeepBg)
+                    .clickable { showPinned = true }
+                    .padding(horizontal = Spec.screenPad, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.chat_pinned_strip, pinnedPreviewText(pinned)),
+                    style = Spec.msgQuote.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                    color = Spec.gold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            // حدّ سفلي رقيق بلون `pinnedBorder` (فاصل الشريط عن الرسائل)
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Spec.pinnedBorder))
+        }
 
         Box(Modifier.weight(1f)) {
             when {
-                loading -> LoadingBox(text = stringResource(R.string.chat_loading_messages))
-                messages.isEmpty() -> EmptyState(stringResource(R.string.chat_no_messages))
+                loading -> ChatMessagesLoadingSkeleton()
+                messages.isEmpty() -> ChatMessagesEmptyState(stringResource(R.string.chat_no_messages))
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    // حشو القائمة 14 رأسياً / 12 أفقياً (§٤٫٣)
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 14.dp),
                 ) {
                     itemsIndexedCompat(
                         messages,
@@ -526,18 +625,16 @@ fun ChatScreen(
                         MessageBlock(
                             ui = ui,
                             previous = previous,
-                            showDate = previous == null ||
-                                TimeFormat.dayLabel(
-                                    previous.message.createdAt, Locale.getDefault(),
-                                    todayLabel, yesterdayLabel,
-                                ) !=
-                                TimeFormat.dayLabel(
-                                    ui.message.createdAt, Locale.getDefault(),
-                                    todayLabel, yesterdayLabel,
-                                ),
-                            isNewDivider = false,
-                            myId = container.supabase.session()?.userId,
-                            onLongPress = { actionsFor = ui },
+                            // مقارنة مفتاح اليوم (مُخزَّن في العنصر) بدل حساب
+                            // نصّ التاريخ مرّتين لكل رسالة — انظر Models.dayKey.
+                            showDate = previous == null || previous.dayKey != ui.dayKey,
+                            isNewDivider = newDividerId == ui.message.id,
+                            myId = myId,
+                            currentProfile = profile,
+                            onLongPress = { bounds ->
+                                actionsFor = ui
+                                actionAnchor = bounds.takeIf { it.width > 0f && it.height > 0f }
+                            },
                             onReply = { replyTo = ui.message },
                             onOpenImage = openFullSize,
                             onStickerTap = {
@@ -546,14 +643,17 @@ fun ChatScreen(
                                 // (الحذف يبقى من قائمة الضغط المطوّل خلال ٣ دقائق.)
                                 ui.message.stickerUrl?.takeIf { it.isNotBlank() }?.let { sticker ->
                                     resentSticker = sticker
+                                    reactionTargetMessageId = null
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus(force = true)
                                     showEmoji = true
                                 }
                             },
                             onToggleReaction = { emoji -> vm.toggleReaction(ui.message.id, emoji) },
                             onOpenUser = { userId ->
-                                authors[userId]?.let { onOpenUser(it) }
+                                memberCardProfile = authors[userId] ?: profile?.takeIf { it.id == userId }
                             },
-                            stickerUrlResolver = { path -> container.siteAssetUrl(path) },
+                            stickerUrlResolver = stickerUrlResolver,
                             onPlayVideo = {
                                 // رابط الفيديو يُوقَّع عند الضغط (صالح دقائق) ثم يُشغَّل
                                 scope.launch {
@@ -572,62 +672,123 @@ fun ChatScreen(
                 }
             }
 
-            if (newBelow) {
+            if (farFromBottom || newBelow) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 12.dp)
-                        .clip(CircleShape)
-                        .background(AppColors.Green)
-                        .clickable {
-                            vm.markReadUpToBottom()
-                            scope.launch { messages.lastOrNull()?.let { listState.animateScrollToItem(messages.lastIndex) } }
-                        }
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 12.dp, bottom = 12.dp),
                 ) {
-                    Text(stringResource(R.string.chat_new_messages), style = AppText.small, color = AppColors.OnGreen)
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .shadow(6.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.35f), spotColor = Color.Black.copy(alpha = 0.35f))
+                            .clip(CircleShape)
+                            .background(Spec.surface)
+                            .border(1.dp, Spec.border, CircleShape)
+                            .clickable {
+                                vm.markReadUpToBottom()
+                                scope.launch { messages.lastOrNull()?.let { listState.animateScrollToItem(messages.lastIndex) } }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.cd_scroll_to_bottom),
+                            tint = Spec.text,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    if (unreadBelowCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = 6.dp, y = (-6).dp)
+                                .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
+                                .clip(CircleShape)
+                                .background(Spec.blue)
+                                .border(2.dp, Spec.bg, CircleShape)
+                                .padding(horizontal = 5.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                if (unreadBelowCount > 99) "99+" else unreadBelowCount.toString(),
+                                style = Spec.badge.copy(fontSize = 10.sp),
+                                color = Color.White,
+                                maxLines = 1,
+                            )
+                        }
+                    }
                 }
             }
         }
 
         typing.firstOrNull()?.let { name ->
-            Text(
-                stringResource(R.string.chat_typing, name),
-                style = AppText.tiny,
-                color = AppColors.Muted,
-                modifier = Modifier.padding(start = 16.dp, bottom = 2.dp),
-            )
-        }
-
-        replyTo?.let { original ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .background(Spec.barSurface)
+                    .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ChatTypingDots()
+                Text(
+                    stringResource(R.string.chat_typing, name),
+                    style = Spec.msgQuote,
+                    color = Spec.textMuted,
+                )
+            }
+        }
+
+        replyTo?.let { original ->
+            val replyPreview = when {
+                original.status == "deleted" -> stringResource(R.string.chat_delete_done)
+                !original.content.isNullOrBlank() -> original.content.orEmpty().replace('\n', ' ')
+                original.messageType == "image" -> stringResource(R.string.chat_attach_photo)
+                original.messageType == "sticker" -> stringResource(R.string.chat_stickers)
+                original.messageType == "video" -> stringResource(R.string.chat_video_label)
+                original.messageType == "audio" -> stringResource(R.string.chat_audio_label)
+                else -> stringResource(R.string.chat_announcement)
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(AppColors.Elevated)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .background(Spec.surface)
+                    .border(1.dp, Spec.border, RoundedCornerShape(10.dp))
+                    .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    stringResource(
-                        R.string.chat_replying_to,
-                        authors[original.userId]?.username ?: "",
-                    ),
-                    style = AppText.tiny,
-                    color = AppColors.Blue,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = null,
-                    tint = AppColors.Muted,
+                Column(Modifier.weight(1f).padding(vertical = 2.dp)) {
+                    Text(
+                        stringResource(
+                            R.string.chat_replying_to,
+                            authors[original.userId]?.username ?: "",
+                        ),
+                        style = Spec.msgQuote.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold),
+                        color = Spec.blueLink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        replyPreview,
+                        style = Spec.msgTime,
+                        color = Spec.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                // زرّ الإغلاق 44dp (هدف لمس كامل)
+                Box(
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(Spec.touch)
+                        .clip(CircleShape)
                         .clickable { replyTo = null },
-                )
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = null, tint = Spec.textMuted, modifier = Modifier.size(18.dp))
+                }
             }
         }
 
@@ -671,12 +832,10 @@ fun ChatScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(AppColors.Elevated)
-                    .border(1.dp, AppColors.Border, RoundedCornerShape(14.dp))
-                    .padding(12.dp),
+                    .background(Spec.barSurface)
+                    .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
                     text = when {
@@ -685,15 +844,14 @@ fun ChatScreen(
                         isMuted -> stringResource(R.string.chat_muted_until, TimeFormat.countdown(chatStatus?.mutedUntil))
                         else -> stringResource(R.string.comm_locked)
                     },
-                    style = AppText.bodySmall,
-                    color = AppColors.Muted,
+                    style = Spec.secondary,
+                    color = Spec.textMuted,
                     modifier = Modifier.weight(1f),
                 )
                 if (!signedIn) {
-                    GradientButton(
+                    SpecPrimaryButton(
                         text = stringResource(R.string.auth_sign_in),
                         onClick = onLogin,
-                        modifier = Modifier.widthIn(min = 110.dp),
                     )
                 }
             }
@@ -702,16 +860,16 @@ fun ChatScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(AppColors.Bg.copy(alpha = 0.96f))
-                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                    .background(Spec.barSurface)
+                    .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("🔒", style = AppText.body)
+                Text("🔒", style = Spec.msgBody)
                 Text(
                     stringResource(R.string.chat_read_only),
-                    style = AppText.bodySmall,
-                    color = AppColors.Muted,
+                    style = Spec.secondary,
+                    color = Spec.textMuted,
                 )
             }
         } else {
@@ -722,8 +880,29 @@ fun ChatScreen(
                     text = value
                     if (value.isNotEmpty()) vm.notifyTyping()
                 },
-                onAttach = { showAttach = true },
-                onEmoji = { showEmoji = true },
+                onAttach = {
+                    showEmoji = false
+                    reactionTargetMessageId = null
+                    showAttach = true
+                },
+                panelOpen = showEmoji,
+                focusRequester = focusRequester,
+                onInputFocused = {
+                    showEmoji = false
+                    reactionTargetMessageId = null
+                },
+                onEmoji = {
+                    reactionTargetMessageId = null
+                    if (showEmoji) {
+                        showEmoji = false
+                        focusRequester.requestFocus()
+                        keyboardController?.show()
+                    } else {
+                        keyboardController?.hide()
+                        focusManager.clearFocus(force = true)
+                        showEmoji = true
+                    }
+                },
                 onSend = { sendNow() },
                 remaining = 500 - text.length,
                 mentionSuggestions = if (text.endsWith("@")) authors.values.map { it.username ?: "" }
@@ -735,76 +914,44 @@ fun ChatScreen(
                 canSend = text.isNotBlank() || attachment != null || pendingSticker != null,
             )
         }
-    }
+        // The picker occupies the IME area below the composer; messages resize instead of being covered.
+        if (showEmoji) {
+            EmojiStickerPanel(
+                stickers = stickers,
+                packs = packs,
+                resolvedStickerUrl = { container.siteAssetUrl(it) },
+                onEmoji = { emoji ->
+                    val reactionTarget = reactionTargetMessageId
+                    reactionTargetMessageId = null
+                    resentSticker = null
+                    showEmoji = false
+                    if (reactionTarget != null) {
+                        vm.toggleReaction(reactionTarget, emoji)
+                    } else {
+                        text += emoji
+                        if (canPost && !readOnlyRoom) {
+                            focusRequester.requestFocus()
+                            keyboardController?.show()
+                        }
+                    }
+                },
+                focusSticker = resentSticker,
+                showStickerTab = reactionTargetMessageId == null,
+                onSticker = { stickerUrl ->
+                    // اختيار الملصق لا يُرسله فوراً: يوضعه في مربع الإرسال (معاينة + ✕ أحمر)
+                    // فيستطيع صاحبه أن يكتب نصاً تحته إن أراد، ثم يضغط إرسال.
+                    pendingSticker = stickerUrl
+                    resentSticker = null
+                    reactionTargetMessageId = null
+                    showEmoji = false
+                    if (canPost && !readOnlyRoom) {
+                        focusRequester.requestFocus()
+                        keyboardController?.show()
+                    }
+                },
+            )
+        }
 
-    // النوافذ المنبثقة (E4/C4/C6/C7)
-    if (showEmoji) {
-        EmojiStickerSheet(
-            stickers = stickers,
-            packs = packs,
-            resolvedStickerUrl = { container.siteAssetUrl(it) },
-            onDismiss = { showEmoji = false },
-            onEmoji = { emoji ->
-                text += emoji
-                showEmoji = false
-            },
-            focusSticker = resentSticker,
-            onSticker = { stickerUrl ->
-                // اختيار الملصق لا يُرسله فوراً: يوضعه في مربع الإرسال (معاينة + ✕ أحمر)
-                // فيستطيع صاحبه أن يكتب نصاً تحته إن أراد، ثم يضغط إرسال.
-                pendingSticker = stickerUrl
-                resentSticker = null
-                showEmoji = false
-            },
-        )
-    }
-
-    if (showAttach) {
-        AttachSheet(
-            onDismiss = { showAttach = false },
-            onPhoto = {
-                showAttach = false
-                imagePicker.launch("image/*")
-            },
-            onAudioVideo = {
-                showAttach = false
-                // الوسائط (فيديو · صوت · تسجيل صوتي) للأدمن فقط — حماية مزدوجة مع الخادم
-                if (isAdmin) mediaSheet = true else statusMessage = mediaAdminMsg
-            },
-            isAdmin = isAdmin,
-        )
-    }
-
-    if (mediaSheet) {
-        AttachMediaSheet(
-            onDismiss = { mediaSheet = false },
-            onAudio = {
-                mediaSheet = false
-                if (isAdmin) mediaPicker.launch("audio/*") else statusMessage = mediaAdminMsg
-            },
-            onVideo = {
-                mediaSheet = false
-                if (isAdmin) mediaPicker.launch("video/*") else statusMessage = mediaAdminMsg
-            },
-        )
-    }
-
-    if (showMembers) {
-        MembersSheet(
-            authors = authors.values.toList(),
-            onDismiss = { showMembers = false },
-            onOpenProfile = { p ->
-                showMembers = false
-                onOpenUser(p)
-            },
-        )
-    }
-
-    if (showPinned) {
-        PinnedSheet(
-            pinned = pinnedMessages,
-            onDismiss = { showPinned = false },
-        )
     }
 
     actionsFor?.let { ui ->
@@ -812,6 +959,7 @@ fun ChatScreen(
         val deleteLeftMinutes = deleteWindowRemainingMinutes(ui.message.createdAt)
         MessageActionsSheet(
             ui = ui,
+            anchorBounds = actionAnchor,
             myId = container.supabase.session()?.userId,
             isStaff = canModerateRoom,
             canDeleteMine = canDeleteOwnMessage(ui.message.createdAt),
@@ -850,7 +998,7 @@ fun ChatScreen(
                 actionsFor = null
             },
             onModerate = {
-                vm.moderate(ui.message.id, true)
+                vm.moderate(ui.message.id, hide = ui.message.status != "hidden")
                 actionsFor = null
             },
             onPin = {
@@ -871,13 +1019,96 @@ fun ChatScreen(
                 actionsFor = null
             },
             onOpenProfile = {
-                authors[ui.message.userId]?.let { onOpenUser(it) }
+                memberCardProfile = authors[ui.message.userId]
                 actionsFor = null
             },
             onReact = { emoji ->
                 vm.toggleReaction(ui.message.id, emoji)
                 actionsFor = null
             },
+            onMoreReactions = {
+                reactionTargetMessageId = ui.message.id
+                resentSticker = null
+                keyboardController?.hide()
+                focusManager.clearFocus(force = true)
+                showEmoji = true
+                actionsFor = null
+            },
+        )
+    }
+    }
+
+
+
+
+    if (showAttach) {
+        AttachSheet(
+            onDismiss = { showAttach = false },
+            onPhoto = {
+                showAttach = false
+                imagePicker.launch("image/*")
+            },
+            onAudioVideo = {
+                showAttach = false
+                // الوسائط (فيديو · صوت · تسجيل صوتي) للأدمن فقط — حماية مزدوجة مع الخادم
+                if (isAdmin) mediaSheet = true else statusMessage = mediaAdminMsg
+            },
+            isAdmin = isAdmin,
+        )
+    }
+
+    if (mediaSheet) {
+        AttachMediaSheet(
+            onDismiss = { mediaSheet = false },
+            onAudio = {
+                mediaSheet = false
+                if (isAdmin) mediaPicker.launch("audio/*") else statusMessage = mediaAdminMsg
+            },
+            onVideo = {
+                mediaSheet = false
+                if (isAdmin) mediaPicker.launch("video/*") else statusMessage = mediaAdminMsg
+            },
+        )
+    }
+
+    if (showMembers) {
+        MembersSheet(
+            authors = authors.values.toList(),
+            onDismiss = { showMembers = false },
+            onOpenProfile = { p ->
+                showMembers = false
+                memberCardProfile = p
+            },
+        )
+    }
+
+    if (showPinned) {
+        PinnedSheet(
+            pinned = pinnedMessages,
+            onDismiss = { showPinned = false },
+        )
+    }
+
+    memberCardProfile?.let { member ->
+        com.addonstation.mobile.ui.chat.MemberCardHost(
+            profile = member,
+            onDismiss = { memberCardProfile = null },
+            onOpenProfile = {
+                memberCardProfile = null
+                onOpenUser(member)
+            },
+            onEditProfile = {
+                memberCardProfile = null
+                onOpenUser(member)
+            },
+            refreshToken = memberCardRefresh,
+            onAddFriend = {
+                container.profile.sendFriendRequest(member.id).also { result ->
+                    if (result.isSuccess) memberCardRefresh += 1
+                }
+            },
+            // There is no private-message route or backend in this app yet. Never redirect to a public room.
+            showMessage = false,
         )
     }
 
@@ -890,6 +1121,275 @@ fun ChatScreen(
     }
 }
 
+
+@Composable
+private fun ChatMessagesLoadingSkeleton() {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "chat-message-skeleton")
+    val alpha by transition.animateFloat(
+        initialValue = 0.28f,
+        targetValue = 0.82f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(1100),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "chat-message-skeleton-alpha",
+    )
+    val shimmer = Spec.surfaceHigh.copy(alpha = alpha)
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        repeat(4) { index ->
+            val outgoing = index % 3 == 2
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = if (outgoing) Arrangement.End else Arrangement.Start,
+            ) {
+                if (!outgoing) {
+                    Box(Modifier.size(36.dp).clip(CircleShape).background(shimmer))
+                    Spacer(Modifier.size(8.dp))
+                }
+                Column(
+                    Modifier
+                        .fillMaxWidth(if (outgoing) 0.72f else 0.82f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Spec.surface)
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(Modifier.fillMaxWidth(0.34f).height(12.dp).clip(CircleShape).background(shimmer))
+                    Box(Modifier.fillMaxWidth(if (index % 2 == 0) 0.88f else 0.64f).height(36.dp).clip(RoundedCornerShape(12.dp)).background(shimmer))
+                }
+            }
+        }
+        Text(
+            stringResource(R.string.chat_loading_messages),
+            style = Spec.secondary,
+            color = Spec.textMuted,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun ChatMessagesEmptyState(message: String) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(Spec.surface)
+                .border(1.dp, Spec.border, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("💬", style = Spec.chatName, color = Spec.blueLink)
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            message,
+            style = Spec.msgQuote,
+            color = Spec.textMuted,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun NewMessagesDivider() {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(Modifier.weight(1f).height(1.dp).background(Spec.blue))
+        Text(
+            stringResource(R.string.chat_new_tag),
+            style = Spec.badge.copy(letterSpacing = 0.8.sp),
+            color = Spec.blueLink,
+            maxLines = 1,
+        )
+        Box(Modifier.weight(1f).height(1.dp).background(Spec.blue))
+    }
+}
+
+
+@Composable
+private fun ChatTypingDots() {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "chat-typing")
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(3) { index ->
+            val alpha by transition.animateFloat(
+                initialValue = 0.28f,
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = androidx.compose.animation.core.tween(650, delayMillis = index * 150),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+                ),
+                label = "chat-typing-dot-$index",
+            )
+            Box(
+                Modifier
+                    .size(6.dp)
+                    .alpha(alpha)
+                    .clip(CircleShape)
+                    .background(Spec.blueLink),
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun AudioMessageTile(
+    mediaPath: String?,
+    durationSeconds: Int?,
+    sizeBytes: Long?,
+    isMine: Boolean,
+    onReply: () -> Unit,
+    onLongPress: () -> Unit,
+) {
+    val context = LocalContext.current
+    val container = rememberContainer()
+    val scope = rememberCoroutineScope()
+    var player by remember(mediaPath) { mutableStateOf<ExoPlayer?>(null) }
+    var loading by remember(mediaPath) { mutableStateOf(false) }
+    var playing by remember(mediaPath) { mutableStateOf(false) }
+    val activePlayer = player
+
+    DisposableEffect(activePlayer) {
+        if (activePlayer == null) {
+            onDispose { }
+        } else {
+            val listener = object : Player.Listener {
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    playing = isPlaying
+                }
+
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_ENDED) {
+                        activePlayer.seekTo(0)
+                        playing = false
+                    }
+                }
+
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    playing = false
+                }
+            }
+            activePlayer.addListener(listener)
+            onDispose {
+                activePlayer.removeListener(listener)
+                runCatching { activePlayer.stop() }
+                activePlayer.release()
+            }
+        }
+    }
+
+    fun togglePlayback() {
+        val current = player
+        if (current != null) {
+            if (current.isPlaying) current.pause()
+            else {
+                if (current.playbackState == Player.STATE_ENDED) current.seekTo(0)
+                current.play()
+            }
+            return
+        }
+        if (loading || mediaPath.isNullOrBlank()) return
+        loading = true
+        scope.launch {
+            val url = runCatching { container.chat.mediaUrl(mediaPath) }.getOrNull()
+            if (url != null) {
+                val created = ExoPlayer.Builder(context).build().apply {
+                    setMediaItem(MediaItem.fromUri(url))
+                    prepare()
+                    playWhenReady = true
+                }
+                player = created
+                playing = true
+            }
+            loading = false
+        }
+    }
+
+    val foreground = if (isMine) Color.White else Spec.text
+    val muted = if (isMine) Color.White.copy(alpha = 0.78f) else Spec.textMuted
+    val background = if (isMine) Spec.blue else Spec.surface
+    Row(
+        modifier = Modifier
+            .widthIn(max = 260.dp)
+            .clip(RoundedCornerShape(if (isMine) 16.dp else 14.dp))
+            .background(background)
+            .combinedClickable(onClick = onReply, onLongClick = onLongPress)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(if (isMine) Color.White else Spec.blue)
+                .clickable(enabled = mediaPath?.isNotBlank() == true) { togglePlayback() },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(19.dp),
+                    color = if (isMine) Spec.blue else Color.White,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = stringResource(R.string.chat_audio_label),
+                    tint = if (isMine) Spec.blue else Color.White,
+                    modifier = Modifier.size(23.dp),
+                )
+            }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                stringResource(R.string.chat_audio_label),
+                style = Spec.msgTime.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                color = foreground,
+                maxLines = 1,
+            )
+            val heights = listOf(10, 16, 23, 14, 27, 19, 11, 25, 15, 20, 28, 12, 18, 24, 14, 21)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                heights.forEachIndexed { index, height ->
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(height.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(
+                                if (playing && index < heights.size / 2) foreground
+                                else (if (isMine) foreground else Spec.blueLink).copy(alpha = if (isMine) 0.72f else 0.84f),
+                            ),
+                    )
+                }
+            }
+            Text(
+                TimeFormat.durationLabel(durationSeconds) + " · " + TimeFormat.fileSizeLabel(sizeBytes),
+                style = Spec.msgTime,
+                color = muted,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
 @Composable
 private fun ChatHeader(
     channel: ChatChannel,
@@ -897,71 +1397,168 @@ private fun ChatHeader(
     onMembers: () -> Unit,
     onPinned: () -> Unit,
     onSettings: () -> Unit,
+    online: Int = 0,
+    pinnedCount: Int = 0,
+    showSettings: Boolean = false,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(AppColors.Bg.copy(alpha = 0.96f))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(
+    // ارتفاع ≥ 64 كما تنصّ الوثيقة، وحدّ سفلي 1dp بلون `border`
+    Column(modifier = Modifier.fillMaxWidth().background(Spec.barSurface)) {
+        Row(
             modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(AppColors.Elevated2)
-                .clickable { onBack() },
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .heightIn(min = 64.dp)
+                .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(
-                androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(R.string.common_back),
-                tint = AppColors.Text,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                RoomIcon(channelId = channel.id, size = 20.dp)
+            // زرّ الرجوع 44×44 (هدف لمس كامل)
+            Box(
+                modifier = Modifier
+                    .size(Spec.touch)
+                    .clip(CircleShape)
+                    .background(Spec.surface)
+                    .border(1.dp, Spec.border, CircleShape)
+                    .clickable { onBack() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.common_back),
+                    tint = Spec.text,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            // Room avatar 40dp with the design-system outline.
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).border(2.dp, Spec.border, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                RoomIcon(channelId = channel.id, size = 36.dp)
+            }
+            Column(Modifier.weight(1f)) {
                 Text(
                     // اسم غرفة اللغة بلغتها نفسها (العربية · Русский · 中文 …)
                     com.addonstation.mobile.ui.community.channelDisplayName(channel),
-                    style = AppText.chatName,
-                    color = AppColors.Text,
+                    style = Spec.chatName,
+                    color = Spec.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (channel.isLocked) Text("🔒", style = AppText.tiny)
+                Text(
+                    // «[N] online» أخضر — أو السطر الهادئ حين لا أحد في الغرفة
+                    text = if (online > 0) stringResource(R.string.chat_online, online)
+                    else stringResource(R.string.chat_nobody_online),
+                    style = Spec.chatOnline,
+                    color = if (online > 0) Spec.green else Spec.textMuted,
+                    maxLines = 1,
+                )
             }
-            // الوصف أيضاً بلغة الغرفة نفسها لغرف اللغات
-            com.addonstation.mobile.ui.community.channelDisplayDescription(channel)?.let {
-                Text(it, style = AppText.tiny, color = AppColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Pinned action is shown only when the room has pinned messages.
+            if (pinnedCount > 0) {
+                HeaderIcon(
+                    icon = Icons.Filled.PushPin,
+                    description = stringResource(R.string.chat_pinned_plain) + " · " + pinnedCount,
+                    onClick = onPinned,
+                    tint = Spec.gold,
+                    badge = pinnedCount,
+                )
+            }
+            HeaderIcon(
+                icon = Icons.Filled.Group,
+                description = stringResource(R.string.chat_members),
+                onClick = onMembers,
+            )
+            if (showSettings) {
+                HeaderIcon(
+                    icon = Icons.Filled.Settings,
+                    description = stringResource(R.string.cd_room_settings),
+                    onClick = onSettings,
+                )
             }
         }
-        HeaderIcon(Icons.Filled.Group, onMembers)
-        HeaderIcon(Icons.Filled.PushPin, onPinned)
+        // الحدّ السفلي للشريط
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Spec.border))
+    }
+}
+
+/**
+ * لون اسم صاحب الرسالة (وثيقة الشات §٤٫٣):
+ *   • الأدمن ⇒ ذهبي (وبجانبه شارة ADMIN) · المشرف والمبدع ⇒ أخضر ·
+ *   • Legendary ⇒ ذهبي · Epic ⇒ بنفسجي؛
+ *   • وأي عضو آخر: لون **ثابت له** من أربعة ألوان — يُشتقّ من معرّفه، فلا يتغيّر
+ *     بين رسالة وأخرى (نفس العضو = نفس اللون دائماً).
+ */
+private fun roleColorOf(role: String?, plan: String?, userId: String): Color = when {
+    role == "admin" -> Spec.gold
+    role == "moderator" -> Spec.green
+    role == "creator" -> Spec.blueLink
+    plan == "legendary" -> Spec.gold
+    plan == "epic" -> Spec.epic
+    else -> Spec.nameColors[Math.floorMod(userId.hashCode(), Spec.nameColors.size)]
+}
+
+/**
+ * نصّ مختصر للرسالة المثبّتة (شريط §٤٫٢): نصّها، وإن كانت ملصقاً أو صورة فرمز
+ * بدل فراغ مقلق — منعاً لشريط فارغ بعد «Pinned messages ·».
+ */
+private fun pinnedPreviewText(message: ChatMessage): String {
+    val body = message.content
+    if (!body.isNullOrBlank()) return body.replace('\n', ' ')
+    return when (message.messageType) {
+        "sticker" -> "🖼"
+        "image" -> "🖼"
+        "video" -> "🎬"
+        "audio" -> "🎙️"
+        else -> "—"
     }
 }
 
 @Composable
 private fun HeaderIcon(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
     onClick: () -> Unit,
+    tint: Color = Spec.text,
+    badge: Int = 0,
 ) {
     Box(
         modifier = Modifier
-            .size(32.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(AppColors.Elevated)
+            .size(Spec.touch)
+            .clip(CircleShape)
+            .background(Spec.surface)
+            .border(1.dp, Spec.border, CircleShape)
             .clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = AppColors.Muted, modifier = Modifier.size(16.dp))
+        Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(22.dp))
+        if (badge > 0) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 2.dp, y = (-2).dp)
+                    .sizeIn(minWidth = 16.dp, minHeight = 16.dp)
+                    .clip(CircleShape)
+                    .background(Spec.goldFill)
+                    .border(2.dp, Spec.barSurface, CircleShape)
+                    .padding(horizontal = 3.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    if (badge > 99) "99+" else badge.toString(),
+                    style = Spec.badge,
+                    color = Spec.goldInk,
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }
 
-/** شريط الإدخال: ➕ · حقل النص · 😊 · زر الإرسال الأخضر. */
+/**
+ * شريط الكتابة (§٤٫٤ من الوثيقة): خلفية `barSurface` بحدّ علوي 1dp، وحشو 8/8/18،
+ * عناصره مُوسَّطة: زرّ صورة (44 دائري) · زرّ ملصقات (44 دائري) · حقل 44 بنصف قطر 22
+ * · زرّ إرسال أزرق (44 دائري). كل الأزرار أهداف لمس ≥44dp.
+ */
 @Composable
 private fun ChatInputBar(
     channel: ChatChannel,
@@ -969,141 +1566,205 @@ private fun ChatInputBar(
     onTextChange: (String) -> Unit,
     onAttach: () -> Unit,
     onEmoji: () -> Unit,
+    panelOpen: Boolean,
+    focusRequester: FocusRequester,
+    onInputFocused: () -> Unit,
     onSend: () -> Unit,
     remaining: Int,
     mentionSuggestions: List<String>,
     onMention: (String) -> Unit,
     slowmodeSeconds: Int,
-    /**
-     * ملصق مختار ينتظر الإرسال: رابط معاينته تظهر **داخل مربع الإرسال** فوق
-     * حقل الكتابة، وزر ✕ الأحمر على أقصى يمينه يُلغيه.
-     */
     pendingStickerUrl: String? = null,
     onRemoveSticker: () -> Unit = {},
-    /** هل يمكن الإرسال الآن؟ (نص مكتوب، أو صورة مرفقة، أو ملصق في الانتظار) */
     canSend: Boolean = text.isNotBlank(),
 ) {
-    Column {
-        // معاينة الملصق داخل مربع الإرسال (النص يُكتب تحته إن أراد، ثم إرسال)
-        if (pendingStickerUrl != null) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(AppColors.Elevated)
-                    .border(1.dp, AppColors.Border, RoundedCornerShape(14.dp))
-                    .padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                PendingStickerPreview(url = pendingStickerUrl, onRemove = onRemoveSticker)
-                Text(
-                    stringResource(R.string.chat_sticker_ready),
-                    style = AppText.tiny,
-                    color = AppColors.Muted,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-        }
-        if (mentionSuggestions.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(140.dp)
-                    .padding(horizontal = 12.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(AppColors.Elevated)
-                    .border(1.dp, AppColors.Border, RoundedCornerShape(12.dp)),
-            ) {
-                items(mentionSuggestions.size) { index ->
-                    val name = mentionSuggestions[index]
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Spec.barSurface),
+    ) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Spec.border))
+        Column(modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 14.dp)) {
+            if (pendingStickerUrl != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Spec.surface)
+                        .border(1.dp, Spec.border, RoundedCornerShape(14.dp))
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    PendingStickerPreview(url = pendingStickerUrl, onRemove = onRemoveSticker)
                     Text(
-                        "@$name",
-                        style = AppText.bodySmall,
-                        color = AppColors.Blue,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onMention(name) }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        stringResource(R.string.chat_sticker_ready),
+                        style = Spec.secondary,
+                        color = Spec.textMuted,
+                        modifier = Modifier.weight(1f),
                     )
                 }
+                Spacer(Modifier.height(6.dp))
             }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(AppColors.Elevated2)
-                    .clickable { onAttach() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.chat_add_photo), tint = AppColors.Text)
-            }
-            Column(Modifier.weight(1f)) {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { if (it.length <= 500) onTextChange(it) },
-                    // Enter على لوحة المفاتيح يُرسل الرسالة (زر الإرسال يبقى موجوداً)
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Send),
-                    // Enter على لوحة المفاتيح يُرسل ما في المربع (نصّاً أو ملصقاً)
-                    keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() }),
-                    placeholder = {
+            if (mentionSuggestions.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Spec.surface)
+                        .border(1.dp, Spec.border, RoundedCornerShape(12.dp)),
+                ) {
+                    items(mentionSuggestions.size) { index ->
+                        val name = mentionSuggestions[index]
                         Text(
-                            stringResource(
-                                R.string.chat_hint,
-                                com.addonstation.mobile.ui.community.channelDisplayName(channel),
-                            ),
-                            style = AppText.bodySmall,
+                            "@$name",
+                            style = Spec.secondary,
+                            color = Spec.blueLink,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onMention(name) }
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
                         )
-                    },
-                    maxLines = 4,
-                    shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (remaining in 1..49) {
-                    Text(
-                        "$remaining",
-                        style = AppText.tiny,
-                        color = if (remaining < 10) AppColors.Red else AppColors.Muted,
-                        modifier = Modifier.padding(start = 6.dp),
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(Spec.pillRadius))
+                        .background(Spec.surface)
+                        .border(1.dp, Spec.border, RoundedCornerShape(Spec.pillRadius))
+                        .padding(horizontal = 4.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(if (panelOpen) Spec.blue.copy(alpha = 0.18f) else Color.Transparent)
+                            .clickable { onEmoji() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (panelOpen) Icons.Filled.Keyboard else Icons.Filled.EmojiEmotions,
+                            contentDescription = stringResource(
+                                if (panelOpen) R.string.cd_emoji_toggle_keyboard else R.string.cd_emoji_toggle_open,
+                            ),
+                            tint = if (panelOpen) Spec.blueLink else Spec.textMuted,
+                            modifier = Modifier.size(21.dp),
+                        )
+                    }
+                    Box(
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        if (text.isEmpty()) {
+                            Text(
+                                stringResource(
+                                    R.string.chat_hint,
+                                    com.addonstation.mobile.ui.community.channelDisplayName(channel),
+                                ),
+                                style = Spec.msgBody.copy(fontSize = 15.sp),
+                                color = Spec.textMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        BasicTextField(
+                            value = text,
+                            onValueChange = { if (it.length <= 500) onTextChange(it) },
+                            singleLine = true,
+                            textStyle = Spec.msgBody.copy(fontSize = 15.sp, lineHeight = 22.sp, color = Spec.text),
+                            cursorBrush = SolidColor(Spec.blue),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() }),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester)
+                                .onFocusChanged { if (it.isFocused) onInputFocused() },
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .clickable { onAttach() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = stringResource(R.string.chat_add_photo),
+                            tint = Spec.textMuted,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .then(if (canSend) Modifier.shadow(6.dp, CircleShape) else Modifier)
+                        .clip(CircleShape)
+                        .background(
+                            if (canSend) Brush.linearGradient(listOf(Spec.blue, Color(0xFF4C9AFF)))
+                            else Brush.linearGradient(listOf(Spec.surfaceHigh, Spec.surfaceHigh)),
+                        )
+                        .clickable(enabled = canSend) { onSend() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.Send,
+                        contentDescription = stringResource(R.string.chat_send),
+                        tint = if (canSend) Color.White else Spec.textMuted,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(AppColors.Elevated2)
-                    .clickable { onEmoji() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.EmojiEmotions, contentDescription = stringResource(R.string.chat_emoji), tint = AppColors.Text)
+            val hintLine = buildString {
+                if (remaining in 1..49) append(remaining)
+                if (slowmodeSeconds > 0) {
+                    if (isNotEmpty()) append(" · ")
+                    append(stringResource(R.string.chat_slowmode, slowmodeSeconds))
+                }
             }
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(if (canSend) AppColors.Green else AppColors.Elevated2)
-                    .clickable(enabled = canSend) { onSend() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.Send,
-                    contentDescription = stringResource(R.string.chat_send),
-                    tint = if (canSend) AppColors.OnGreen else AppColors.Dim,
-                    modifier = Modifier.size(20.dp),
+            if (hintLine.isNotEmpty()) {
+                Text(
+                    hintLine,
+                    style = Spec.secondary,
+                    color = if (remaining in 1..9) Spec.gold else Spec.textMuted,
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp),
+                    maxLines = 1,
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SpecComposerCircle(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    selected: Boolean = false,
+) {
+    val shape = CircleShape
+    Box(
+        modifier = Modifier
+            .size(Spec.touch)
+            .clip(shape)
+            .background(if (selected) Spec.blue.copy(alpha = 0.18f) else Spec.surface)
+            .border(if (selected) 1.dp else 0.dp, if (selected) Spec.blue.copy(alpha = 0.45f) else Color.Transparent, shape)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = description, tint = if (selected) Spec.blueLink else Spec.text, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -1290,7 +1951,8 @@ private fun MessageBlock(
     showDate: Boolean,
     isNewDivider: Boolean,
     myId: String?,
-    onLongPress: () -> Unit,
+    currentProfile: Profile?,
+    onLongPress: (Rect) -> Unit,
     /** ضغطة بسيطة على الرسالة ⇒ الرد عليها مباشرة (الضغط المطوّل = قائمة الإبلاغ/الحذف). */
     onReply: () -> Unit,
     /** ضغطة سريعة على أي ملصق ⇒ لوحة الملصقات تُفتح على مكانه وهو محدَّد. */
@@ -1310,7 +1972,16 @@ private fun MessageBlock(
 ) {
     val container = rememberContainer()
     val message = ui.message
-    val author = ui.author
+    var messageBounds by remember(message.id) { mutableStateOf(Rect.Zero) }
+    val haptic = LocalHapticFeedback.current
+    val openActions: () -> Unit = {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        onLongPress(messageBounds)
+    }
+    val isMine = myId != null && message.userId == myId
+    // رسائلي تستخدم ملف الجلسة المحلي إن لم تكن نسخة المرسل موجودة في قائمة المؤلفين.
+    val author = ui.author ?: currentProfile?.takeIf { isMine && it.id == myId }
+    /** فقاعة الرسالة الصادرة تبقى زرقاء ومحاذاة النهاية؛ الترويسة تُعرض أعلاها. */
     // رابط الصورة المرفقة: يُوقَّع من الخادم مرة واحدة لكل رسالة (بدونه تظهر فارغة)
     var imageUrl by remember(message.id, message.imagePath) { mutableStateOf<String?>(null) }
     // إعادة توقيع الرابط عند الطلب (ضغطة على الصورة البيضاء) — لا ننتظر التحديث
@@ -1328,33 +1999,37 @@ private fun MessageBlock(
     val grouped = previous != null &&
         previous.message.userId == message.userId &&
         TimeFormat.withinFiveMinutes(previous.message.createdAt, message.createdAt)
+    // Incoming groups get one sender header; own messages stay anonymous inside their own bubble.
+    val showAuthorHeader = !isMine && !grouped
 
     if (showDate) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.weight(1f).height(1.dp).background(AppColors.Border))
             Text(
                 TimeFormat.dayLabel(
                     message.createdAt, Locale.getDefault(),
                     stringResource(R.string.chat_today), stringResource(R.string.chat_yesterday),
                 ),
-                style = AppText.tiny,
-                color = AppColors.Muted,
-                modifier = Modifier.padding(horizontal = 8.dp),
+                style = Spec.msgQuote.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold),
+                color = Spec.textMuted,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Spec.surfaceHigh)
+                    .padding(horizontal = 14.dp, vertical = 5.dp),
             )
-            Box(Modifier.weight(1f).height(1.dp).background(AppColors.Border))
         }
     }
+
+    if (isNewDivider) NewMessagesDivider()
 
     if (message.messageType == "system") {
         Text(
             message.content.orEmpty(),
-            style = AppText.tiny,
-            color = AppColors.Muted,
+            style = Spec.msgTime,
+            color = Spec.textMuted,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
@@ -1367,7 +2042,7 @@ private fun MessageBlock(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = if (grouped) 2.dp else 10.dp)
+            .padding(top = if (grouped) 3.dp else 8.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(
                 when {
@@ -1376,9 +2051,11 @@ private fun MessageBlock(
                     else -> Color.Transparent
                 }
             )
-            .combinedClickable(onClick = onReply, onLongClick = onLongPress)
+            .onGloballyPositioned { messageBounds = it.boundsInRoot() }
+            .combinedClickable(onClick = onReply, onLongClick = openActions)
             .alpha(if (ui.pending) 0.55f else 1f)      // قيد الإرسال — تظهر فوراً
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
     ) messageBody@{
         if (message.isAnnouncement) {
             Text(
@@ -1388,109 +2065,115 @@ private fun MessageBlock(
             )
         }
 
-        if (!grouped) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (showAuthorHeader) {
+            Row(
+                modifier = Modifier.widthIn(max = 300.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 com.addonstation.mobile.ui.components.AvatarImage(
                     url = assetUrl(container, author?.avatarUrl),
                     size = 40.dp,
                     online = author?.showOnlineStatus == true,
                     modifier = Modifier.clickable { onOpenUser(message.userId) },
                 )
-                // الاسم كما هو (جنب الصورة) … و**اللقب (TheKing · Epic · …)
-                // ينزل سطراً تحته** — طلب المالك: سطران بدل سطر واحد.
-                // weight بلا fill: يأخذ العمود ما يحتاجه فقط، فتبقى الأداة
-                // ملاصقةً له ولا تُدفع إلى حافة الشاشة.
-                // **اللقب تحت الاسم**: لا شيء لصاحب الخطة المجانية (طلب المالك)
-                // — «Free 🍃» لا تظهر أبداً تحت الاسم. يظهر اللقب للمشترك
-                // (Epic 💎 · Legendary 👑) ولصاحب رتبة (أدمن · مشرف · مبدع).
-                // والخطة تُقرأ لحظياً عبر effectivePlan: فإن اشترك المجّاني ظهر
-                // لقبه من تلقاء نفسه، وإن انتهى اشتراكه عاد السطر فارغاً.
-                val showRankTitle = hasRankTitle(author?.role, author?.effectivePlan)
                 Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
                         text = author?.displayName ?: author?.username ?: "—",
-                        style = AppText.chatName,
-                        color = com.addonstation.mobile.ui.theme.nameColor(author?.role ?: "user", author?.effectivePlan ?: "free"),
+                        style = Spec.msgAuthor,
+                        color = roleColorOf(author?.role, author?.effectivePlan, message.userId),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (author != null && showRankTitle) {
-                        Spacer(Modifier.height(3.dp))
-                        com.addonstation.mobile.ui.components.RankBadge(
-                            role = author.role,
-                            plan = author.effectivePlan,
-                        )
+                    if (author != null && hasRankTitle(author.role, author.effectivePlan)) {
+                        RankBadge(role = author.role, plan = author.effectivePlan)
                     }
                 }
                 if (author?.equippedItemId != null && author.equippedItemId != "none") {
-                    // الأداة المجهّزة **بجانبهما** (الاسم ولقبه): أكبر من قبل
-                    // — 32dp بدل 16dp — وأقلّ قليلاً من الصورة (40dp) طلباً
-                    // للشكل الجمالي. صورتها الحقيقية (متحرّكة إن كانت GIF).
                     val itemImg = com.addonstation.mobile.ui.equippedItemUrl(container, author.equippedItemId)
                     if (itemImg != null) {
                         com.addonstation.mobile.ui.components.CoverImage(
                             url = itemImg,
                             radius = 8.dp,
                             modifier = Modifier.size(32.dp),
+                            backgroundColor = Color.Transparent,
                         )
                     } else {
-                        Text("🎖", style = AppText.body.copy(fontSize = 24.sp))
+                        Text("🎖", style = AppText.body.copy(fontSize = 22.sp))
                     }
                 }
-                // وقت الإرسال لم يعد هنا: صار في **نهاية الرسالة نفسها** (أسفل
-                // النص على حافة الفقاعة) كما في صورة المالك.
             }
         }
 
         ui.replyTo?.let { original ->
+            // الاقتباس (§٤٫٣): خلفية `surface` · شريط أزرق 3dp يساراً · نصف قطر 6
             Row(
                 modifier = Modifier
-                    .padding(start = 48.dp, top = 2.dp)
-                    .fillMaxWidth(0.9f),
+                    .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp)
+                    .fillMaxWidth(0.92f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Spec.surface),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Box(
-                    Modifier
-                        .size(width = 2.dp, height = 16.dp)
-                        .background(AppColors.Dim),
-                )
+                Box(Modifier.size(width = 3.dp, height = 30.dp).background(Spec.blue))
                 Text(
                     // مقتبس بلا نص (ملصق/صورة) ⇒ رمز بدل فراغ
-                    "@${ui.replyAuthorName ?: ""}: " +
+                    stringResource(R.string.chat_replying_to, ui.replyAuthorName ?: "") + " · " +
                         (if (original.content.isNullOrBlank() &&
                             (original.stickerUrl != null || original.imagePath != null)
                         ) "🖼 " else "") +
-                        original.content.orEmpty().take(60),
-                    style = AppText.tiny,
-                    color = AppColors.Muted,
+                        original.content.orEmpty().replace('\n', ' ').take(60),
+                    style = Spec.msgQuote,
+                    color = Spec.textMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                 )
             }
         }
 
         // رسالة محذوفة أو مخفية: سطر واحد فقط لكل الأنواع (نص/ملصق/وسائط/صورة)
         if (message.status == "hidden" || message.status == "deleted") {
-            Text(
-                stringResource(R.string.chat_hidden_message),
-                style = AppText.bodySmall,
-                color = AppColors.Muted,
-                modifier = Modifier.padding(start = 48.dp),
-            )
+            Row(
+                modifier = Modifier
+                    .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Spec.surfaceHigh)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    Icons.Filled.VisibilityOff,
+                    contentDescription = null,
+                    tint = Spec.textMuted,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    stringResource(R.string.chat_hidden_message_plain),
+                    style = Spec.secondary.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                    color = Spec.textMuted,
+                )
+            }
             return@messageBody
         }
 
         when (message.messageType) {
             "sticker" -> {
                 val url = stickerUrlResolver(message.stickerUrl ?: "")
-                Column(modifier = Modifier.padding(start = 48.dp, top = 4.dp)) {
+                // الملصق: 96×96 بلا فقاعة (وثيقة §٤٫٣) — يميناً إن كانت رسالتي
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
+                    horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+                ) {
                     // النص أولاً، وتحته مباشرة الملصق — رسالة واحدة كما يراها صاحبها
                     if (!message.content.isNullOrBlank()) {
                         Text(
                             text = message.content.orEmpty(),
-                            style = AppText.chatBody,
-                            color = AppColors.Text,
+                            style = Spec.msgBody,
+                            color = Spec.text,
                             modifier = Modifier.padding(bottom = 6.dp),
                         )
                     }
@@ -1500,12 +2183,7 @@ private fun MessageBlock(
                     ) {
                         Box(
                             modifier = Modifier
-                                // حجم الملصق يتبع عرض شاشة الهاتف (لا يفيض على الشاشات الضيقة)
-                                .size(
-                                    com.addonstation.mobile.ui.theme.screenWidthFraction(
-                                        fraction = 0.38f, minDp = 108, maxDp = 180,
-                                    ),
-                                )
+                                .size(Spec.stickerSize)
                                 // ضغطة مطوّلة ⇒ قائمة الرسالة نفسها (رد · نسخ · إبلاغ · حذف)
                                 .combinedClickable(
                                     onClick = {
@@ -1513,12 +2191,16 @@ private fun MessageBlock(
                                         val takeBack = onStickerTap
                                         if (takeBack != null) takeBack() else message.stickerUrl?.let(onOpenImage)
                                     },
-                                    onLongClick = onLongPress,
+                                    onLongClick = openActions,
                                 ),
                         ) {
-                            com.addonstation.mobile.ui.components.CoverImage(url = url, radius = 12.dp, modifier = Modifier.fillMaxSize())
+                            com.addonstation.mobile.ui.components.CoverImage(
+                                url = url,
+                                radius = 8.dp,
+                                modifier = Modifier.fillMaxSize(),
+                            )
                         }
-                        // الوقت في نهاية الرسالة (أسفل الملصق على الحافة)
+                        // الوقت أسفل الملصق — لرسالتي فقط (الوارد وقته في سطر الرأس)
                         MessageStatus(
                             ui = ui,
                             createdAt = message.createdAt,
@@ -1531,13 +2213,18 @@ private fun MessageBlock(
                 }
             }
             "image" -> {
-                Column(modifier = Modifier.padding(start = 48.dp, top = 4.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
+                    horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+                ) {
                     // النص أولاً وتحته الصورة — **رسالة واحدة** كما أُرسلت
                     if (!message.content.isNullOrBlank()) {
                         Text(
                             text = message.content.orEmpty(),
-                            style = AppText.chatBody,
-                            color = AppColors.Text,
+                            style = Spec.msgBody,
+                            color = Spec.text,
                             modifier = Modifier.padding(bottom = 6.dp),
                         )
                     }
@@ -1545,40 +2232,56 @@ private fun MessageBlock(
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        // ⚠️ سبب «أرسلت صورة ولم تظهر»: الصورة كانت تقيس
-                        // بـ widthIn(max) بلا حدٍّ أدنى فيصير عرضها **صفراً**.
-                        // الآن مقاس ثابت يتبع عرض الشاشة: تظهر دائماً.
                         ChatImageTile(
                             url = imageUrl,
                             localPreview = ui.localPreview,
+                            isMine = isMine,
                             onOpen = {
                                 val path = message.imagePath
                                 if (imageUrl != null) onOpenImage(imageUrl!!)
                                 else if (path != null) onOpenImage(path)
                             },
-                            onLongPress = onLongPress,
+                            onLongPress = openActions,
                             onRetryUrl = { reloadImageUrl() },
+                            statusContent = if (isMine) {
+                                {
+                                    MessageStatus(
+                                        ui = ui,
+                                        createdAt = message.createdAt,
+                                        notSentLabel = notSentLabel,
+                                        retryLabel = retryLabel,
+                                        onRetry = onRetry,
+                                        onDiscard = onDiscard,
+                                        isMine = true,
+                                    )
+                                }
+                            } else null,
                         )
-                        // الوقت في نهاية الرسالة (أسفل الصورة على الحافة)
-                        MessageStatus(
-                            ui = ui,
-                            createdAt = message.createdAt,
-                            notSentLabel = notSentLabel,
-                            retryLabel = retryLabel,
-                            onRetry = onRetry,
-                            onDiscard = onDiscard,
-                        )
+                        if (!isMine) {
+                            MessageStatus(
+                                ui = ui,
+                                createdAt = message.createdAt,
+                                notSentLabel = notSentLabel,
+                                retryLabel = retryLabel,
+                                onRetry = onRetry,
+                                onDiscard = onDiscard,
+                            )
+                        }
                     }
                 }
             }
             "video" -> {
-                Column(modifier = Modifier.padding(start = 48.dp, top = 4.dp)) {
-                    // النص أولاً وتحته الفيديو — **رسالة واحدة** كما أُرسلت
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
+                    horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+                ) {
                     if (!message.content.isNullOrBlank()) {
                         Text(
                             text = message.content.orEmpty(),
-                            style = AppText.chatBody,
-                            color = AppColors.Text,
+                            style = Spec.msgBody,
+                            color = Spec.text,
                             modifier = Modifier.padding(bottom = 6.dp),
                         )
                     }
@@ -1598,7 +2301,7 @@ private fun MessageBlock(
                                 height = 168.dp,
                             ),
                             onClick = onPlayVideo,
-                            onLongPress = onLongPress,
+                            onLongPress = openActions,
                         )
                         MessageStatus(
                             ui = ui,
@@ -1612,37 +2315,117 @@ private fun MessageBlock(
                 }
             }
             "audio" -> {
-                Column(modifier = Modifier.padding(start = 48.dp, top = 4.dp)) {
-                    // النص أولاً وتحته شريط الصوت — **رسالة واحدة** كما أُرسلت
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
+                    horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+                ) {
                     if (!message.content.isNullOrBlank()) {
                         Text(
                             text = message.content.orEmpty(),
-                            style = AppText.chatBody,
-                            color = AppColors.Text,
+                            style = Spec.msgBody,
+                            color = Spec.text,
                             modifier = Modifier.padding(bottom = 6.dp),
                         )
                     }
                     Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(AppColors.Elevated)
-                            // ضغطة مطوّلة ⇒ قائمة الرسالة نفسها (رد · نسخ · إبلاغ · حذف)
-                            .combinedClickable(onClick = onReply, onLongClick = onLongPress)
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text("🎙️", style = AppText.bodySmall)
-                        Column {
+                        AudioMessageTile(
+                            mediaPath = message.mediaPath,
+                            durationSeconds = message.mediaDuration,
+                            sizeBytes = message.mediaSize,
+                            isMine = isMine,
+                            onReply = onReply,
+                            onLongPress = openActions,
+                        )
+                        MessageStatus(
+                            ui = ui,
+                            createdAt = message.createdAt,
+                            notSentLabel = notSentLabel,
+                            retryLabel = retryLabel,
+                            onRetry = onRetry,
+                            onDiscard = onDiscard,
+                        )
+                    }
+                }
+            }
+            else -> {
+                if (isMine) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = if (grouped) 2.dp else 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .widthIn(max = Spec.ownBubbleMax)
+                                .clip(
+                                    RoundedCornerShape(
+                                        topStart = 16.dp,
+                                        topEnd = 16.dp,
+                                        bottomEnd = 4.dp,
+                                        bottomStart = 16.dp,
+                                    ),
+                                )
+                                .background(Brush.linearGradient(listOf(Spec.blue, Color(0xFF4C9AFF))))
+                                .combinedClickable(onClick = onReply, onLongClick = openActions)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
                             Text(
-                                stringResource(R.string.chat_audio_label),
-                                style = AppText.tiny,
-                                color = AppColors.Text,
+                                text = message.content.orEmpty(),
+                                style = Spec.msgBody.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                color = Color.White,
                             )
+                            Row(
+                                Modifier.fillMaxWidth().padding(top = 3.dp),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                MessageStatus(
+                                    ui = ui,
+                                    createdAt = message.createdAt,
+                                    notSentLabel = notSentLabel,
+                                    retryLabel = retryLabel,
+                                    onRetry = onRetry,
+                                    onDiscard = onDiscard,
+                                    isMine = true,
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.padding(start = 48.dp, top = 2.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .widthIn(max = 250.dp)
+                                .clip(
+                                    RoundedCornerShape(
+                                        topStart = 16.dp,
+                                        topEnd = 16.dp,
+                                        bottomEnd = 16.dp,
+                                        bottomStart = 4.dp,
+                                    ),
+                                )
+                                .background(Spec.surface)
+                                .border(
+                                    1.dp,
+                                    Spec.border,
+                                    RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 4.dp),
+                                )
+                                .combinedClickable(onClick = onReply, onLongClick = openActions)
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                        ) {
                             Text(
-                                TimeFormat.durationLabel(message.mediaDuration) + " · " + TimeFormat.fileSizeLabel(message.mediaSize),
-                                style = AppText.tiny,
-                                color = AppColors.Muted,
+                                text = message.content.orEmpty(),
+                                style = Spec.msgBody,
+                                color = Spec.text,
                             )
                         }
                         MessageStatus(
@@ -1656,29 +2439,6 @@ private fun MessageBlock(
                     }
                 }
             }
-            else -> {
-                Row(
-                    modifier = Modifier.padding(start = 48.dp, top = 2.dp),
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = message.content.orEmpty(),
-                        style = AppText.chatBody,
-                        color = AppColors.Text,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    // الوقت في نهاية السطر (على حافة الفقاعة) — أو حالة الإرسال
-                    MessageStatus(
-                        ui = ui,
-                        createdAt = message.createdAt,
-                        notSentLabel = notSentLabel,
-                        retryLabel = retryLabel,
-                        onRetry = onRetry,
-                        onDiscard = onDiscard,
-                    )
-                }
-            }
         }
 
         // التفاعلات بأسلوب ديسكورد: صفّ من **البسولات الدائرية** تحت الرسالة،
@@ -1686,7 +2446,7 @@ private fun MessageBlock(
         // الصفّ زر «إضافة تفاعل» (＋) الذي يفتح لوحة الرموز.
         if (ui.reactions.isNotEmpty()) {
             Row(
-                modifier = Modifier.padding(start = 48.dp, top = 4.dp),
+                modifier = Modifier.padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1698,7 +2458,7 @@ private fun MessageBlock(
                         onClick = { onToggleReaction(emoji) },
                     )
                 }
-                AddReactionPill(onClick = onLongPress)
+                AddReactionPill(onClick = openActions)
             }
         }
     }
@@ -1752,8 +2512,8 @@ private fun MessageTime(
 ) {
     Text(
         text = TimeFormat.timeOnly(createdAt, Locale.getDefault()),
-        style = AppText.chatTime,
-        color = AppColors.Dim,
+        style = Spec.msgTime,
+        color = Spec.textMuted,
         modifier = modifier,
     )
 }
@@ -1775,6 +2535,7 @@ private fun MessageStatus(
     retryLabel: String,
     onRetry: () -> Unit,
     onDiscard: () -> Unit,
+    isMine: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     when {
@@ -1783,18 +2544,18 @@ private fun MessageStatus(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("⚠️", style = AppText.tiny)
-            Text(notSentLabel, style = AppText.chatTime, color = AppColors.Red)
+            Text("⚠️", style = Spec.msgTime)
+            Text(notSentLabel, style = Spec.msgTime, color = if (isMine) Color.White else Spec.gold)
             Text(
                 retryLabel,
-                style = AppText.chatTime,
-                color = AppColors.Green,
+                style = Spec.msgTime,
+                color = if (isMine) Color.White else Spec.green,
                 modifier = Modifier.clickable { onRetry() },
             )
             Text(
                 "✕",
-                style = AppText.chatTime,
-                color = AppColors.Muted,
+                style = Spec.msgTime,
+                color = if (isMine) Color.White.copy(alpha = 0.8f) else Spec.textMuted,
                 modifier = Modifier.clickable { onDiscard() },
             )
         }
@@ -1804,11 +2565,28 @@ private fun MessageStatus(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             CircularProgressIndicator(
-                color = AppColors.Muted,
+                color = if (isMine) Color.White.copy(alpha = 0.8f) else Spec.textMuted,
                 strokeWidth = 1.5.dp,
                 modifier = Modifier.size(10.dp),
             )
-            Text("🕓", style = AppText.tiny)
+            Text("🕓", style = Spec.msgTime, color = if (isMine) Color.White.copy(alpha = 0.8f) else Spec.textMuted)
+        }
+        isMine -> Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(
+                TimeFormat.timeOnly(createdAt, Locale.getDefault()),
+                style = Spec.msgTime.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                color = Color.White.copy(alpha = 0.75f),
+            )
+            Icon(
+                Icons.Filled.DoneAll,
+                contentDescription = stringResource(R.string.cd_message_delivered),
+                tint = Color.White.copy(alpha = 0.75f),
+                modifier = Modifier.size(14.dp),
+            )
         }
         else -> MessageTime(createdAt = createdAt, modifier = modifier)
     }
@@ -1825,25 +2603,30 @@ private fun MessageStatus(
 private fun ChatImageTile(
     url: String?,
     localPreview: String?,
+    isMine: Boolean,
     onOpen: () -> Unit,
     onLongPress: () -> Unit,
     onRetryUrl: () -> Unit,
+    statusContent: (@Composable () -> Unit)? = null,
 ) {
+    val imageShape = RoundedCornerShape(
+        topStart = 16.dp,
+        topEnd = 16.dp,
+        bottomEnd = if (isMine) 4.dp else 16.dp,
+        bottomStart = if (isMine) 16.dp else 4.dp,
+    )
     Box(
         modifier = Modifier
-            .size(
-                width = com.addonstation.mobile.ui.theme.screenWidthFraction(
-                    fraction = 0.58f, minDp = 150, maxDp = 250,
-                ),
-                height = 168.dp,
-            )
-            .clip(RoundedCornerShape(14.dp))
+            // مقاس المواصفة: 230×150 مع زاوية سفلية مميزة لاتجاه الرسالة.
+            .size(width = Spec.incomingImageW, height = Spec.incomingImageH)
+            .clip(imageShape)
+            .border(1.dp, Spec.border, imageShape)
             .combinedClickable(onClick = onOpen, onLongClick = onLongPress),
     ) {
         com.addonstation.mobile.ui.components.CoverImage(
             url = url,
             model = localPreview?.let { java.io.File(it) },
-            radius = 14.dp,
+            radius = 0.dp,
             modifier = Modifier.fillMaxSize(),
         )
         // لم يُوقَّع الرابط بعد (أو فشل) ⇒ زرّ إعادة محاولة واضح بدل صورة بيضاء
@@ -1854,7 +2637,19 @@ private fun ChatImageTile(
                     .clickable { onRetryUrl() },
                 contentAlignment = Alignment.Center,
             ) {
-                Text("🖼 " + stringResource(R.string.chat_tap_to_retry), style = AppText.tiny, color = AppColors.Muted)
+                Text("🖼 " + stringResource(R.string.chat_tap_to_retry), style = Spec.msgTime, color = Spec.textMuted)
+            }
+        }
+        statusContent?.let { content ->
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 7.dp, vertical = 4.dp),
+            ) {
+                content()
             }
         }
     }
