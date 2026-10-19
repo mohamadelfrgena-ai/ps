@@ -7,9 +7,10 @@
 الترتيب ملزم: 01 → 02 → 03 → 04 → 05 → 06 → 07 → 10
 (08 إعداد الأدمن يُنفَّذ يدوياً بعد إنشاء الحساب، و09 بوابات الدفع اختياري.)
 12_avatars.sql يضيف 25 أفاتاراً إلى site_assets (قديمة — يستبدلها 15_assets_v2.sql).
-15_assets_v2.sql في النهاية: يحذف كل الأصول القديمة (أفاتارات/ملصقات/أدوات) ويزرع الدفعة
-الجديدة (492 أصلاً في 21 قسماً حسب مجلدات المصدر) — لذا ينتهي التجهيز بالأصول الصحيحة.
-11_grants.sql في النهاية وهو إلزامي لمشاريع Supabase الجديدة (منح صلاحيات anon/authenticated).
+15_assets_v2.sql يزرع دفعة الأصول الأساسية، ثم تنظف الترحيلات اللاحقة الأفاتارات
+المجانية القديمة. 46_profile_avatar_packs.sql هو النهاية الحالية: يستبدل Profiles
+بـ24 Epic ويضيف Profile 2 بـ11 Legendary مع إبقاء onefree وحدها مجانية.
+11_grants.sql إلزامي لمشاريع Supabase الجديدة (منح صلاحيات anon/authenticated).
 
 الاستخدام: python3 tools/build_all_in_one_sql.py
 """
@@ -64,6 +65,7 @@ ORDER = [
     # it must never run as part of a fresh all-in-one installation.
     "44_fix_profile_asset_guard.sql",
     "45_single_attached_free_avatar.sql",
+    "46_profile_avatar_packs.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -91,7 +93,9 @@ HEADER = """-- =================================================================
 --      → 40_admin_asset_privacy (أصول الأدمن لا تظهر لغيره + مخزن خاص)
 --      → 41_console_link_codes (ربط PlayStation الآمن برمز مؤقت وموافقة صريحة)
 --      → 42_visible_profiles_access → 44_fix_profile_asset_guard
---      → 45_single_attached_free_avatar
+--      → 45_single_attached_free_avatar → 46_profile_avatar_packs
+--  ⚠️ ارفع ملفات supabase/profile-pack-files إلى مخزن site-assets قبل تشغيل 46؛
+--     يتحقق الترحيل من الأحجام والبصمات ويرفض إنشاء أي صف ذي صورة ناقصة.
 --  (43_content_download_integrity إصلاح بيانات إنتاجية مستقل، وليس للتنصيب الجديد.)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.

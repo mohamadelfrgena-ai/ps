@@ -15,6 +15,10 @@
 الاستخدام:
     python3 tools/build_assets_sql.py
     python3 tools/build_assets_sql.py --manifest assets-manifest.json --out supabase/15_assets_v2.sql
+
+مهم: هذا مولّد بذرة المرحلة 15 التاريخية، لا الحالة النهائية للأفاتارات.
+31/32/45 تُبقي onefree وحدها مجانية، ثم 46 (المولّد من profile-packs.json)
+يستبدل Profiles بـ24 Epic ويضيف Profile 2 بـ11 Legendary.
 """
 import argparse
 import collections

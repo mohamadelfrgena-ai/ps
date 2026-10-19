@@ -23,7 +23,7 @@ insert into public.site_assets
    collection_order, sort_order, enabled)
 values
   ('avatar', 'Default Free Avatar', 'profiles/profiles/onefree.png', 'free',
-   false, 'Profiles', 2, 1, true)
+   false, 'Default', 1, 1, true)
 on conflict (file_url) do update
    set asset_type       = excluded.asset_type,
        name             = excluded.name,

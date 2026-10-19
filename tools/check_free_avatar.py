@@ -15,6 +15,7 @@ CANONICAL_PATH = "profiles/profiles/onefree.png"
 
 M31 = SUPABASE / "31_single_free_avatar.sql"
 M45 = SUPABASE / "45_single_attached_free_avatar.sql"
+M46 = SUPABASE / "46_profile_avatar_packs.sql"
 SCHEMA = SUPABASE / "01_schema.sql"
 FUNCTIONS = SUPABASE / "02_functions_core.sql"
 SEED = SUPABASE / "15_assets_v2.sql"
@@ -53,6 +54,7 @@ def deletes_other_free_rows(sql: str) -> bool:
 def main() -> int:
     m31 = read(M31)
     m45 = read(M45)
+    m46 = read(M46)
     schema = read(SCHEMA)
     functions = read(FUNCTIONS)
     seed = read(SEED)
@@ -85,6 +87,11 @@ def main() -> int:
              "required_plan",
              "enabled          = true",
          ))),
+        ("الحزمتان المدفوعتان لا تبتلعان الصورة المجانية",
+         "'Default', 1, 1, true" in m31
+         and "'Default', 1, 1, true" in m45
+         and "collection = 'Default'" in m46
+         and "onefree.png must remain the sole enabled free avatar" in m46),
         ("الحسابات ذات المسار القديم تُنقل قبل الحذف",
          "p.avatar_url = 'profiles/onefree.png'" in m45
          and m45.index("update public.profiles p") < m45.index("delete from public.site_assets")),
@@ -108,10 +115,11 @@ def main() -> int:
         ("صورة المجهول المنفصلة بقيت محصورة في AnonymousAvatarImage",
          common.count("R.drawable.ic_default_profile") == 1
          and "R.drawable.ic_default_profile" not in registered_ui),
-        ("الملف الجامع يتضمن الترحيل 45 في النهاية",
+        ("الملف الجامع يطبّق 45 ثم حزم 46 في النهاية",
          "-- ##  القسم: 45_single_attached_free_avatar.sql" in all_in_one
-         and all_in_one.rfind("45_single_attached_free_avatar.sql")
-             > all_in_one.rfind("44_fix_profile_asset_guard.sql")),
+         and "-- ##  القسم: 46_profile_avatar_packs.sql" in all_in_one
+         and all_in_one.rfind("46_profile_avatar_packs.sql")
+             > all_in_one.rfind("45_single_attached_free_avatar.sql")),
     ]
 
     print("فحص الصورة المجانية الوحيدة")

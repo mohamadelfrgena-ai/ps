@@ -3,7 +3,7 @@
 """
 يولّد **`supabase/99_VERIFY_ALL.sql`** — فاحص القاعدة الكامل (قراءة فقط).
 
-ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 45) نُفِّذت
+ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 46) نُفِّذت
 كما نريد، ويطبع جدولاً: ✅/❌ + التفاصيل (وما هو المفقود بالاسم). يلصقه المالك
 في Supabase → SQL Editor مرة واحدة.
 
@@ -16,6 +16,7 @@
     python3 tools/make_verify_sql.py
 """
 import io
+import json
 import os
 import sys
 
@@ -325,16 +326,18 @@ missing_list("14_redeem_codes", "سياسات أكواد الشحن",
 # ═══════════════════════════════════════════════════════════════════════════
 #  15_assets_v2 (+16_fix_asset_paths) + 21_banners + 27_admin_only_assets
 # ═══════════════════════════════════════════════════════════════════════════
-COLLECTIONS = [("PFP", 1), ("Profiles", 1), ("Best Cartoon", 7),
-               ("Cartoon Meme", 11), ("Cool Cartoon", 6), ("Call Of Duty", 10), ("Sad", 10),
-               ("Ahh", 8), ("Moumen", 4), ("Animated", 8), ("Memes", 47),
-               ("Minecraft Memes 1", 21), ("Minecraft Memes 2", 87), ("Minecraft Memes 3", 20),
-               ("Minecraft Movie", 6), ("Top", 12), ("Minecraft Items", 103), ("Games", 41),
-               ("PlayStation", 10), ("Random Things", 22), ("Nature 🌿", 13), ("Random 🎲", 27)]
+COLLECTIONS = [("PFP", 1), ("Default", 1), ("Profiles", 24), ("Profile 2", 11),
+               ("Best Cartoon", 7), ("Cartoon Meme", 11), ("Cool Cartoon", 6),
+               ("Call Of Duty", 10), ("Sad", 10), ("Ahh", 8), ("Moumen", 4),
+               ("Animated", 8), ("Memes", 47), ("Minecraft Memes 1", 21),
+               ("Minecraft Memes 2", 87), ("Minecraft Memes 3", 20),
+               ("Minecraft Movie", 6), ("Top", 12), ("Minecraft Items", 103),
+               ("Games", 41), ("PlayStation", 10), ("Random Things", 22),
+               ("Nature 🌿", 13), ("Random 🎲", 27)]
 COLLECTION_VALUES = ",\n              ".join(
     f"('{c}', {n})" for c, n in COLLECTIONS)
 TOTAL_ASSETS = sum(n for _, n in COLLECTIONS)
-TYPE_MIN = {"avatar": 66, "item": 176, "sticker": 193, "banner": 40}
+TYPE_MIN = {"avatar": 101, "item": 176, "sticker": 193, "banner": 40}
 
 # نُقارن بعدد **لا ينقص** عن دفعاتنا: أي زيادة = أصول أضفتها أنت من لوحة الإدارة
 # (مثل بانرين إضافيين) — وهذا لا يُعدّ نقصاً، بل يُذكر في التفاصيل.
@@ -342,13 +345,13 @@ TYPE_CHECKS = " and ".join(
     f"(count(*) filter (where asset_type = '{t}') >= {n})"
     for t, n in TYPE_MIN.items())
 
-add("15_assets_v2 · 21_banners · 45", f"مجموع الأصول >= {TOTAL_ASSETS} (435 بعد حذف المجاني القديم + 40 بانر)",
+add("15_assets_v2 · 21_banners · 45 · 46", f"مجموع الأصول >= {TOTAL_ASSETS} (101 أفاتاراً بعد استبدال الحزمتين + 409 أصول أخرى)",
     q_ok(f"select (count(*) >= {TOTAL_ASSETS})::text from public.site_assets", "true"),
     qdet(f"select count(*)::text || '/{TOTAL_ASSETS} مصدر' "
          "|| ' · إضافاتك: ' || greatest(count(*) - " + str(TOTAL_ASSETS) + ", 0)::text "
          "from public.site_assets"))
 
-add("15_assets_v2 · 45", "توزيع الأصول كاملًا (66 أفاتاراً · 176 أداة · 193 ملصقاً · 40 بانراً)",
+add("15_assets_v2 · 45 · 46", "توزيع الأصول كاملًا (101 أفاتاراً · 176 أداة · 193 ملصقاً · 40 بانراً)",
     q_ok(f"select ({TYPE_CHECKS})::text from public.site_assets", "true"),
     qdet("select 'avatar ' || count(*) filter (where asset_type = 'avatar')::text "
          "|| ' · item ' || count(*) filter (where asset_type = 'item')::text "
@@ -374,6 +377,54 @@ add("15_assets_v2 · 21_banners", f"لا نقص في أي قسم من أقسام
                           where collection is not null
                           group by collection) a on a.collection = e.collection
              where coalesce(a.have, 0) < e.want""", "لا نقص في أي قسم"))
+
+# الحزمتان الجديدتان: نقرأ المسارات والبصمات من البيان المثبّت نفسه الذي ولّد 46.
+with io.open(os.path.join(ROOT, "supabase", "profile-packs.json"), encoding="utf-8") as _profile_fh:
+    PROFILE_PACK_ASSETS = json.load(_profile_fh)["assets"]
+PROFILE_PACK_DB_VALUES = ", ".join(
+    "('{path}', '{collection}', '{plan}')".format(
+        path=a["path"].replace("'", "''"),
+        collection=a["collection"].replace("'", "''"),
+        plan=a["plan"].replace("'", "''"),
+    )
+    for a in PROFILE_PACK_ASSETS
+)
+PROFILE_PACK_STORAGE_VALUES = ", ".join(
+    "('{path}', {size}::bigint, '{md5}')".format(
+        path=a["path"].replace("'", "''"), size=a["bytes"], md5=a["md5"])
+    for a in PROFILE_PACK_ASSETS
+)
+
+add("46_profile_avatar_packs", "حزمة Profiles = 24 Epic وحزمة Profile 2 = 11 Legendary بالضبط",
+    q_ok("select (((count(*) filter (where collection = 'Profiles')) = 24) and "
+         "((count(*) filter (where collection = 'Profiles' and required_plan = 'epic' and enabled)) = 24) and "
+         "((count(*) filter (where collection = 'Profile 2')) = 11) and "
+         "((count(*) filter (where collection = 'Profile 2' and required_plan = 'legendary' and enabled)) = 11))::text "
+         "from public.site_assets where asset_type = 'avatar'", "true"),
+    qdet("select string_agg(collection || '/' || required_plan || '=' || total::text, ' · ' order by collection, required_plan) "
+         "from (select collection, required_plan, count(*) total from public.site_assets "
+         "where asset_type = 'avatar' and collection in ('Profiles', 'Profile 2') "
+         "group by collection, required_plan) s"))
+
+add("46_profile_avatar_packs", "كل مسارات الحزمتين الـ35 مسجّلة بالخطة والقسم الصحيحين",
+    q_ok(f"select (count(*) = 0)::text from (values {PROFILE_PACK_DB_VALUES}) e(path, collection, plan) "
+         "left join public.site_assets a on a.file_url = e.path and a.asset_type = 'avatar' "
+         "where a.id is null or not a.enabled or a.collection <> e.collection or a.required_plan <> e.plan", "true"),
+    qdet(f"select string_agg(e.path, ' · ') from (values {PROFILE_PACK_DB_VALUES}) e(path, collection, plan) "
+         "left join public.site_assets a on a.file_url = e.path and a.asset_type = 'avatar' "
+         "where a.id is null or not a.enabled or a.collection <> e.collection or a.required_plan <> e.plan",
+         "كل المسارات مطابقة"))
+
+add("46_profile_avatar_packs", "ملفات الحزمتين الـ35 في Storage مطابقة للحجم والبصمة المثبّتَين",
+    q_ok(f"select (count(*) = 0)::text from (values {PROFILE_PACK_STORAGE_VALUES}) e(path, bytes, md5) "
+         "left join storage.objects o on o.bucket_id = 'site-assets' and o.name = e.path "
+         "where o.id is null or coalesce((o.metadata->>'size')::bigint, -1) <> e.bytes "
+         "or trim(both '\"' from coalesce(o.metadata->>'eTag', '')) <> e.md5", "true"),
+    qdet(f"select string_agg(e.path, ' · ') from (values {PROFILE_PACK_STORAGE_VALUES}) e(path, bytes, md5) "
+         "left join storage.objects o on o.bucket_id = 'site-assets' and o.name = e.path "
+         "where o.id is null or coalesce((o.metadata->>'size')::bigint, -1) <> e.bytes "
+         "or trim(both '\"' from coalesce(o.metadata->>'eTag', '')) <> e.md5",
+         "35/35 ملفاً مطابقاً"))
 
 # المصدر المرجعي: الملفات المرفوعة في المخزن. المسار المكرّر (profiles/profiles/…)
 # ليس خطأً — هكذا رُفعت الملفات فعلاً؛ لذلك نُقارن **بعد تطبيع البادئة المكرّرة**
@@ -565,8 +616,8 @@ add("30_chat_members_only", "الشات للمسجّلين فقط (3 سياسا�
       "and policyname in ('messages_read', 'reactions_read', 'channels_read') "
       "and qual ilike '%auth.uid()%'"))
 
-add("31_single_free_avatar · 45", "سجل أفاتار مجاني واحد فقط وملف onefree موجود",
-    qbool("select (count(*) = 1 and bool_and(a.enabled) and "
+add("31_single_free_avatar · 45 · 46", "سجل أفاتار مجاني واحد فقط في Default وملف onefree موجود",
+    qbool("select (count(*) = 1 and bool_and(a.enabled) and bool_and(a.collection = 'Default') and "
           "bool_and(a.file_url = 'profiles/profiles/onefree.png') and bool_and(exists ("
           "select 1 from storage.objects o where o.bucket_id = 'site-assets' "
           "and o.name = a.file_url)))::text from public.site_assets a "
@@ -636,7 +687,7 @@ add("45_single_attached_free_avatar", "ملف صورة المالك موجود �
 # ── معلوماتية: ملفات قديمة مُستبدَلة + حالة الشات ─────────────────────────
 add("07_seed_assets · 12_avatars", "دفعات الأصول القديمة (مُستبدَلة بـ15 — لا يلزم تنفيذها)",
     "true",
-    "'لا شيء مطلوب: 15_assets_v2 و21_banners و45 هي المرجع (475 أصلاً مفعّلاً)'")
+    "'لا شيء مطلوب: 15_assets_v2 و21_banners و45 و46 هي المرجع (510 أصول مفعّلة على الأقل)'")
 
 add("16_fix_asset_paths", "توحيد المسارات المكرّرة (نسخة آمنة — لا تلزمك الآن)",
     "true",
@@ -857,7 +908,7 @@ HEAD = r'''-- ==================================================================
 --  AddonStation Mobile — ٩٩) فاحص القاعدة: «هل نُفِّذ كل SQL كما نريد؟»
 -- ============================================================================
 --
---  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 45) بنداً بنداً، ويطبع
+--  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 46) بنداً بنداً، ويطبع
 --  جدولاً واحداً: كل صف = بند · العمود «الحالة» ✅ أو ❌ · والعمود «التفاصيل»
 --  يقول لك ما هو الناقص بالاسم بالضبط.
 --
@@ -877,10 +928,11 @@ HEAD = r'''-- ==================================================================
 --     • `15_assets_v2.sql` يبدأ بـ `delete from public.site_assets` ثم يزرع
 --       الدفعة، و`21_banners.sql` يضيف 40 بانراً ⇒ **نفّذ 15 قبل 21** دائماً؛
 --       وإلا مُحيت البانرات.
---     • الترتيب الموصى به للبقية: 26 (التسلسل) · 27 (أصول الإدارة) ·
---       31 ثم 45 (صورة onefree الوحيدة) في النهاية؛ وكلاهما آمن للتكرار.
---     • النتيجة المرجعية بعد حذف 57 سجلاً مجانياً قديماً: 475 أصلاً مفعّلاً؛
---       إن نقصت البانرات فأعِد تنفيذ `21_banners.sql` وحده.
+--     • الترتيب الموصى به للبقية: 26 (التسلسل) · 27 (أصول الإدارة) · 31 ثم
+--       45 (صورة onefree الوحيدة) · 46 (الحزمتان المدفوعتان) في النهاية.
+--       ارفع ملفات profile-packs إلى Storage قبل 46؛ وكل هذه الملفات آمنة للتكرار.
+--     • النتيجة المرجعية: 510 أصول مفعّلة على الأقل (101 أفاتار)؛ وقد تظهر
+--       إضافات الإدارة فوق هذا الحد. إن نقصت البانرات فأعِد تنفيذ 21 وحده.
 -- ============================================================================
 
 create or replace function public.diag_text(q text) returns text

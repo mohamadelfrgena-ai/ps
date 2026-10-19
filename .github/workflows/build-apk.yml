@@ -11,6 +11,7 @@
 #         task: content-diagnostic ← يفحص حزمة Sulfur Cars المصدرية فقط، بلا رفع أو APK
 #         task: content-repair ← يعيد حزمة Sulfur Cars الموثوقة ويرفعها، بلا APK
 #         task: kotlin-check   ← تصريف Kotlin فقط للتحقق، بلا إنشاء APK
+#         task: profile-packs-upload ← ارفع حزمتَي البروفايل المثبّتتين وتحقق من بصماتهما
 #     ثم يُدفع الالتزام. لا تُشترط أي كلمة في تعليق الالتزام — الملف وحده هو المُحكَم،
 #     فإن كان فيه «none» لا يُبنى شيء مهما كان التعليق.
 #
@@ -52,6 +53,7 @@ on:
           - content-diagnostic
           - content-repair
           - kotlin-check
+          - profile-packs-upload
           - assets-dry-run
           - assets-upload
   # هذا المحفّز لا يعمل إلا إذا تغيّر ملف طلب البناء (.build-request).
@@ -600,7 +602,74 @@ jobs:
             && echo "✓ نُشر السجل كتعليق" || echo "تعذّر نشر التعليق"
 
   # ==========================================================================
-  # 2) رفع أصول site-assets الجديدة (492 ملفاً · 21 قسماً) — يدوياً فقط
+  # 2) رفع حزمتَي صور البروفايل المثبّتتين — بلا APK وبلا تعديل قاعدة البيانات
+  # ==========================================================================
+  profile-packs-upload:
+    needs: request
+    if: needs.request.outputs.task == 'profile-packs-upload'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify the pinned profile-pack files and generated SQL
+        run: |
+          set -euo pipefail
+          python3 tools/build_all_in_one_sql.py
+          git diff --exit-code -- supabase/00_ALL_IN_ONE.sql
+          python3 tools/check_profile_packs.py
+          python3 tools/check_free_avatar.py
+
+      - name: Check protected Storage credentials
+        env:
+          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          S_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$S_URL" ] || [ -z "$S_KEY" ]; then
+            echo "::error::ADDONSTATION_SUPABASE_URL and ADDONSTATION_SUPABASE_SECRET_KEY are required"
+            exit 1
+          fi
+          case "$S_URL" in https://*.supabase.co) ;; *) echo "::error::Unexpected Supabase URL"; exit 1 ;; esac
+          case "$S_KEY" in
+            sb_secret_*|eyJ*) ;;
+            *) echo "::error::A secret/service-role key is required"; exit 1 ;;
+          esac
+          echo "Protected Storage credentials are configured (secret value not printed)."
+
+      - name: Upload exactly the 35 pinned pack images
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          python3 tools/upload_seed_assets.py \
+            --source supabase/profile-pack-files \
+            --bucket site-assets
+
+      - name: Verify every object through the public Storage endpoint
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          python3 tools/verify_profile_pack_storage.py --workers 8 | tee /tmp/profile-pack-verification.txt
+          {
+            echo '### Profile packs uploaded and verified'
+            echo ''
+            echo '- Profiles: **24** exact images (Epic after migration 46)'
+            echo '- Profile 2: **11** exact images (Legendary after migration 46)'
+            echo '- onefree.png was not uploaded, replaced, or deleted by this task'
+            echo ''
+            echo '```text'
+            tail -5 /tmp/profile-pack-verification.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ==========================================================================
+  # 3) رفع أصول site-assets الجديدة (492 ملفاً · 21 قسماً) — يدوياً فقط
   # ==========================================================================
   upload-assets:
     needs: request

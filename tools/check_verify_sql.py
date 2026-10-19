@@ -6,7 +6,7 @@
 الملف 99 هو ما يلصقه المالك في Supabase ليتأكّد أن **كل** ملفات SQL نُفِّذت.
 هذا الفاحص يحرسه من الداخل:
 
-  ١) موجود ويحوي بنداً لكل ملف ترحيل (01 → 31)؛
+  ١) موجود ويحوي بنداً لكل ملف ترحيل (01 → 46)؛
   ٢) **لا يكتب شيئاً**: لا insert/update/delete/drop/alter/truncate — قراءة فقط
      (الاستثناء الوحيد: إنشاء دالة التشخيص `public.diag_text`)؛
   ٣) كل جدول/دالة/سياسة/زناد/تسلسل/مخزن **يذكره** موجود فعلاً في ملفات
@@ -299,6 +299,16 @@ def main() -> int:
                     continue
                 name = fields[6].strip("'")
                 counts[name] = counts.get(name, 0) + 1
+        # Migration 46 moves the canonical free image out of Profiles, then
+        # atomically replaces Profiles and adds Profile 2 from the pinned
+        # profile-packs manifest. Model that final state rather than the
+        # transient historical rows in migration 15.
+        canonical = counts.pop("Profiles", 0)
+        if canonical != 1:
+            raise AssertionError(f"expected one canonical Profiles seed row before migration 46, found {canonical}")
+        counts["Default"] = 1
+        counts["Profiles"] = 24
+        counts["Profile 2"] = 11
         return counts
 
     seed = seed_collections()

@@ -204,9 +204,10 @@ select collection, count(*) as n,
 
 ## الصورة الافتراضية المجانية (`onefree`) لكل حساب جديد 🍃
 
-- **القاعدة هي مصدر الحقيقة:** عمود `profiles.avatar_url` افتراضه `profiles/onefree.png`،
-  ودالة `handle_new_user()` تثبّت نفس الصورة صراحةً عند إنشاء كل حساب
-  (`supabase/24_free_default_avatar.sql`) ⇒ كل حساب جديد يولد وصورته `onefree`.
+- **القاعدة هي مصدر الحقيقة:** عمود `profiles.avatar_url` افتراضه
+  `profiles/profiles/onefree.png`، ودالة `handle_new_user()` تثبّت نفس الصورة
+  صراحةً عند إنشاء كل حساب (`supabase/24_free_default_avatar.sql`) ⇒ كل حساب
+  جديد يولد وصورته `onefree`.
 - **الحسابات القديمة:** نفس الملف يعبّئ كل حساب بلا صورة (فارغ أو `null`) بـ`onefree`.
 - **إعادة التعيين:** زر «إزالة/إعادة التعيين» و`set_profile_asset('avatar','none')`
   يعيدان `onefree` أيضاً.
@@ -240,14 +241,31 @@ select collection, count(*) as n,
 
 **الصورة نفسها:** محفوظة في المستودع
 `supabase/site-assets/profiles/onefree.png` (640×640) — والمسار المعتمد في
-المخزن هو **`profiles/profiles/onefree.png`** (هكذا رُفع فعلاً، ومعه 25 صورة
-أخرى في قسم «Profiles»)، و`32_onefree_canonical_path.sql` يوحّد كل شيء عليه:
+المخزن هو **`profiles/profiles/onefree.png`** (هكذا رُفع فعلاً)، لكنه يظهر في
+قسم **Default** المستقل ولا يُحسب ضمن الحزمة المدفوعة. ويوحّد
+`32_onefree_canonical_path.sql` كل شيء عليه:
 صف المكتبة · افتراضي `avatar_url` · دالة إنشاء الحساب · وكل الحسابات.
 
-> التطبيق يجرب المسارين تلقائياً (`profiles/profiles/onefree.png` ثم
-> `profiles/onefree.png`) ثم أيقونة محلية — فلا تظهر صورة مكسورة في أي حال.
+> التطبيق يستخدم المسار المعتمد `profiles/profiles/onefree.png` ثم النسخة
+> المحلية المطابقة عند تعذر الشبكة — فلا يعود إلى مسار قديم أو صورة مختلفة.
 
 **البذرة:** `supabase/15_assets_v2.sql` يعطّل المجاني القديم بعد الإدخال، فأي
 تثبيت جديد من الصفر يطابق النتيجة بلا خطوة إضافية.
 
-**الفاحص:** `tools/check_free_avatar.py` يمنع رجوع هذه القاعدة.
+### حزمتا البروفايل الحاليتان
+
+| القسم | المصدر المثبّت | العدد | الخطة |
+|---|---|---:|---|
+| `Profiles` | `profiles.zip` | 24 | **Epic** |
+| `Profile 2` | `porfile.zip` | 11 | **Legendary** |
+| `Default` | `onefree.png` | 1 | **Free** |
+
+الملف `supabase/profile-packs.json` يحفظ رابط المصدر وGit blob SHA وSHA-256 لكل
+أرشيف، إضافة إلى الحجم وSHA-256 لكل صورة. الصور الـ35 المستخرجة بأسماء آمنة
+موجودة في `supabase/profile-pack-files/`. لإعادة النشر: شغّل مهمة
+`profile-packs-upload` أولاً، وتحقق أنها نجحت، ثم طبّق
+`supabase/46_profile_avatar_packs.sql`. الترحيل يستبدل القسمين ذرياً ويمنع صفوف
+صور مكسورة بفحص كائنات Storage وبصماتها قبل `commit`.
+
+**الفاحصان:** `tools/check_free_avatar.py` يمنع رجوع صورة مجانية أخرى، و
+`tools/check_profile_packs.py` يمنع تغيّر ملف أو خطة أو عدد في الحزمتين.

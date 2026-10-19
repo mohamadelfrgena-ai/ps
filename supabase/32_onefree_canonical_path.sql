@@ -38,14 +38,12 @@ delete from public.site_assets
 -- ٢) تثبيت الصف المعتمد: المسار الموجود في المخزن · مجاني · مفعّل
 -- ---------------------------------------------------------------------------
 update public.site_assets
-   set asset_type    = 'avatar',
-       required_plan = 'free',
-       enabled       = true,
-       collection    = coalesce(collection, 'Profiles'),
-       collection_order = case when coalesce(collection_order, 0) = 0 then 2
-                               else collection_order end,
-       sort_order    = case when coalesce(sort_order, 0) = 0 then 40
-                            else sort_order end
+   set asset_type       = 'avatar',
+       required_plan    = 'free',
+       enabled          = true,
+       collection       = 'Default',
+       collection_order = 1,
+       sort_order       = 1
  where file_url = 'profiles/profiles/onefree.png';
 
 -- وإن لم يوجد الصف أصلاً (تنصيب جديد) أدرجه
@@ -54,11 +52,14 @@ insert into public.site_assets
    collection_order, sort_order, enabled)
 values
   ('avatar', 'Onefree', 'profiles/profiles/onefree.png', 'free', false,
-   'Profiles', 2, 40, true)
+   'Default', 1, 1, true)
 on conflict (file_url) do update
-   set asset_type    = excluded.asset_type,
-       required_plan = excluded.required_plan,
-       enabled       = true;
+   set asset_type       = excluded.asset_type,
+       required_plan    = excluded.required_plan,
+       collection       = excluded.collection,
+       collection_order = excluded.collection_order,
+       sort_order       = excluded.sort_order,
+       enabled          = true;
 
 -- ---------------------------------------------------------------------------
 -- ٣) الأفاتار المجاني المفعّل = onefree وحده (ولا شيء غيره)
