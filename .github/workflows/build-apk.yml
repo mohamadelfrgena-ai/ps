@@ -8,6 +8,7 @@
 #         task: assets-dry-run ← تجربة رفع بلا كتابة
 #         task: profile-diagnostic ← فحص قراءة البروفايل فقط، بلا كتابة أو نشر
 #         task: profile-access-fix ← تطبيق إصلاح visible_profiles المحدد والتحقق منه
+#         task: content-diagnostic ← يفحص حزمة Sulfur Cars المصدرية فقط، بلا رفع أو APK
 #         task: kotlin-check   ← تصريف Kotlin فقط للتحقق، بلا إنشاء APK
 #     ثم يُدفع الالتزام. لا تُشترط أي كلمة في تعليق الالتزام — الملف وحده هو المُحكَم،
 #     فإن كان فيه «none» لا يُبنى شيء مهما كان التعليق.
@@ -47,6 +48,7 @@ on:
           - apk-commit
           - profile-diagnostic
           - profile-access-fix
+          - content-diagnostic
           - kotlin-check
           - assets-dry-run
           - assets-upload
@@ -155,7 +157,72 @@ jobs:
           exit "$code"
 
   # ==========================================================================
-  # 0d) تصريف Kotlin فقط — يتحقق من الواجهة ولا ينشئ أو يسجّل APK
+  # 0d) فحص حزمة Sulfur Cars المصدرية من إصدار GitHub العام — قراءة فقط
+  #     لا يرفع إلى Supabase، ولا يغيّر البيانات، ولا يبني APK.
+  # ==========================================================================
+  content-diagnostic:
+    needs: request
+    if: needs.request.outputs.task == 'content-diagnostic'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and inspect the trusted release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/sulfur-cars
+          cd /tmp/sulfur-cars
+          gh release download content-001 \
+            --repo foxinteractive-pixel/content \
+            --pattern 'sulfur-cars_*.raw'
+          printf '%s  %s\n' \
+            'eb19f9cbbfef7639c16508c6baabdcd4bd4960a0f39540a52f70b487384946fc' 'sulfur-cars_ff44ec0a.raw' \
+            '45b26116a1342a5e8cb21a3beb51a30c459f283f47de3ef713c8e9fc3e6cfc9b' 'sulfur-cars_ffe0c865.raw' \
+            | sha256sum --check
+          file sulfur-cars_*.raw
+          python3 - <<'PY' | tee /tmp/content-diagnostic.txt
+          import hashlib
+          import json
+          import pathlib
+          import zipfile
+
+          for path in sorted(pathlib.Path('/tmp/sulfur-cars').glob('sulfur-cars_*.raw')):
+              data = path.read_bytes()
+              print(f'ASSET {path.name}: size={len(data)} sha256={hashlib.sha256(data).hexdigest()} magic={data[:24].hex()}')
+              print(f'ZIP={zipfile.is_zipfile(path)}')
+              if not zipfile.is_zipfile(path):
+                  print(f'HEAD={data[:160]!r}')
+                  continue
+              with zipfile.ZipFile(path) as archive:
+                  names = archive.namelist()
+                  print(f'ENTRIES={len(names)}')
+                  for name in names[:80]:
+                      info = archive.getinfo(name)
+                      print(f'  {name} ({info.file_size} bytes)')
+                  manifests = [name for name in names if name.lower().endswith('manifest.json')]
+                  print(f'MANIFESTS={manifests}')
+                  for name in manifests:
+                      try:
+                          parsed = json.loads(archive.read(name).decode('utf-8-sig'))
+                          print(f'MANIFEST {name}: {json.dumps(parsed, ensure_ascii=True, sort_keys=True)}')
+                      except Exception as error:
+                          print(f'MANIFEST_ERROR {name}: {error}')
+              print()
+          PY
+          {
+            echo '### Sulfur Cars package diagnostic (read-only)'
+            echo '```text'
+            cat /tmp/content-diagnostic.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=Content package::$line"
+          done < <(grep -E '^(ASSET|ZIP=|ENTRIES=|MANIFESTS=|MANIFEST )' /tmp/content-diagnostic.txt)
+
+  # ==========================================================================
+  # 0e) تصريف Kotlin فقط — يتحقق من الواجهة ولا ينشئ أو يسجّل APK
   # ==========================================================================
   kotlin-check:
     needs: request
