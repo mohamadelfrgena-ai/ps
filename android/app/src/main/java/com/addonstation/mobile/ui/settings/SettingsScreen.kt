@@ -302,7 +302,9 @@ fun SettingsScreen(
                 container = container,
                 onClick = onOpenProfile,
             )
-            SettingsPlanCard(profile = profile, onOpenPlans = onOpenPlans)
+            if (signedIn) {
+                SettingsPlanCard(profile = profile, onOpenPlans = onOpenPlans)
+            }
 
             // DEVICES sits above Account exactly as in the supplied phone design.
             // This adds console icons only; the app's existing Settings icon is preserved.
@@ -386,24 +388,29 @@ fun SettingsScreen(
                         )
                     },
                 )
-                AuthSettingsDivider()
-                val canShowOnline = profile?.effectivePlan == "legendary"
-                AuthSettingsRow(
-                    title = stringResource(R.string.profile_online_status),
-                    subtitle = stringResource(R.string.plan_locked_online),
-                    clickable = true,
-                    onClick = { if (canShowOnline) setOnline(!(profile?.showOnlineStatus ?: false)) else if (signedIn) onOpenPlans() else onLogin() },
-                    tile = { AuthSettingsIconTile(Icons.Outlined.Visibility, AppColors.AuthGreen) },
-                    trailing = {
-                        AuthSettingsSwitch(
-                            checked = profile?.showOnlineStatus == true,
-                            enabled = canShowOnline && !onlineBusy,
-                            onCheckedChange = { setOnline(it) },
-                        )
-                    },
-                )
-                onlineNote?.let {
-                    Text(apiErrorText(it), style = Spec.rowSub, color = AppColors.AuthRed, modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp))
+                if (signedIn) {
+                    AuthSettingsDivider()
+                    val canShowOnline = profile?.effectivePlan == "legendary"
+                    AuthSettingsRow(
+                        title = stringResource(R.string.profile_online_status),
+                        subtitle = stringResource(R.string.plan_locked_online),
+                        clickable = true,
+                        onClick = {
+                            if (canShowOnline) setOnline(!(profile?.showOnlineStatus ?: false))
+                            else onOpenPlans()
+                        },
+                        tile = { AuthSettingsIconTile(Icons.Outlined.Visibility, AppColors.AuthGreen) },
+                        trailing = {
+                            AuthSettingsSwitch(
+                                checked = profile?.showOnlineStatus == true,
+                                enabled = canShowOnline && !onlineBusy,
+                                onCheckedChange = { setOnline(it) },
+                            )
+                        },
+                    )
+                    onlineNote?.let {
+                        Text(apiErrorText(it), style = Spec.rowSub, color = AppColors.AuthRed, modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp))
+                    }
                 }
             }
 
@@ -954,19 +961,21 @@ private fun SettingsProfileCard(
                         }
                     }
                 }
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(AppColors.AuthSurfaceHigh)
-                        .padding(horizontal = 9.dp, vertical = 5.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        planLabelOf(profile?.effectivePlan ?: "free"),
-                        style = Spec.badgeChip,
-                        color = AppColors.AuthChipLabel,
-                        maxLines = 1,
-                    )
+                if (signedIn) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(AppColors.AuthSurfaceHigh)
+                            .padding(horizontal = 9.dp, vertical = 5.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            planLabelOf(profile?.effectivePlan ?: "free"),
+                            style = Spec.badgeChip,
+                            color = AppColors.AuthChipLabel,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }

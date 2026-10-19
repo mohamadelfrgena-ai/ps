@@ -151,7 +151,7 @@ for rel, needle in (
 KEYS = (
     "auth_confirm_title", "auth_confirm_text", "auth_confirm_retry",
     "auth_confirm_resend", "auth_confirm_resent", "auth_confirm_hint",
-    "common_guest", "splash_skip",
+    "common_guest",
 )
 user_labels = {
     "values": "User",

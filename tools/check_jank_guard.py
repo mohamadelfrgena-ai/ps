@@ -115,10 +115,9 @@ splash = read("ui/splash/SplashScreen.kt")
 for token, description in (
     ("FIRST_ENTRANCE_MS = 1_250", "مدة دخول أول تشغيل القصيرة"),
     ("RETURN_ENTRANCE_MS = 780", "مدة دخول التشغيلات التالية القصيرة"),
-    ("LaunchedEffect(entranceComplete, startupReady, skipRequested)", "الخروج مرتبط باكتمال الحركة وجاهزية الإقلاع"),
+    ("LaunchedEffect(entranceComplete, startupReady)", "الخروج مرتبط باكتمال الحركة وجاهزية الإقلاع"),
     ("if (!entranceComplete || !startupReady || completionHandled) return@LaunchedEffect", "الخروج ينتظر الجاهزية ولا يتكرر"),
     ("entranceComplete = true", "علامة اكتمال حركة الدخول"),
-    ("skipRequested", "تخطي حركة الدخول بالنقر"),
     ("AppPrefs.splashCompleted(context)", "تذكّر اكتمال أول تشغيل"),
     ("val targetProgress = if (startupReady) 1f else loadingProgress.coerceIn(0f, 1f)", "ربط الشريط بالتقدم الحقيقي فقط"),
     ("ProgressBarRangeInfo(progress, 0f..1f)", "التقدم متاح لقارئات الشاشة"),
@@ -135,6 +134,9 @@ for token, description in (
     ("timeMinimum", "تقدم تحميل زمني وهمي"),
     ("waitingPulse", "نبض تحميل شكلي"),
     ("drawFourPointSparkle", "لمعان ثقيل متكرر"),
+    ("skipRequested", "إمكانية تخطي شاشة البداية بالنقر"),
+    ("splash_skip", "نص تخطي شاشة البداية"),
+    (".clickable(", "نقر لتجاوز شاشة البداية"),
 ):
     if token in splash:
         problems.append(f"ui/splash/SplashScreen.kt: عاد {description}")

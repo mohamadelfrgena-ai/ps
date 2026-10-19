@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SPLASH = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/splash/SplashScreen.kt"
 APP_NAV = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/nav/AppNav.kt"
 DRAWABLE = ROOT / "android/app/src/main/res/drawable-nodpi/splash_cave_chase.jpg"
+RES = ROOT / "android/app/src/main/res"
 
 
 def require(condition: bool, message: str) -> None:
@@ -30,6 +31,14 @@ def main() -> None:
     require(DRAWABLE.stat().st_size <= 512_000, "splash artwork unexpectedly exceeds 512 KiB")
     require("painterResource(R.drawable.splash_cave_chase)" in splash,
             "splash no longer renders the approved artwork")
+
+    # Splash cannot be bypassed: neither a tap handler/state nor a translated
+    # prompt may quietly reintroduce the removed Skip option.
+    for token in ("skipRequested", "skipEnabled", "splash_skip", ".clickable(", "detectTapGestures"):
+        require(token not in splash, f"removed splash bypass returned: {token}")
+    for strings_file in RES.glob("values*/strings.xml"):
+        require('name="splash_skip"' not in strings_file.read_text(encoding="utf-8"),
+                f"removed skip prompt returned in {strings_file.relative_to(ROOT)}")
 
     # The three permanent lines must share one centred group, not three absolute
     # positions that can drift or clip independently.

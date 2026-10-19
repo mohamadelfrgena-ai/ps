@@ -386,7 +386,7 @@ private fun MainNavigation(
 
     /**
      * الوجهة التي أرادها المستخدم قبل أن نوقفه عند شاشة الدخول — نعود إليها
-     * بعد نجاح الدخول مباشرةً (قائمة الغرف، أو الغرفة نفسها إن جاء من إشعار).
+     * بعد نجاح الدخول مباشرةً، سواء كانت شاتاً أو إحدى واجهات الاشتراك.
      */
     var afterLoginRoute by remember { mutableStateOf<String?>(null) }
 
@@ -394,22 +394,28 @@ private fun MainNavigation(
     fun isChatRoute(destination: String): Boolean =
         destination == Routes.COMMUNITY || destination.startsWith("chat/")
 
+    /** لا تُعرض واجهات الاشتراك وطلباته إلا بعد تسجيل الدخول. */
+    fun isPlanRoute(destination: String): Boolean =
+        destination == Routes.PLANS ||
+            destination == Routes.ORDERS ||
+            destination == Routes.CHECKOUT ||
+            destination.startsWith("checkout/")
+
+    /** يطابق المسار الفعلي نمط Compose ذي الوسيط عند الوقوف عليه. */
+    fun matchesIntendedRoute(current: String?, intended: String): Boolean =
+        current == intended ||
+            (current == Routes.CHAT && intended.startsWith("chat/")) ||
+            (current == Routes.CHECKOUT && intended.startsWith("checkout/"))
+
     /**
-     * **الشات كلّه خلف تسجيل الدخول** (طلب المالك): لا تُفتح قائمة الغرف ولا
-     * غرفةٌ منها لغير مسجّل — يُنقل إلى شاشة الدخول، وبعد نجاحه يعود إلى حيث
-     * أراد تلقائياً.
-     *
-     * إخراج وجهة الشات من الرصة خطوة جوهريّة: لولاها صار زرّ الرجوع من شاشة
-     * الدخول يعيده إلى الشات، فيُرسله إلى الدخول من جديد … حلقة لا تنتهي.
+     * بوابة موحّدة للشاشات المحمية: لا تُركّب واجهة الشات أو الاشتراك للضيف،
+     * بل ينتقل إلى الدخول ثم يعود إلى وجهته المقصودة بعد نجاح المصادقة.
      */
     fun requireSignIn(intended: String) {
         afterLoginRoute = intended
-        // إن كنّا واقفين على وجهة الشات أخرجناها من الرصة أولاً: وإلا صار زرّ
-        // الرجوع من شاشة الدخول يعيده إلى الشات، فيُرسله إلى الدخول من جديد
-        // … حلقة لا تنتهي. (الغرفة تُبلّغ عن نمطها chat/{channelId} لا عن
-        // معرّفها، لذا نفحص العائلة بالنمط لا بالمعرّف.)
-        val standingOnChat = route == Routes.COMMUNITY || route?.startsWith("chat/") == true
-        if (standingOnChat) navController.popBackStack()
+        // عند الوصول المباشر إلى وجهة محمية، أخرجها من الرصة أولاً كي لا يعيد
+        // زر الرجوع المستخدم إليها فتفتح بوابة الدخول في حلقة متكررة.
+        if (matchesIntendedRoute(route, intended)) navController.popBackStack()
         navController.navigate(Routes.LOGIN) { launchSingleTop = true }
     }
 
@@ -438,7 +444,7 @@ private fun MainNavigation(
     }
 
     fun go(route: String) {
-        if (isChatRoute(route) && !signedIn) {
+        if (!signedIn && (isChatRoute(route) || isPlanRoute(route))) {
             requireSignIn(route)
             return
         }
@@ -548,20 +554,27 @@ private fun MainNavigation(
     // إن رجع المستخدم من شاشة الدخول بلا إتمام نُلغي الوجهة المعلّقة، فلا يقفز
     // إلى الشات في دخولٍ تالٍ لا علاقة له به. (الدخول الناجح يُفرغها بنفسه.)
     LaunchedEffect(route) {
-        if (route != null && route != Routes.LOGIN && route != Routes.SIGNUP) {
+        val pending = afterLoginRoute
+        if (
+            route != null &&
+            route != Routes.LOGIN &&
+            route != Routes.SIGNUP &&
+            pending != null &&
+            !matchesIntendedRoute(route, pending)
+        ) {
             afterLoginRoute = null
         }
     }
 
-    // سطرٌ أعلى شاشة الدخول يفسّر لماذا فُتحت: «الشات للمسجّلين فقط»
+    // سطرٌ أعلى شاشة الدخول يفسّر لماذا فُتحت البوابة المحمية.
     val chatLoginNotice = stringResource(R.string.chat_login_required)
+    val accountLoginNotice = stringResource(R.string.msg_sign_in_needed)
 
     /**
-     * بعد نجاح الدخول: إن كنّا أوقفنا المستخدم عند بوابة الشات نعيده إلى
-     * وجهته نفسها (قائمة الغرف، أو الغرفة التي فتحها من إشعار) ونُخبر النداء.
-     * وإلا لا نفعل شيئاً فيعود إلى الصفحة الرئيسية — السلوك المعتاد.
+     * بعد نجاح الدخول: إن كنّا أوقفنا المستخدم عند بوابة محمية نعيده إلى
+     * وجهته نفسها (الشات أو الاشتراك). وإلا يعود إلى الصفحة الرئيسية.
      *
-     * @return صحيحٌ إن أعدناه إلى الشات؛ وإلا فالصفحة الرئيسية.
+     * @return صحيحٌ إن أعدناه إلى الوجهة المحمية؛ وإلا فالصفحة الرئيسية.
      */
     fun continueAfterLogin(): Boolean {
         val intended = afterLoginRoute
@@ -720,12 +733,13 @@ private fun MainNavigation(
                 composable(Routes.LOGIN) {
                     com.addonstation.mobile.ui.auth.LoginScreen(
                         onBack = { back() },
-                        // بعد الدخول ⟵ الصفحة الرئيسية مباشرةً (طلب المالك) …
-                        // إلّا إن كان قد أُوقف عند الدخول وهو داخلٌ إلى الشات:
-                        // فنردّه إلى الشات الذي أراده (قائمة الغرف أو الغرفة).
+                        // بعد الدخول ⟵ الصفحة الرئيسية مباشرةً، إلا إذا أوقفته
+                        // بوابة محمية؛ عندها نعيده إلى الوجهة التي طلبها.
                         onSuccess = { if (!continueAfterLogin()) goTab(MainTab.Home) },
                         onOpenSignup = { go(Routes.SIGNUP) },
-                        notice = if (afterLoginRoute != null) chatLoginNotice else null,
+                        notice = afterLoginRoute?.let { intended ->
+                            if (isChatRoute(intended)) chatLoginNotice else accountLoginNotice
+                        },
                     )
                 }
                 composable(Routes.SIGNUP) {
@@ -865,28 +879,48 @@ private fun MainNavigation(
                     )
                 }
 
-                // الخطط والدفع
+                // الخطط والدفع — واجهات حساب محمية؛ لا تُركّب للضيف حتى عبر
+                // استعادة حالة التنقّل أو الوصول المباشر إلى المسار.
                 composable(Routes.PLANS) {
-                    com.addonstation.mobile.ui.plans.PlansScreen(
-                        onBack = { back() },
-                        onCheckout = { plan -> go(Routes.checkout(plan.id)) },
-                        onOpenOrders = { go(Routes.ORDERS) },
-                    )
+                    SignInGate(
+                        signedIn = signedIn,
+                        intended = Routes.PLANS,
+                        onRequireSignIn = { intended -> requireSignIn(intended) },
+                    ) {
+                        com.addonstation.mobile.ui.plans.PlansScreen(
+                            onBack = { back() },
+                            onCheckout = { plan -> go(Routes.checkout(plan.id)) },
+                            onOpenOrders = { go(Routes.ORDERS) },
+                        )
+                    }
                 }
                 composable(
                     route = Routes.CHECKOUT,
                     arguments = listOf(navArgument("planId") { type = NavType.StringType }),
                 ) { entry ->
-                    com.addonstation.mobile.ui.plans.CheckoutScreen(
-                        planId = entry.arguments?.getString("planId").orEmpty(),
-                        onBack = { back() },
-                        onOpenOrders = { go(Routes.ORDERS) },
-                        onLogin = { go(Routes.LOGIN) },
-                        onOpenPlans = { go(Routes.PLANS) },
-                    )
+                    val planId = entry.arguments?.getString("planId").orEmpty()
+                    SignInGate(
+                        signedIn = signedIn,
+                        intended = Routes.checkout(planId),
+                        onRequireSignIn = { intended -> requireSignIn(intended) },
+                    ) {
+                        com.addonstation.mobile.ui.plans.CheckoutScreen(
+                            planId = planId,
+                            onBack = { back() },
+                            onOpenOrders = { go(Routes.ORDERS) },
+                            onLogin = { go(Routes.LOGIN) },
+                            onOpenPlans = { go(Routes.PLANS) },
+                        )
+                    }
                 }
                 composable(Routes.ORDERS) {
-                    com.addonstation.mobile.ui.plans.MyOrdersScreen(onBack = { back() })
+                    SignInGate(
+                        signedIn = signedIn,
+                        intended = Routes.ORDERS,
+                        onRequireSignIn = { intended -> requireSignIn(intended) },
+                    ) {
+                        com.addonstation.mobile.ui.plans.MyOrdersScreen(onBack = { back() })
+                    }
                 }
 
                 // المبدعون
@@ -1192,12 +1226,9 @@ private fun MainNavigation(
 }
 
 /**
- * **بوابة الشات**: قائمة الغرف وكل غرفةٍ فيها **خلف تسجيل الدخول** — لا تدخل
- * الشات إلا بعد الدخول، ومن يحاول وهو غير مسجّل يُنقل إلى شاشة الدخول فوراً.
- *
- * وُضعت في التنقّل نفسه لا داخل الشاشة، فتعمل مع كل الطرق: ضغطة تبويب
- * «المجتمع»، رابط إشعار، رجوعٌ في التنقّل، أو استعادةُ حالةٍ بعد قتل العملية.
- * ولا يرى غير المسجّل الشات ولا لحظةً واحدة — حتى أثناء النقل.
+ * بوابة الوجهات المحمية: لا تُركّب واجهة الشات أو الاشتراك قبل تسجيل الدخول.
+ * وُضعت في التنقّل نفسه لتغطي الضغطة العادية، والرابط المباشر، والرجوع،
+ * واستعادة حالة التنقّل بعد قتل العملية بلا إظهار المحتوى للضيف ولو للحظة.
  */
 @Composable
 private fun SignInGate(

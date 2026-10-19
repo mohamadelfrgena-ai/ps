@@ -9,8 +9,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -115,34 +113,20 @@ fun SplashScreen(
         }.getOrDefault(false)
     }
     val startedAt = remember { SystemClock.elapsedRealtime() }
-    val skipText = stringResource(R.string.splash_skip)
     val loadingText = stringResource(R.string.common_loading)
     val entrance = remember(reduceMotion) { Animatable(if (reduceMotion) 1f else 0f) }
     val exitProgress = remember { Animatable(0f) }
     var entranceComplete by remember(reduceMotion) { mutableStateOf(reduceMotion) }
-    var skipRequested by remember { mutableStateOf(false) }
-    var skipEnabled by remember { mutableStateOf(false) }
     var completionHandled by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        delay(650L)
-        skipEnabled = true
-    }
-
-    LaunchedEffect(isFirstLaunch, reduceMotion, skipRequested) {
+    LaunchedEffect(isFirstLaunch, reduceMotion) {
         if (reduceMotion) {
             entrance.snapTo(1f)
         } else {
             entrance.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(
-                    durationMillis = if (skipRequested) {
-                        150
-                    } else if (isFirstLaunch) {
-                        FIRST_ENTRANCE_MS
-                    } else {
-                        RETURN_ENTRANCE_MS
-                    },
+                    durationMillis = if (isFirstLaunch) FIRST_ENTRANCE_MS else RETURN_ENTRANCE_MS,
                     easing = FastOutSlowInEasing,
                 ),
             )
@@ -150,16 +134,14 @@ fun SplashScreen(
         entranceComplete = true
     }
 
-    // Skipping completes the cinematic entrance only. The splash still waits
-    // for the real bootstrap and the precomposed destination behind it.
-    LaunchedEffect(entranceComplete, startupReady, skipRequested) {
+    // The splash always finishes its bounded entrance and real startup work;
+    // there is deliberately no user-controlled bypass path.
+    LaunchedEffect(entranceComplete, startupReady) {
         if (!entranceComplete || !startupReady || completionHandled) return@LaunchedEffect
-        if (!skipRequested) {
-            val minimum = if (isFirstLaunch) MIN_FIRST_SPLASH_MS else MIN_RETURN_SPLASH_MS
-            val elapsed = SystemClock.elapsedRealtime() - startedAt
-            val remaining = (minimum - elapsed).coerceAtLeast(0L)
-            if (remaining > 0L) delay(remaining)
-        }
+        val minimum = if (isFirstLaunch) MIN_FIRST_SPLASH_MS else MIN_RETURN_SPLASH_MS
+        val elapsed = SystemClock.elapsedRealtime() - startedAt
+        val remaining = (minimum - elapsed).coerceAtLeast(0L)
+        if (remaining > 0L) delay(remaining)
         completionHandled = true
         if (reduceMotion) {
             exitProgress.snapTo(1f)
@@ -178,7 +160,6 @@ fun SplashScreen(
     val brandName = stringResource(R.string.brand_wordmark).uppercase(Locale.ROOT)
     val platformTagline = stringResource(R.string.home_guest_card_title_plain)
     val appName = stringResource(R.string.app_name)
-    val interactionSource = remember { MutableInteractionSource() }
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
@@ -191,14 +172,7 @@ fun SplashScreen(
                 val scale = lerp(1f, 1.012f, exitProgress.value)
                 scaleX = scale
                 scaleY = scale
-            }
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                enabled = skipEnabled && !completionHandled,
-                onClickLabel = skipText,
-            ) { skipRequested = true }
-            .semantics { contentDescription = skipText },
+            },
     ) {
         val shortScreen = maxHeight < 700.dp
         val sloganSize = when (languageCode) {
@@ -305,21 +279,6 @@ fun SplashScreen(
                 startupReady = startupReady,
                 reduceMotion = reduceMotion,
                 loadingDescription = loadingText,
-            )
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = skipText,
-                style = TextStyle(
-                    fontFamily = if (languageCode == "ar") TajawalFont else NunitoFont,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = if (languageCode == "ar") 0.sp else 0.4.sp,
-                    color = SceneMuted.copy(alpha = 0.76f),
-                    textAlign = TextAlign.Center,
-                ),
-                modifier = Modifier.graphicsLayer {
-                    alpha = if (skipEnabled && !completionHandled) 1f else 0f
-                },
             )
         }
     }

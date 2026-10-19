@@ -316,6 +316,7 @@ fun HomeScreen(
             }
             item {
                 HomeQuickActions(
+                    signedIn = signedIn,
                     font = font,
                     palette = palette,
                     actions = actions,
@@ -899,6 +900,7 @@ private fun HomeChip(
 
 @Composable
 private fun HomeQuickActions(
+    signedIn: Boolean,
     font: FontFamily,
     palette: HomePalette,
     actions: HomeActions,
@@ -933,15 +935,17 @@ private fun HomeQuickActions(
             onClick = actions.openDownloads,
             modifier = Modifier.weight(1f),
         )
-        HomeQuickActionTile(
-            icon = Icons.Filled.WorkspacePremium,
-            label = stringResource(R.string.home_qa_upgrade),
-            accent = palette.goldText,
-            font = font,
-            palette = palette,
-            onClick = actions.openPlans,
-            modifier = Modifier.weight(1f),
-        )
+        if (signedIn) {
+            HomeQuickActionTile(
+                icon = Icons.Filled.WorkspacePremium,
+                label = stringResource(R.string.home_qa_upgrade),
+                accent = palette.goldText,
+                font = font,
+                palette = palette,
+                onClick = actions.openPlans,
+                modifier = Modifier.weight(1f),
+            )
+        }
         HomeQuickActionTile(
             icon = Icons.Filled.PhoneAndroid,
             label = stringResource(R.string.home_qa_device),

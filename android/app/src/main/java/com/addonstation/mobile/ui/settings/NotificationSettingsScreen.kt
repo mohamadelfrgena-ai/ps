@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +70,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
     val container = rememberContainer()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val signedIn by container.state.signedIn.collectAsState()
 
     var prefs by remember { mutableStateOf<PushPrefs?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -280,16 +282,18 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     onCheckedChange = { value -> save { it.copy(social = value) } },
                 )
                 AuthSettingsDivider()
-                AuthNotificationToggleRow(
-                    title = stringResource(R.string.plan_title),
-                    subtitle = stringResource(R.string.notif_cat_account_desc),
-                    icon = Icons.Outlined.Star,
-                    accent = AppColors.AuthGold,
-                    checked = p.account,
-                    enabled = p.master,
-                    onCheckedChange = { value -> save { it.copy(account = value) } },
-                )
-                AuthSettingsDivider()
+                if (signedIn) {
+                    AuthNotificationToggleRow(
+                        title = stringResource(R.string.plan_title),
+                        subtitle = stringResource(R.string.notif_cat_account_desc),
+                        icon = Icons.Outlined.Star,
+                        accent = AppColors.AuthGold,
+                        checked = p.account,
+                        enabled = p.master,
+                        onCheckedChange = { value -> save { it.copy(account = value) } },
+                    )
+                    AuthSettingsDivider()
+                }
                 AuthNotificationToggleRow(
                     title = stringResource(R.string.notif_ch_content),
                     subtitle = stringResource(R.string.notif_ch_content_desc),
