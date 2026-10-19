@@ -11862,8 +11862,7 @@ begin
     if char_length(v_source) not between 1 and 300
        or v_source like '/%'
        or v_source ~ '(^|/)\.\.(/|$)'
-       or position(chr(92) in v_source) > 0
-       or position(chr(0) in v_source) > 0 then
+       or position(chr(92) in v_source) > 0 then
       return jsonb_build_object('ok', false, 'message', 'bulk_source_folder_invalid', 'item', v_ordinal);
     end if;
     if lower(v_source) = any(v_seen_sources) then
@@ -11893,16 +11892,14 @@ begin
        or v_file_path not like ('bulk/' || v_batch_text || '/%')
        or v_file_path like '%..%'
        or v_file_path like '%//%'
-       or position(chr(92) in v_file_path) > 0
-       or position(chr(0) in v_file_path) > 0 then
+       or position(chr(92) in v_file_path) > 0 then
       return jsonb_build_object('ok', false, 'message', 'bulk_file_path_invalid', 'item', v_ordinal);
     end if;
     if char_length(v_cover_path) not between 51 and 500
        or v_cover_path not like ('items/bulk/' || v_batch_text || '/%')
        or v_cover_path like '%..%'
        or v_cover_path like '%//%'
-       or position(chr(92) in v_cover_path) > 0
-       or position(chr(0) in v_cover_path) > 0 then
+       or position(chr(92) in v_cover_path) > 0 then
       return jsonb_build_object('ok', false, 'message', 'bulk_cover_path_invalid', 'item', v_ordinal);
     end if;
     if lower(v_file_path) = any(v_seen_files)
