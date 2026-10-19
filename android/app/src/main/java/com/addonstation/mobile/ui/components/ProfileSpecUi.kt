@@ -268,8 +268,8 @@ fun SpecProfileAvatar(
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(avatarUrl ?: R.drawable.ic_default_profile)
-                    .error(R.drawable.ic_default_profile)
+                    .data(avatarUrl ?: R.drawable.ic_free_profile)
+                    .error(R.drawable.ic_free_profile)
                     .crossfade(true)
                     .build(),
                 contentDescription = null,

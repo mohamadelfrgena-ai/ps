@@ -22,6 +22,9 @@
 --      → 28_chat_cleanup (تنظيف غرف الشات: حذف/إخفاء الرسائل — أقسام اختيارية)
 --      → 40_admin_asset_privacy (أصول الأدمن لا تظهر لغيره + مخزن خاص)
 --      → 41_console_link_codes (ربط PlayStation الآمن برمز مؤقت وموافقة صريحة)
+--      → 42_visible_profiles_access → 44_fix_profile_asset_guard
+--      → 45_single_attached_free_avatar
+--  (43_content_download_integrity إصلاح بيانات إنتاجية مستقل، وليس للتنصيب الجديد.)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --
@@ -82,7 +85,7 @@ create table if not exists public.profiles (
   id                 uuid primary key references auth.users(id) on delete cascade,
   username           citext unique,
   display_name       text,
-  avatar_url         text default 'profiles/onefree.png',   -- مسار نسبي داخل مخزن site-assets
+  avatar_url         text default 'profiles/profiles/onefree.png', -- the single free avatar in site-assets
   banner_url         text,
   custom_status      text check (custom_status is null or char_length(custom_status) <= 60),
   bio                text check (bio is null or char_length(bio) <= 400),
@@ -585,8 +588,8 @@ begin
     v_username := v_username || floor(random()*10)::int;
   end loop;
 
-  insert into public.profiles (id, username, display_name)
-  values (new.id, v_username, v_username)
+  insert into public.profiles (id, username, display_name, avatar_url)
+  values (new.id, v_username, v_username, 'profiles/profiles/onefree.png')
   on conflict (id) do nothing;
 
   insert into public.ac_wallets (user_id, balance, total_earned)
@@ -4315,7 +4318,7 @@ select
 --
 --  يولّده tools/build_assets_sql.py من assets-manifest.json — لا تعدّله يدوياً.
 --
---  المحتوى: 123 أفاتاراً · 193 ملصقاً · 176 أداة  =  492 أصلاً
+--  final content after free-avatar cleanup: 66 avatars · 193 stickers · 176 items = 435 assets
 --  منها 214 ملفاً متحرّكاً (GIF) يعمل داخل التطبيق مع المعاينات.
 --
 --  ⚠️ هذا الملف **يحذف كل الأصول القديمة** (أفاتارات/ملصقات/أدوات) ثم يزرع الجديدة.
@@ -4913,19 +4916,15 @@ on conflict (file_url) do update
       enabled = true;
 
 -- ---------------------------------------------------------------------------
--- الأفاتار المجاني = واحد فقط (onefree)
+-- Keep exactly one free avatar record: the owner's canonical onefree image.
 -- ---------------------------------------------------------------------------
--- طلب المالك: «أريد هذه الصورة المجانية الافتراضية لكل الحساب، والصور التي
--- معيّنة مجانية والافتراضية القديمة أزلها.»
--- ⇒ نُعطّل (لا نحذف) كل أفاتار مجاني قديم، فيبقى مفعّلاً أصلٌ واحد:
---    profiles/onefree.png  (يُثبَّته ويُفعَّل في 31_single_free_avatar.sql).
--- التعطيل يكفي: التطبيق يستعلم بـ enabled=eq.true فلا تظهر المعطَّلات أصلاً،
--- والصفوف باقية في القاعدة ⇒ إرجاع أي صورة سطر UPDATE واحد.
-update public.site_assets
-   set enabled = false
+-- Old free/default avatar records are intentionally removed rather than merely
+-- hidden. Migration 45 maps any legacy profile references before enforcing the
+-- same invariant on existing installations.
+delete from public.site_assets
  where asset_type = 'avatar'
    and required_plan = 'free'
-   and lower(file_url) not like '%onefree%';
+   and file_url <> 'profiles/profiles/onefree.png';
 
 -- ---------------------------------------------------------------------------
 -- تحقق: يجب أن ترى 21 قسماً والأعداد كما في الجدول أدناه
@@ -4936,7 +4935,7 @@ select asset_type as "النوع", collection as "القسم", count(*) as "ال
  group by asset_type, collection, collection_order
  order by asset_type, collection_order;
 
--- الإجمالي المتوقّع: avatar = 123 · sticker = 193 · item = 176
+-- Expected final totals: avatar = 66 · sticker = 193 · item = 176
 select asset_type, count(*) as total, count(*) filter (where animated) as animated
   from public.site_assets group by asset_type order by asset_type;
 
@@ -6040,9 +6039,8 @@ $$;
 --
 --  ⚠️ المسار المعتمد هو ما هو موجود فعلاً في المخزن:
 --       site-assets/profiles/profiles/onefree.png
---     (التطبيق يجرب المسارين — profiles/profiles/onefree.png ثم
---      profiles/onefree.png — ثم أيقونة محلية أخيرة، فلا تعطل الصورة أبداً.
---      وملف 32_onefree_canonical_path يوحّد كل شيء على المسار الموجود.)
+--     (التطبيق يستخدم هذا المسار وحده، ثم نسخة محلية مطابقة للصورة نفسها عند
+--      تعذر الشبكة. وملفا 32 و45 يثبتان المسار والسجل المجاني الوحيد.)
 --
 --  يُنفَّذ مرة واحدة في Supabase → SQL Editor.
 -- ============================================================================
@@ -7277,168 +7275,166 @@ comment on table public.chat_messages is
 -- ############################################################################
 
 -- ============================================================================
---  AddonStation Mobile — 31) أفاتار مجاني واحد: onefree لكل الحسابات
+-- AddonStation Mobile — keep one free/default avatar only
 --
---  الطلب (حرفياً): «أنا أنشئ حساباً جديداً — أريد هذه الصورة المجانية
---  الافتراضية لكل الحساب [onefree.png]، والصور التي معيّنة مجانية
---  والافتراضية القديمة أزلها.»
+-- The canonical image is the owner's onefree.png at:
+--   site-assets/profiles/profiles/onefree.png
 --
---  القرار المتّفق عليه:
---      • الأفاتارات المجانية القديمة (58 صورة: PFP · Profiles · Pack One
---        ومنها «Default Profile») **تُعطَّل** (enabled = false) لا تُحذف:
---        تبقى صفوفها في القاعدة مخفيّة عن التطبيق، وإرجاعها سطر واحد.
---      • الصورة المجانية المفعّلة تبقى **واحدة فقط**: profiles/onefree.png.
---      • كل حساب يستعمل صورة مجانية قديمة يُحوَّل إلى onefree
---        («لكل الحساب»).
---
---  لماذا التعطيل يكفي؟ التطبيق يقرأ الأصول بـ
---      select=*&asset_type=eq.avatar&enabled=eq.true
---  (AssetsRepository.byType) ⇒ المعطَّل لا يظهر في تبويب الأفاتار أصلاً.
---
---  آمن لإعادة التنفيذ (idempotent).
---
---  ⚠️ الملف نفسه مرفوع في المخزن على المسار:
---        site-assets/profiles/profiles/onefree.png   ← المسار المعتمد
---     (نسخة محفوظة في المستودع: supabase/site-assets/profiles/onefree.png
---      — ارفعها على المسار أعلاه إن احتجت، و32 يوحّد كل شيء عليه)
---
---  يُنفَّذ مرة واحدة في Supabase → SQL Editor.
+-- Unlike the previous revision, obsolete free avatar database records are
+-- deleted rather than only disabled. Paid/admin avatars and the separate guest
+-- image used before sign-in are not changed.
 -- ============================================================================
 
--- ---------------------------------------------------------------------------
--- ٠) فهرس فريد على file_url (يحتاجه الـ upsert أدناه) + تنظيف أي تكرار قديم
--- ---------------------------------------------------------------------------
+begin;
+
+-- The upsert below relies on one row per storage path.
 delete from public.site_assets a
  using public.site_assets b
  where a.file_url = b.file_url
    and a.id > b.id;
 
-do $$
-begin
-  if not exists (
-        select 1 from pg_indexes
-         where schemaname = 'public' and indexname = 'site_assets_file_url_uidx'
-     ) then
-    execute 'create unique index site_assets_file_url_uidx on public.site_assets (file_url)';
-  end if;
-end $$;
+create unique index if not exists site_assets_file_url_uidx
+  on public.site_assets (file_url);
 
--- ---------------------------------------------------------------------------
--- ١) تعطيل كل الأفاتارات المجانية القديمة (تبقى في القاعدة · مخفيّة عن التطبيق)
--- ---------------------------------------------------------------------------
-update public.site_assets
-   set enabled = false
- where asset_type = 'avatar'
-   and required_plan = 'free'
-   and lower(file_url) not like '%onefree%';
-
--- المسار المعتمد **واحد فقط**: profiles/profiles/onefree.png — وهو المسار
--- الذي رُفعت إليه الصورة فعلاً في المخزن (تحقّق منه فاحص 99). أي صف onefree
--- آخر (مثل profiles/onefree.png) يُعطَّل، ولا يظهر مرّتين في تبويب الأفاتار.
-update public.site_assets
-   set enabled = false
- where asset_type = 'avatar'
-   and lower(file_url) like '%onefree%'
-   and file_url <> 'profiles/profiles/onefree.png';
-
--- ---------------------------------------------------------------------------
--- ٢) تثبيت الأصل المجاني الوحيد: profiles/profiles/onefree.png (موجود في المخزن)
--- ---------------------------------------------------------------------------
-insert into public.site_assets (asset_type, name, file_url, required_plan, animated, sort_order, enabled)
-values ('avatar', 'Onefree', 'profiles/profiles/onefree.png', 'free', false, 1, true)
+-- Establish the canonical free row before migrating old references.
+insert into public.site_assets
+  (asset_type, name, file_url, required_plan, animated, collection,
+   collection_order, sort_order, enabled)
+values
+  ('avatar', 'Default Free Avatar', 'profiles/profiles/onefree.png', 'free',
+   false, 'Profiles', 2, 1, true)
 on conflict (file_url) do update
-   set asset_type    = excluded.asset_type,
-       name          = excluded.name,
-       required_plan = excluded.required_plan,
-       animated      = excluded.animated,
-       sort_order    = excluded.sort_order,
-       enabled       = true;
+   set asset_type       = excluded.asset_type,
+       name             = excluded.name,
+       required_plan    = excluded.required_plan,
+       animated         = excluded.animated,
+       collection       = excluded.collection,
+       collection_order = excluded.collection_order,
+       sort_order       = excluded.sort_order,
+       enabled          = true;
 
--- ---------------------------------------------------------------------------
--- ٣) توحيد مسار onefree في الحسابات: profiles/profiles/onefree.png ⇒ profiles/…
--- ---------------------------------------------------------------------------
-update public.profiles
-   set avatar_url = 'profiles/onefree.png',
-       updated_at = now()
- where lower(avatar_url) like '%onefree%'
-   and avatar_url <> 'profiles/onefree.png';
-
--- ---------------------------------------------------------------------------
--- ٤) كل حساب يستعمل صورة مجانية قديمة (معطَّلة الآن) ⇒ onefree
---    المطابقة من الجهتين لأن المسار قد يكون مسبوقاً بـ profiles/
--- ---------------------------------------------------------------------------
+-- Move missing, legacy-onefree, and obsolete-free references to the canonical
+-- image before deleting their asset records.
 update public.profiles p
-   set avatar_url = 'profiles/onefree.png',
+   set avatar_url = 'profiles/profiles/onefree.png',
        updated_at = now()
- where exists (
-        select 1
-          from public.site_assets a
-         where a.asset_type    = 'avatar'
-           and a.required_plan = 'free'
-           and a.enabled       = false
-           and lower(a.file_url) not like '%onefree%'
-           and (   p.avatar_url = a.file_url
-                or p.avatar_url = 'profiles/' || a.file_url
-                or a.file_url   = 'profiles/' || p.avatar_url )
+ where p.avatar_url is null
+    or btrim(p.avatar_url) = ''
+    or lower(btrim(p.avatar_url)) = 'none'
+    or p.avatar_url = 'profiles/onefree.png'
+    or exists (
+         select 1
+           from public.site_assets a
+          where a.asset_type = 'avatar'
+            and a.required_plan = 'free'
+            and a.file_url <> 'profiles/profiles/onefree.png'
+            and (
+                 p.avatar_url = a.file_url
+              or p.avatar_url = 'profiles/' || a.file_url
+              or a.file_url = 'profiles/' || p.avatar_url
+            )
        );
 
--- ---------------------------------------------------------------------------
--- ٥) تحقّق: أفاتار مجاني مفعّل واحد فقط · ولا حساب بلا صورة
--- ---------------------------------------------------------------------------
-select count(*)                                    as "كل الأفاتارات",
-       count(*) filter (where required_plan = 'free' and enabled)     as "مجاني مفعّل",
-       count(*) filter (where required_plan = 'free' and not enabled)  as "مجاني معطّل (قديم)",
-       count(*) filter (where required_plan = 'epic')                  as "epic",
-       count(*) filter (where required_plan = 'legendary')             as "legendary"
-  from public.site_assets
- where asset_type = 'avatar';
+-- Remove every other free avatar record. This is deliberately stricter than
+-- enabled=false so a stale client or admin query cannot expose old defaults.
+delete from public.site_assets
+ where asset_type = 'avatar'
+   and required_plan = 'free'
+   and file_url <> 'profiles/profiles/onefree.png';
 
-select count(*)                                       as "كل الحسابات",
-       count(*) filter (where avatar_url is null
-                           or btrim(avatar_url) = '')  as "بلا صورة",
-       count(*) filter (where lower(avatar_url) like '%onefree%') as "يستعمل onefree"
-  from public.profiles;
+alter table public.profiles
+  alter column avatar_url set default 'profiles/profiles/onefree.png';
 
+-- Every newly created account starts on the free plan with this exact avatar.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_username text;
+  v_welcome  int := 50;
+begin
+  v_username := coalesce(
+    nullif(new.raw_user_meta_data->>'username', ''),
+    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+    'player_' || substr(new.id::text, 1, 8)
+  );
+
+  while exists (select 1 from public.profiles p where p.username = v_username) loop
+    v_username := v_username || floor(random() * 10)::int;
+  end loop;
+
+  insert into public.profiles (id, username, display_name, avatar_url)
+  values (new.id, v_username, v_username, 'profiles/profiles/onefree.png')
+  on conflict (id) do nothing;
+
+  insert into public.ac_wallets (user_id, balance, total_earned)
+  values (new.id, v_welcome, v_welcome)
+  on conflict (user_id) do nothing;
+
+  insert into public.ac_transactions
+    (user_id, amount, kind, reason, request_key, balance_after)
+  values
+    (new.id, v_welcome, 'welcome', 'Welcome reward',
+     'welcome:' || new.id::text, v_welcome)
+  on conflict (request_key) do nothing;
+
+  return new;
+end;
+$$;
+
+-- Fail atomically if another free/default avatar survived.
 do $$
 declare
-  v_enabled int;
-  v_missing int;
+  v_free_count integer;
+  v_canonical_count integer;
+  v_legacy_profiles integer;
   v_default text;
-  v_name    text;
 begin
-  select count(*) into v_enabled
+  select count(*) into v_free_count
     from public.site_assets
-   where asset_type = 'avatar' and required_plan = 'free' and enabled;
+   where asset_type = 'avatar' and required_plan = 'free';
 
-  select count(*) into v_missing
+  select count(*) into v_canonical_count
+    from public.site_assets
+   where asset_type = 'avatar'
+     and required_plan = 'free'
+     and enabled
+     and file_url = 'profiles/profiles/onefree.png';
+
+  select count(*) into v_legacy_profiles
     from public.profiles
-   where avatar_url is null or btrim(avatar_url) = '';
+   where avatar_url is null
+      or btrim(avatar_url) = ''
+      or lower(btrim(avatar_url)) = 'none'
+      or avatar_url = 'profiles/onefree.png';
 
   select column_default into v_default
     from information_schema.columns
-   where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url';
+   where table_schema = 'public'
+     and table_name = 'profiles'
+     and column_name = 'avatar_url';
 
-  select name into v_name
-    from public.site_assets
-   where asset_type = 'avatar' and required_plan = 'free' and enabled
-   limit 1;
-
-  if v_enabled <> 1 then
-    raise exception '✗ عدد الأفاتارات المجانية المفعّلة = % (المطلوب 1 فقط)', v_enabled;
+  if v_free_count <> 1 or v_canonical_count <> 1 then
+    raise exception 'Expected exactly one canonical free avatar; free=%, canonical=%',
+      v_free_count, v_canonical_count;
   end if;
-
-  if v_missing > 0 then
-    raise exception '✗ ما زال هناك % حساباً بلا صورة', v_missing;
+  if v_legacy_profiles <> 0 then
+    raise exception 'Found % profiles without the canonical default path', v_legacy_profiles;
   end if;
-
-  if v_default is null or v_default not like '%onefree%' then
-    raise exception '✗ افتراضي avatar_url ليس onefree: %', coalesce(v_default, '(بلا)');
+  if v_default is null
+     or v_default not like '%profiles/profiles/onefree.png%'
+  then
+    raise exception 'Unexpected profiles.avatar_url default: %', coalesce(v_default, '(none)');
   end if;
-
-  raise notice '✅ 31_single_free_avatar: الأفاتار المجاني المفعّل = % (واحد فقط) · '
-               'وكل الحسابات صورتها onefree', v_name;
 end;
 $$;
+
+commit;
+
+notify pgrst, 'reload schema';
 
 
 -- ############################################################################
@@ -7463,9 +7459,9 @@ $$;
 --      3) دالة `handle_new_user()` ⇒ كل حساب جديد؛
 --      4) وكل حساب يشير إلى المسار غير الموجود (`profiles/onefree.png`).
 --
---  ملاحظة: التطبيق يجرب المسارين تلقائياً (Common.kt) فالصورة كانت تظهر
---  بالفعل — لكن التوحيد يمنع طلباً فاشلاً (404) لكل حساب عند كل عرض.
---  النتيجة: 123 أفاتاراً · ومفعّل مجاني واحد · وملفه موجود فعلاً.
+--  التطبيق الآن يستخدم المسار المعتمد وحده، ثم نسخة محلية مطابقة عند تعذر
+--  الشبكة؛ لذلك لا يوجد طلب 404 لمسار قديم ولا يظهر بديل بصري مختلف.
+--  النتيجة النهائية بعد ملف 45: 66 أفاتاراً · وسجل مجاني واحد فقط · وملفه موجود فعلاً.
 --
 --  آمن لإعادة التنفيذ (idempotent) · يُنفَّذ مرة واحدة في Supabase → SQL Editor.
 -- ============================================================================
@@ -7603,9 +7599,8 @@ begin
     return jsonb_build_object('ok', false, 'message', 'invalid_kind');
   end if;
 
-  -- This validated SECURITY DEFINER RPC is the only non-admin path allowed to
-  -- change protected profile asset columns. The trigger remains strict for
-  -- direct table updates.
+  -- This validated RPC is allowed through guard_profile_update; direct writes
+  -- to protected asset columns remain unavailable to authenticated clients.
   perform set_config('app.allow_profile_write', '1', true);
 
   -- السماح بإعادة التعيين للقيمة الافتراضية
@@ -10959,3 +10954,483 @@ comment on function public.console_code_complete(uuid, uuid, text) is
   'Service role only: activates a linked console using an opaque credential reference.';
 
 commit;
+
+
+-- ############################################################################
+-- ##  القسم: 42_visible_profiles_access.sql
+-- ############################################################################
+
+-- ============================================================================
+--  AddonStation Mobile — restore readable public profile metadata
+--
+--  Existing deployments only need this focused, idempotent migration.
+--  `visible_profiles` previously called a private helper function. PostgreSQL
+--  checks function EXECUTE privileges as the caller even inside an owner-run
+--  view, so `select=*` failed while a pruned `select=id` appeared healthy.
+--
+--  Keep the helper private and evaluate the same redaction directly in the
+--  security-barrier view. The view owner may inspect the asset catalog, but
+--  callers receive only the already-redacted profile columns.
+-- ============================================================================
+
+begin;
+
+revoke all on function public.is_admin_only_profile_asset(text, text) from public;
+revoke all on function public.is_admin_only_profile_asset(text, text) from anon, authenticated;
+
+create or replace view public.visible_profiles
+with (security_barrier = true)
+as
+select
+  p.id,
+  p.username,
+  p.display_name,
+  case
+    when public.is_admin()
+      or coalesce(p.avatar_url, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'avatar'
+           and (a.file_url = p.avatar_url or a.name = p.avatar_url)
+      )
+      then p.avatar_url
+    else null
+  end as avatar_url,
+  case
+    when public.is_admin()
+      or coalesce(p.banner_url, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'banner'
+           and (a.file_url = p.banner_url or a.name = p.banner_url)
+      )
+      then p.banner_url
+    else null
+  end as banner_url,
+  p.custom_status,
+  p.bio,
+  p.country,
+  p.role,
+  p.plan,
+  p.plan_expires_at,
+  p.user_level,
+  case
+    when public.is_admin()
+      or coalesce(p.equipped_item_id, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'item'
+           and (a.file_url = p.equipped_item_id or a.name = p.equipped_item_id)
+      )
+      then p.equipped_item_id
+    else 'none'
+  end as equipped_item_id,
+  p.show_online_status,
+  p.last_seen_at,
+  p.created_at,
+  p.updated_at
+from public.profiles p;
+
+comment on view public.visible_profiles is
+  'Public profile read interface; redacts admin-only avatars, banners, and items from non-admin users.';
+
+revoke all on public.visible_profiles from public;
+grant select on public.visible_profiles to anon, authenticated;
+revoke select on public.profiles from public, anon, authenticated;
+revoke update (equipped_item_id) on public.profiles from authenticated;
+
+commit;
+
+notify pgrst, 'reload schema';
+
+
+-- ############################################################################
+-- ##  القسم: 44_fix_profile_asset_guard.sql
+-- ############################################################################
+
+-- ============================================================================
+-- AddonStation Mobile — allow validated profile RPC writes through the guard
+--
+-- Direct authenticated UPDATE privileges remain limited to safe text columns.
+-- Protected username/avatar/banner/item writes continue to require these
+-- SECURITY DEFINER RPCs, which validate ownership, plan rank, and admin assets
+-- before setting a transaction-local flag consumed by guard_profile_update().
+-- ============================================================================
+
+begin;
+
+create or replace function public.guard_profile_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor_role text;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if coalesce(current_setting('app.allow_profile_write', true), '') = '1' then
+    return new;
+  end if;
+
+  select role into v_actor_role
+    from public.profiles
+   where id = auth.uid();
+
+  if coalesce(v_actor_role, '') = 'admin' then
+    return new;
+  end if;
+
+  if new.role is distinct from old.role
+     or new.plan is distinct from old.plan
+     or new.plan_expires_at is distinct from old.plan_expires_at
+     or new.user_level is distinct from old.user_level
+     or new.username is distinct from old.username
+     or new.equipped_item_id is distinct from old.equipped_item_id
+     or new.avatar_url is distinct from old.avatar_url
+     or new.banner_url is distinct from old.banner_url
+  then
+    raise exception 'forbidden_profile_column';
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace function public.set_profile_asset(p_kind text, p_value text)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid       uuid := auth.uid();
+  v_asset     public.site_assets;
+  v_plan      text;
+  v_is_admin  boolean;
+begin
+  if v_uid is null then
+    return jsonb_build_object('ok', false, 'message', 'sign_in_required');
+  end if;
+
+  if p_kind not in ('avatar', 'banner', 'item') then
+    return jsonb_build_object('ok', false, 'message', 'invalid_kind');
+  end if;
+
+  perform set_config('app.allow_profile_write', '1', true);
+
+  if p_value is null or p_value = '' or p_value = 'none' then
+    if p_kind = 'avatar' then
+      update public.profiles
+         set avatar_url = coalesce(
+               (
+                 select a.file_url
+                   from public.site_assets a
+                  where a.asset_type = 'avatar'
+                    and a.required_plan = 'free'
+                    and a.enabled
+                  order by a.sort_order, a.id
+                  limit 1
+               ),
+               'profiles/profiles/onefree.png'
+             ),
+             updated_at = now()
+       where id = v_uid;
+    elsif p_kind = 'banner' then
+      update public.profiles
+         set banner_url = null,
+             updated_at = now()
+       where id = v_uid;
+    else
+      update public.profiles
+         set equipped_item_id = 'none',
+             updated_at = now()
+       where id = v_uid;
+    end if;
+    return jsonb_build_object('ok', true, 'value', 'none');
+  end if;
+
+  select * into v_asset
+    from public.site_assets
+   where enabled
+     and asset_type = case when p_kind = 'item' then 'item' else p_kind end
+     and (file_url = p_value or name = p_value)
+   limit 1;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'message', 'asset_not_found');
+  end if;
+
+  v_plan := public.effective_plan(v_uid);
+  v_is_admin := public.is_admin(v_uid);
+
+  if v_asset.required_plan = 'admin' and not v_is_admin then
+    return jsonb_build_object('ok', false, 'message', 'admin_only_asset');
+  end if;
+
+  if v_asset.required_plan <> 'admin'
+     and not v_is_admin
+     and public.plan_rank(v_plan) < public.plan_rank(v_asset.required_plan)
+  then
+    return jsonb_build_object(
+      'ok', false,
+      'message', 'plan_too_low',
+      'required_plan', v_asset.required_plan
+    );
+  end if;
+
+  if p_kind = 'avatar' then
+    update public.profiles
+       set avatar_url = v_asset.file_url,
+           updated_at = now()
+     where id = v_uid;
+  elsif p_kind = 'banner' then
+    update public.profiles
+       set banner_url = v_asset.file_url,
+           updated_at = now()
+     where id = v_uid;
+  else
+    update public.profiles
+       set equipped_item_id = coalesce(v_asset.name, v_asset.file_url),
+           updated_at = now()
+     where id = v_uid;
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'value', v_asset.file_url,
+    'required_plan', v_asset.required_plan
+  );
+end;
+$$;
+
+create or replace function public.update_my_profile(
+  p_username text default null,
+  p_bio text default null,
+  p_custom_status text default null,
+  p_show_online boolean default null,
+  p_country text default null
+)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    return jsonb_build_object('ok', false, 'message', 'sign_in_required');
+  end if;
+
+  if p_username is not null then
+    if char_length(p_username) < 3 then
+      return jsonb_build_object('ok', false, 'message', 'username_too_short');
+    end if;
+    if exists (
+      select 1
+        from public.profiles
+       where username = p_username
+         and id <> v_uid
+    ) then
+      return jsonb_build_object('ok', false, 'message', 'username_taken');
+    end if;
+  end if;
+
+  perform set_config('app.allow_profile_write', '1', true);
+
+  update public.profiles
+     set username = coalesce(p_username, username),
+         bio = coalesce(p_bio, bio),
+         custom_status = coalesce(p_custom_status, custom_status),
+         show_online_status = coalesce(p_show_online, show_online_status),
+         country = coalesce(p_country, country),
+         last_seen_at = now(),
+         updated_at = now()
+   where id = v_uid;
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+commit;
+
+notify pgrst, 'reload schema';
+
+
+-- ############################################################################
+-- ##  القسم: 45_single_attached_free_avatar.sql
+-- ############################################################################
+
+-- ============================================================================
+-- AddonStation Mobile — make the owner's attached image the only free avatar
+--
+-- Canonical Storage object:
+--   bucket: site-assets
+--   path:   profiles/profiles/onefree.png
+--   bytes:  271089
+--   SHA-256 of the repository/attached image:
+--   6e2e27187e757d8f213d6dd29c6afe9667e960447e752d3ae2c82b66bb33b7a5
+--
+-- This migration removes obsolete free avatar database records, preserves all
+-- paid/admin avatars, repairs legacy profile references, and guarantees that a
+-- newly created free account receives the canonical image.
+-- ============================================================================
+
+begin;
+
+create unique index if not exists site_assets_file_url_uidx
+  on public.site_assets (file_url);
+
+insert into public.site_assets
+  (asset_type, name, file_url, required_plan, animated, collection,
+   collection_order, sort_order, enabled)
+values
+  ('avatar', 'Default Free Avatar', 'profiles/profiles/onefree.png', 'free',
+   false, 'Profiles', 2, 1, true)
+on conflict (file_url) do update
+   set asset_type       = excluded.asset_type,
+       name             = excluded.name,
+       required_plan    = excluded.required_plan,
+       animated         = excluded.animated,
+       collection       = excluded.collection,
+       collection_order = excluded.collection_order,
+       sort_order       = excluded.sort_order,
+       enabled          = true;
+
+-- Repair profile references while the obsolete rows are still available for
+-- exact matching.
+update public.profiles p
+   set avatar_url = 'profiles/profiles/onefree.png',
+       updated_at = now()
+ where p.avatar_url is null
+    or btrim(p.avatar_url) = ''
+    or lower(btrim(p.avatar_url)) = 'none'
+    or p.avatar_url = 'profiles/onefree.png'
+    or exists (
+         select 1
+           from public.site_assets a
+          where a.asset_type = 'avatar'
+            and a.required_plan = 'free'
+            and a.file_url <> 'profiles/profiles/onefree.png'
+            and (
+                 p.avatar_url = a.file_url
+              or p.avatar_url = 'profiles/' || a.file_url
+              or a.file_url = 'profiles/' || p.avatar_url
+            )
+       );
+
+-- The owner's canonical image is now the only free avatar record. Storage files
+-- are left untouched so this database-only migration cannot remove unrelated
+-- archival objects.
+delete from public.site_assets
+ where asset_type = 'avatar'
+   and required_plan = 'free'
+   and file_url <> 'profiles/profiles/onefree.png';
+
+alter table public.profiles
+  alter column avatar_url set default 'profiles/profiles/onefree.png';
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_username text;
+  v_welcome  integer := 50;
+begin
+  v_username := coalesce(
+    nullif(new.raw_user_meta_data->>'username', ''),
+    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+    'player_' || substr(new.id::text, 1, 8)
+  );
+
+  while exists (select 1 from public.profiles p where p.username = v_username) loop
+    v_username := v_username || floor(random() * 10)::integer;
+  end loop;
+
+  insert into public.profiles (id, username, display_name, avatar_url)
+  values (new.id, v_username, v_username, 'profiles/profiles/onefree.png')
+  on conflict (id) do nothing;
+
+  insert into public.ac_wallets (user_id, balance, total_earned)
+  values (new.id, v_welcome, v_welcome)
+  on conflict (user_id) do nothing;
+
+  insert into public.ac_transactions
+    (user_id, amount, kind, reason, request_key, balance_after)
+  values
+    (new.id, v_welcome, 'welcome', 'Welcome reward',
+     'welcome:' || new.id::text, v_welcome)
+  on conflict (request_key) do nothing;
+
+  return new;
+end;
+$$;
+
+do $$
+declare
+  v_free_count integer;
+  v_canonical_count integer;
+  v_bad_profiles integer;
+  v_default text;
+begin
+  select count(*) into v_free_count
+    from public.site_assets
+   where asset_type = 'avatar' and required_plan = 'free';
+
+  select count(*) into v_canonical_count
+    from public.site_assets
+   where asset_type = 'avatar'
+     and required_plan = 'free'
+     and enabled
+     and file_url = 'profiles/profiles/onefree.png';
+
+  select count(*) into v_bad_profiles
+    from public.profiles
+   where avatar_url is null
+      or btrim(avatar_url) = ''
+      or lower(btrim(avatar_url)) = 'none'
+      or avatar_url = 'profiles/onefree.png';
+
+  select column_default into v_default
+    from information_schema.columns
+   where table_schema = 'public'
+     and table_name = 'profiles'
+     and column_name = 'avatar_url';
+
+  if v_free_count <> 1 or v_canonical_count <> 1 then
+    raise exception 'Expected one canonical free avatar; free=%, canonical=%',
+      v_free_count, v_canonical_count;
+  end if;
+  if v_bad_profiles <> 0 then
+    raise exception 'Found % missing or legacy profile avatar paths', v_bad_profiles;
+  end if;
+  if v_default is null
+     or v_default not like '%profiles/profiles/onefree.png%'
+  then
+    raise exception 'Unexpected profiles.avatar_url default: %', coalesce(v_default, '(none)');
+  end if;
+  if position(
+       'profiles/profiles/onefree.png'
+       in pg_get_functiondef('public.handle_new_user()'::regprocedure)
+     ) = 0
+  then
+    raise exception 'handle_new_user does not assign the canonical free avatar';
+  end if;
+end;
+$$;
+
+commit;
+
+notify pgrst, 'reload schema';

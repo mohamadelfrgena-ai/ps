@@ -46,7 +46,7 @@ create table if not exists public.profiles (
   id                 uuid primary key references auth.users(id) on delete cascade,
   username           citext unique,
   display_name       text,
-  avatar_url         text default 'profiles/onefree.png',   -- مسار نسبي داخل مخزن site-assets
+  avatar_url         text default 'profiles/profiles/onefree.png', -- the single free avatar in site-assets
   banner_url         text,
   custom_status      text check (custom_status is null or char_length(custom_status) <= 60),
   bio                text check (bio is null or char_length(bio) <= 400),
@@ -549,8 +549,8 @@ begin
     v_username := v_username || floor(random()*10)::int;
   end loop;
 
-  insert into public.profiles (id, username, display_name)
-  values (new.id, v_username, v_username)
+  insert into public.profiles (id, username, display_name, avatar_url)
+  values (new.id, v_username, v_username, 'profiles/profiles/onefree.png')
   on conflict (id) do nothing;
 
   insert into public.ac_wallets (user_id, balance, total_earned)

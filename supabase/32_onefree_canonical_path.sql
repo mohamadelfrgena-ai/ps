@@ -16,9 +16,9 @@
 --      3) دالة `handle_new_user()` ⇒ كل حساب جديد؛
 --      4) وكل حساب يشير إلى المسار غير الموجود (`profiles/onefree.png`).
 --
---  ملاحظة: التطبيق يجرب المسارين تلقائياً (Common.kt) فالصورة كانت تظهر
---  بالفعل — لكن التوحيد يمنع طلباً فاشلاً (404) لكل حساب عند كل عرض.
---  النتيجة: 123 أفاتاراً · ومفعّل مجاني واحد · وملفه موجود فعلاً.
+--  التطبيق الآن يستخدم المسار المعتمد وحده، ثم نسخة محلية مطابقة عند تعذر
+--  الشبكة؛ لذلك لا يوجد طلب 404 لمسار قديم ولا يظهر بديل بصري مختلف.
+--  النتيجة النهائية بعد ملف 45: 66 أفاتاراً · وسجل مجاني واحد فقط · وملفه موجود فعلاً.
 --
 --  آمن لإعادة التنفيذ (idempotent) · يُنفَّذ مرة واحدة في Supabase → SQL Editor.
 -- ============================================================================
@@ -156,6 +156,10 @@ begin
     return jsonb_build_object('ok', false, 'message', 'invalid_kind');
   end if;
 
+  -- This validated RPC is allowed through guard_profile_update; direct writes
+  -- to protected asset columns remain unavailable to authenticated clients.
+  perform set_config('app.allow_profile_write', '1', true);
+
   -- السماح بإعادة التعيين للقيمة الافتراضية
   if p_value is null or p_value = '' or p_value = 'none' then
     if p_kind = 'avatar' then
@@ -170,9 +174,15 @@ begin
              updated_at = now()
        where id = v_uid;
     elsif p_kind = 'banner' then
-      update public.profiles set banner_url = null where id = v_uid;
+      update public.profiles
+         set banner_url = null,
+             updated_at = now()
+       where id = v_uid;
     else
-      update public.profiles set equipped_item_id = 'none' where id = v_uid;
+      update public.profiles
+         set equipped_item_id = 'none',
+             updated_at = now()
+       where id = v_uid;
     end if;
     return jsonb_build_object('ok', true, 'value', 'none');
   end if;

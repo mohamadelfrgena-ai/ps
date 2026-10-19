@@ -1352,7 +1352,7 @@ private fun PreviewAvatar(url: String?, online: Boolean) {
     val palette = LocalHomePalette.current
     Box(Modifier.size(76.dp)) {
         ComposeImage(
-            painter = painterResource(R.drawable.ic_default_profile),
+            painter = painterResource(R.drawable.ic_free_profile),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -1410,7 +1410,7 @@ private fun ItemChatPreviewCard(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(Modifier.size(38.dp)) {
                 ComposeImage(
-                    painter = painterResource(R.drawable.ic_default_profile),
+                    painter = painterResource(R.drawable.ic_free_profile),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().clip(CircleShape),

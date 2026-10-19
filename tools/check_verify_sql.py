@@ -287,6 +287,16 @@ def main() -> int:
                 fields.append("".join(buf).strip())
                 if len(fields) < 9 or fields[0] not in ("avatar", "banner", "sticker", "item"):
                     continue
+                # Migration 45 removes every old free avatar row after the seed;
+                # compare the verifier against that final catalog, not the raw
+                # transient VALUES list in 15_assets_v2.sql.
+                if (fields[0] == "avatar" and fields[4] == "free"
+                        and fields[2] not in (
+                            "profiles/profiles/onefree.png",
+                            # 27_admin_only_assets promotes this row before 45.
+                            "profiles/pfp/download-1.jpg",
+                        )):
+                    continue
                 name = fields[6].strip("'")
                 counts[name] = counts.get(name, 0) + 1
         return counts

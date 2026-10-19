@@ -59,6 +59,11 @@ ORDER = [
     "39_notif_revert.sql",
     "40_admin_asset_privacy.sql",
     "41_console_link_codes.sql",
+    "42_visible_profiles_access.sql",
+    # 43 is a production-data repair that requires an already-uploaded object;
+    # it must never run as part of a fresh all-in-one installation.
+    "44_fix_profile_asset_guard.sql",
+    "45_single_attached_free_avatar.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -85,6 +90,9 @@ HEADER = """-- =================================================================
 --      → 28_chat_cleanup (تنظيف غرف الشات: حذف/إخفاء الرسائل — أقسام اختيارية)
 --      → 40_admin_asset_privacy (أصول الأدمن لا تظهر لغيره + مخزن خاص)
 --      → 41_console_link_codes (ربط PlayStation الآمن برمز مؤقت وموافقة صريحة)
+--      → 42_visible_profiles_access → 44_fix_profile_asset_guard
+--      → 45_single_attached_free_avatar
+--  (43_content_download_integrity إصلاح بيانات إنتاجية مستقل، وليس للتنصيب الجديد.)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --

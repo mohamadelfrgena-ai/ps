@@ -3,7 +3,7 @@
 """
 يولّد **`supabase/99_VERIFY_ALL.sql`** — فاحص القاعدة الكامل (قراءة فقط).
 
-ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 34) نُفِّذت
+ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 45) نُفِّذت
 كما نريد، ويطبع جدولاً: ✅/❌ + التفاصيل (وما هو المفقود بالاسم). يلصقه المالك
 في Supabase → SQL Editor مرة واحدة.
 
@@ -325,7 +325,7 @@ missing_list("14_redeem_codes", "سياسات أكواد الشحن",
 # ═══════════════════════════════════════════════════════════════════════════
 #  15_assets_v2 (+16_fix_asset_paths) + 21_banners + 27_admin_only_assets
 # ═══════════════════════════════════════════════════════════════════════════
-COLLECTIONS = [("PFP", 14), ("Profiles", 26), ("Pack One", 19), ("Best Cartoon", 7),
+COLLECTIONS = [("PFP", 1), ("Profiles", 1), ("Best Cartoon", 7),
                ("Cartoon Meme", 11), ("Cool Cartoon", 6), ("Call Of Duty", 10), ("Sad", 10),
                ("Ahh", 8), ("Moumen", 4), ("Animated", 8), ("Memes", 47),
                ("Minecraft Memes 1", 21), ("Minecraft Memes 2", 87), ("Minecraft Memes 3", 20),
@@ -334,7 +334,7 @@ COLLECTIONS = [("PFP", 14), ("Profiles", 26), ("Pack One", 19), ("Best Cartoon",
 COLLECTION_VALUES = ",\n              ".join(
     f"('{c}', {n})" for c, n in COLLECTIONS)
 TOTAL_ASSETS = sum(n for _, n in COLLECTIONS)
-TYPE_MIN = {"avatar": 123, "item": 176, "sticker": 193, "banner": 40}
+TYPE_MIN = {"avatar": 66, "item": 176, "sticker": 193, "banner": 40}
 
 # نُقارن بعدد **لا ينقص** عن دفعاتنا: أي زيادة = أصول أضفتها أنت من لوحة الإدارة
 # (مثل بانرين إضافيين) — وهذا لا يُعدّ نقصاً، بل يُذكر في التفاصيل.
@@ -342,13 +342,13 @@ TYPE_CHECKS = " and ".join(
     f"(count(*) filter (where asset_type = '{t}') >= {n})"
     for t, n in TYPE_MIN.items())
 
-add("15_assets_v2 · 21_banners", f"مجموع الأصول >= {TOTAL_ASSETS} (492 من 15 + 40 بانر من 21)",
+add("15_assets_v2 · 21_banners · 45", f"مجموع الأصول >= {TOTAL_ASSETS} (435 بعد حذف المجاني القديم + 40 بانر)",
     q_ok(f"select (count(*) >= {TOTAL_ASSETS})::text from public.site_assets", "true"),
     qdet(f"select count(*)::text || '/{TOTAL_ASSETS} مصدر' "
          "|| ' · إضافاتك: ' || greatest(count(*) - " + str(TOTAL_ASSETS) + ", 0)::text "
          "from public.site_assets"))
 
-add("15_assets_v2", "توزيع الأصول كاملًا (123 أفاتاراً · 176 أداة · 193 ملصقاً · 40 بانراً)",
+add("15_assets_v2 · 45", "توزيع الأصول كاملًا (66 أفاتاراً · 176 أداة · 193 ملصقاً · 40 بانراً)",
     q_ok(f"select ({TYPE_CHECKS})::text from public.site_assets", "true"),
     qdet("select 'avatar ' || count(*) filter (where asset_type = 'avatar')::text "
          "|| ' · item ' || count(*) filter (where asset_type = 'item')::text "
@@ -565,19 +565,15 @@ add("30_chat_members_only", "الشات للمسجّلين فقط (3 سياسا�
       "and policyname in ('messages_read', 'reactions_read', 'channels_read') "
       "and qual ilike '%auth.uid()%'"))
 
-add("31_single_free_avatar · 32", "أفاتار مجاني مفعّل واحد فقط (onefree) وملفه موجود في المخزن",
-    qbool("select (count(*) = 1)::text from public.site_assets a "
-          "where a.asset_type = 'avatar' and a.required_plan = 'free' and a.enabled "
-          "and exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' "
-          "and regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/') "
-          "  = regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/'))"),
-    qdet("select count(*)::text || ' مفعّل · ملفه: ' || coalesce((select string_agg(a.file_url, ' · ') "
-         "from public.site_assets a where a.asset_type = 'avatar' "
-         "and a.required_plan = 'free' and a.enabled and not exists ("
-         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and "
-         "regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/') = "
-         "regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/'))), 'موجود ✅') "
-         "from public.site_assets where asset_type = 'avatar' and required_plan = 'free' and enabled"))
+add("31_single_free_avatar · 45", "سجل أفاتار مجاني واحد فقط وملف onefree موجود",
+    qbool("select (count(*) = 1 and bool_and(a.enabled) and "
+          "bool_and(a.file_url = 'profiles/profiles/onefree.png') and bool_and(exists ("
+          "select 1 from storage.objects o where o.bucket_id = 'site-assets' "
+          "and o.name = a.file_url)))::text from public.site_assets a "
+          "where a.asset_type = 'avatar' and a.required_plan = 'free'"),
+    qdet("select count(*)::text || ' سجل مجاني · ' || "
+         "coalesce(string_agg(file_url, ' · '), '—') from public.site_assets "
+         "where asset_type = 'avatar' and required_plan = 'free'"))
 
 add("32_onefree_canonical_path", "المسار المعتمد موحّد (الأصل المفعّل · الافتراضي · كل الحسابات)",
     q_ok("select ((select count(*) from public.site_assets where asset_type = 'avatar' "
@@ -616,35 +612,31 @@ add("33_user_block", "الحظر بين المستخدمين (سياسة جوج�
          "from pg_policies where schemaname = 'public' and tablename = 'chat_messages' "
          "and policyname = 'messages_read' and qual like '%is_blocked_pair%') "
          "|| ' · حظرات مسجّلة: ' || (select count(*) from public.user_blocks)::text"))
-add("31_single_free_avatar", "كل الحسابات صورتها onefree (ولا حساب بلا صورة)",
+add("31_single_free_avatar · 45", "لا يوجد حساب بلا صورة افتراضية أو مخصّصة",
     qbool("select (count(*) = 0)::text from public.profiles where avatar_url is null "
           "or btrim(avatar_url) = ''"),
     qdet("select count(*)::text || ' بلا صورة' from public.profiles "
          "where avatar_url is null or btrim(avatar_url) = ''"))
 
-add("31_single_free_avatar", "لا حساب يستعمل صورة مجانية قديمة (معطَّلة)",
-    qbool("select (count(*) = 0)::text from public.profiles p where exists ("
-          "select 1 from public.site_assets a where a.asset_type = 'avatar' "
-          "and a.required_plan = 'free' and not a.enabled and lower(a.file_url) not like '%onefree%' "
-          "and (p.avatar_url = a.file_url or p.avatar_url = 'profiles/' || a.file_url "
-          "or a.file_url = 'profiles/' || p.avatar_url))"),
-    qdet("select count(*)::text || ' حساباً' from public.profiles p where exists ("
-         "select 1 from public.site_assets a where a.asset_type = 'avatar' "
-         "and a.required_plan = 'free' and not a.enabled and lower(a.file_url) not like '%onefree%' "
-         "and (p.avatar_url = a.file_url or p.avatar_url = 'profiles/' || a.file_url "
-         "or a.file_url = 'profiles/' || p.avatar_url))"))
+add("45_single_attached_free_avatar", "لا توجد سجلات أفاتار مجانية قديمة",
+    qbool("select (count(*) = 0)::text from public.site_assets "
+          "where asset_type = 'avatar' and required_plan = 'free' "
+          "and file_url <> 'profiles/profiles/onefree.png'"),
+    qdet("select count(*)::text || ' سجل مجاني قديم' from public.site_assets "
+         "where asset_type = 'avatar' and required_plan = 'free' "
+         "and file_url <> 'profiles/profiles/onefree.png'"))
 
-add("31_single_free_avatar", "ملف الصورة موجود فعلاً في المخزن (site-assets/profiles/onefree.png)",
-    q_ok("select (count(*) >= 1)::text from storage.objects where bucket_id = 'site-assets' "
-         "and name in ('profiles/onefree.png', 'profiles/profiles/onefree.png')", "true"),
-    qdet("select string_agg(name, ' · ') from storage.objects "
-         "where bucket_id = 'site-assets' and name in ('profiles/onefree.png', "
-         "'profiles/profiles/onefree.png')", "غير مرفوع بعد"))
+add("45_single_attached_free_avatar", "ملف صورة المالك موجود على المسار الوحيد المعتمد",
+    q_ok("select (count(*) = 1)::text from storage.objects where bucket_id = 'site-assets' "
+         "and name = 'profiles/profiles/onefree.png'", "true"),
+    qdet("select string_agg(name || ' · ' || coalesce(metadata->>'size', '?') || ' bytes', ' · ') "
+         "from storage.objects where bucket_id = 'site-assets' "
+         "and name = 'profiles/profiles/onefree.png'", "غير مرفوع بعد"))
 
 # ── معلوماتية: ملفات قديمة مُستبدَلة + حالة الشات ─────────────────────────
 add("07_seed_assets · 12_avatars", "دفعات الأصول القديمة (مُستبدَلة بـ15 — لا يلزم تنفيذها)",
     "true",
-    "'لا شيء مطلوب: 15_assets_v2 و21_banners هما المرجع (532 أصلاً)'")
+    "'لا شيء مطلوب: 15_assets_v2 و21_banners و45 هي المرجع (475 أصلاً مفعّلاً)'")
 
 add("16_fix_asset_paths", "توحيد المسارات المكرّرة (نسخة آمنة — لا تلزمك الآن)",
     "true",
@@ -818,13 +810,54 @@ add("41_console_link_codes", "Owner-only linked-console RLS policy exists",
          "and policyname = 'linked_consoles_select_own'"))
 
 # ═══════════════════════════════════════════════════════════════════════════
+#  42–45 focused production fixes
+# ═══════════════════════════════════════════════════════════════════════════
+add("42_visible_profiles_access", "visible_profiles readable while raw profiles stays private",
+    q_ok("select (has_table_privilege('anon', 'public.visible_profiles', 'select') "
+         "and has_table_privilege('authenticated', 'public.visible_profiles', 'select') "
+         "and not has_table_privilege('anon', 'public.profiles', 'select') "
+         "and not has_table_privilege('authenticated', 'public.profiles', 'select'))::text", "true"),
+    qdet("select 'visible anon/auth: ' || "
+         "has_table_privilege('anon', 'public.visible_profiles', 'select')::text || '/' || "
+         "has_table_privilege('authenticated', 'public.visible_profiles', 'select')::text || "
+         "' · raw profiles anon/auth: ' || "
+         "has_table_privilege('anon', 'public.profiles', 'select')::text || '/' || "
+         "has_table_privilege('authenticated', 'public.profiles', 'select')::text"))
+
+add("43_content_download_integrity", "downloads require an existing Storage object before recording",
+    q_ok("select ((position('storage.objects' in pg_get_functiondef("
+         "'public.record_content_download(uuid)'::regprocedure)) > 0) "
+         "and (select count(*) from pg_trigger where not tgisinternal "
+         "and tgname = 'content_items_require_uploaded_file') = 1 "
+         "and to_regprocedure('public.ensure_published_content_file()') is not null)::text", "true"),
+    qdet("select 'record guard: ' || (position('storage.objects' in pg_get_functiondef("
+         "'public.record_content_download(uuid)'::regprocedure)) > 0)::text || "
+         "' · publish trigger: ' || (select count(*) from pg_trigger "
+         "where not tgisinternal and tgname = 'content_items_require_uploaded_file')::text"))
+
+add("44_fix_profile_asset_guard", "trusted profile RPCs pass the strict protected-column trigger",
+    q_ok("select ((position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.guard_profile_update()'::regprocedure)) > 0) "
+         "and (position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.set_profile_asset(text,text)'::regprocedure)) > 0) "
+         "and (position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.update_my_profile(text,text,text,boolean,text)'::regprocedure)) > 0))::text", "true"),
+    qdet("select 'guard/RPCs: ' || "
+         "(position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.guard_profile_update()'::regprocedure)) > 0)::text || '/' || "
+         "(position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.set_profile_asset(text,text)'::regprocedure)) > 0)::text || '/' || "
+         "(position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.update_my_profile(text,text,text,boolean,text)'::regprocedure)) > 0)::text"))
+
+# ═══════════════════════════════════════════════════════════════════════════
 #  كتابة الملف
 # ═══════════════════════════════════════════════════════════════════════════
 HEAD = r'''-- ============================================================================
 --  AddonStation Mobile — ٩٩) فاحص القاعدة: «هل نُفِّذ كل SQL كما نريد؟»
 -- ============================================================================
 --
---  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 41) بنداً بنداً، ويطبع
+--  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 45) بنداً بنداً، ويطبع
 --  جدولاً واحداً: كل صف = بند · العمود «الحالة» ✅ أو ❌ · والعمود «التفاصيل»
 --  يقول لك ما هو الناقص بالاسم بالضبط.
 --
@@ -842,12 +875,12 @@ HEAD = r'''-- ==================================================================
 --
 --  ⚠️ ترتيب مهم — بعض الملفات تُعيد بناء الجدول:
 --     • `15_assets_v2.sql` يبدأ بـ `delete from public.site_assets` ثم يزرع
---       492 أصلاً، و`21_banners.sql` يضيف 40 بانراً ⇒ **نفّذ 15 قبل 21**
---       أبداً؛ وإلا مُحيت البانرات.
+--       الدفعة، و`21_banners.sql` يضيف 40 بانراً ⇒ **نفّذ 15 قبل 21** دائماً؛
+--       وإلا مُحيت البانرات.
 --     • الترتيب الموصى به للبقية: 26 (التسلسل) · 27 (أصول الإدارة) ·
---       31 (onefree) في النهاية — و31 آمن للتكرار في أي وقت.
---     • الفاحص يكشف الخلل بنفسه: إن ظهر المجموع 492 بدل 532 أو نقصت
---       البانرات ⇒ أعِد تنفيذ `21_banners.sql` وحده.
+--       31 ثم 45 (صورة onefree الوحيدة) في النهاية؛ وكلاهما آمن للتكرار.
+--     • النتيجة المرجعية بعد حذف 57 سجلاً مجانياً قديماً: 475 أصلاً مفعّلاً؛
+--       إن نقصت البانرات فأعِد تنفيذ `21_banners.sql` وحده.
 -- ============================================================================
 
 create or replace function public.diag_text(q text) returns text

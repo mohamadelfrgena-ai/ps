@@ -1291,7 +1291,7 @@ private fun HomeCreatorCard(
                 contentDescription = card.profile.displayName ?: card.profile.username,
                 modifier = Modifier.fillMaxSize().clip(CircleShape),
                 radius = 0.dp,
-                fallback = R.drawable.ic_default_profile,
+                fallback = R.drawable.ic_free_profile,
             )
         }
         Text(

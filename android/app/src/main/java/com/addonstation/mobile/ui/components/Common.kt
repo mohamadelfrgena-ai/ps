@@ -337,17 +337,16 @@ private fun assetThumbUrl(url: String?, animate: Boolean = false): String? {
     return "$url.thumb.jpg"
 }
 
-private val ASSET_FREE_DEFAULT = listOf("profiles/profiles/onefree.png", "profiles/onefree.png")
+private val ASSET_FREE_DEFAULT = listOf("profiles/profiles/onefree.png")
 private val ASSET_AUTH_DEFAULT = listOf("profiles/profiles/default-profile.jpg")
 
 /**
  * صورة من مكتبة الأصول (site-assets) مع نسخة محلية احتياطية: تظهر فوراً محلياً
  * ثم تُستبدل بالأصل الحقيقي عند وصوله — فتعمل بلا إنترنت أيضاً.
  *
- * المسارات تُجرَّب **بالترتيب**: إن فشل الأول (404 لأن سكربت الرفع كرّر اسم
- * المجلد مثلاً: profiles/profiles/onefree.png) ننتقل إلى الذي يليه
- * (profiles/onefree.png) ثم إلى الصورة المحلية — فتظهر الصورة الافتراضية
- * المجانية ولو اختلف مسارها بين قاعدة وأخرى.
+ * المسارات تُجرَّب **بالترتيب** ثم ننتقل إلى الصورة المحلية. للأفاتار
+ * المجاني مسار خادم معتمد واحد فقط (`profiles/profiles/onefree.png`)، والنسخة
+ * المحلية هي نفس ملف المالك حرفياً، لذلك يظهر فوراً وبلا اختلاف عند انقطاع الشبكة.
  */
 @Composable
 private fun SiteAssetOrLocal(
@@ -405,7 +404,7 @@ private fun SiteAssetOrLocal(
  */
 @Composable
 fun AvatarFallback(size: Dp) {
-    SiteAssetOrLocal(ASSET_FREE_DEFAULT, R.drawable.ic_user, size)
+    SiteAssetOrLocal(ASSET_FREE_DEFAULT, R.drawable.ic_free_profile, size)
 }
 
 /**
@@ -569,7 +568,7 @@ fun AvatarImage(
             val paths = if (url.isNullOrBlank()) ASSET_FREE_DEFAULT else listOf(url) + ASSET_FREE_DEFAULT
             SiteAssetOrLocal(
                 paths = paths,
-                local = R.drawable.ic_user,
+                local = R.drawable.ic_free_profile,
                 size = size,
                 modifier = Modifier.size(size).clip(shape),
             )
