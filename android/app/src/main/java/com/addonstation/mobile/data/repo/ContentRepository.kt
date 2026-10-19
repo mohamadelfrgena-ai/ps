@@ -234,8 +234,9 @@ class ContentRepository(
     }
 
     /**
-     * تنزيل ملف عنصر: تستدعي record_content_download → ترجع bucket/path → رابط موقّع 60 ثانية → البايتات.
-     * كل شروط الخطة والحد اليومي تُفرض داخل الدالة على الخادم.
+     * تنزيل ملف عنصر: تستدعي record_content_download → ترجع bucket/path → رابط موقّع 60 ثانية.
+     * يُنقل الملف streaming إلى ملف مؤقت ثم يُنقل إلى وجهته فقط بعد اكتماله؛
+     * كل شروط الخطة والحد اليومي ووجود object فعلي تُفرض داخل الدالة على الخادم.
      */
     suspend fun download(context: android.content.Context, item: ContentItem): Result<DownloadedFile> = runCatching {
         val result = supabase.rpc("record_content_download", params("p_item_id" to p(item.id)), signedOnly = true)
@@ -245,12 +246,13 @@ class ContentRepository(
         val path = outcome.data.str("path") ?: item.filePath
             ?: throw ApiError(ApiErrorKind.FILE_NOT_UPLOADED)
         val signed = supabase.signedUrl(bucket, path, expiresInSeconds = 60)
-        val bytes = supabase.downloadBytes(signed)
-        val fileName = path.substringAfterLast('/').ifBlank { "${item.slug ?: item.id}.zip" }
+        val fileName = path.substringAfterLast('/').takeIf {
+            it.isNotBlank() && it != "." && it != ".." && '\u0000' !in it
+        } ?: "${item.slug ?: item.id}.mcaddon"
         val dir = java.io.File(context.getExternalFilesDir(null) ?: context.filesDir, "AddonStation")
-        if (!dir.exists()) dir.mkdirs()
         val file = java.io.File(dir, fileName)
-        file.writeBytes(bytes)
+        val expectedSize = outcome.data["size"].asLong()?.takeIf { it > 0L } ?: item.fileSize
+        supabase.downloadToFile(signed, file, expectedSize = expectedSize)
         DownloadedFile(file = file, fileName = fileName, signedUrl = signed)
     }
 

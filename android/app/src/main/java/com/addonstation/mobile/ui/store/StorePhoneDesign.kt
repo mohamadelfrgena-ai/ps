@@ -1,5 +1,6 @@
 package com.addonstation.mobile.ui.store
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.webkit.MimeTypeMap
@@ -288,7 +289,7 @@ private fun ContentAccessBadge(
     }
 }
 
-private enum class DetailStage { IDLE, DOWNLOADING, DOWNLOADED, LIMIT, FAILED }
+private enum class DetailStage { IDLE, DOWNLOADING, DOWNLOADED, LIMIT, FAILED, NO_FILE }
 
 private enum class DetailMode {
     FREE,
@@ -430,7 +431,7 @@ internal fun DesignedContentDetailScreen(
                 failureKind = kind
                 stage = when (kind) {
                     ApiErrorKind.DOWNLOAD_LIMIT -> DetailStage.LIMIT
-                    ApiErrorKind.FILE_NOT_UPLOADED -> DetailStage.IDLE
+                    ApiErrorKind.FILE_NOT_UPLOADED -> DetailStage.NO_FILE
                     else -> DetailStage.FAILED
                 }
             }
@@ -461,7 +462,7 @@ internal fun DesignedContentDetailScreen(
         stage == DetailStage.DOWNLOADED -> DetailMode.DOWNLOADED
         stage == DetailStage.LIMIT -> DetailMode.LIMIT
         stage == DetailStage.FAILED -> DetailMode.FAILED
-        current.filePath.isNullOrBlank() -> DetailMode.NO_FILE
+        stage == DetailStage.NO_FILE || current.filePath.isNullOrBlank() -> DetailMode.NO_FILE
         access is AccessState.RequiresLegendary -> DetailMode.NEEDS_LEGENDARY
         access is AccessState.RequiresEpic || access is AccessState.RequiresPlan -> DetailMode.NEEDS_EPIC
         current.acPrice > 0 && !unlocked -> DetailMode.PAID_AC
@@ -1192,6 +1193,7 @@ private fun openDownloadedFile(context: Context, downloaded: DownloadedFile): Bo
     val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "application/zip"
     val intent = Intent(Intent.ACTION_VIEW).apply {
         setDataAndType(uri, mime)
+        clipData = ClipData.newRawUri(downloaded.fileName, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     context.startActivity(Intent.createChooser(intent, downloaded.fileName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -1203,6 +1205,7 @@ private fun shareDownloadedFile(context: Context, downloaded: DownloadedFile): B
     val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "application/zip"
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = mime
+        clipData = ClipData.newRawUri(downloaded.fileName, uri)
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
     }

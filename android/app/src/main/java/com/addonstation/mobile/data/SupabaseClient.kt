@@ -3,6 +3,8 @@ package com.addonstation.mobile.data
 import com.addonstation.mobile.data.model.AuthUser
 import com.addonstation.mobile.data.model.Session
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -470,6 +472,63 @@ class SupabaseClient(
         )
         if (text.isBlank()) JsonArray(emptyList()) else json.parseToJsonElement(text)
     }
+
+    /**
+     * Streams a protected download to a temporary file and only replaces the
+     * destination after the full response has been received and validated.
+     * This avoids holding addon archives in memory and never leaves a partial
+     * file that Android/Minecraft could try to open.
+     */
+    suspend fun downloadToFile(url: String, destination: java.io.File, expectedSize: Long? = null): Long =
+        withContext(Dispatchers.IO) {
+            val parent = destination.parentFile
+                ?: throw ApiError(ApiErrorKind.SERVER, "download_directory_missing")
+            if ((!parent.exists() && !parent.mkdirs()) || !parent.isDirectory) {
+                throw ApiError(ApiErrorKind.SERVER, "download_directory_unavailable")
+            }
+            val temporary = java.io.File.createTempFile(".${destination.name}.", ".part", parent)
+            try {
+                val request = Request.Builder().url(url).get().build()
+                val copied = http.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        if (response.code == 404) throw ApiError(ApiErrorKind.FILE_NOT_UPLOADED, "file_not_uploaded", 404)
+                        throw apiErrorFromMessage("download_failed", response.code)
+                    }
+                    val body = response.body
+                        ?: throw ApiError(ApiErrorKind.SERVER, "download_body_missing")
+                    val coroutine = currentCoroutineContext()
+                    var total = 0L
+                    body.byteStream().buffered().use { input ->
+                        temporary.outputStream().buffered().use { output ->
+                            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                            while (true) {
+                                coroutine.ensureActive()
+                                val read = input.read(buffer)
+                                if (read < 0) break
+                                if (read == 0) continue
+                                output.write(buffer, 0, read)
+                                total += read
+                            }
+                        }
+                    }
+                    total
+                }
+                if (copied <= 0L) throw ApiError(ApiErrorKind.SERVER, "download_empty")
+                if (expectedSize != null && expectedSize > 0L && copied != expectedSize) {
+                    throw ApiError(ApiErrorKind.SERVER, "download_size_mismatch:$copied/$expectedSize")
+                }
+                if (destination.exists() && !destination.delete()) {
+                    throw ApiError(ApiErrorKind.SERVER, "download_destination_busy")
+                }
+                if (!temporary.renameTo(destination)) {
+                    temporary.copyTo(destination, overwrite = true)
+                    temporary.delete()
+                }
+                copied
+            } finally {
+                if (temporary.exists()) temporary.delete()
+            }
+        }
 
     suspend fun downloadBytes(url: String): ByteArray {
         val request = Request.Builder().url(url).get().build()

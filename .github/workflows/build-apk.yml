@@ -280,6 +280,21 @@ jobs:
             | tee /tmp/sulfur-cars/upload-result.json
           echo '::notice title=Protected content upload::Uploaded content-001/sulfur-cars_ffe0c865.mcaddon; database metadata is updated separately after object verification.'
 
+      - name: Verify the short-lived signed download byte-for-byte
+        if: needs.request.outputs.task == 'content-repair'
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          python3 tools/verify_storage_download.py \
+            --bucket content-files \
+            --path content-001/sulfur-cars_ffe0c865.mcaddon \
+            --expected-size 1053329 \
+            --expected-sha256 8e42de5649008804526d414e2c26612502697a265d7d0140a9cd1f52ab196896 \
+            | tee /tmp/sulfur-cars/signed-download-result.json
+          echo '::notice title=Signed content download::Downloaded 1053329 verified bytes through a short-lived Storage URL.'
+
   # ==========================================================================
   # 0e) تصريف Kotlin فقط — يتحقق من الواجهة ولا ينشئ أو يسجّل APK
   # ==========================================================================
@@ -315,6 +330,7 @@ jobs:
           python3 tools/check_kotlin_refs.py
           python3 tools/check_splash_progress.py
           python3 tools/check_screen_backgrounds.py
+          python3 tools/check_content_download.py
           python3 tools/check_jank_guard.py
 
       - name: Compile debug Kotlin without building an APK
@@ -384,6 +400,9 @@ jobs:
             echo "::error::مشاكل في مجلد res/ — أصلحها أولاً (التفاصيل في السجل أعلاه)"
             exit 1
           }
+
+      - name: حارس تنزيل ملفات الإضافات قبل البناء
+        run: python3 tools/check_content_download.py
 
       - name: فحص جودة التجربة قبل البناء
         run: |

@@ -216,13 +216,14 @@ class CreatorRepository(
         runCatching {
             val uid = supabase.session()?.userId
                 ?: throw com.addonstation.mobile.data.ApiError(com.addonstation.mobile.data.ApiErrorKind.NOT_SIGNED_IN)
-            // غلاف المبدع → site-assets/items/<uid>/ (سياسة site_assets_creator_write تسمح
-            // للمبدع بالكتابة داخل مجلده فقط)، وبقية الملفات → creator-media الخاص.
+            // غلاف المبدع → site-assets/items/<uid>/. ملف المحتوى النهائي يذهب
+            // مباشرةً إلى content-files الخاص؛ عند الموافقة تشير content_items إلى
+            // object موجود فعلياً، ولا تُنشر metadata مكسورة من creator-media.
             val isCover = kind == "cover"
-            val bucket = if (isCover) "site-assets" else "creator-media"
+            val bucket = if (isCover) "site-assets" else "content-files"
             val path =
                 if (isCover) "items/$uid/${System.currentTimeMillis()}-$fileName"
-                else "$uid/${System.currentTimeMillis()}-$fileName"
+                else "creators/$uid/${System.currentTimeMillis()}-$fileName"
             supabase.upload(bucket, path, bytes, mime)
             path
         }
