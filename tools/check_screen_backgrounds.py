@@ -174,10 +174,12 @@ def main() -> int:
                      "splash_dream_it", "splash_build_it", "splash_create_it"
                  ))
                  and splash.count("SplashSloganLine(") >= 4))
-    rows.append(("الحركة الجديدة تشمل كشف المشهد والتقريب الهادئ واللمعة",
-                 "sceneProgress.animateTo(" in splash
-                 and "lerp(1.09f, 1f, sceneProgress.value)" in splash
-                 and "drawFourPointSparkle(SceneLava)" in splash))
+    rows.append(("حركة دخول واحدة ناعمة بلا حلقات أو لمعان ثقيل",
+                 "entrance.animateTo(" in splash
+                 and "targetValue = 1f" in splash
+                 and ".align(Alignment.Center)" in splash
+                 and "rememberInfiniteTransition" not in splash
+                 and "drawFourPointSparkle" not in splash))
     rows.append(("أيقونة التطبيق باقية ضمن هوية الشاشة الجديدة",
                  APP_ICON.exists() and APP_ICON.read_bytes()[:4] == PNG_SIGNATURE
                  and "R.drawable.app_icon" in splash))

@@ -582,6 +582,17 @@ as $$
 declare
   v_actor_role text;
 begin
+  -- Server-side maintenance has no end-user JWT and remains allowed.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  -- Validated SECURITY DEFINER profile RPCs set this transaction-local flag.
+  -- End-user REST clients still lack UPDATE grants on protected columns.
+  if coalesce(current_setting('app.allow_profile_write', true), '') = '1' then
+    return new;
+  end if;
+
   -- من له دور admin يستطيع تغيير كل شيء
   select role into v_actor_role from public.profiles where id = auth.uid();
 

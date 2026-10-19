@@ -110,31 +110,34 @@ fmt = read("util/TimeFormat.kt")
 if "fun localDayKey(" not in fmt:
     problems.append("util/TimeFormat.kt: localDayKey مفقودة")
 
-# 6) البداية: النصوص في كل وضع، والتقدم مربوط بمراحل الإقلاع والجاهزية
+# 6) البداية: حركة قصيرة محدودة، كلمات ثابتة في الوسط، وتقدم إقلاع حقيقي
 splash = read("ui/splash/SplashScreen.kt")
 for token, description in (
-    ("FULL_TIMELINE_MS = 5_200", "مدة المقدمة الجديدة 5.2s"),
-    ("COMPACT_LOOP_MS = 1_500", "حلقة التشغيلات التالية 1.5s"),
-    ("MIN_SPLASH_MS = 1_500L", "الحد الأدنى لعرض البداية 1.5s"),
-    ("LaunchedEffect(introComplete, skipRequested, startupReady)", "الخروج مرتبط باكتمال الحركة وجاهزية الإقلاع"),
-    ("if (!introComplete || completionHandled || (!startupReady && !skipRequested)) return@LaunchedEffect", "الخروج ينتظر الجاهزية إلا عند التخطي ولا يتكرر"),
-    ("introComplete = true", "علامة اكتمال المقدمة"),
-    ("skipRequested", "تخطي الحركة بالنقر"),
+    ("FIRST_ENTRANCE_MS = 1_250", "مدة دخول أول تشغيل القصيرة"),
+    ("RETURN_ENTRANCE_MS = 780", "مدة دخول التشغيلات التالية القصيرة"),
+    ("LaunchedEffect(entranceComplete, startupReady, skipRequested)", "الخروج مرتبط باكتمال الحركة وجاهزية الإقلاع"),
+    ("if (!entranceComplete || !startupReady || completionHandled) return@LaunchedEffect", "الخروج ينتظر الجاهزية ولا يتكرر"),
+    ("entranceComplete = true", "علامة اكتمال حركة الدخول"),
+    ("skipRequested", "تخطي حركة الدخول بالنقر"),
     ("AppPrefs.splashCompleted(context)", "تذكّر اكتمال أول تشغيل"),
-    ("waitingPulse.animateTo(", "نبض متحرك لشريط التحميل"),
-    ("ProgressBarRangeInfo(semanticProgress", "التقدم متاح لقارئات الشاشة"),
-    ("if (compactMode) 0.14f else 0.61f", "حدّ زمني أدنى وفق المقدمة الجديدة"),
-    ("startupReady || skipRequested -> 1f", "اكتمال الشريط عند الجاهزية أو التخطي"),
+    ("val targetProgress = if (startupReady) 1f else loadingProgress.coerceIn(0f, 1f)", "ربط الشريط بالتقدم الحقيقي فقط"),
+    ("ProgressBarRangeInfo(progress, 0f..1f)", "التقدم متاح لقارئات الشاشة"),
+    (".align(Alignment.Center)", "الكلمات الثلاث مجمعة في منتصف الشاشة"),
 ):
     if token not in splash:
         problems.append(f"ui/splash/SplashScreen.kt: {description} غير موجود")
 for key in ("splash_dream_it", "splash_build_it", "splash_create_it"):
     if f"R.string.{key}" not in splash:
         problems.append(f"ui/splash/SplashScreen.kt: العبارة المترجمة {key} غير مستخدمة")
-if "if (!compactMode)" in splash:
-    problems.append("ui/splash/SplashScreen.kt: العبارات/الوصف ما زالت محجوبة في التشغيلات المختصرة")
-if "startupReady" not in splash or "loadingProgress" not in splash:
-    problems.append("ui/splash/SplashScreen.kt: حالة الإقلاع/التقدم غير موصولة بالشريط")
+for token, description in (
+    ("rememberInfiniteTransition", "حلقة حركة لا نهائية"),
+    ("infiniteRepeatable", "تكرار حركة لا نهائي"),
+    ("timeMinimum", "تقدم تحميل زمني وهمي"),
+    ("waitingPulse", "نبض تحميل شكلي"),
+    ("drawFourPointSparkle", "لمعان ثقيل متكرر"),
+):
+    if token in splash:
+        problems.append(f"ui/splash/SplashScreen.kt: عاد {description}")
 nav = read("ui/nav/AppNav.kt")
 if "if (!splashDone)" not in nav:
     problems.append("ui/nav/AppNav.kt: شاشة البداية ليست طبقة فوق المحتوى (المحتوى يُبنى خلفها)")
@@ -142,6 +145,10 @@ if "startupReady by remember" not in nav or "startupProgress by remember" not in
     problems.append("ui/nav/AppNav.kt: حالة الجاهزية/التقدم غير معرفة عند الإقلاع")
 if "withTimeoutOrNull(10_000L)" not in nav:
     problems.append("ui/nav/AppNav.kt: الإقلاع قد يعلّق شاشة البداية بلا حدّ زمني")
+if "delay(850L)" not in nav or "underlayReady = true" not in nav:
+    problems.append("ui/nav/AppNav.kt: تركيب الواجهة الثقيلة لا يزال ينافس حركة الدخول")
+if "startupReady = startupReady && (!configured || underlayReady)" not in nav:
+    problems.append("ui/nav/AppNav.kt: الخروج لا ينتظر تجهيز الوجهة خلف شاشة البداية")
 for token in ("val refresh = async", "val assets = async", "val plans = async", "val paymentMethods = async"):
     if token not in nav:
         problems.append(f"ui/nav/AppNav.kt: تحميل الإقلاع المتوازي مفقود ({token})")
@@ -156,5 +163,5 @@ if problems:
     print(f"\n✗ عاد {len(problems)} سبباً من أسباب التقطيع/الثِقَل — أصلحها قبل البناء.")
     sys.exit(1)
 print("🟢 لا توليف فرعي في القوائم · الجلسة من الذاكرة · فهرس أدوات O(1) ·")
-print("   الرئيسية كسولة · فاصل التاريخ مرة واحدة · المقدمة الجديدة 5.2s والحلقة 1.5s،")
-print("   العبارات المترجمة ظاهرة في كل تشغيل · الشريط يعكس تقدم الإقلاع وينبض حتى الجاهزية · المهلة والتخطي يمنعان الانتظار المفتوح.")
+print("   الرئيسية كسولة · فاصل التاريخ مرة واحدة · حركة البداية قصيرة ومحدودة بلا حلقات،")
+print("   الكلمات المترجمة ثابتة في الوسط · الشريط يعكس مراحل الإقلاع الفعلية · والوجهة تُركّب بعد هدوء الحركة.")

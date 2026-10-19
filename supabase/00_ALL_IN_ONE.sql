@@ -618,6 +618,17 @@ as $$
 declare
   v_actor_role text;
 begin
+  -- Server-side maintenance has no end-user JWT and remains allowed.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  -- Validated SECURITY DEFINER profile RPCs set this transaction-local flag.
+  -- End-user REST clients still lack UPDATE grants on protected columns.
+  if coalesce(current_setting('app.allow_profile_write', true), '') = '1' then
+    return new;
+  end if;
+
   -- من له دور admin يستطيع تغيير كل شيء
   select role into v_actor_role from public.profiles where id = auth.uid();
 
@@ -1352,6 +1363,11 @@ begin
     return jsonb_build_object('ok', false, 'message', 'invalid_kind');
   end if;
 
+  -- This validated SECURITY DEFINER RPC is the only non-admin path allowed to
+  -- change protected profile asset columns. The trigger remains strict for
+  -- direct table updates.
+  perform set_config('app.allow_profile_write', '1', true);
+
   -- السماح بإعادة التعيين للقيمة الافتراضية
   if p_value is null or p_value = '' or p_value = 'none' then
     if p_kind = 'avatar' then
@@ -1366,9 +1382,15 @@ begin
              updated_at = now()
        where id = v_uid;
     elsif p_kind = 'banner' then
-      update public.profiles set banner_url = null where id = v_uid;
+      update public.profiles
+         set banner_url = null,
+             updated_at = now()
+       where id = v_uid;
     else
-      update public.profiles set equipped_item_id = 'none' where id = v_uid;
+      update public.profiles
+         set equipped_item_id = 'none',
+             updated_at = now()
+       where id = v_uid;
     end if;
     return jsonb_build_object('ok', true, 'value', 'none');
   end if;
@@ -1430,6 +1452,10 @@ begin
       return jsonb_build_object('ok', false, 'message', 'username_taken');
     end if;
   end if;
+
+  -- Username changes are validated above and must pass the protected-column
+  -- trigger through this trusted RPC only.
+  perform set_config('app.allow_profile_write', '1', true);
 
   update public.profiles
      set username = coalesce(p_username, username),
@@ -7577,6 +7603,11 @@ begin
     return jsonb_build_object('ok', false, 'message', 'invalid_kind');
   end if;
 
+  -- This validated SECURITY DEFINER RPC is the only non-admin path allowed to
+  -- change protected profile asset columns. The trigger remains strict for
+  -- direct table updates.
+  perform set_config('app.allow_profile_write', '1', true);
+
   -- السماح بإعادة التعيين للقيمة الافتراضية
   if p_value is null or p_value = '' or p_value = 'none' then
     if p_kind = 'avatar' then
@@ -7591,9 +7622,15 @@ begin
              updated_at = now()
        where id = v_uid;
     elsif p_kind = 'banner' then
-      update public.profiles set banner_url = null where id = v_uid;
+      update public.profiles
+         set banner_url = null,
+             updated_at = now()
+       where id = v_uid;
     else
-      update public.profiles set equipped_item_id = 'none' where id = v_uid;
+      update public.profiles
+         set equipped_item_id = 'none',
+             updated_at = now()
+       where id = v_uid;
     end if;
     return jsonb_build_object('ok', true, 'value', 'none');
   end if;

@@ -167,13 +167,19 @@ fun AppRoot(
     var startupProgress by remember { mutableStateOf(0f) }
     var startupReady by remember { mutableStateOf(false) }
     var navigationReady by remember { mutableStateOf(false) }
+    var underlayReady by remember { mutableStateOf(false) }
 
-    // Keep the first Compose frame deliberately small: the system launch screen
-    // can hand off to our splash before the complete navigation graph is composed.
+    // Keep the animated entrance isolated from the expensive first composition
+    // of the navigation graph. Once the three centred words have settled, build
+    // the destination behind the static splash and wait for two rendered frames
+    // before allowing the exit transition.
     LaunchedEffect(Unit) {
         withFrameNanos { }
-        withFrameNanos { }
+        delay(850L)
         navigationReady = true
+        withFrameNanos { }
+        withFrameNanos { }
+        underlayReady = true
     }
 
     // أيقونات شريط الحالة تتبع وضع التطبيق نفسه (لا وضع الجهاز):
@@ -295,10 +301,10 @@ fun AppRoot(
                         .windowInsetsTopHeight(WindowInsets.statusBars.union(WindowInsets.displayCutout)),
                 )
                 Box(Modifier.fillMaxSize()) {
-                    // **البناء خلف شاشة الترحيب لا بعدها**: كانت الشاشة الأولى
-                    // (وكل شبكاتها وصورها) لا تبدأ البناء إلا بعد انتهاء حركة
-                    // البداية ⇒ انتظار مضاعف يحسّه المستخدم «يطول». الآن يُبنى
-                    // المحتوى فوراً وتُغطّيه شاشة الترحيب، فحين تنقشع يكون جاهزاً.
+                    // **البناء خلف شاشة الترحيب لا بعدها**: نؤخر التركيب الثقيل
+                    // حتى تستقر حركة الكلمات، ثم نبني الوجهة تحت الغطاء الساكن
+                    // وننتظر إطارين قبل التلاشي. هكذا لا تنافس الحركةَ وفي الوقت
+                    // نفسه تكون الشاشة التالية جاهزة حين تنقشع شاشة الترحيب.
                     if (configured && navigationReady) {
                         MainNavigation(
                             startAtReset = deepLinkSession,
@@ -314,7 +320,7 @@ fun AppRoot(
                         // الشاشة نفسها فوق كل شيء، وتخرج بتلاشٍ يكشف ما تحتها
                         SplashScreen(
                             loadingProgress = startupProgress,
-                            startupReady = startupReady,
+                            startupReady = startupReady && (!configured || underlayReady),
                             onFinished = { splashDone = true },
                         )
                     }
