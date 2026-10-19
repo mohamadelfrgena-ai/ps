@@ -130,7 +130,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_PUBLIC_KEY: ${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.ADDONSTATION_SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: ${{ vars.ADDONSTATION_PROJECT_REF }}
         run: |
           set +e
