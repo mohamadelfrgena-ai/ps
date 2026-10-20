@@ -25,9 +25,10 @@ val AppShapes = Shapes(
 )
 
 private fun darkScheme() = darkColorScheme(
-    primary = AppColors.Green,
-    onPrimary = AppColors.OnGreen,
-    primaryContainer = AppColors.Green2,
+    // اللون الأساسي أزرق (كباقي التطبيق) — منه يأتي مؤشر الكتابة ودوائر التحميل الافتراضية.
+    primary = HomePalettes.Dark.blue,
+    onPrimary = Color.White,
+    primaryContainer = AppColors.BlueDark,
     onPrimaryContainer = AppColors.Text,
     secondary = AppColors.Blue,
     onSecondary = AppColors.BlueText,
@@ -47,7 +48,7 @@ private fun darkScheme() = darkColorScheme(
 )
 
 private fun lightScheme() = lightColorScheme(
-    primary = AppColors.Green2,
+    primary = HomePalettes.Light.blue,
     onPrimary = Color.White,
     secondary = AppColors.BlueDark,
     onSecondary = Color.White,
@@ -90,8 +91,8 @@ fun AddonStationTheme(
 }
 
 /**
- * خلفية التطبيق: لون أساسي + توهجان شعاعيان ناعمان
- * (أخضر أعلى اليمين 7٪، أزرق أسفل اليسار 6٪) كما في الوثيقة.
+ * خلفية التطبيق: لون أساسي + توهجان أزرقان ناعمان
+ * (أعلى 10٪ داكن / 8٪ فاتح، وأسفل 6٪) — لا أخضر في الخلفية.
  */
 @Composable
 fun AppBackground(
@@ -100,7 +101,7 @@ fun AppBackground(
     content: @Composable () -> Unit,
 ) {
     val base = if (dark) AppColors.Bg else AppColors.LightBg
-    val green = if (dark) AppColors.Green.copy(alpha = 0.07f) else AppColors.Green.copy(alpha = 0.10f)
+    val topGlow = if (dark) HomePalettes.Dark.blue.copy(alpha = 0.10f) else HomePalettes.Light.blue.copy(alpha = 0.08f)
     val blue = if (dark) AppColors.Blue.copy(alpha = 0.06f) else AppColors.Blue.copy(alpha = 0.10f)
     Box(
         modifier = modifier
@@ -108,7 +109,7 @@ fun AppBackground(
             .background(base)
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(green, Color.Transparent),
+                    colors = listOf(topGlow, Color.Transparent),
                     startY = 0f,
                     endY = 1200f,
                 )

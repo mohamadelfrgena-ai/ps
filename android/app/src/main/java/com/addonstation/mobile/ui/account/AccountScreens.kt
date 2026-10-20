@@ -184,7 +184,7 @@ fun NotificationsScreen(
                             .background(if (notification.isRead) AppColors.Surface else AppColors.Elevated)
                             .border(
                                 1.dp,
-                                if (notification.isRead) AppColors.Border else AppColors.Green.copy(alpha = 0.35f),
+                                if (notification.isRead) AppColors.Border else AppColors.AuthBlue.copy(alpha = 0.55f),
                                 RoundedCornerShape(14.dp),
                             )
                             .clickable {
@@ -217,10 +217,10 @@ fun NotificationsScreen(
                             Text(
                                 stringResource(R.string.notif_new),
                                 style = AppText.tiny,
-                                color = AppColors.OnGreen,
+                                color = AppColors.AuthWhite,
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .background(AppColors.Green)
+                                    .background(AppColors.AuthBlue)
                                     .padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }

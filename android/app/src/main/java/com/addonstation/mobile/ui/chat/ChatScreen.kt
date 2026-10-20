@@ -80,6 +80,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -1937,11 +1938,11 @@ private fun PendingAttachmentPreview(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     CircularProgressIndicator(
-                        color = AppColors.Green,
+                        color = AppColors.AuthBlue,
                         strokeWidth = 2.dp,
                         modifier = Modifier.size(12.dp),
                     )
-                    Text(uploadingLabel, style = AppText.tiny, color = AppColors.Green)
+                    Text(uploadingLabel, style = AppText.tiny, color = AppColors.AuthBlue)
                 }
                 attachment.failed -> Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -2062,231 +2063,374 @@ private fun MessageBlock(
     }
 
     val mentionsMe = myId != null && message.mentions.contains(myId)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = if (grouped) 3.dp else 8.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                when {
-                    message.isAnnouncement -> AppColors.AnnouncementBg
-                    mentionsMe -> AppColors.MentionTint
-                    else -> Color.Transparent
-                }
-            )
-            .onGloballyPositioned { messageBounds = it.boundsInRoot() }
-            .combinedClickable(onClick = onReply, onLongClick = openActions)
-            .alpha(if (ui.pending) 0.55f else 1f)      // قيد الإرسال — تظهر فوراً
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
-    ) messageBody@{
-        if (message.isAnnouncement) {
-            Text(
-                "📢 " + stringResource(R.string.chat_announcement),
-                style = AppText.tiny,
-                color = AppColors.Gold,
-            )
-        }
-
-        if (showAuthorHeader) {
-            Row(
-                modifier = Modifier.widthIn(max = 300.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                com.addonstation.mobile.ui.components.AvatarImage(
-                    url = assetUrl(container, author?.avatarUrl),
-                    size = 40.dp,
-                    online = author?.showOnlineStatus == true,
-                    modifier = Modifier.clickable { onOpenUser(message.userId) },
-                )
-                Column(modifier = Modifier.weight(1f, fill = false)) {
-                    Text(
-                        text = author?.displayName?.takeIf(String::isNotBlank)
-                            ?: author?.username?.takeIf(String::isNotBlank)
-                            ?: "—",
-                        style = Spec.msgAuthor,
-                        color = roleColorOf(author?.role, author?.effectivePlan, message.userId),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (author != null && hasRankTitle(author.role, author.effectivePlan)) {
-                        RankBadge(role = author.role, plan = author.effectivePlan)
+    // التفاعلات: كبسولات بلا إطار تلتصق بالحافة السفلية للرسالة — نصفها داخل الفقاعة ونصفها خارجها.
+    // الصفّ يُرسم فوق الفقاعة داخل نفس الـBox، فتبقى الضغطة على أي جزء منه تقلّب التفاعل.
+    val showReactions = ui.reactions.isNotEmpty() && message.status != "hidden" && message.status != "deleted"
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = if (grouped) 3.dp else 8.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(
+                    when {
+                        message.isAnnouncement -> AppColors.AnnouncementBg
+                        mentionsMe -> AppColors.MentionTint
+                        else -> Color.Transparent
                     }
-                }
-                val equippedItem = author?.equippedItemId
-                    ?.takeUnless { it.isBlank() || it.equals("none", ignoreCase = true) }
-                if (equippedItem != null) {
-                    val itemImg = equippedItemUrlResolver(equippedItem)
-                    if (itemImg != null) {
-                        com.addonstation.mobile.ui.components.CoverImage(
-                            url = itemImg,
-                            radius = 8.dp,
-                            modifier = Modifier.size(32.dp),
-                            animate = true,
-                            backgroundColor = Color.Transparent,
-                        )
-                    } else {
-                        // لا نعرض إيموجي ميدالية لا علاقة له بالأداة. إذا تعذّر
-                        // رابط الصورة بعد إعادة تحميل الأصول، يبقى اسم الأداة
-                        // الحقيقي ظاهراً بدلاً من معلومة مضللة.
+                )
+                .onGloballyPositioned { messageBounds = it.boundsInRoot() }
+                .combinedClickable(onClick = onReply, onLongClick = openActions)
+                .alpha(if (ui.pending) 0.55f else 1f)      // قيد الإرسال — تظهر فوراً
+                .padding(start = 8.dp, end = 8.dp, top = 2.dp, bottom = if (showReactions) 13.dp else 2.dp),
+            horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+        ) messageBody@{
+            if (message.isAnnouncement) {
+                Text(
+                    "📢 " + stringResource(R.string.chat_announcement),
+                    style = AppText.tiny,
+                    color = AppColors.Gold,
+                )
+            }
+
+            if (showAuthorHeader) {
+                Row(
+                    modifier = Modifier.widthIn(max = 300.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    com.addonstation.mobile.ui.components.AvatarImage(
+                        url = assetUrl(container, author?.avatarUrl),
+                        size = 40.dp,
+                        online = author?.showOnlineStatus == true,
+                        modifier = Modifier.clickable { onOpenUser(message.userId) },
+                    )
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                         Text(
-                            text = equippedItem,
-                            style = AppText.tiny,
-                            color = AppColors.Muted,
+                            text = author?.displayName?.takeIf(String::isNotBlank)
+                                ?: author?.username?.takeIf(String::isNotBlank)
+                                ?: "—",
+                            style = Spec.msgAuthor,
+                            color = roleColorOf(author?.role, author?.effectivePlan, message.userId),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .widthIn(max = 82.dp)
-                                .clip(RoundedCornerShape(7.dp))
-                                .background(AppColors.Elevated)
-                                .padding(horizontal = 6.dp, vertical = 3.dp),
                         )
+                        if (author != null && hasRankTitle(author.role, author.effectivePlan)) {
+                            RankBadge(role = author.role, plan = author.effectivePlan)
+                        }
                     }
-                }
-            }
-        }
-
-        ui.replyTo?.let { original ->
-            // الاقتباس (§٤٫٣): خلفية `surface` · شريط أزرق 3dp يساراً · نصف قطر 6
-            Row(
-                modifier = Modifier
-                    .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp)
-                    .fillMaxWidth(0.92f)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Spec.surface),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(width = 3.dp, height = 30.dp).background(Spec.blue))
-                Text(
-                    // مقتبس بلا نص (ملصق/صورة) ⇒ رمز بدل فراغ
-                    stringResource(R.string.chat_replying_to, ui.replyAuthorName ?: "") + " · " +
-                        (if (original.content.isNullOrBlank() &&
-                            (original.stickerUrl != null || original.imagePath != null)
-                        ) "🖼 " else "") +
-                        original.content.orEmpty().replace('\n', ' ').take(60),
-                    style = Spec.msgQuote,
-                    color = Spec.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                )
-            }
-        }
-
-        // رسالة محذوفة أو مخفية: سطر واحد فقط لكل الأنواع (نص/ملصق/وسائط/صورة)
-        if (message.status == "hidden" || message.status == "deleted") {
-            Row(
-                modifier = Modifier
-                    .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Spec.surfaceHigh)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Icon(
-                    Icons.Filled.VisibilityOff,
-                    contentDescription = null,
-                    tint = Spec.textMuted,
-                    modifier = Modifier.size(16.dp),
-                )
-                Text(
-                    stringResource(R.string.chat_hidden_message_plain),
-                    style = Spec.secondary.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                    color = Spec.textMuted,
-                )
-            }
-            return@messageBody
-        }
-
-        when (message.messageType) {
-            "sticker" -> {
-                val url = stickerUrlResolver(message.stickerUrl ?: "")
-                // الملصق: 96×96 بلا فقاعة (وثيقة §٤٫٣) — يميناً إن كانت رسالتي
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
-                    horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
-                ) {
-                    // النص أولاً، وتحته مباشرة الملصق — رسالة واحدة كما يراها صاحبها
-                    if (!message.content.isNullOrBlank()) {
-                        Text(
-                            text = message.content.orEmpty(),
-                            style = Spec.msgBody,
-                            color = Spec.text,
-                            modifier = Modifier.padding(bottom = 6.dp),
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(Spec.stickerSize)
-                                // ضغطة مطوّلة ⇒ قائمة الرسالة نفسها (رد · نسخ · إبلاغ · حذف)
-                                .combinedClickable(
-                                    onClick = {
-                                        // ضغطة سريعة = لوحة الملصقات على مكان هذا الملصق (بلا حذف)
-                                        val takeBack = onStickerTap
-                                        if (takeBack != null) takeBack() else message.stickerUrl?.let(onOpenImage)
-                                    },
-                                    onLongClick = openActions,
-                                ),
-                        ) {
+                    val equippedItem = author?.equippedItemId
+                        ?.takeUnless { it.isBlank() || it.equals("none", ignoreCase = true) }
+                    if (equippedItem != null) {
+                        val itemImg = equippedItemUrlResolver(equippedItem)
+                        if (itemImg != null) {
                             com.addonstation.mobile.ui.components.CoverImage(
-                                url = url,
+                                url = itemImg,
                                 radius = 8.dp,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.size(32.dp),
+                                animate = true,
+                                backgroundColor = Color.Transparent,
+                            )
+                        } else {
+                            // لا نعرض إيموجي ميدالية لا علاقة له بالأداة. إذا تعذّر
+                            // رابط الصورة بعد إعادة تحميل الأصول، يبقى اسم الأداة
+                            // الحقيقي ظاهراً بدلاً من معلومة مضللة.
+                            Text(
+                                text = equippedItem,
+                                style = AppText.tiny,
+                                color = AppColors.Muted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .widthIn(max = 82.dp)
+                                    .clip(RoundedCornerShape(7.dp))
+                                    .background(AppColors.Elevated)
+                                    .padding(horizontal = 6.dp, vertical = 3.dp),
                             )
                         }
-                        // الوقت أسفل الملصق — لرسالتي فقط (الوارد وقته في سطر الرأس)
-                        MessageStatus(
-                            ui = ui,
-                            createdAt = message.createdAt,
-                            notSentLabel = notSentLabel,
-                            retryLabel = retryLabel,
-                            onRetry = onRetry,
-                            onDiscard = onDiscard,
-                        )
                     }
                 }
             }
-            "image" -> {
-                Column(
+
+            ui.replyTo?.let { original ->
+                // الاقتباس (§٤٫٣): خلفية `surface` · شريط أزرق 3dp يساراً · نصف قطر 6
+                Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
-                    horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+                        .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp)
+                        .fillMaxWidth(0.92f)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Spec.surface),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // النص أولاً وتحته الصورة — **رسالة واحدة** كما أُرسلت
-                    if (!message.content.isNullOrBlank()) {
-                        Text(
-                            text = message.content.orEmpty(),
-                            style = Spec.msgBody,
-                            color = Spec.text,
-                            modifier = Modifier.padding(bottom = 6.dp),
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    Box(Modifier.size(width = 3.dp, height = 30.dp).background(Spec.blue))
+                    Text(
+                        // مقتبس بلا نص (ملصق/صورة) ⇒ رمز بدل فراغ
+                        stringResource(R.string.chat_replying_to, ui.replyAuthorName ?: "") + " · " +
+                            (if (original.content.isNullOrBlank() &&
+                                (original.stickerUrl != null || original.imagePath != null)
+                            ) "🖼 " else "") +
+                            original.content.orEmpty().replace('\n', ' ').take(60),
+                        style = Spec.msgQuote,
+                        color = Spec.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
+
+            // رسالة محذوفة أو مخفية: سطر واحد فقط لكل الأنواع (نص/ملصق/وسائط/صورة)
+            if (message.status == "hidden" || message.status == "deleted") {
+                Row(
+                    modifier = Modifier
+                        .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Spec.surfaceHigh)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.VisibilityOff,
+                        contentDescription = null,
+                        tint = Spec.textMuted,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        stringResource(R.string.chat_hidden_message_plain),
+                        style = Spec.secondary.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                        color = Spec.textMuted,
+                    )
+                }
+                return@messageBody
+            }
+
+            when (message.messageType) {
+                "sticker" -> {
+                    val url = stickerUrlResolver(message.stickerUrl ?: "")
+                    // الملصق: 96×96 بلا فقاعة (وثيقة §٤٫٣) — يميناً إن كانت رسالتي
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
+                        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
                     ) {
-                        ChatImageTile(
-                            url = imageUrl,
-                            localPreview = ui.localPreview,
-                            isMine = isMine,
-                            onOpen = {
-                                val path = message.imagePath
-                                if (imageUrl != null) onOpenImage(imageUrl!!)
-                                else if (path != null) onOpenImage(path)
-                            },
-                            onLongPress = openActions,
-                            onRetryUrl = { reloadImageUrl() },
-                            statusContent = if (isMine) {
-                                {
+                        // النص أولاً، وتحته مباشرة الملصق — رسالة واحدة كما يراها صاحبها
+                        if (!message.content.isNullOrBlank()) {
+                            Text(
+                                text = message.content.orEmpty(),
+                                style = Spec.msgBody,
+                                color = Spec.text,
+                                modifier = Modifier.padding(bottom = 6.dp),
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(Spec.stickerSize)
+                                    // ضغطة مطوّلة ⇒ قائمة الرسالة نفسها (رد · نسخ · إبلاغ · حذف)
+                                    .combinedClickable(
+                                        onClick = {
+                                            // ضغطة سريعة = لوحة الملصقات على مكان هذا الملصق (بلا حذف)
+                                            val takeBack = onStickerTap
+                                            if (takeBack != null) takeBack() else message.stickerUrl?.let(onOpenImage)
+                                        },
+                                        onLongClick = openActions,
+                                    ),
+                            ) {
+                                com.addonstation.mobile.ui.components.CoverImage(
+                                    url = url,
+                                    radius = 8.dp,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                            // الوقت أسفل الملصق — لرسالتي فقط (الوارد وقته في سطر الرأس)
+                            MessageStatus(
+                                ui = ui,
+                                createdAt = message.createdAt,
+                                notSentLabel = notSentLabel,
+                                retryLabel = retryLabel,
+                                onRetry = onRetry,
+                                onDiscard = onDiscard,
+                            )
+                        }
+                    }
+                }
+                "image" -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
+                        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+                    ) {
+                        // النص أولاً وتحته الصورة — **رسالة واحدة** كما أُرسلت
+                        if (!message.content.isNullOrBlank()) {
+                            Text(
+                                text = message.content.orEmpty(),
+                                style = Spec.msgBody,
+                                color = Spec.text,
+                                modifier = Modifier.padding(bottom = 6.dp),
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            ChatImageTile(
+                                url = imageUrl,
+                                localPreview = ui.localPreview,
+                                isMine = isMine,
+                                onOpen = {
+                                    val path = message.imagePath
+                                    if (imageUrl != null) onOpenImage(imageUrl!!)
+                                    else if (path != null) onOpenImage(path)
+                                },
+                                onLongPress = openActions,
+                                onRetryUrl = { reloadImageUrl() },
+                                statusContent = if (isMine) {
+                                    {
+                                        MessageStatus(
+                                            ui = ui,
+                                            createdAt = message.createdAt,
+                                            notSentLabel = notSentLabel,
+                                            retryLabel = retryLabel,
+                                            onRetry = onRetry,
+                                            onDiscard = onDiscard,
+                                            isMine = true,
+                                        )
+                                    }
+                                } else null,
+                            )
+                            if (!isMine) {
+                                MessageStatus(
+                                    ui = ui,
+                                    createdAt = message.createdAt,
+                                    notSentLabel = notSentLabel,
+                                    retryLabel = retryLabel,
+                                    onRetry = onRetry,
+                                    onDiscard = onDiscard,
+                                )
+                            }
+                        }
+                    }
+                }
+                "video" -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
+                        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+                    ) {
+                        if (!message.content.isNullOrBlank()) {
+                            Text(
+                                text = message.content.orEmpty(),
+                                style = Spec.msgBody,
+                                color = Spec.text,
+                                modifier = Modifier.padding(bottom = 6.dp),
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            // بطاقة فيديو كتليجرام: إطار من الفيديو + ▶ + المدّة
+                            VideoTile(
+                                thumbUrl = videoThumbUrl,
+                                localPreview = ui.localPreview,
+                                durationSeconds = message.mediaDuration,
+                                modifier = Modifier.size(
+                                    width = com.addonstation.mobile.ui.theme.screenWidthFraction(
+                                        fraction = 0.58f, minDp = 150, maxDp = 250,
+                                    ),
+                                    height = 168.dp,
+                                ),
+                                onClick = onPlayVideo,
+                                onLongPress = openActions,
+                            )
+                            MessageStatus(
+                                ui = ui,
+                                createdAt = message.createdAt,
+                                notSentLabel = notSentLabel,
+                                retryLabel = retryLabel,
+                                onRetry = onRetry,
+                                onDiscard = onDiscard,
+                            )
+                        }
+                    }
+                }
+                "audio" -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
+                        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
+                    ) {
+                        if (!message.content.isNullOrBlank()) {
+                            Text(
+                                text = message.content.orEmpty(),
+                                style = Spec.msgBody,
+                                color = Spec.text,
+                                modifier = Modifier.padding(bottom = 6.dp),
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            AudioMessageTile(
+                                mediaPath = message.mediaPath,
+                                durationSeconds = message.mediaDuration,
+                                sizeBytes = message.mediaSize,
+                                isMine = isMine,
+                                onReply = onReply,
+                                onLongPress = openActions,
+                            )
+                            MessageStatus(
+                                ui = ui,
+                                createdAt = message.createdAt,
+                                notSentLabel = notSentLabel,
+                                retryLabel = retryLabel,
+                                onRetry = onRetry,
+                                onDiscard = onDiscard,
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    if (isMine) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = if (grouped) 2.dp else 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
+                            verticalAlignment = Alignment.Bottom,
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .widthIn(max = Spec.ownBubbleMax)
+                                    .clip(
+                                        RoundedCornerShape(
+                                            topStart = 16.dp,
+                                            topEnd = 16.dp,
+                                            bottomEnd = 4.dp,
+                                            bottomStart = 16.dp,
+                                        ),
+                                    )
+                                    .background(Brush.linearGradient(listOf(Spec.blue, Color(0xFF4C9AFF))))
+                                    .combinedClickable(onClick = onReply, onLongClick = openActions)
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                            ) {
+                                Text(
+                                    text = message.content.orEmpty(),
+                                    style = Spec.msgBody.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                    color = Color.White,
+                                )
+                                Row(
+                                    Modifier.fillMaxWidth().padding(top = 3.dp),
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
                                     MessageStatus(
                                         ui = ui,
                                         createdAt = message.createdAt,
@@ -2297,9 +2441,40 @@ private fun MessageBlock(
                                         isMine = true,
                                     )
                                 }
-                            } else null,
-                        )
-                        if (!isMine) {
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.padding(start = 48.dp, top = 2.dp),
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .widthIn(max = 250.dp)
+                                    .clip(
+                                        RoundedCornerShape(
+                                            topStart = 16.dp,
+                                            topEnd = 16.dp,
+                                            bottomEnd = 16.dp,
+                                            bottomStart = 4.dp,
+                                        ),
+                                    )
+                                    .background(Spec.surface)
+                                    .border(
+                                        1.dp,
+                                        Spec.border,
+                                        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 4.dp),
+                                    )
+                                    .combinedClickable(onClick = onReply, onLongClick = openActions)
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                            ) {
+                                Text(
+                                    text = message.content.orEmpty(),
+                                    style = Spec.msgBody,
+                                    color = Spec.text,
+                                )
+                            }
                             MessageStatus(
                                 ui = ui,
                                 createdAt = message.createdAt,
@@ -2312,183 +2487,16 @@ private fun MessageBlock(
                     }
                 }
             }
-            "video" -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
-                    horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
-                ) {
-                    if (!message.content.isNullOrBlank()) {
-                        Text(
-                            text = message.content.orEmpty(),
-                            style = Spec.msgBody,
-                            color = Spec.text,
-                            modifier = Modifier.padding(bottom = 6.dp),
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        // بطاقة فيديو كتليجرام: إطار من الفيديو + ▶ + المدّة
-                        VideoTile(
-                            thumbUrl = videoThumbUrl,
-                            localPreview = ui.localPreview,
-                            durationSeconds = message.mediaDuration,
-                            modifier = Modifier.size(
-                                width = com.addonstation.mobile.ui.theme.screenWidthFraction(
-                                    fraction = 0.58f, minDp = 150, maxDp = 250,
-                                ),
-                                height = 168.dp,
-                            ),
-                            onClick = onPlayVideo,
-                            onLongPress = openActions,
-                        )
-                        MessageStatus(
-                            ui = ui,
-                            createdAt = message.createdAt,
-                            notSentLabel = notSentLabel,
-                            retryLabel = retryLabel,
-                            onRetry = onRetry,
-                            onDiscard = onDiscard,
-                        )
-                    }
-                }
-            }
-            "audio" -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
-                    horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
-                ) {
-                    if (!message.content.isNullOrBlank()) {
-                        Text(
-                            text = message.content.orEmpty(),
-                            style = Spec.msgBody,
-                            color = Spec.text,
-                            modifier = Modifier.padding(bottom = 6.dp),
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        AudioMessageTile(
-                            mediaPath = message.mediaPath,
-                            durationSeconds = message.mediaDuration,
-                            sizeBytes = message.mediaSize,
-                            isMine = isMine,
-                            onReply = onReply,
-                            onLongPress = openActions,
-                        )
-                        MessageStatus(
-                            ui = ui,
-                            createdAt = message.createdAt,
-                            notSentLabel = notSentLabel,
-                            retryLabel = retryLabel,
-                            onRetry = onRetry,
-                            onDiscard = onDiscard,
-                        )
-                    }
-                }
-            }
-            else -> {
-                if (isMine) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = if (grouped) 2.dp else 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
-                        verticalAlignment = Alignment.Bottom,
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .widthIn(max = Spec.ownBubbleMax)
-                                .clip(
-                                    RoundedCornerShape(
-                                        topStart = 16.dp,
-                                        topEnd = 16.dp,
-                                        bottomEnd = 4.dp,
-                                        bottomStart = 16.dp,
-                                    ),
-                                )
-                                .background(Brush.linearGradient(listOf(Spec.blue, Color(0xFF4C9AFF))))
-                                .combinedClickable(onClick = onReply, onLongClick = openActions)
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                        ) {
-                            Text(
-                                text = message.content.orEmpty(),
-                                style = Spec.msgBody.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                                color = Color.White,
-                            )
-                            Row(
-                                Modifier.fillMaxWidth().padding(top = 3.dp),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                MessageStatus(
-                                    ui = ui,
-                                    createdAt = message.createdAt,
-                                    notSentLabel = notSentLabel,
-                                    retryLabel = retryLabel,
-                                    onRetry = onRetry,
-                                    onDiscard = onDiscard,
-                                    isMine = true,
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.padding(start = 48.dp, top = 2.dp),
-                        verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .widthIn(max = 250.dp)
-                                .clip(
-                                    RoundedCornerShape(
-                                        topStart = 16.dp,
-                                        topEnd = 16.dp,
-                                        bottomEnd = 16.dp,
-                                        bottomStart = 4.dp,
-                                    ),
-                                )
-                                .background(Spec.surface)
-                                .border(
-                                    1.dp,
-                                    Spec.border,
-                                    RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 4.dp),
-                                )
-                                .combinedClickable(onClick = onReply, onLongClick = openActions)
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                        ) {
-                            Text(
-                                text = message.content.orEmpty(),
-                                style = Spec.msgBody,
-                                color = Spec.text,
-                            )
-                        }
-                        MessageStatus(
-                            ui = ui,
-                            createdAt = message.createdAt,
-                            notSentLabel = notSentLabel,
-                            retryLabel = retryLabel,
-                            onRetry = onRetry,
-                            onDiscard = onDiscard,
-                        )
-                    }
-                }
-            }
         }
 
-        // التفاعلات بأسلوب ديسكورد: صفّ من **البسولات الدائرية** تحت الرسالة،
-        // والبسولة التي تفاعلتَ بها بخلفية مضيئة وإطار أخضر ورقم أخضر، وآخر
-        // الصفّ زر «إضافة تفاعل» (＋) الذي يفتح لوحة الرموز.
-        if (ui.reactions.isNotEmpty()) {
+        if (showReactions) {
             Row(
-                modifier = Modifier.padding(start = if (isMine) 0.dp else 48.dp, top = 4.dp),
+                modifier = Modifier
+                    .align(if (isMine) Alignment.BottomEnd else Alignment.BottomStart)
+                    .padding(
+                        start = if (isMine) 0.dp else 64.dp,
+                        end = if (isMine) 16.dp else 0.dp,
+                    ),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -2507,8 +2515,10 @@ private fun MessageBlock(
 }
 
 /**
- * بسولة تفاعل واحدة (ديسكورد): رمز + عدد داخل كبسولة دائرية صغيرة.
- * البسولة التي تفاعلتَ بها = خلفية مضيئة + إطار أخضر + رقم أخضر.
+ * بسولة تفاعل واحدة: رمز + عدد داخل كبسولة **بلا إطار** بخلفية صلبة.
+ * تُرسم ملتصقة بحافة الرسالة السفلية (نصفها داخل الفقاعة)، لذا الخلفية صلبة
+ * (غير شفافة) كي تبقى واضحة فوق الفقاعة الزرقاء أو الداكنة.
+ * البسولة التي تفاعلتَ بها = خلفية زرقاء داكنة + رقم أبيض (لا أخضر).
  */
 @Composable
 private fun ReactionPill(
@@ -2518,15 +2528,15 @@ private fun ReactionPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val shape = RoundedCornerShape(13.dp)
     Row(
         modifier = modifier
             .height(26.dp)
-            .clip(RoundedCornerShape(13.dp))
-            .background(if (selected) AppColors.GreenGlow else AppColors.Elevated)
-            .border(
-                width = if (selected) 1.5.dp else 1.dp,
-                color = if (selected) AppColors.Green else AppColors.Border,
-                shape = RoundedCornerShape(13.dp),
+            .shadow(2.dp, shape, clip = false)
+            .clip(shape)
+            .background(
+                if (selected) Spec.blue.copy(alpha = 0.32f).compositeOver(Spec.surfaceHigh)
+                else Spec.surfaceHigh,
             )
             .clickable { onClick() }
             .padding(horizontal = 8.dp, vertical = 3.dp),
@@ -2537,7 +2547,7 @@ private fun ReactionPill(
         Text(
             text = "$count",
             style = AppText.tiny,
-            color = if (selected) AppColors.Green else AppColors.Muted,
+            color = if (selected) Color.White else Spec.textMuted,
         )
     }
 }

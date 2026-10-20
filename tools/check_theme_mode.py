@@ -8,8 +8,11 @@ SRC = ROOT / "android/app/src/main/java/com/addonstation/mobile"
 SETTINGS = (SRC / "ui/settings/SettingsScreen.kt").read_text(encoding="utf-8")
 NAV = (SRC / "ui/nav/AppNav.kt").read_text(encoding="utf-8")
 COLORS = (SRC / "ui/theme/Color.kt").read_text(encoding="utf-8")
+THEME = (SRC / "ui/theme/Theme.kt").read_text(encoding="utf-8")
 SPEC = (SRC / "ui/theme/Spec.kt").read_text(encoding="utf-8")
 CHAT = (SRC / "ui/chat/ChatScreen.kt").read_text(encoding="utf-8")
+COMMON = (SRC / "ui/components/Common.kt").read_text(encoding="utf-8")
+ACCOUNT = (SRC / "ui/account/AccountScreens.kt").read_text(encoding="utf-8")
 BOTTOM_NAV = (SRC / "ui/components/BottomNav.kt").read_text(encoding="utf-8")
 
 rows = []
@@ -32,6 +35,26 @@ rows.append(("auth/settings colors follow the selected palette",
 rows.append(("home/chat/profile design tokens have adaptive light values",
              "private val homePalette: HomePalette" in SPEC
              and "get() = if (AppColors.isDark) HomePalettes.Dark else HomePalettes.Light" in SPEC))
+rows.append(("Material primary and app background glow are blue in both modes",
+             "primary = HomePalettes.Dark.blue" in THEME
+             and "primary = HomePalettes.Light.blue" in THEME
+             and "val topGlow = if (dark) HomePalettes.Dark.blue" in THEME
+             and "AppColors.Green.copy" not in THEME))
+rows.append(("shared loading and selected filters use the blue accent",
+             "CircularProgressIndicator(color = AppColors.AuthBlue" in COMMON
+             and "AppColors.AuthBlue.copy(alpha = 0.18f)" in COMMON
+             and "if (selected) AppColors.AuthBlue else AppColors.Border" in COMMON
+             and "if (selected) AppColors.AuthBlueLight else AppColors.Muted" in COMMON))
+rows.append(("unread notification treatment uses the blue accent",
+             "AppColors.AuthBlue.copy(alpha = 0.55f)" in ACCOUNT
+             and ".background(AppColors.AuthBlue)" in ACCOUNT
+             and "color = AppColors.AuthWhite" in ACCOUNT))
+rows.append(("chat upload and attached reactions use blue instead of green",
+             "Text(uploadingLabel, style = AppText.tiny, color = AppColors.AuthBlue)" in CHAT
+             and "val showReactions = ui.reactions.isNotEmpty()" in CHAT
+             and ".align(if (isMine) Alignment.BottomEnd else Alignment.BottomStart)" in CHAT
+             and "Spec.blue.copy(alpha = 0.32f).compositeOver(Spec.surfaceHigh)" in CHAT
+             and "AppColors.GreenGlow" not in CHAT))
 rows.append(("bottom navigation always consumes the active palette",
              "val palette = LocalHomePalette.current" in BOTTOM_NAV
              and "HomePalettes.Dark" not in BOTTOM_NAV))

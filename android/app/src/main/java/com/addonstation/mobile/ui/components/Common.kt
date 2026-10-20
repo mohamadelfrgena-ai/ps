@@ -687,7 +687,7 @@ fun LoadingBox(modifier: Modifier = Modifier, text: String? = null) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        CircularProgressIndicator(color = AppColors.Green, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+        CircularProgressIndicator(color = AppColors.AuthBlue, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
         if (text != null) Text(text, style = AppText.bodySmall, color = AppColors.Muted)
     }
 }
@@ -968,12 +968,12 @@ fun FilterChip(
     Box(
         modifier = modifier
             .clip(CircleShape)
-            .background(if (selected) AppColors.GreenGlow else AppColors.Elevated)
-            .border(1.dp, if (selected) AppColors.Green else AppColors.Border, CircleShape)
+            .background(if (selected) AppColors.AuthBlue.copy(alpha = 0.18f) else AppColors.Elevated)
+            .border(1.dp, if (selected) AppColors.AuthBlue else AppColors.Border, CircleShape)
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 7.dp),
     ) {
-        Text(label, style = AppText.small, color = if (selected) AppColors.Green else AppColors.Muted, maxLines = 1)
+        Text(label, style = AppText.small, color = if (selected) AppColors.AuthBlueLight else AppColors.Muted, maxLines = 1)
     }
 }
 
