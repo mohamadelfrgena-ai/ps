@@ -24,7 +24,11 @@ fun rememberDarkTheme(container: AppContainer): Boolean {
 }
 
 /** يحوّل مساراً نسبياً داخل مخزن site-assets إلى رابط كامل (يتجاهل الروابط المطلقة). */
-fun assetUrl(container: AppContainer, path: String?): String? = container.siteAssetUrl(path)
+fun assetUrl(
+    container: AppContainer,
+    path: String?,
+    privateAssetUrls: Map<String, String> = container.state.privateAssetUrls.value,
+): String? = container.siteAssetUrl(path, privateAssetUrls)
 
 /** قسم واحد من أصول الواجهة: عنوان القسم (اسم المجلد الأصلي) + أصوله بالترتيب. */
 data class AssetSection(val title: String, val assets: List<SiteAsset>)

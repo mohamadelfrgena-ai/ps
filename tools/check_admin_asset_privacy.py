@@ -27,6 +27,9 @@ state = read("android/app/src/main/java/com/addonstation/mobile/data/AppState.kt
 container = read("android/app/src/main/java/com/addonstation/mobile/data/AppContainer.kt")
 assets = read("android/app/src/main/java/com/addonstation/mobile/data/repo/AssetsRepository.kt")
 profile = read("android/app/src/main/java/com/addonstation/mobile/data/repo/ProfileRepository.kt")
+profile_ui = read("android/app/src/main/java/com/addonstation/mobile/ui/profile/ProfileScreens.kt")
+profile_editor = read("android/app/src/main/java/com/addonstation/mobile/ui/profile/EditProfileEditor.kt")
+settings_ui = read("android/app/src/main/java/com/addonstation/mobile/ui/settings/SettingsScreen.kt")
 creator = read("android/app/src/main/java/com/addonstation/mobile/data/repo/CreatorRepository.kt")
 admin = read("android/app/src/main/java/com/addonstation/mobile/data/repo/AdminRepository.kt")
 common = read("android/app/src/main/java/com/addonstation/mobile/ui/components/Common.kt")
@@ -69,9 +72,12 @@ checks = [
      "publishVisibleAssets" in state
      and 'filterNot { it.requiredPlan.equals("admin"' in state
      and "redactAdminAssets" in state),
-    ("حل الرابط الخاص لا يرجع URL عاماً",
+    ("حل الرابط الخاص لا يرجع URL عاماً ويظل محصوراً بدور admin",
      "isPrivateAdminAssetPath(clean)" in container
-     and "state.privateAssetUrl(clean)" in container),
+     and "if (state.isAdmin) privateAssetUrls[clean] else null" in container),
+    ("شاشات صورة/غلاف الحساب تراقب وصول الروابط الموقّعة",
+     all("state.privateAssetUrls.collectAsState()" in text for text in (profile_ui, profile_editor, settings_ui))
+     and "privateAssetUrls: Map<String, String>" in container),
     ("رفع admin يذهب للمخزن الخاص ويوقّع الرابط",
      "if (privateAdmin) ADMIN_ASSETS_BUCKET" in assets
      and 'supabase.signedUrl(ADMIN_ASSETS_BUCKET' in assets
@@ -80,6 +86,9 @@ checks = [
      '"visible_profiles" to null' in profile
      and all('supabase.select("visible_profiles"' in text for text in (creator, admin))
      and "private suspend fun selectProfiles" in profile),
+    ("قراءة التطبيق تبدأ بـ visible_profiles الموثّق لإبقاء أصول الأدمن",
+     profile.find('"visible_profiles" to sessionToken') >= 0
+     and profile.find('"visible_profiles" to sessionToken') < profile.find('"visible_profiles" to null')),
     ("الملف العام يفتح بلا اعتماد على صلاحية JWT",
      '"visible_profiles" to null' in profile
      and "supabase.select(table, query, token = token)" in profile

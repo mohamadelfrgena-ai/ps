@@ -57,6 +57,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.addonstation.mobile.data.AuthEmailLinkKind
 import com.addonstation.mobile.data.model.ChatChannel
 import com.addonstation.mobile.ui.chat.ChatScreen
 import com.addonstation.mobile.ui.components.BottomNavBar
@@ -154,8 +155,8 @@ object Routes {
 
 @Composable
 fun AppRoot(
-    recoveryLink: String? = null,
-    onRecoveryConsumed: () -> Unit = {},
+    authLink: String? = null,
+    onAuthLinkConsumed: () -> Unit = {},
     /** وجهة طلبها إشعار FCM (chat:<id> · item:<id> · notifications · plans · orders · store). */
     pushRoute: String? = null,
     onPushConsumed: () -> Unit = {},
@@ -199,22 +200,38 @@ fun AppRoot(
             bars.isAppearanceLightNavigationBars = light
         }
     }
-    var deepLinkSession by remember { mutableStateOf(false) }
+    var authLinkDestination by remember { mutableStateOf<String?>(null) }
 
-    // **رابط الاستعادة وحده في أثر مستقل**: قد يصل والتطبيق مفتوح أصلاً
-    // (onNewIntent) فيتغيّر `recoveryLink` بعد الإقلاع. لو بقينا نعالجه داخل
-    // أثر الإقلاع (مفتاحه Unit) لضاع الرابط ولم يحدث شيء ⇒ «الرابط لا يعمل».
-    LaunchedEffect(recoveryLink) {
-        val link = recoveryLink ?: return@LaunchedEffect
-        val recovered = runCatching {
-            withContext(Dispatchers.IO) { container.auth.acceptRecoveryLink(link) }
-        }.getOrDefault(false)
-        if (recovered) {
-            container.state.setSignedIn(true)
-            runCatching { withContext(Dispatchers.IO) { container.state.refreshAll() } }
-            deepLinkSession = true
+    // رابط البريد في أثر مستقل لأنه قد يصل عبر onNewIntent والتطبيق مفتوح.
+    // النوع القادم من Supabase هو الفاصل الحاسم: recovery فقط يفتح Reset،
+    // أما signup فيؤكد الحساب ثم يفتح Login ولا يُعامل كاستعادة كلمة مرور.
+    LaunchedEffect(authLink) {
+        val link = authLink ?: return@LaunchedEffect
+        val result = runCatching {
+            withContext(Dispatchers.IO) { container.auth.acceptEmailLink(link) }
+        }.getOrNull()
+        if (result?.accepted == true) {
+            when (result.kind) {
+                AuthEmailLinkKind.RECOVERY -> {
+                    container.state.setSignedIn(true)
+                    authLinkDestination = Routes.RESET
+                    runCatching { withContext(Dispatchers.IO) { container.state.refreshAll() } }
+                }
+                AuthEmailLinkKind.SIGNUP_CONFIRMATION -> {
+                    // جلسة رابط التأكيد مؤقتة؛ المطلوب أن يُدخل المستخدم بياناته
+                    // من شاشة Login بعد نجاح التأكيد، لا أن يدخل أو يفتح Reset.
+                    container.auth.clearEmailConfirmationSession()
+                    container.state.setSignedIn(false)
+                    authLinkDestination = Routes.LOGIN
+                }
+                AuthEmailLinkKind.OTHER -> {
+                    container.state.setSignedIn(true)
+                    authLinkDestination = Routes.HOME
+                    runCatching { withContext(Dispatchers.IO) { container.state.refreshAll() } }
+                }
+            }
         }
-        onRecoveryConsumed()
+        onAuthLinkConsumed()
     }
 
     // استعادة الجلسة وتحميل أساسيات التطبيق بالتوازي مع شاشة البداية.
@@ -308,7 +325,8 @@ fun AppRoot(
                     // نفسه تكون الشاشة التالية جاهزة حين تنقشع شاشة الترحيب.
                     if (configured && navigationReady) {
                         MainNavigation(
-                            startAtReset = deepLinkSession,
+                            authLinkDestination = authLinkDestination,
+                            onAuthNavigationConsumed = { authLinkDestination = null },
                             pushRoute = pushRoute,
                             onPushConsumed = onPushConsumed,
                         )
@@ -335,7 +353,8 @@ fun AppRoot(
 
 @Composable
 private fun MainNavigation(
-    startAtReset: Boolean,
+    authLinkDestination: String?,
+    onAuthNavigationConsumed: () -> Unit,
     /** وجهة طلبها إشعار FCM (chat:<id> · item:<id> · notifications · plans …). */
     pushRoute: String? = null,
     onPushConsumed: () -> Unit = {},
@@ -365,8 +384,14 @@ private fun MainNavigation(
         }
     }
 
-    LaunchedEffect(startAtReset) {
-        if (startAtReset) navController.navigate(Routes.RESET)
+    LaunchedEffect(authLinkDestination) {
+        val destination = authLinkDestination ?: return@LaunchedEffect
+        navController.navigate(destination) {
+            // لا نترك Signup/Reset قديمة تحت الوجهة الجديدة؛ الرجوع يعود Home.
+            popUpTo(Routes.HOME) { inclusive = false }
+            launchSingleTop = true
+        }
+        onAuthNavigationConsumed()
     }
 
     // كل تبويب يستفيد من ملف المستخدم نفسه؛ إذا كان الحساب مسجّلاً لكن الملف
@@ -575,20 +600,24 @@ private fun MainNavigation(
     val accountLoginNotice = stringResource(R.string.msg_sign_in_needed)
 
     /**
-     * بعد نجاح الدخول: إن كنّا أوقفنا المستخدم عند بوابة محمية نعيده إلى
-     * وجهته نفسها (الشات أو الاشتراك). وإلا يعود إلى الصفحة الرئيسية.
-     *
-     * @return صحيحٌ إن أعدناه إلى الوجهة المحمية؛ وإلا فالصفحة الرئيسية.
+     * نجاح الدخول له نهاية واحدة واضحة: Home مع حذف مسار Login/Signup كاملاً.
+     * تحميل الملف والمحفظة يبدأ بعدها في نطاق التنقّل ولا يؤخر الانتقال المرئي.
      */
-    fun continueAfterLogin(): Boolean {
-        val intended = afterLoginRoute
+    fun finishLogin() {
         afterLoginRoute = null
-        if (intended == null) return false
-        navController.navigate(intended) {
-            popUpTo(Routes.LOGIN) { inclusive = true }
+        pendingPush = null
+        navController.navigate(Routes.HOME) {
+            popUpTo(Routes.HOME) { inclusive = true }
             launchSingleTop = true
         }
-        return true
+        scope.launch(Dispatchers.IO) {
+            coroutineScope {
+                launch { runCatching { container.state.refreshAll() } }
+                // الضيف لا يحمّل كتالوج أصول الحساب عند الإقلاع. بعد الدخول
+                // نحمّله هنا كي تُوقّع صورة/غلاف الأدمن الخاصان فوراً.
+                launch { runCatching { container.assets.all() } }
+            }
+        }
     }
 
     val density = LocalDensity.current
@@ -737,9 +766,8 @@ private fun MainNavigation(
                 composable(Routes.LOGIN) {
                     com.addonstation.mobile.ui.auth.LoginScreen(
                         onBack = { back() },
-                        // بعد الدخول ⟵ الصفحة الرئيسية مباشرةً، إلا إذا أوقفته
-                        // بوابة محمية؛ عندها نعيده إلى الوجهة التي طلبها.
-                        onSuccess = { if (!continueAfterLogin()) goTab(MainTab.Home) },
+                        // نجاح الدخول يمسح شاشات المصادقة وينتقل مباشرةً إلى Home.
+                        onSuccess = { finishLogin() },
                         onOpenSignup = { go(Routes.SIGNUP) },
                         notice = afterLoginRoute?.let { intended ->
                             if (isChatRoute(intended)) chatLoginNotice else accountLoginNotice
@@ -749,11 +777,12 @@ private fun MainNavigation(
                 composable(Routes.SIGNUP) {
                     com.addonstation.mobile.ui.auth.SignUpScreen(
                         onBack = { back() },
-                        // بعد إنشاء الحساب ⟵ الصفحة الرئيسية مباشرةً (طلب المالك):
-                        // `AuthRepository.signUp` يدخل الحساب تلقائياً أولاً.
-                        onSuccess = { if (!continueAfterLogin()) goTab(MainTab.Home) },
+                        // بعد إنشاء الحساب وتأكيد البريد تكون الوجهة Login، لا Home.
                         onOpenLogin = {
-                            navController.navigate(Routes.LOGIN) { popUpTo(Routes.SIGNUP) { inclusive = true } }
+                            navController.navigate(Routes.LOGIN) {
+                                popUpTo(Routes.SIGNUP) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         },
                     )
                 }

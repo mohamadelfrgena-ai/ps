@@ -53,7 +53,7 @@ android {
         applicationId = "com.addonstation.mobile"
         minSdk = 24
         targetSdk = 35
-        // 1.3: استعادة كلمة المرور · الدخول التلقائي بعد التسجيل · عين كلمة المرور
+        // 1.3: استعادة كلمة المرور · توجيه تأكيد التسجيل إلى Login · عين كلمة المرور
         //      وحقل التأكيد · شريط التنقّل السفلي · إطار الاختيار · استقرار الشات
         versionCode = 4
         versionName = "1.3"          // AddonStation Mobile v1.3

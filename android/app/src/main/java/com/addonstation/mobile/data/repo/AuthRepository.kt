@@ -2,6 +2,7 @@ package com.addonstation.mobile.data.repo
 
 import com.addonstation.mobile.data.ApiError
 import com.addonstation.mobile.data.ApiErrorKind
+import com.addonstation.mobile.data.AuthEmailLinkResult
 import com.addonstation.mobile.data.SessionStore
 import com.addonstation.mobile.data.SupabaseClient
 import com.addonstation.mobile.data.model.AuthUser
@@ -36,22 +37,21 @@ class AuthRepository(
         }
     }
 
-    /** فتح جلسة من رابط استعادة البريد (يعمل على خيط الإدخال/الإخراج). */
-    suspend fun acceptRecoveryLink(url: String): Boolean = supabase.acceptRecoveryLink(url)
+    /** قبول رابط بريد مع نوعه كي لا يُعامل تأكيد التسجيل كاستعادة كلمة مرور. */
+    suspend fun acceptEmailLink(url: String): AuthEmailLinkResult = supabase.acceptEmailLink(url)
 
     suspend fun signUp(username: String, email: String, password: String): Result<AuthUser> = runCatching {
         validateUsername(username)
         validateEmail(email)
         validatePassword(password)
-        val user = supabase.signUp(email.trim(), password, username.trim())
-        // **دخول تلقائي بعد التسجيل**: إن أعاد الخادم جلسة فهذا يكفي؛ وإن لم
-        // يُعدها (تأكيد البريد مُعطّل لكن الجلسة لم تُحفظ) نحاول الدخول مباشرةً
-        // فيدخل المستخدم التطبيق فوراً بلا شاشة إضافية. وإن فشل (البريد يحتاج
-        // تأكيداً) نتركه كما هو ونُظهر رسالة «أُنشئ الحساب».
-        if (supabase.session() == null) {
-            runCatching { supabase.signIn(email.trim(), password) }
-        }
-        user
+        // لا نحاول تسجيل الدخول هنا: بعد إنشاء الحساب/تأكيد البريد تنتقل الواجهة
+        // صراحةً إلى شاشة الدخول، وفق التدفق المطلوب، ولا تحتفظ بجلسة تسجيل مؤقتة.
+        supabase.signUp(email.trim(), password, username.trim())
+    }
+
+    /** يحذف فقط الجلسة المؤقتة التي قد يعيدها رابط تأكيد التسجيل أو signup. */
+    fun clearEmailConfirmationSession() {
+        sessionStore.clear()
     }
 
     suspend fun signIn(email: String, password: String): Result<AuthUser> = runCatching {

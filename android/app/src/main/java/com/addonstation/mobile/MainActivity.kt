@@ -38,7 +38,7 @@ import com.addonstation.mobile.util.LocaleManager
 
 /**
  * النشاط الوحيد في التطبيق (بورتريه، singleTask):
- * يقرأ رابط الاستعادة addonstation://recovery ويمرّره إلى الواجهة،
+ * يقرأ رابط بريد Supabase (تأكيد التسجيل أو الاستعادة) ويمرّره إلى الواجهة،
  * ويطبّق لغة المستخدم على الـ Context قبل بناء أي شاشة.
  *
  * الرابط **حالة قابلة للملاحظة** لا متغيّراً عادياً: قد يصل الرابط
@@ -48,7 +48,7 @@ import com.addonstation.mobile.util.LocaleManager
  */
 class MainActivity : ComponentActivity() {
 
-    private val recoveryLink: MutableState<String?> = mutableStateOf(null)
+    private val authLink: MutableState<String?> = mutableStateOf(null)
     private val appLocaleCode: MutableState<String> = mutableStateOf("en")
 
     /** تطبيق اللغة فوراً داخل Compose دون إعادة إنشاء النشاط أو إعادة تشغيل جلسة الحساب. */
@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
      */
     private val pushRoute: MutableState<String?> = mutableStateOf(null)
 
-    /** أي رابط addonstation:// يصلنا (استعادة كلمة المرور وغيرها). */
+    /** أي رابط addonstation:// يصلنا (تأكيد التسجيل أو استعادة كلمة المرور). */
     private fun linkOf(intent: android.content.Intent?): String? =
         intent?.data?.toString()?.takeIf { it.startsWith("addonstation://") }
 
@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
             return
         }
         enableEdgeToEdge()
-        recoveryLink.value = linkOf(intent)
+        authLink.value = linkOf(intent)
         pushRoute.value = routeOf(intent)
         appLocaleCode.value = LocaleManager.byCode(AppPrefs.readLocale(this)).code
 
@@ -114,8 +114,8 @@ class MainActivity : ComponentActivity() {
             ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     AppRoot(
-                        recoveryLink = recoveryLink.value,
-                        onRecoveryConsumed = { recoveryLink.value = null },
+                        authLink = authLink.value,
+                        onAuthLinkConsumed = { authLink.value = null },
                         pushRoute = pushRoute.value,
                         onPushConsumed = { pushRoute.value = null },
                     )
@@ -309,7 +309,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         // التطبيق كان مفتوحاً ⇒ نحدّث الحالة فتلتقطها الواجهة فوراً
-        recoveryLink.value = linkOf(intent)
+        authLink.value = linkOf(intent)
         pushRoute.value = routeOf(intent)
     }
 }

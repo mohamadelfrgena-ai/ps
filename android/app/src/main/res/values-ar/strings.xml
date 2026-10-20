@@ -633,7 +633,7 @@
     <string name="profile_no_content_published">لا محتوى منشور بعد</string>
     <string name="auth_confirm_title">تم إنشاء حسابك ✓</string>
     <string name="auth_confirm_text">أرسلنا رابط تأكيد إلى بريدك الإلكتروني. افتحه ثم اضغط الزرّ بالأسفل.</string>
-    <string name="auth_confirm_retry">أكّدت بريدي — سجّلني الآن</string>
+    <string name="auth_confirm_retry">أكّدت بريدي — انتقل لتسجيل الدخول</string>
     <string name="auth_confirm_resend">أعِد إرسال رابط التأكيد</string>
     <string name="auth_confirm_resent">تم إرسال رابط التأكيد مرة أخرى ✓</string>
     <string name="auth_confirm_hint">لم تجد الرسالة؟ تحقّق من مجلّد «الرسائل غير المرغوبة» أيضاً.</string>

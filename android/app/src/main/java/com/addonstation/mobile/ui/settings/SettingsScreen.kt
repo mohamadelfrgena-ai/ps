@@ -155,6 +155,7 @@ fun SettingsScreen(
     val hostActivity = LocalView.current.context.findActivity()
     val scope = rememberCoroutineScope()
     val profile by container.state.profile.collectAsState()
+    val privateAssetUrls by container.state.privateAssetUrls.collectAsState()
     val signedIn by container.state.signedIn.collectAsState()
     val profileLoadStatus by container.state.profileLoadStatus.collectAsState()
     val wallet by container.state.wallet.collectAsState()
@@ -893,7 +894,7 @@ private fun SettingsProfileCard(
                 )
             } else {
                 AsyncImage(
-                    model = assetUrl(container, profile?.bannerUrl),
+                    model = assetUrl(container, profile?.bannerUrl, privateAssetUrls),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxWidth().height(64.dp),
@@ -928,7 +929,7 @@ private fun SettingsProfileCard(
                     )
                 } else {
                     AvatarImage(
-                        url = assetUrl(container, profile.avatarUrl),
+                        url = assetUrl(container, profile.avatarUrl, privateAssetUrls),
                         size = 64.dp,
                         borderColor = AppColors.AuthGold,
                         borderWidth = 3.dp,

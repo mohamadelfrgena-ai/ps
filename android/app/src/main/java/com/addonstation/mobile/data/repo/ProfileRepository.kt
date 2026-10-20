@@ -33,20 +33,20 @@ class ProfileRepository(
     private val refreshMutex = Mutex()
 
     /**
-     * `visible_profiles` is intentionally readable with the publishable key and
-     * already redacts private admin assets. Read it anonymously first so an
-     * expired/invalid user JWT cannot turn a public profile into the generic
-     * Network error screen. This is also the exact access path verified against
-     * the live backend by the read-only profile diagnostic.
+     * `visible_profiles` ينقّح أصول الأدمن لغير الأدمن، لكنه يعيدها للأدمن فقط
+     * عندما يرى الخادم JWT الموثّق وتنجح `public.is_admin()`. لذلك يجب أن تبدأ
+     * القراءة بالجلسة الحالية؛ البدء anonymous كان يحوّل avatar/banner إلى null
+     * حتى في ملف الأدمن نفسه ولا يمكن للتطبيق استرجاع قيمة حُذفت من الاستجابة.
      *
-     * Older servers may not have the view yet, so the remaining attempts keep
-     * backward compatibility. Cancellation is never swallowed.
+     * تبقى القراءة العامة هي الاحتياط التالي حتى لا يحوّل JWT منتهي الصلاحية
+     * الملف العام إلى خطأ شبكة. والمحاولتان الأخيرتان توافق لخادم أقدم بلا view.
+     * لا يُبتلع إلغاء coroutine في أي محاولة.
      */
     private suspend fun selectProfiles(query: String): JsonElement {
         val sessionToken = supabase.session()?.accessToken?.takeIf(String::isNotBlank)
         val sources = listOf(
-            "visible_profiles" to null,
             "visible_profiles" to sessionToken,
+            "visible_profiles" to null,
             "profiles" to sessionToken,
             "profiles" to null,
         ).distinct()

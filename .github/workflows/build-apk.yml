@@ -335,6 +335,8 @@ jobs:
           python3 tools/check_theme_mode.py
           python3 tools/check_chat_message_header.py
           python3 tools/check_profile_asset_guard.py
+          python3 tools/check_admin_asset_privacy.py
+          python3 tools/check_auth_state.py
           python3 tools/check_free_avatar.py
           python3 tools/check_screen_backgrounds.py
           python3 tools/check_content_download.py

@@ -32,9 +32,23 @@ import okhttp3.Response
 import okio.BufferedSink
 import java.io.File
 import java.io.IOException
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+
+/** نوع رابط البريد الذي أعاده Supabase إلى التطبيق بعد التحقق. */
+enum class AuthEmailLinkKind {
+    RECOVERY,
+    SIGNUP_CONFIRMATION,
+    OTHER,
+}
+
+/** نتيجة قبول رابط البريد مع إبقاء قرار الوجهة خارج عميل الشبكة. */
+data class AuthEmailLinkResult(
+    val accepted: Boolean,
+    val kind: AuthEmailLinkKind,
+)
 
 /**
  * عميل Supabase خفيف مبني على OkHttp (بدون مكتبات خارجية إضافية):
@@ -111,7 +125,9 @@ class SupabaseClient(
             put("password", password)
             put("data", buildJsonObject { put("username", username) })
         }
-        val text = authPost("signup", body, token = null)
+        // نعيد رابط تأكيد التسجيل إلى التطبيق نفسه. يضيف Supabase `type=signup`
+        // إلى الرابط النهائي، وبذلك تستطيع الواجهة تمييزه عن `type=recovery`.
+        val text = authPost(authPathWithRedirect("signup", EMAIL_REDIRECT), body, token = null)
         val obj = json.parseToJsonElement(text).jsonObject
         val user = obj["user"]?.jsonObject ?: obj.takeIf { it.containsKey("id") } ?: JsonObject(emptyMap())
         obj["access_token"]?.jsonPrimitive?.contentOrNull()?.let { access ->
@@ -202,7 +218,7 @@ class SupabaseClient(
      */
     suspend fun resendConfirmation(email: String) {
         authPost(
-            "resend",
+            authPathWithRedirect("resend", EMAIL_REDIRECT),
             buildJsonObject {
                 put("type", "signup")
                 put("email", email)
@@ -240,30 +256,40 @@ class SupabaseClient(
     }
 
     /**
-     * يستقبل رابط الاستعادة ويفتح به جلسة صالحة.
+     * يقبل رابط بريد Supabase ويُرجع **نوعه** مع نتيجة التحقق.
      *
-     * يغطّي كل الصيغ التي يُنتجها Supabase (بلا افتراض واحد):
-     *   • `addonstation://recovery#access_token=…&refresh_token=…&type=recovery`
-     *     (التدفّق الضمني — الصيغة المعتادة للروابط المخصّصة)؛
-     *   • `…?access_token=…` (إن نقلها متصفّح أو عميل بريد إلى الاستعلام)؛
-     *   • `…?token_hash=…&type=recovery`
-     *     (صيغة القوالب الحديثة) ⇒ نستبدل الهاش بجلسة من الخادم.
-     *
-     * ويملأ معرّف المستخدم والبريد من **حمولة الـ JWT نفسها** بدل أن يتركهما
-     * فارغين، فتعمل بقية الشاشات (الملف الشخصي، المحفظة…) فور فتح الرابط.
+     * لا يجوز اختزال كل الروابط إلى استعادة كلمة المرور: رابط `type=recovery`
+     * يفتح شاشة كلمة مرور جديدة، بينما `type=signup` يؤكد البريد ثم يجب أن يفتح
+     * شاشة تسجيل الدخول. تدعم الدالة توكن الوصول الجاهز و`token_hash` والرمز
+     * اليدوي، وتملأ الجلسة المؤقتة من حمولة JWT كما في التدفق السابق.
      */
-    suspend fun acceptRecoveryLink(url: String): Boolean {
+    suspend fun acceptEmailLink(url: String): AuthEmailLinkResult {
         val params = linkParams(url)
         val type = params["type"]?.lowercase()
+        val kind = when (type) {
+            "recovery" -> AuthEmailLinkKind.RECOVERY
+            "signup", "email", "email_confirmation" -> AuthEmailLinkKind.SIGNUP_CONFIRMATION
+            else -> {
+                // توافق مع روابط الاستعادة القديمة التي لم تكن تحمل type.
+                val host = url.substringAfter("://", "")
+                    .substringBefore('?')
+                    .substringBefore('#')
+                    .substringBefore('/')
+                    .lowercase()
+                if (type == null && host == "recovery") AuthEmailLinkKind.RECOVERY
+                else AuthEmailLinkKind.OTHER
+            }
+        }
+        fun result(accepted: Boolean) = AuthEmailLinkResult(accepted = accepted, kind = kind)
 
-        // ١) توكن وصول جاهز في الرابط
+        // ١) توكن وصول جاهز في الرابط.
         val access = params["access_token"]
         if (!access.isNullOrBlank()) {
             saveTokenSession(access, params["refresh_token"].orEmpty())
-            return true
+            return result(true)
         }
 
-        // ٢) هاش توكن ({{ .TokenHash }}) ⇒ نستبدله بجلسة
+        // ٢) هاش توكن ({{ .TokenHash }}) ⇒ نستبدله بجلسة.
         val tokenHash = params["token_hash"]
         if (!tokenHash.isNullOrBlank()) {
             return try {
@@ -272,15 +298,16 @@ class SupabaseClient(
                     put("token_hash", tokenHash)
                 }
                 val obj = json.parseToJsonElement(authPost("verify", body, token = null)).jsonObject
-                val newAccess = obj["access_token"]?.jsonPrimitive?.contentOrNull() ?: return false
+                val newAccess = obj["access_token"]?.jsonPrimitive?.contentOrNull()
+                    ?: return result(false)
                 saveTokenSession(newAccess, obj["refresh_token"]?.jsonPrimitive?.contentOrNull().orEmpty())
-                true
+                result(true)
             } catch (_: Throwable) {
-                false
+                result(false)
             }
         }
 
-        // ٣) رمز استرداد مُدخل يدوياً (إن وُجد)
+        // ٣) رمز تحقق مُدخل يدوياً (إن وُجد).
         val token = params["token"]
         if (!token.isNullOrBlank()) {
             return try {
@@ -290,14 +317,15 @@ class SupabaseClient(
                     put("email", params["email"].orEmpty())
                 }
                 val obj = json.parseToJsonElement(authPost("verify", body, token = null)).jsonObject
-                val newAccess = obj["access_token"]?.jsonPrimitive?.contentOrNull() ?: return false
+                val newAccess = obj["access_token"]?.jsonPrimitive?.contentOrNull()
+                    ?: return result(false)
                 saveTokenSession(newAccess, obj["refresh_token"]?.jsonPrimitive?.contentOrNull().orEmpty())
-                true
+                result(true)
             } catch (_: Throwable) {
-                false
+                result(false)
             }
         }
-        return false
+        return result(false)
     }
 
     /**
@@ -358,6 +386,9 @@ class SupabaseClient(
             token = token,
             body = body.toString().toRequestBody(JSON_MEDIA),
         )
+
+    private fun authPathWithRedirect(path: String, redirect: String): String =
+        "$path?redirect_to=${URLEncoder.encode(redirect, Charsets.UTF_8.name())}"
 
     private fun storeSession(obj: JsonObject, access: String, fallbackEmail: String? = null) {
         val user = obj["user"]?.jsonObject
@@ -745,8 +776,10 @@ class SupabaseClient(
          * الرابط الذي يفتح التطبيق بعد الضغط على رابط البريد.
          * يجب إضافته في لوحة Supabase: Authentication → URL Configuration →
          * Redirect URLs، وإلا يتجاهل الخادم redirect_to ويعود إلى Site URL.
+         * يميّز التطبيق التدفقات من معامل `type` الذي يضيفه Supabase.
          */
         const val RECOVERY_REDIRECT = "addonstation://recovery"
+        const val EMAIL_REDIRECT = RECOVERY_REDIRECT
         val EMPTY_BODY: RequestBody = ByteArray(0).toRequestBody(null)
     }
 }

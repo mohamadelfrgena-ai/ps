@@ -68,7 +68,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- رابط استعادة كلمة المرور: addonstation://recovery#access_token=... -->
+            <!-- روابط بريد Supabase: type=recovery للاستعادة وtype=signup لتأكيد التسجيل -->
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

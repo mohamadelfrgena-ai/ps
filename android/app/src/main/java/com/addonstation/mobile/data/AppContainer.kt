@@ -70,12 +70,17 @@ class AppContainer(context: Context) {
      * رابط أصل واجهة. الأصول العادية من site-assets العام؛ أما المسار المحجوز
      * admin-private/ فلا يُرجع إلا رابطاً موقّعاً سبق أن حصل عليه حساب admin.
      */
-    fun siteAssetUrl(path: String?): String? {
+    fun siteAssetUrl(
+        path: String?,
+        privateAssetUrls: Map<String, String> = state.privateAssetUrls.value,
+    ): String? {
         if (path.isNullOrBlank()) return null
         val clean = path.trim().trimStart('/')
         if (!state.isAdmin && state.isAdminOnlyAssetValue(clean)) return null
         if (path.startsWith("http://") || path.startsWith("https://")) return path
-        if (isPrivateAdminAssetPath(clean)) return state.privateAssetUrl(clean)
+        if (isPrivateAdminAssetPath(clean)) {
+            return if (state.isAdmin) privateAssetUrls[clean] else null
+        }
         val cfg = config ?: return null
         return cfg.publicUrl("site-assets", clean)
     }

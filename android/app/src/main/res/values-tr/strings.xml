@@ -633,7 +633,7 @@
     <string name="profile_no_content_published">Henüz yayınlanmış içerik yok</string>
     <string name="auth_confirm_title">Hesabın oluşturuldu ✓</string>
     <string name="auth_confirm_text">E-postana bir doğrulama bağlantısı gönderdik. Aç ve aşağıdaki düğmeye dokun.</string>
-    <string name="auth_confirm_retry">Onayladım — giriş yap</string>
+    <string name="auth_confirm_retry">Onayladım — giriş ekranına git</string>
     <string name="auth_confirm_resend">Doğrulama bağlantısını yeniden gönder</string>
     <string name="auth_confirm_resent">Doğrulama bağlantısı yeniden gönderildi ✓</string>
     <string name="auth_confirm_hint">Mesaj gelmedi mi? Spam klasörüne de bak.</string>

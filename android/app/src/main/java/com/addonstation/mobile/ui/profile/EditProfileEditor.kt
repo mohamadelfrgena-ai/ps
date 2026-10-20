@@ -229,6 +229,7 @@ internal fun ProfileEditorScreen(
 ) {
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
+    val privateAssetUrls by container.state.privateAssetUrls.collectAsState()
     val scope = rememberCoroutineScope()
     val palette = LocalHomePalette.current
     val isRtl = LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
@@ -339,9 +340,9 @@ internal fun ProfileEditorScreen(
             it.name.equals(selectedItem, ignoreCase = true) || it.fileUrl.equals(selectedItem, ignoreCase = true)
         }
     }
-    val previewAvatarUrl = assetUrl(container, selectedAvatar)
-    val previewBannerUrl = assetUrl(container, selectedBanner)
-    val previewItemUrl = selectedItemAsset?.let { assetUrl(container, it.fileUrl) }
+    val previewAvatarUrl = assetUrl(container, selectedAvatar, privateAssetUrls)
+    val previewBannerUrl = assetUrl(container, selectedBanner, privateAssetUrls)
+    val previewItemUrl = selectedItemAsset?.let { assetUrl(container, it.fileUrl, privateAssetUrls) }
         ?: equippedItemUrl(container, selectedItem)
     val displayName = profile?.displayName?.takeIf { it.isNotBlank() } ?: profile?.username.orEmpty()
     val onlineLabel = stringResource(R.string.profile_online)

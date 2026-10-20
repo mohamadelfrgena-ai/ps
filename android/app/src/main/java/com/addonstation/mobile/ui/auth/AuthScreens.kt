@@ -118,8 +118,9 @@ fun LoginScreen(
             busy = true
             container.auth.signIn(email.trim(), password)
                 .onSuccess {
+                    // الانتقال لا ينتظر طلبات الملف/المحفظة البطيئة؛ الجذر
+                    // يحدّث بيانات الحساب في الخلفية بعد وصولنا إلى Home.
                     container.state.setSignedIn(true)
-                    container.state.refreshAll()
                     onSuccess()
                 }
                 .onFailure { errorKind = it.toApiError().kind }
@@ -288,7 +289,6 @@ fun LoginScreen(
 @Composable
 fun SignUpScreen(
     onBack: () -> Unit,
-    onSuccess: () -> Unit,
     onOpenLogin: () -> Unit,
 ) {
     val container = rememberContainer()
@@ -319,7 +319,6 @@ fun SignUpScreen(
     val shortPassword = stringResource(R.string.msg_password_too_short)
     val noMatch = stringResource(R.string.msg_passwords_no_match)
     val createdMsg = stringResource(R.string.msg_account_created)
-    val signingIn = stringResource(R.string.msg_signing_in)
     val resentMsg = stringResource(R.string.auth_confirm_resent)
     val resendFailedMsg = stringResource(R.string.msg_network_error)
 
@@ -348,10 +347,12 @@ fun SignUpScreen(
             container.auth.signUp(name, email.trim(), password)
                 .onSuccess {
                     if (container.supabase.session() != null) {
-                        container.state.setSignedIn(true)
-                        container.state.refreshAll()
+                        // بعض إعدادات Supabase تؤكد البريد فوراً وتعيد جلسة مع
+                        // signup. نحذفها أيضاً كي يبقى التدفق ثابتاً: Login.
+                        container.auth.clearEmailConfirmationSession()
+                        container.state.setSignedIn(false)
                         status = null
-                        onSuccess()
+                        onOpenLogin()
                     } else {
                         status = createdMsg
                         pendingConfirm = true
@@ -362,23 +363,11 @@ fun SignUpScreen(
         }
     }
 
-    fun confirmAndSignIn() {
+    fun openLoginAfterConfirmation() {
         if (busy) return
-        scope.launch {
-            busy = true
-            resendOk = false
-            resendErrorKind = null
-            resendMessage = signingIn
-            container.auth.signIn(email.trim(), password)
-                .onSuccess {
-                    container.state.setSignedIn(true)
-                    container.state.refreshAll()
-                    resendMessage = null
-                    onSuccess()
-                }
-                .onFailure { resendErrorKind = it.toApiError().kind; resendMessage = null }
-            busy = false
-        }
+        container.auth.clearEmailConfirmationSession()
+        container.state.setSignedIn(false)
+        onOpenLogin()
     }
 
     fun resend() {
@@ -410,7 +399,7 @@ fun SignUpScreen(
             resendOk = resendOk,
             resendMessage = resendMessage,
             resendErrorKind = resendErrorKind,
-            onConfirm = ::confirmAndSignIn,
+            onConfirm = ::openLoginAfterConfirmation,
             onResend = ::resend,
         )
     } else {
@@ -546,7 +535,7 @@ fun SignUpScreen(
     }
 }
 
-/** Full-screen confirmation state after account creation; preserves the existing auth calls. */
+/** Full-screen confirmation state; after confirmation it opens Login without signing in. */
 @Composable
 private fun EmailConfirmationScreen(
     email: String,
@@ -558,7 +547,6 @@ private fun EmailConfirmationScreen(
     onConfirm: () -> Unit,
     onResend: () -> Unit,
 ) {
-    val signingIn = stringResource(R.string.msg_signing_in)
     val resendLabel = stringResource(R.string.auth_confirm_resend)
     Column(
         modifier = Modifier
@@ -661,7 +649,7 @@ private fun EmailConfirmationScreen(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                if (busy) signingIn else stringResource(R.string.auth_confirm_retry),
+                stringResource(R.string.auth_confirm_retry),
                 style = Spec.button.copy(fontSize = 15.sp),
                 color = Color.White,
                 maxLines = 1,

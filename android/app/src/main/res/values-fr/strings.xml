@@ -633,7 +633,7 @@
     <string name="profile_no_content_published">Aucun contenu publié pour le moment</string>
     <string name="auth_confirm_title">Votre compte est créé ✓</string>
     <string name="auth_confirm_text">Nous avons envoyé un lien de confirmation à votre e-mail. Ouvrez-le puis touchez le bouton ci-dessous.</string>
-    <string name="auth_confirm_retry">J\'ai confirmé — connectez-moi</string>
+    <string name="auth_confirm_retry">J\'ai confirmé — aller à la connexion</string>
     <string name="auth_confirm_resend">Renvoyer le lien de confirmation</string>
     <string name="auth_confirm_resent">Lien de confirmation renvoyé ✓</string>
     <string name="auth_confirm_hint">Rien reçu ? Vérifiez aussi le dossier spam.</string>

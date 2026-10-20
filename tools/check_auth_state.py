@@ -12,8 +12,8 @@
      شاشة الدخول؛ زرّ الرجوع يعيده للرئيسية ولا يكرّر التحويل.
 
   2) **إنشاء حساب بتأكيد بريد**: `supabase/signup` لا يُرجع جلسة حين يكون
-     «Confirm email» مفعّلاً، فيبقى المستخدم خارج التطبيق. المعتمد الآن: بطاقة
-     تأكيد صريحة + «أكّدت بريدي — سجّلني» + «أعِد إرسال الرابط».
+     «Confirm email» مفعّلاً. المعتمد: بطاقة تأكيد + إعادة إرسال، ثم Login؛
+     لا تسجيل دخول تلقائي ولا معاملة رابط signup كرابط recovery.
 
   3) **خروج تلقائي غير مرغوب**: رفض توكن التحديث لا يمسح الجلسة محلياً؛
      لا يُسجَّل خروج صاحب الحساب إلا عند ضغطه على زر الخروج.
@@ -90,23 +90,58 @@ if not all(token in tab_router for token in (
 if "onLogin =" in profile_route or "onOpenSignup =" in profile_route:
     problems.append("ui/nav/AppNav.kt: صفحة الملف ما زالت تعتمد على شاشة الزائر")
 
-# 2) إنشاء حساب: معالجة تأكيد البريد
-signup = read("ui/auth/AuthScreens.kt")
+# 2) إنشاء حساب: معالجة تأكيد البريد ثم Login، بلا دخول تلقائي
+screens = read("ui/auth/AuthScreens.kt")
+login_start = screens.find("fun LoginScreen(")
+signup_start = screens.find("fun SignUpScreen(")
+confirm_screen_start = screens.find("private fun EmailConfirmationScreen(")
+login = screens[login_start:signup_start] if login_start >= 0 and signup_start > login_start else ""
+signup = screens[signup_start:confirm_screen_start] if signup_start >= 0 and confirm_screen_start > signup_start else ""
 if "pendingConfirm" not in signup:
     problems.append("ui/auth/AuthScreens.kt: لا معالجة لحالة «الحساب أُنشئ وينتظر تأكيد البريد»")
 for key in ("auth_confirm_retry", "auth_confirm_resend", "auth_confirm_hint"):
-    if key not in signup:
+    if key not in screens:
         problems.append(f"ui/auth/AuthScreens.kt: عنصر {key} مفقود من بطاقة التأكيد")
+if "container.auth.signIn(" in signup or "container.state.refreshAll()" in signup:
+    problems.append("ui/auth/AuthScreens.kt: عاد تسجيل الدخول التلقائي من شاشة إنشاء الحساب")
+if not all(token in signup for token in (
+    "clearEmailConfirmationSession()", "container.state.setSignedIn(false)", "onOpenLogin()",
+)):
+    problems.append("ui/auth/AuthScreens.kt: تأكيد/إنشاء الحساب لا ينتهي في Login بجلسة نظيفة")
+if not all(token in login for token in ("container.state.setSignedIn(true)", "onSuccess()")):
+    problems.append("ui/auth/AuthScreens.kt: نجاح الدخول لا يبلّغ الحالة/التنقّل")
+if "container.state.refreshAll()" in login:
+    problems.append("ui/auth/AuthScreens.kt: الانتقال بعد الدخول ما زال ينتظر تحميل الشبكة")
 
 repo = read("data/repo/AuthRepository.kt")
 if "fun resendConfirmation" not in repo:
     problems.append("data/repo/AuthRepository.kt: دالة resendConfirmation مفقودة")
-if "container.state.setSignedIn(true)" not in signup:
-    problems.append("ui/auth/AuthScreens.kt: الدخول لا يُبلّغ حالة التطبيق (setSignedIn)")
+if "fun clearEmailConfirmationSession" not in repo or "acceptEmailLink" not in repo:
+    problems.append("data/repo/AuthRepository.kt: فصل جلسة تأكيد البريد/نوع الرابط مفقود")
 
 client = read("data/SupabaseClient.kt")
 if '"resend"' not in client:
     problems.append("data/SupabaseClient.kt: نقطة إعادة إرسال رابط التأكيد (resend) مفقودة")
+if not all(token in client for token in (
+    "AuthEmailLinkKind", "RECOVERY", "SIGNUP_CONFIRMATION", "acceptEmailLink",
+    '"signup", "email", "email_confirmation"', "authPathWithRedirect(\"signup\"",
+)):
+    problems.append("data/SupabaseClient.kt: لا يوجد فصل كامل بين رابط signup ورابط recovery")
+if not all(token in nav for token in (
+    "AuthEmailLinkKind.RECOVERY", "Routes.RESET",
+    "AuthEmailLinkKind.SIGNUP_CONFIRMATION", "Routes.LOGIN",
+)):
+    problems.append("ui/nav/AppNav.kt: وجهتا رابط الاستعادة وتأكيد التسجيل غير منفصلتين")
+finish_start = nav.find("fun finishLogin()")
+finish_end = nav.find("\n    val density", finish_start)
+finish_login = nav[finish_start:finish_end] if finish_start >= 0 and finish_end > finish_start else ""
+if not all(token in finish_login for token in (
+    "navController.navigate(Routes.HOME)",
+    "popUpTo(Routes.HOME) { inclusive = true }",
+    "container.state.refreshAll()",
+    "container.assets.all()",
+)):
+    problems.append("ui/nav/AppNav.kt: نجاح Login لا يمسح مسار المصادقة إلى Home ويحدّث البيانات بالخلفية")
 
 # 3) لا خروج تلقائياً: المسح محصور بدالة الخروج الصريح
 refresh_start = client.find("suspend fun refreshSession()")
@@ -184,4 +219,5 @@ if problems:
     sys.exit(1)
 print("🟢 تبويب الملف يفتح الدخول مباشرةً لغير المسجّل · زرّ الرجوع للرئيسية · تغيير اللغة بلا إعادة إنشاء ·")
 print("   لا خروج تلقائياً عند تعذّر التجديد · مسح الجلسة محصور بالخروج الصريح ·")
-print("   الشاشات تُحدّث نفسها بعد الدخول · تأكيد البريد واضح · النصوص الثمانية مكتملة.")
+print("   Login ينتقل فوراً إلى Home ويحدّث بالخلفية · تأكيد التسجيل يفتح Login لا Reset ·")
+print("   النصوص الثمانية مكتملة.")

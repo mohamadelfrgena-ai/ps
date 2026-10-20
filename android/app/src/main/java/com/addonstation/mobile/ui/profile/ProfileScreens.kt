@@ -175,6 +175,7 @@ fun ProfileScreen(
 
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
+    val privateAssetUrls by container.state.privateAssetUrls.collectAsState()
     val wallet by container.state.wallet.collectAsState()
     val signedIn by container.state.signedIn.collectAsState()
     val profileLoadStatus by container.state.profileLoadStatus.collectAsState()
@@ -272,7 +273,7 @@ fun ProfileScreen(
         ) {
             // A · banner with back only.
             SpecProfileBanner(
-                bannerUrl = assetUrl(container, me.bannerUrl),
+                bannerUrl = assetUrl(container, me.bannerUrl, privateAssetUrls),
                 onBack = onBack,
             )
 
@@ -286,7 +287,7 @@ fun ProfileScreen(
                 Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
                     Box(Modifier.padding(start = Spec.screenPad)) {
                         SpecProfileAvatar(
-                            avatarUrl = assetUrl(container, me.avatarUrl),
+                            avatarUrl = assetUrl(container, me.avatarUrl, privateAssetUrls),
                             status = specStatusOf(me, isMe = true),
                             showHiddenDot = true,
                         )
@@ -1090,6 +1091,7 @@ fun UserProfileScreen(
 ) {
     val container = rememberContainer()
     val myProfile by container.state.profile.collectAsState()
+    val privateAssetUrls by container.state.privateAssetUrls.collectAsState()
     val isMyProfile = container.supabase.session()?.userId == userId
     val scope = rememberCoroutineScope()
     // كتم الأعضاء ميزة Legendary (والخادم يتحقق أيضاً — هذا للواجهة فقط)
@@ -1204,7 +1206,7 @@ fun UserProfileScreen(
 
         // ١) البانر: رجوع يسارًا · «المزيد» يمينًا (نفس أدوات بطاقة السلامة)
         SpecProfileBanner(
-            bannerUrl = assetUrl(container, me.bannerUrl),
+            bannerUrl = assetUrl(container, me.bannerUrl, privateAssetUrls),
             onBack = onBack,
             more = {
                 Box {
@@ -1251,7 +1253,7 @@ fun UserProfileScreen(
         ) {
             Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
                 Box(Modifier.padding(start = Spec.screenPad)) {
-                    SpecProfileAvatar(avatarUrl = assetUrl(container, me.avatarUrl), status = status)
+                    SpecProfileAvatar(avatarUrl = assetUrl(container, me.avatarUrl, privateAssetUrls), status = status)
                 }
             }
             if (isMyProfile) {
@@ -1630,6 +1632,7 @@ fun ProfileAsOthersScreen(
 ) {
     val container = rememberContainer()
     val profile by container.state.profile.collectAsState()
+    val privateAssetUrls by container.state.privateAssetUrls.collectAsState()
     var stats by remember { mutableStateOf<ProfileStats?>(null) }
 
     LaunchedEffect(profile?.id) {
@@ -1649,7 +1652,7 @@ fun ProfileAsOthersScreen(
         val status = specStatusOf(me, isMe = false)
 
         SpecProfileBanner(
-            bannerUrl = assetUrl(container, me.bannerUrl),
+            bannerUrl = assetUrl(container, me.bannerUrl, privateAssetUrls),
             onBack = onBack,
         )
 
@@ -1659,7 +1662,7 @@ fun ProfileAsOthersScreen(
         ) {
             Box(Modifier.offset(y = -(Spec.avatarOverlap / 2))) {
                 Box(Modifier.padding(start = Spec.screenPad)) {
-                    SpecProfileAvatar(avatarUrl = assetUrl(container, me.avatarUrl), status = status)
+                    SpecProfileAvatar(avatarUrl = assetUrl(container, me.avatarUrl, privateAssetUrls), status = status)
                 }
             }
             SpecFillButton(
