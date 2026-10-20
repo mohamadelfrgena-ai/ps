@@ -301,6 +301,7 @@ fun SettingsScreen(
                 profile = profile,
                 signedIn = signedIn,
                 container = container,
+                privateAssetUrls = privateAssetUrls,
                 onClick = onOpenProfile,
             )
             if (signedIn) {
@@ -873,6 +874,7 @@ private fun SettingsProfileCard(
     profile: Profile?,
     signedIn: Boolean,
     container: AppContainer,
+    privateAssetUrls: Map<String, String>,
     onClick: () -> Unit,
 ) {
     Column(
