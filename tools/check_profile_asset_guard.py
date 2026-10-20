@@ -115,8 +115,9 @@ def main() -> None:
     require("parts.drop(1)" not in supabase_config,
             "repeated real storage folders are being collapsed again")
     for token in (
-        "val previewAvatarUrl = assetUrl(container, selectedAvatar)",
-        "val previewBannerUrl = assetUrl(container, selectedBanner)",
+        "val privateAssetUrls by container.state.privateAssetUrls.collectAsState()",
+        "val previewAvatarUrl = assetUrl(container, selectedAvatar, privateAssetUrls)",
+        "val previewBannerUrl = assetUrl(container, selectedBanner, privateAssetUrls)",
         "avatarUrl = previewAvatarUrl",
         "bannerUrl = previewBannerUrl",
     ):
