@@ -347,7 +347,16 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace
+          set +e
+          ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace 2>&1 | tee kotlin-check.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            grep -n -E "^e: |error: |What went wrong|> Task .* FAILED|Execution failed|Unresolved reference|Argument type mismatch" kotlin-check.log \
+              | head -70 | while IFS= read -r line; do
+                echo "::error title=Kotlin compile::$line"
+              done
+            exit "$code"
+          fi
 
   # ==========================================================================
   # 1) بناء التطبيق (debug APK)
