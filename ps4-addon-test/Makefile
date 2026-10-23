@@ -1,7 +1,7 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
-# AddonStation PS4 Mini-App — v0.22 test build (UI v2 redesign)
-VERSION     := 0.22
+# AddonStation PS4 — v0.23 (UI v7.3 final)
+VERSION     := 0.23
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
@@ -35,6 +35,7 @@ OO_SDL_SAMPLE := $(TOOLCHAIN)/samples/SDL2
 PKG_FILES   := eboot.bin \
                sce_sys/param.sfo \
                sce_sys/icon0.png \
+               sce_sys/pic1.png \
                sce_sys/about/right.sprx \
                sce_module/libc.prx \
                sce_module/libSceFios2.prx \
@@ -42,7 +43,8 @@ PKG_FILES   := eboot.bin \
 
 OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/http_download.o \
                $(OBJ_DIR)/supabase_client.o \
-               $(OBJ_DIR)/ime_dialog.o $(OBJ_DIR)/ui_engine.o $(OBJ_DIR)/screens.o $(OBJ_DIR)/jbc.o
+               $(OBJ_DIR)/ime_dialog.o $(OBJ_DIR)/ui_engine.o $(OBJ_DIR)/screens.o \
+               $(OBJ_DIR)/ui_audio.o $(OBJ_DIR)/jbc.o
 
 LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut \
                -lScePad -lSceSysmodule -lSDL2 -lSceNet -lSceSsl -lSceHttp -lSceImeDialog
@@ -78,6 +80,9 @@ $(OBJ_DIR)/installer.o: src/installer.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/ui_engine.o: src/ui_engine.cpp | $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/ui_audio.o: src/ui_audio.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/screens.o: src/screens.cpp | $(OBJ_DIR)
@@ -127,9 +132,10 @@ prepare-runtime: check-toolchain
 	  cp "$$sample/sce_module/libc.prx" sce_module/libc.prx; \
 	  cp "$$sample/sce_module/libSceFios2.prx" sce_module/libSceFios2.prx; \
 	  cp "$$sample/sce_sys/about/right.sprx" sce_sys/about/right.sprx; \
-	  cp "../ps4/sce_sys/icon0.png" sce_sys/icon0.png
+	  cp "assets/ps4/icon0.png" sce_sys/icon0.png; \
+	  cp "assets/ps4/pic1.png" sce_sys/pic1.png
 
-assets/ui.pak: tools/build_ui_pak.py assets/font_cjk.ttf
+assets/ui.pak: tools/build_ui_pak.py $(wildcard assets/v73/*)
 	python3 tools/build_ui_pak.py assets/ui.pak
 
 $(PKG_FILE): eboot.bin sce_sys/param.sfo assets/ui.pak | prepare-runtime

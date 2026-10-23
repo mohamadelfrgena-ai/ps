@@ -137,6 +137,13 @@ const ArabicLetterForms* findArabicForm(std::uint32_t cp) {
     return nullptr;
 }
 
+// v6.1: the Arabic font (Cairo) has very tall ascent/descent (1.87 em), so stbtt_ScaleForPixelHeight would draw
+// it ~40% smaller than the Latin text. Arabic is sized by its em instead: pxSize -> em of pxSize * kArabicEm.
+constexpr float kArabicEm = 0.94f;
+constexpr float kArabicTop = 850.0f, kArabicBottom = 470.0f;   // fixed Arabic line box (font units)
+float arabicScale(const stbtt_fontinfo* f, int pxSize) {
+    return stbtt_ScaleForMappingEmToPixels(f, static_cast<float>(pxSize) * kArabicEm);
+}
 bool isArabicDiacritic(std::uint32_t cp) {
     return (cp >= 0x064B && cp <= 0x065F) || cp == 0x0670;
 }
@@ -348,17 +355,8 @@ bool UiEngine::init(const std::string& pakPath) {
             fonts_->cjkBuf = std::move(data);
             fonts_->cjkValid = stbtt_InitFont(&fonts_->cjkInfo, fonts_->cjkBuf.data(), 0) != 0;
         } else {
-            int w = 0, h = 0, comp = 0;
-            unsigned char* pixels = stbi_load_from_memory(
-                data.data(), static_cast<int>(data.size()), &w, &h, &comp, 4);
-            if (pixels) {
-                ImageData img;
-                img.w = w;
-                img.h = h;
-                img.rgba.assign(pixels, pixels + static_cast<std::size_t>(w) * h * 4);
-                images_[name] = std::move(img);
-                stbi_image_free(pixels);
-            }
+            // v5: keep the compressed bytes; decode on first draw (fast start-up, unused art never uses RAM)
+            packed_[name] = std::move(data);
         }
     }
     std::fclose(fp);
@@ -472,21 +470,36 @@ void UiEngine::fillGradV(int x, int y, int w, int h, SDL_Color top, SDL_Color bo
     }
 }
 
+// v7.0: signed distance to a rounded-rect boundary (negative inside) — used for AA edge coverage
+static inline float rr_dist_sdf(int px, int py, int x, int y, int w, int h, int r) {
+    const float cx = x + w * 0.5f, cy = y + h * 0.5f;
+    const float dx = std::fabs(px - cx) - (w * 0.5f - r), dy = std::fabs(py - cy) - (h * 0.5f - r);
+    const float ax = std::max(dx, 0.0f), ay = std::max(dy, 0.0f);
+    return std::sqrt(ax * ax + ay * ay) + std::min(std::max(dx, dy), 0.0f) - r;
+}
 void UiEngine::drawRoundRect(int x, int y, int w, int h, int radius, SDL_Color c) {
-    if (w <= 0 || h <= 0) return;
+    if (w <= 0 || h <= 0 || c.a == 0) return;
     const int r = std::max(0, std::min({radius, w / 2, h / 2}));
-    if (r <= 1) {
-        fillRect(x, y, w, h, c);
-        return;
-    }
+    if (r <= 1) { fillRect(x, y, w, h, c); return; }
+    // v7.0 AA: straight fills for the body (pixel-perfect), SDF coverage in the 4 corner boxes only.
     fillRect(x, y + r, w, h - 2 * r, c);
+    fillRect(x + r, y, w - 2 * r, r, c);
+    fillRect(x + r, y + h - r, w - 2 * r, r, c);
     for (int dy = 0; dy < r; ++dy) {
-        const float yf = static_cast<float>(r - dy) - 0.5f;
-        const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(r * r) - yf * yf)));
-        blendRow(x + r - dx, x + w - (r - dx), y + dy, c.r, c.g, c.b, c.a);
-        blendRow(x + r - dx, x + w - (r - dx), y + h - 1 - dy, c.r, c.g, c.b, c.a);
+        for (int dx = 0; dx < r; ++dx) {
+            const float d = rr_dist_sdf(x + dx, y + dy, x, y, w, h, r);
+            float cov = 0.5f - d;
+            if (cov <= 0.0f) continue;
+            if (cov > 1.0f) cov = 1.0f;
+            const Uint8 a = static_cast<Uint8>(cov * c.a + 0.5f);
+            blendPx(x + dx, y + dy, c.r, c.g, c.b, a);
+            blendPx(x + w - 1 - dx, y + dy, c.r, c.g, c.b, a);
+            blendPx(x + dx, y + h - 1 - dy, c.r, c.g, c.b, a);
+            blendPx(x + w - 1 - dx, y + h - 1 - dy, c.r, c.g, c.b, a);
+        }
     }
 }
+
 
 void UiEngine::drawRoundGradH(int x, int y, int w, int h, int radius, SDL_Color left, SDL_Color right) {
     if (w <= 0 || h <= 0) return;
@@ -497,65 +510,64 @@ void UiEngine::drawRoundGradH(int x, int y, int w, int h, int radius, SDL_Color 
         const Uint8 cg = clamp8(static_cast<int>(left.g + (right.g - left.g) * t));
         const Uint8 cb = clamp8(static_cast<int>(left.b + (right.b - left.b) * t));
         const Uint8 ca = clamp8(static_cast<int>(left.a + (right.a - left.a) * t));
-        int dyInset = 0;
-        if (col < r) {
-            const float xf = static_cast<float>(r - col) - 0.5f;
-            const int dy = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(r * r) - xf * xf)));
-            dyInset = r - dy;
-        } else if (col >= w - r) {
-            const float xf = static_cast<float>(col - (w - r)) + 0.5f;
-            const int dy = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(r * r) - xf * xf)));
-            dyInset = r - dy;
-        }
-        for (int dy = dyInset; dy < h - dyInset; ++dy) {
-            blendPx(x + col, y + dy, cr, cg, cb, ca);
+        if (ca == 0) continue;
+        if (col >= r && col < w - r) {
+            for (int dy = 0; dy < h; ++dy) blendPx(x + col, y + dy, cr, cg, cb, ca);
+        } else {
+            for (int dy = r; dy < h - r; ++dy) blendPx(x + col, y + dy, cr, cg, cb, ca);   // fully inside between the corner zones
+            for (int dy = 0; dy < r; ++dy) {
+                float cov = 0.5f - rr_dist_sdf(x + col, y + dy, x, y, w, h, r);
+                if (cov <= 0.0f) continue;
+                if (cov > 1.0f) cov = 1.0f;
+                blendPx(x + col, y + dy, cr, cg, cb, static_cast<Uint8>(cov * ca + 0.5f));
+                cov = 0.5f - rr_dist_sdf(x + col, y + h - 1 - dy, x, y, w, h, r);
+                if (cov <= 0.0f) continue;
+                if (cov > 1.0f) cov = 1.0f;
+                blendPx(x + col, y + h - 1 - dy, cr, cg, cb, static_cast<Uint8>(cov * ca + 0.5f));
+            }
         }
     }
 }
+
 
 void UiEngine::drawRoundBorder(int x, int y, int w, int h, int radius, int thickness, SDL_Color c) {
-    if (w <= 0 || h <= 0 || thickness <= 0) return;
+    if (w <= 0 || h <= 0 || thickness <= 0 || c.a == 0) return;
     const int rOut = std::max(0, std::min({radius, w / 2, h / 2}));
     const int rIn = std::max(0, rOut - thickness);
-
-    for (int dy = 0; dy < h; ++dy) {
-        int outLeft = x;
-        int outRight = x + w;
-        if (dy < rOut) {
-            const float yf = static_cast<float>(rOut - dy) - 0.5f;
-            const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(rOut * rOut) - yf * yf)));
-            outLeft = x + rOut - dx;
-            outRight = x + w - (rOut - dx);
-        } else if (dy >= h - rOut) {
-            const float yf = static_cast<float>(dy - (h - rOut)) + 0.5f;
-            const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(rOut * rOut) - yf * yf)));
-            outLeft = x + rOut - dx;
-            outRight = x + w - (rOut - dx);
-        }
-
-        if (dy < thickness || dy >= h - thickness) {
-            blendRow(outLeft, outRight, y + dy, c.r, c.g, c.b, c.a);
+    const int t = thickness;
+    // v7.0 AA: straight stroke bands (exact), SDF dual-arc coverage only in the 4 corner boxes.
+    for (int dy = rOut; dy < h - rOut; ++dy) {
+        if (dy < t || dy >= h - t) {
+            blendRow(x, x + w, y + dy, c.r, c.g, c.b, c.a);
         } else {
-            int inLeft = x + thickness;
-            int inRight = x + w - thickness;
-            const int inDy = dy - thickness;
-            const int inH = h - 2 * thickness;
-            if (rIn > 0 && inDy < rIn) {
-                const float yf = static_cast<float>(rIn - inDy) - 0.5f;
-                const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(rIn * rIn) - yf * yf)));
-                inLeft = x + thickness + rIn - dx;
-                inRight = x + w - thickness - (rIn - dx);
-            } else if (rIn > 0 && inDy >= inH - rIn) {
-                const float yf = static_cast<float>(inDy - (inH - rIn)) + 0.5f;
-                const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(rIn * rIn) - yf * yf)));
-                inLeft = x + thickness + rIn - dx;
-                inRight = x + w - thickness - (rIn - dx);
-            }
-            blendRow(outLeft, inLeft, y + dy, c.r, c.g, c.b, c.a);
-            blendRow(inRight, outRight, y + dy, c.r, c.g, c.b, c.a);
+            blendRow(x, x + t, y + dy, c.r, c.g, c.b, c.a);
+            blendRow(x + w - t, x + w, y + dy, c.r, c.g, c.b, c.a);
+        }
+    }
+    for (int dy = 0; dy < t; ++dy) {
+        if (dy < rOut) blendRow(x + rOut, x + w - rOut, y + dy, c.r, c.g, c.b, c.a);
+        else blendRow(x, x + w, y + dy, c.r, c.g, c.b, c.a);
+    }
+    for (int dy = h - t; dy < h; ++dy) {
+        if (dy >= h - rOut) blendRow(x + rOut, x + w - rOut, y + dy, c.r, c.g, c.b, c.a);
+        else blendRow(x, x + w, y + dy, c.r, c.g, c.b, c.a);
+    }
+    for (int dy = 0; dy < rOut; ++dy) {
+        for (int dx = 0; dx < rOut; ++dx) {
+            const float dO = rr_dist_sdf(x + dx, y + dy, x, y, w, h, rOut);
+            const float dI = rr_dist_sdf(x + dx, y + dy, x + t, y + t, w - 2 * t, h - 2 * t, rIn);
+            float cov = std::min(0.5f - dO, 0.5f + dI);
+            if (cov <= 0.0f) continue;
+            if (cov > 1.0f) cov = 1.0f;
+            const Uint8 a = static_cast<Uint8>(cov * c.a + 0.5f);
+            blendPx(x + dx, y + dy, c.r, c.g, c.b, a);
+            blendPx(x + w - 1 - dx, y + dy, c.r, c.g, c.b, a);
+            blendPx(x + dx, y + h - 1 - dy, c.r, c.g, c.b, a);
+            blendPx(x + w - 1 - dx, y + h - 1 - dy, c.r, c.g, c.b, a);
         }
     }
 }
+
 
 void UiEngine::drawFocusRing(int x, int y, int w, int h, int radius) {
     drawRoundBorder(x - 12, y - 12, w + 24, h + 24, radius + 12, 8, SDL_Color{46, 123, 239, 88});
@@ -569,27 +581,30 @@ void UiEngine::drawCircle(int cx, int cy, int radius, SDL_Color c) {
 void UiEngine::drawRoundGradV(int x, int y, int w, int h, int radius, SDL_Color top, SDL_Color bottom) {
     if (w <= 0 || h <= 0) return;
     const int r = std::max(0, std::min({radius, w / 2, h / 2}));
-    for (int row = 0; row < h; ++row) {
-        const float t = static_cast<float>(row) / static_cast<float>(std::max(1, h - 1));
+    for (int dy = 0; dy < h; ++dy) {
+        const float t = static_cast<float>(dy) / static_cast<float>(std::max(1, h - 1));
         const Uint8 cr = clamp8(static_cast<int>(top.r + (bottom.r - top.r) * t));
         const Uint8 cg = clamp8(static_cast<int>(top.g + (bottom.g - top.g) * t));
         const Uint8 cb = clamp8(static_cast<int>(top.b + (bottom.b - top.b) * t));
         const Uint8 ca = clamp8(static_cast<int>(top.a + (bottom.a - top.a) * t));
-        int xr0 = 0, xr1 = w;
-        if (r > 1) {
-            if (row < r) {
-                const float yf = static_cast<float>(r - row) - 0.5f;
-                const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(r * r) - yf * yf)));
-                xr0 = r - dx; xr1 = w - (r - dx);
-            } else if (row >= h - r) {
-                const float yf = static_cast<float>(row - (h - r)) + 0.5f;
-                const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(r * r) - yf * yf)));
-                xr0 = r - dx; xr1 = w - (r - dx);
+        if (ca == 0) continue;
+        if (dy >= r && dy < h - r) {
+            blendRow(x, x + w, y + dy, cr, cg, cb, ca);
+        } else {
+            for (int dx = r; dx < w - r; ++dx) blendPx(x + dx, y + dy, cr, cg, cb, ca);
+            for (int dx = 0; dx < r; ++dx) {
+                const float d = rr_dist_sdf(x + dx, y + dy, x, y, w, h, r);
+                float cov = 0.5f - d;
+                if (cov <= 0.0f) continue;
+                if (cov > 1.0f) cov = 1.0f;
+                const Uint8 a = static_cast<Uint8>(cov * ca + 0.5f);
+                blendPx(x + dx, y + dy, cr, cg, cb, a);
+                blendPx(x + w - 1 - dx, y + dy, cr, cg, cb, a);
             }
         }
-        blendRow(x + xr0, x + xr1, y + row, cr, cg, cb, ca);
     }
 }
+
 
 void UiEngine::drawRoundGradD(int x, int y, int w, int h, int radius, SDL_Color c0, SDL_Color c1) {
     // 135deg diagonal gradient (design: .pb.pri linear-gradient(135deg,#2E7BEF,#4C9AFF))
@@ -621,28 +636,87 @@ void UiEngine::drawRoundGradD(int x, int y, int w, int h, int radius, SDL_Color 
 }
 
 void UiEngine::dropShadow(int x, int y, int w, int h, int radius, int blur, Uint8 alpha) {
-    // Concentric BORDER rings only (perimeter cost) — soft falloff, ~30x cheaper
-    // than filling layered rects, and visually equivalent at these alphas.
-    if (w <= 0 || h <= 0) return;
-    const int rings = std::max(1, std::min(blur / 3, 5));
-    for (int i = rings; i >= 1; --i) {
-        const int grow = 2 + (blur * i) / rings;
-        const int a = static_cast<int>(alpha) * (rings - i + 1) / (rings * 3);
-        if (a <= 0) continue;
-        drawRoundBorder(x - grow, y + grow / 3, w + 2 * grow, h + 2 * grow,
-                        radius + grow, std::max(3, grow / 2),
-                        SDL_Color{0, 0, 0, static_cast<Uint8>(a)});
+    // v6.6: smooth single-layer shadow (no stacked rings -> no "ghost" outlines under boxes).
+    if (w <= 0 || h <= 0 || alpha == 0) return;
+    const int b = std::max(2, blur);                 // outer falloff
+    const int s = std::max(1, b / 2);                // inner softness (starts under the box edge)
+    const int off = std::max(1, b / 3);              // small drop; off <= s so no hard band appears below the box
+    const float r = static_cast<float>(std::max(0, std::min(radius, std::min(w, h) / 2)));
+    const float hw = w * 0.5f, hh = h * 0.5f, cx = x + hw, cy = y + off + hh;
+    // (fb_ is written directly: this runs for every card / button each frame)
+    const float peak = alpha * 0.55f;
+    const int n = (b + s) * 4 + 1;
+    Uint8 lut[1024];
+    const int nn = std::min(n, 1024);
+    for (int i = 0; i < nn; ++i) {
+        const float t = static_cast<float>(i) / static_cast<float>(nn - 1);   // 0 at d=-s, 1 at d=b
+        const float k = (1.0f - t) * (1.0f - t);
+        lut[i] = static_cast<Uint8>(std::lround(peak * k));
     }
-    // tight dark edge (contact shadow)
-    drawRoundBorder(x - 1, y + 1, w + 2, h + 2, radius + 1, 2,
-                    SDL_Color{0, 0, 0, static_cast<Uint8>(alpha / 2)});
+    const int rr = static_cast<int>(r);
+    const float kIdx = static_cast<float>(nn - 1) / static_cast<float>(b + s);
+    auto alphaAt = [&](float d) -> Uint8 {
+        const int idx = static_cast<int>((d + s) * kIdx);
+        return idx >= nn ? 0 : (idx <= 0 ? lut[0] : lut[idx]);
+    };
+    auto darken = [](std::uint32_t& c, int a) {      // black over c with alpha a
+        const int ia = 256 - a - (a >> 7);
+        const std::uint32_t rr2 = (((c >> 16) & 0xFF) * ia) >> 8, gg = (((c >> 8) & 0xFF) * ia) >> 8, bb = ((c & 0xFF) * ia) >> 8;
+        c = (255u << 24) | (rr2 << 16) | (gg << 8) | bb;
+    };
+    auto sdf = [&](float fx, float fy) {
+        return (fx > 0.0f && fy > 0.0f ? std::sqrt(fx * fx + fy * fy) : std::max(fx, fy)) - r;
+    };
+    // straight middle columns: |px + 0.5 - cx| <= hw - r  ->  [mA, mB)
+    const int mA = static_cast<int>(std::ceil(cx - (hw - r) - 0.5f)), mB = static_cast<int>(std::floor(cx + (hw - r) - 0.5f)) + 1;
+    auto span = [&](int py, int xa, int xb, bool inner) {
+        xa = std::max(xa, 0); xb = std::min(xb, kWidth);
+        if (xa >= xb) return;
+        std::uint32_t* row = &fb_[static_cast<std::size_t>(py) * kWidth];
+        const float fy = std::fabs(py + 0.5f - cy) - (hh - r);          // shadow shape (shifted down by off)
+        const float gy = std::fabs(py + 0.5f - (cy - off)) - (hh - r);  // the box itself
+        auto pix = [&](int px) {
+            const float fx = std::fabs(px + 0.5f - cx) - (hw - r);
+            const float d = sdf(fx, fy);
+            if (!inner && (d < 0.0f || sdf(fx, gy) < 0.0f)) return;    // inside: the box covers it
+            const Uint8 a = alphaAt(d);
+            if (a) darken(row[px], a);
+        };
+        int ma = xb, mb = xb;
+        if (fy > 0.0f) { ma = std::max(mA, xa); mb = std::min(mB, xb); if (ma > mb) ma = mb = xb; }
+        for (int px = xa; px < std::min(ma, xb); ++px) pix(px);
+        if (ma < mb) {   // constant alpha along the straight top / bottom edge
+            const float d = fy - r;
+            const bool skip = !inner && (d < 0.0f || gy - r < 0.0f);
+            const Uint8 a = skip ? 0 : alphaAt(d);
+            if (a) for (int px = ma; px < mb; ++px) darken(row[px], a);
+        }
+        for (int px = std::max(mb, xa); px < xb; ++px) pix(px);
+    };
+    const int y0 = std::max(0, y + off - b), y1 = std::min(kHeight, y + off + h + b);
+    // Callers pass the shadow rect a few px (<= 12) below the box, so the bottom rows of the rect are NOT covered
+    // by the box: compute them fully (otherwise a light strip shows under the box).
+    const int bot = std::max(rr, 16);
+    for (int py = y0; py < y1; ++py) {
+        if (py >= y + h - bot) {                          // bottom of the rect + below it: full row
+            span(py, x - b, x + w + b, true);
+        } else if (py >= y + rr) {                        // straight sides: only the left / right bands
+            span(py, x - b, x, false);
+            span(py, x + w, x + w + b, false);
+        } else if (py >= y && py < y + h) {             // rows through the box corners
+            span(py, x - b, x + rr, false);
+            span(py, x + w - rr, x + w + b, false);
+        } else {                                         // above the box: full row
+            span(py, x - b, x + w + b, false);
+        }
+    }
 }
 
 void UiEngine::drawImageRounded(const std::string& name, int x, int y, int w, int h,
                                 int radius, Uint8 alpha) {
-    auto it = images_.find(name);
-    if (it == images_.end() || it->second.w <= 0 || it->second.h <= 0) return;
-    const ImageData& img = it->second;
+    const ImageData* ip = findImage(name);
+    if (!ip || (*ip).w <= 0 || (*ip).h <= 0) return;
+    const ImageData& img = (*ip);
     // COVER crop (fills the box, centered) like CSS background-size:cover
     const float scale = std::max(static_cast<float>(w) / img.w, static_cast<float>(h) / img.h);
     const int sw = std::max(1, static_cast<int>(w / scale));
@@ -655,9 +729,9 @@ void UiEngine::drawImageRounded(const std::string& name, int x, int y, int w, in
 void UiEngine::drawImageRotated(const std::string& name, int cx, int cy, int w, int h,
                                 float angleDeg, Uint8 alpha) {
     if (w <= 0 || h <= 0) return;
-    auto it = images_.find(name);
-    if (it == images_.end()) return;
-    const ImageData& img = it->second;
+    const ImageData* ip = findImage(name);
+    if (!ip) return;
+    const ImageData& img = (*ip);
     if (img.w <= 0 || img.h <= 0) return;
 
     const float ang = angleDeg * 3.14159265f / 180.0f;
@@ -821,9 +895,9 @@ void UiEngine::drawImageCropped(const std::string& name,
                                 int sx0, int sy0, int sw, int sh,
                                 int x, int y, int w, int h,
                                 Uint8 alpha, int radius) {
-    auto it = images_.find(name);
-    if (it == images_.end() || w <= 0 || h <= 0 || sw <= 0 || sh <= 0) return;
-    const ImageData& img = it->second;
+    const ImageData* ip = findImage(name);
+    if (!ip || w <= 0 || h <= 0 || sw <= 0 || sh <= 0) return;
+    const ImageData& img = (*ip);
 
     // Cache key: source crop + target size (zoom is quantized by the caller)
     const std::string key = name + "|" + std::to_string(sx0) + "," + std::to_string(sy0) +
@@ -831,7 +905,7 @@ void UiEngine::drawImageCropped(const std::string& name,
                             "|" + std::to_string(w) + "x" + std::to_string(h);
     auto sc = scaledCache_.find(key);
     if (sc == scaledCache_.end()) {
-        if (scaledCache_.size() > 160) scaledCache_.clear();
+        trimScaled(static_cast<std::size_t>(w) * h * 4);
         ScaledImage built;
         built.w = w;
         built.h = h;
@@ -911,8 +985,12 @@ void UiEngine::drawImageCropped(const std::string& name,
             }
         }
         }
+        built.opaque = true;
+        for (const std::uint32_t p : built.px) if ((p >> 24) != 255u) { built.opaque = false; break; }
+        scaledBytes_ += built.px.size() * 4;
         sc = scaledCache_.emplace(key, std::move(built)).first;
     }
+    sc->second.used = ++tick_;
 
     // Span blit with alpha (integer math, no function calls)
     const ScaledImage& scaled = sc->second;
@@ -923,6 +1001,15 @@ void UiEngine::drawImageCropped(const std::string& name,
     // Rounded-corner mask (anti-aliased). Before this fix the `radius`
     // argument was accepted but never applied, so every cover/avatar was square.
     const int rr = std::max(0, std::min(radius, std::min(w, h) / 2));
+    // v5 fast path: opaque, square, full alpha -> straight row copies (backgrounds, baked layers)
+    if (scaled.opaque && rr == 0 && alpha == 255) {
+        if (x1d > x0d)
+            for (int dy = y0d; dy < y1d; ++dy)
+                std::memcpy(&fb_[static_cast<std::size_t>(dy) * kWidth + x0d],
+                            &scaled.px[static_cast<std::size_t>(dy - y) * scaled.w + (x0d - x)],
+                            static_cast<std::size_t>(x1d - x0d) * 4);
+        return;
+    }
     for (int dy = y0d; dy < y1d; ++dy) {
         const std::uint32_t* srow = &scaled.px[static_cast<std::size_t>(dy - y) * scaled.w];
         std::uint32_t* drow = &fb_[static_cast<std::size_t>(dy) * kWidth];
@@ -970,17 +1057,17 @@ void UiEngine::drawImageCropped(const std::string& name,
 }
 
 bool UiEngine::imageSize(const std::string& name, int& w, int& h) const {
-    const auto it = images_.find(name);
-    if (it == images_.end()) return false;
-    w = it->second.w;
-    h = it->second.h;
+    const ImageData* ip = const_cast<UiEngine*>(this)->findImage(name);
+    if (!ip) return false;
+    w = (*ip).w;
+    h = (*ip).h;
     return w > 0 && h > 0;
 }
 
 void UiEngine::drawImage(const std::string& name, int x, int y, int w, int h, Uint8 alpha) {
-    auto it = images_.find(name);
-    if (it == images_.end() || w <= 0 || h <= 0) return;
-    const ImageData& img = it->second;
+    const ImageData* ip = findImage(name);
+    if (!ip || w <= 0 || h <= 0) return;
+    const ImageData& img = (*ip);
     if (img.w <= 0 || img.h <= 0) return;
 
     const float dstRatio = static_cast<float>(w) / static_cast<float>(h);
@@ -997,9 +1084,9 @@ void UiEngine::drawImage(const std::string& name, int x, int y, int w, int h, Ui
 }
 
 void UiEngine::drawImageZoomed(const std::string& name, int x, int y, int w, int h, float zoom, Uint8 alpha) {
-    auto it = images_.find(name);
-    if (it == images_.end() || w <= 0 || h <= 0) return;
-    const ImageData& img = it->second;
+    const ImageData* ip = findImage(name);
+    if (!ip || w <= 0 || h <= 0) return;
+    const ImageData& img = (*ip);
 
     // quantize zoom to 1/20 steps so the animated background reuses cached scales
     const float zq = std::round(std::max(1.0f, zoom) * 20.0f) / 20.0f;
@@ -1063,6 +1150,9 @@ const UiEngine::TextBitmap& UiEngine::buildFallbackText(const std::string& utf8,
     const std::string key = "fb:" + std::to_string(pxSize) + ":" + utf8;
     auto it = textCache_.find(key);
     if (it != textCache_.end()) return it->second;
+    bmp.baseline = bmp.h;
+    measureInk(bmp);
+    bmp.used = ++tick_;
     auto res = textCache_.emplace(key, std::move(bmp));
     return res.first->second;
 }
@@ -1077,11 +1167,9 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
     const std::string key = std::to_string(static_cast<int>(role)) + ":" +
                             std::to_string(pxSize) + ":" + (isArabicLang ? "1:" : "0:") + utf8;
     auto it = textCache_.find(key);
-    if (it != textCache_.end()) return it->second;
+    if (it != textCache_.end()) { it->second.used = ++tick_; return it->second; }
 
-    if (textCache_.size() > 600) {
-        textCache_.clear();
-    }
+    if (textCache_.size() > 600) trimText();   // v5: drop the least-recently-used half only
 
     if (!fontsLoaded_) {
         return buildFallbackText(utf8, pxSize);
@@ -1098,7 +1186,8 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
         primaryFont = &fonts_->f77Info;
     }
 
-    const float scalePrimary = stbtt_ScaleForPixelHeight(primaryFont, static_cast<float>(pxSize));
+    const float scalePrimary = primaryFont == &fonts_->arInfo ? arabicScale(&fonts_->arInfo, pxSize)
+                                                              : stbtt_ScaleForPixelHeight(primaryFont, static_cast<float>(pxSize));
     int ascent = 0, descent = 0, lineGap = 0;
     stbtt_GetFontVMetrics(primaryFont, &ascent, &descent, &lineGap);
 
@@ -1112,7 +1201,7 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
             return &fonts_->bodyInfo;
         }
         if (stbtt_FindGlyphIndex(&fonts_->arInfo, static_cast<int>(cp)) != 0) {
-            outScale = stbtt_ScaleForPixelHeight(&fonts_->arInfo, static_cast<float>(pxSize));
+            outScale = arabicScale(&fonts_->arInfo, pxSize);
             return &fonts_->arInfo;
         }
         if (fonts_->cjkValid && stbtt_FindGlyphIndex(&fonts_->cjkInfo, static_cast<int>(cp)) != 0) {
@@ -1143,6 +1232,12 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
             penX += sc * stbtt_GetCodepointKernAdvance(
                              fn, static_cast<int>(cps[i]), static_cast<int>(cps[i + 1]));
         }
+    }
+    if (primaryFont == &fonts_->arInfo && !firstBox) {
+        // Same top/bottom for every Arabic string at a given size, so words line up in rows and labels don't jump
+        // depending on which letters they contain (units of Cairo's 1000-unit em: theh dots top / yeh tail bottom).
+        minY = std::min(minY, -static_cast<int>(std::ceil(kArabicTop * scalePrimary)));
+        maxY = std::max(maxY, static_cast<int>(std::ceil(kArabicBottom * scalePrimary)));
     }
     const int surfW = std::max(4, static_cast<int>(std::ceil(penX)) + 6);
     const int kPadTop = 3;
@@ -1214,6 +1309,10 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
         }
     }
 
+    bmp.baseline = baseline;
+    bmp.arabic = (primaryFont == &fonts_->arInfo);
+    measureInk(bmp);
+    bmp.used = ++tick_;
     auto res = textCache_.emplace(key, std::move(bmp));
     return res.first->second;
 }
@@ -1255,6 +1354,35 @@ int UiEngine::drawText(const std::string& utf8,
     return drawW;
 }
 
+// v6.4: ink bounding box of a text bitmap (computed once per cached string)
+void UiEngine::measureInk(TextBitmap& b) {
+    b.inkX0 = b.w; b.inkX1 = -1; b.inkY0 = b.h; b.inkY1 = -1;
+    for (int y = 0; y < b.h; ++y) {
+        const std::uint32_t* row = b.px.data() + static_cast<std::size_t>(y) * b.w;
+        for (int x = 0; x < b.w; ++x) {
+            if ((row[x] >> 24) < 40) continue;              // ignore faint anti-aliasing fringe
+            if (x < b.inkX0) b.inkX0 = x;
+            if (x > b.inkX1) b.inkX1 = x;
+            if (y < b.inkY0) b.inkY0 = y;
+            if (y > b.inkY1) b.inkY1 = y;
+        }
+    }
+}
+
+// v6.7
+int UiEngine::inkWidth(const std::string& utf8, int pxSize, FontRole role, bool isArabicLang) {
+    if (utf8.empty()) return 0;
+    const TextBitmap& bmp = getOrBuildText(utf8, pxSize, role, isArabicLang);
+    if (bmp.inkX1 < bmp.inkX0) return bmp.w;
+    return bmp.inkX1 - bmp.inkX0 + 1;
+}
+int UiEngine::inkCapHeight(const std::string& utf8, int pxSize, FontRole role, bool isArabicLang) {
+    if (utf8.empty()) return 0;
+    const TextBitmap& bmp = getOrBuildText(utf8, pxSize, role, isArabicLang);
+    if (bmp.inkY1 < bmp.inkY0) return pxSize;
+    return std::max(1, std::min(bmp.inkY1 + 1, bmp.baseline) - bmp.inkY0);
+}
+
 int UiEngine::drawTextCentered(const std::string& utf8,
                                int cx,
                                int cy,
@@ -1264,7 +1392,159 @@ int UiEngine::drawTextCentered(const std::string& utf8,
                                bool isArabicLang) {
     const TextBitmap& bmp = getOrBuildText(utf8, pxSize, role, isArabicLang);
     if (bmp.w <= 0 || bmp.h <= 0) return 0;
-    return drawText(utf8, cx - bmp.w / 2, cy - bmp.h / 2, pxSize, color, role, false, isArabicLang);
+    if (bmp.inkX1 < bmp.inkX0) return drawText(utf8, cx - bmp.w / 2, cy - bmp.h / 2, pxSize, color, role, false, isArabicLang);
+    const int x = cx - (bmp.inkX0 + bmp.inkX1 + 1) / 2;
+    int y;
+    if (bmp.arabic) {
+        y = cy - bmp.h / 2;                                   // fixed Arabic line box (v6.1) already balanced
+    } else {
+        const int bottom = std::min(bmp.inkY1 + 1, bmp.baseline);   // ignore descenders (g, p, y …)
+        y = cy - (bmp.inkY0 + std::max(bottom, bmp.inkY0 + 1)) / 2;
+    }
+    return drawText(utf8, x, y, pxSize, color, role, false, isArabicLang);
+}
+
+// ---------------------------------------------------------------------------
+// v5: runtime images + lazy decoding + LRU caches
+// ---------------------------------------------------------------------------
+UiEngine::ImageData* UiEngine::findImage(const std::string& name) {
+    auto it = images_.find(name);
+    if (it != images_.end()) return &it->second;
+    auto pk = packed_.find(name);
+    if (pk == packed_.end()) return nullptr;
+    int w = 0, h = 0, comp = 0;
+    unsigned char* px = stbi_load_from_memory(pk->second.data(), static_cast<int>(pk->second.size()), &w, &h, &comp, 4);
+    if (!px) { packed_.erase(pk); return nullptr; }
+    ImageData img;
+    img.w = w; img.h = h;
+    img.rgba.assign(px, px + static_cast<std::size_t>(w) * h * 4);
+    stbi_image_free(px);
+    imageBytes_ += img.rgba.size();
+    return &(images_[name] = std::move(img));
+}
+
+bool UiEngine::storeImage(const std::string& name, int w, int h, const std::uint8_t* rgba, int maxW, int maxH) {
+    if (name.empty() || !rgba || w <= 0 || h <= 0) return false;
+    ImageData img;
+    float k = 1.0f;
+    if (maxW > 0 && w > maxW) k = std::min(k, static_cast<float>(maxW) / w);
+    if (maxH > 0 && h > maxH) k = std::min(k, static_cast<float>(maxH) / h);
+    if (k < 1.0f) {
+        // one-time area-average downscale (premultiplied) -> small, sharp, cheap to draw
+        img.w = std::max(1, static_cast<int>(w * k + 0.5f));
+        img.h = std::max(1, static_cast<int>(h * k + 0.5f));
+        img.rgba.resize(static_cast<std::size_t>(img.w) * img.h * 4);
+        for (int dy = 0; dy < img.h; ++dy) {
+            const int y0 = dy * h / img.h, y1 = std::max(y0 + 1, (dy + 1) * h / img.h);
+            for (int dx = 0; dx < img.w; ++dx) {
+                const int x0 = dx * w / img.w, x1 = std::max(x0 + 1, (dx + 1) * w / img.w);
+                std::uint64_t sr = 0, sg = 0, sb = 0, sa = 0;
+                for (int yy = y0; yy < y1; ++yy) {
+                    const std::uint8_t* p = rgba + (static_cast<std::size_t>(yy) * w + x0) * 4;
+                    for (int xx = x0; xx < x1; ++xx, p += 4) {
+                        sr += p[0] * p[3]; sg += p[1] * p[3]; sb += p[2] * p[3]; sa += p[3];
+                    }
+                }
+                const std::uint64_t n = static_cast<std::uint64_t>(x1 - x0) * (y1 - y0);
+                std::uint8_t* d = &img.rgba[(static_cast<std::size_t>(dy) * img.w + dx) * 4];
+                d[3] = static_cast<std::uint8_t>(sa / n);
+                d[0] = sa ? static_cast<std::uint8_t>(sr / sa) : 0;
+                d[1] = sa ? static_cast<std::uint8_t>(sg / sa) : 0;
+                d[2] = sa ? static_cast<std::uint8_t>(sb / sa) : 0;
+            }
+        }
+    } else {
+        img.w = w;
+        img.h = h;
+        img.rgba.assign(rgba, rgba + static_cast<std::size_t>(w) * h * 4);
+    }
+    unloadImage(name);
+    imageBytes_ += img.rgba.size();
+    images_[name] = std::move(img);
+    return true;
+}
+
+bool UiEngine::loadImageMemory(const std::string& name, const void* data, std::size_t size, int maxW, int maxH) {
+    if (!data || size == 0) return false;
+    int w = 0, h = 0, comp = 0;
+    unsigned char* px = stbi_load_from_memory(static_cast<const unsigned char*>(data),
+                                              static_cast<int>(size), &w, &h, &comp, 4);
+    if (!px) return false;
+    const bool ok = storeImage(name, w, h, px, maxW, maxH);
+    stbi_image_free(px);
+    return ok;
+}
+
+bool UiEngine::loadImageFile(const std::string& name, const std::string& path, int maxW, int maxH) {
+    std::FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) return false;
+    std::vector<unsigned char> buf;
+    unsigned char chunk[16384];
+    std::size_t n = 0;
+    while ((n = std::fread(chunk, 1, sizeof(chunk), f)) > 0) buf.insert(buf.end(), chunk, chunk + n);
+    std::fclose(f);
+    return loadImageMemory(name, buf.data(), buf.size(), maxW, maxH);
+}
+
+bool UiEngine::addImageRGBA(const std::string& name, int w, int h, const std::uint8_t* rgba) {
+    return storeImage(name, w, h, rgba, 0, 0);
+}
+
+void UiEngine::unloadImage(const std::string& name) {
+    auto it = images_.find(name);
+    if (it == images_.end()) return;
+    imageBytes_ -= std::min(imageBytes_, it->second.rgba.size());
+    images_.erase(it);
+    dropScaled(name);
+    if (name.size() < 5 || name.compare(name.size() - 5, 5, "#blur") != 0) unloadImage(name + "#blur");
+}
+
+bool UiEngine::makeBlurred(const std::string& src, const std::string& dst, int maxDim) {
+    const ImageData* ip = findImage(src);
+    if (!ip || ip->w <= 0 || ip->h <= 0) return false;
+    const ImageData copy = *ip;   // storeImage may rehash nothing (std::map) but keep it simple and safe
+    return storeImage(dst, copy.w, copy.h, copy.rgba.data(), maxDim, maxDim);
+}
+
+void UiEngine::dropScaled(const std::string& name) {
+    const std::string prefix = name + "|";
+    for (auto it = scaledCache_.lower_bound(prefix); it != scaledCache_.end() &&
+         it->first.compare(0, prefix.size(), prefix) == 0;) {
+        scaledBytes_ -= std::min(scaledBytes_, it->second.px.size() * 4);
+        it = scaledCache_.erase(it);
+    }
+}
+
+void UiEngine::trimScaled(std::size_t incoming) {
+    // Evict least-recently-used scales until the new one fits the byte budget.
+    while (!scaledCache_.empty() && scaledBytes_ + incoming > scaledBudget_) {
+        auto victim = scaledCache_.begin();
+        for (auto it = scaledCache_.begin(); it != scaledCache_.end(); ++it)
+            if (it->second.used < victim->second.used) victim = it;
+        scaledBytes_ -= std::min(scaledBytes_, victim->second.px.size() * 4);
+        scaledCache_.erase(victim);
+    }
+}
+
+void UiEngine::trimText() {
+    std::vector<std::uint64_t> ages;
+    ages.reserve(textCache_.size());
+    for (const auto& kv : textCache_) ages.push_back(kv.second.used);
+    std::nth_element(ages.begin(), ages.begin() + ages.size() / 2, ages.end());
+    const std::uint64_t cut = ages[ages.size() / 2];
+    for (auto it = textCache_.begin(); it != textCache_.end();)
+        it = it->second.used < cut ? textCache_.erase(it) : std::next(it);
+}
+
+void UiEngine::fadeToBlack(Uint8 keep) {
+    // Two channels per multiply (0x00RR00BB and 0x0000GG00) — one pass over the frame, no blending maths.
+    if (keep == 255) return;
+    const std::uint32_t k = keep;
+    for (std::uint32_t& p : fb_) {
+        const std::uint32_t rb = (((p & 0x00FF00FFu) * k) >> 8) & 0x00FF00FFu;
+        const std::uint32_t g = (((p & 0x0000FF00u) * k) >> 8) & 0x0000FF00u;
+        p = (p & 0xFF000000u) | rb | g;
+    }
 }
 
 void UiEngine::present(SDL_Surface* windowSurface) {
@@ -1293,17 +1573,22 @@ void UiEngine::present(SDL_Surface* windowSurface) {
     const int copyW = std::min(kWidth, windowSurface->w);
     const int copyH = std::min(kHeight, windowSurface->h);
 
-    // FAST PATH: window already in0xAARRGGBB byte layout (B,G,R,A) like fb_ -> row copies
-    const bool argbMatch = (fmt->Rmask == 0x00FF0000u && fmt->Gmask == 0x0000FF00u &&
-                            fmt->Bmask == 0x000000FFu);
+    // v5 fast path: surface is already ARGB8888 (same layout as fb_) -> row memcpy.
+    if (rShift == 16 && gShift == 8 && bShift == 0 && (aShift == 24 || aShift < 0)) {
+        const std::size_t rowBytes = static_cast<std::size_t>(copyW) * 4;
+        if (pitch == kWidth * 4 && copyW == kWidth) {
+            std::memcpy(dstBase, fb_.data(), rowBytes * static_cast<std::size_t>(copyH));
+        } else {
+            for (int y = 0; y < copyH; ++y)
+                std::memcpy(dstBase + static_cast<std::size_t>(y) * pitch,
+                            &fb_[static_cast<std::size_t>(y) * kWidth], rowBytes);
+        }
+        return;
+    }
 
     for (int y = 0; y < copyH; ++y) {
         const std::uint32_t* srcRow = &fb_[static_cast<std::size_t>(y) * kWidth];
         Uint8* dstRow = dstBase + static_cast<std::size_t>(y) * pitch;
-        if (argbMatch) {
-            std::memcpy(dstRow, srcRow, static_cast<std::size_t>(copyW) * 4);
-            continue;
-        }
         for (int x = 0; x < copyW; ++x) {
             const std::uint32_t px = srcRow[x];
             const Uint8 r = static_cast<Uint8>((px >> 16) & 0xFF);

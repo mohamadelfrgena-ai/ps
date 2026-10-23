@@ -80,6 +80,8 @@ struct BannerData {
     std::string badgeText;    // مثل -50%
     long discountPercent = 0;
     std::string targetType;   // deals | item | creators | store
+    std::string coverUrl;     // optional artwork (v7.3)
+    std::string endsAt;       // ISO timestamp (v7.3 countdown)
 };
 
 struct PackTarget {
@@ -100,6 +102,20 @@ struct ItemData {
     long saleAcPrice = -1;    // -1 = لا يوجد سعر خصم
     bool isFeatured = false;
     bool isExclusive = false;
+    // ---- v7.3 fields (all optional — empty/0 hides them in the UI) ----
+    std::string description;
+    std::string category;
+    std::string coverUrl;
+    std::string version;
+    std::string creatorName;  // profiles.display_name of created_by
+    long long fileSize = 0;
+    long downloads = 0;
+    double rating = 0;
+    long ratingCount = 0;
+    long exclusiveSlot = 0;
+    std::string createdAt;    // ISO timestamp (UTC)
+    std::string ps4RawUrl;
+    std::string packTargetsRaw; // raw jsonb (pack_targets)
 };
 
 // قراءة البانرات والمحتوى المنشور (anon)
@@ -121,6 +137,51 @@ DownloadGrant callRecordContentDownload(const SupabaseConfig& cfg,
 
 // ترجمة كائن i18n {"en":..,"ar":..} للغة المطلوبة (مع fallback للإنجليزية)
 std::string i18nPick(const std::string& i18nJson, const std::string& langCode);
+
+// ---- v7.3: console code sign-in (console_code_* RPCs) ---------------------------------
+// console_code_create(device_name, app_version, 'ps4', fingerprint)
+RpcResult callConsoleCodeCreate(const SupabaseConfig& cfg,
+                                const std::string& deviceName,
+                                const std::string& appVersion,
+                                const std::string& fingerprint);
+// console_code_consume(code, poll_secret) — 0 pending / 1 approved / 2 expired / 3 error
+RpcResult callConsoleCodeConsume(const SupabaseConfig& cfg,
+                                 const std::string& code,
+                                 const std::string& pollSecret);
+// console_code_complete(exchange_id, linked_console_id, session_ref)
+RpcResult callConsoleCodeComplete(const SupabaseConfig& cfg,
+                                  const std::string& exchangeId,
+                                  const std::string& linkedConsoleId,
+                                  const std::string& sessionRef);
+RpcResult callConsoleSessionTouch(const SupabaseConfig& cfg, const std::string& sessionToken);
+RpcResult callConsoleUnlink(const SupabaseConfig& cfg, const std::string& sessionToken);
+// ac_unlock_content(p_item_id) — user-authenticated
+RpcResult callAcUnlock(const SupabaseConfig& cfg, const std::string& itemId, const std::string& userToken);
+
+// ---- v7.3: account / wallet / plans --------------------------------------------------
+struct ProfileRow {
+    bool ok = false;
+    std::string displayName, username, avatarUrl, plan;
+    std::string planExpiresAt;
+    long acBalance = 0;
+    long downloads = 0, favorites = 0;
+};
+ProfileRow fetchProfile(const SupabaseConfig& cfg, const std::string& userId, const std::string& userToken);
+
+struct WalletRow {
+    long amount = 0;
+    std::string kind, label, at;
+    long balanceAfter = 0;
+};
+std::vector<WalletRow> fetchWalletTx(const SupabaseConfig& cfg, const std::string& userId, const std::string& userToken, int limit = 8);
+
+struct PlanRow {
+    std::string plan;          // free | epic | legendary
+    std::string priceLabel;    // already formatted ("" = hidden)
+    long downloadLimit = 0;    // -1 unlimited
+    std::string limitPeriod;   // day | week | month
+};
+std::vector<PlanRow> fetchSubscriptionPlans(const SupabaseConfig& cfg);
 
 // جلسة المستخدم المرتبط (تُحفَظ على القرص لتعمل بعد إعادة التشغيل)
 struct LinkSession {

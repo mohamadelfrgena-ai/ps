@@ -317,6 +317,8 @@ std::vector<BannerData> fetchStoreBanners(const SupabaseConfig& cfg) {
         b.badgeText = jsonGetString(obj, "badge_text");
         b.discountPercent = jsonGetInt(obj, "discount_percent", 0);
         b.targetType = jsonGetString(obj, "target_type");
+        b.coverUrl = jsonGetString(obj, "cover_url");
+        b.endsAt = jsonGetString(obj, "ends_at");
         out.push_back(b);
     }
     return out;
@@ -327,8 +329,7 @@ std::vector<ItemData> fetchContentItems(const SupabaseConfig& cfg, int limit) {
     if (!cfg.ok()) return out;
     const std::string url =
         cfg.url + "/rest/v1/content_items?is_published=eq.true"
-        "&order=created_at.desc&limit=" + std::to_string(limit) +
-        "&select=id,title,slug,content_type,plan,ac_price,sale_ac_price,is_featured,is_exclusive";
+        "&order=created_at.desc&limit=" + std::to_string(limit) + "&select=*";
     const std::vector<std::pair<std::string, std::string>> headers = {
         {"apikey", cfg.anonKey},
         {"Authorization", "Bearer " + cfg.anonKey},
@@ -348,6 +349,22 @@ std::vector<ItemData> fetchContentItems(const SupabaseConfig& cfg, int limit) {
         it.saleAcPrice = (sale.empty() || sale == "null") ? -1 : std::strtol(sale.c_str(), nullptr, 10);
         it.isFeatured = jsonGetBool(obj, "is_featured", false);
         it.isExclusive = jsonGetBool(obj, "is_exclusive", false);
+        it.description = jsonGetString(obj, "description");
+        it.category = jsonGetString(obj, "category");
+        it.coverUrl = jsonGetString(obj, "cover_url");
+        it.version = jsonGetString(obj, "version");
+        it.fileSize = (long long)jsonGetInt(obj, "file_size", 0);
+        it.downloads = jsonGetInt(obj, "downloads_count", 0);
+        it.rating = (double)jsonGetInt(obj, "rating", 0);
+        {
+            const std::string r = jsonGetString(obj, "rating");
+            if (!r.empty() && r != "null") it.rating = std::strtod(r.c_str(), nullptr);
+        }
+        it.ratingCount = jsonGetInt(obj, "rating_count", 0);
+        it.exclusiveSlot = jsonGetInt(obj, "exclusive_slot", 0);
+        it.createdAt = jsonGetString(obj, "created_at");
+        it.ps4RawUrl = jsonGetString(obj, "ps4_raw_url");
+        it.packTargetsRaw = jsonGetRaw(obj, "pack_targets");
         out.push_back(it);
     }
     return out;
@@ -422,6 +439,151 @@ LinkSession loadLinkSession() {
 
 void clearLinkSession() {
     std::remove(kSessionPath);
+}
+
+// ============================================================================
+//  v7.3 — console-code sign-in RPCs (console_code_*), account / wallet / plans
+// ============================================================================
+RpcResult callConsoleCodeCreate(const SupabaseConfig& cfg,
+                                const std::string& deviceName,
+                                const std::string& appVersion,
+                                const std::string& fingerprint) {
+    const std::string body =
+        "{\"p_device_name\":\"" + jsonEscape(deviceName) + "\",\"p_app_version\":\"" +
+        jsonEscape(appVersion) + "\",\"p_platform\":\"ps4\",\"p_fingerprint\":\"" +
+        jsonEscape(fingerprint) + "\"}";
+    return supabaseRpc(cfg, "console_code_create", body);
+}
+
+RpcResult callConsoleCodeConsume(const SupabaseConfig& cfg,
+                                 const std::string& code,
+                                 const std::string& pollSecret) {
+    const std::string body =
+        "{\"p_code\":\"" + jsonEscape(code) + "\",\"p_poll_secret\":\"" +
+        jsonEscape(pollSecret) + "\"}";
+    return supabaseRpc(cfg, "console_code_consume", body);
+}
+
+RpcResult callConsoleCodeComplete(const SupabaseConfig& cfg,
+                                  const std::string& exchangeId,
+                                  const std::string& linkedConsoleId,
+                                  const std::string& sessionRef) {
+    const std::string body =
+        "{\"p_exchange_id\":\"" + jsonEscape(exchangeId) + "\",\"p_linked_console_id\":\"" +
+        jsonEscape(linkedConsoleId) + "\",\"p_session_ref\":\"" + jsonEscape(sessionRef) + "\"}";
+    return supabaseRpc(cfg, "console_code_complete", body);
+}
+
+RpcResult callConsoleSessionTouch(const SupabaseConfig& cfg, const std::string& sessionToken) {
+    return supabaseRpc(cfg, "console_session_touch",
+                       "{\"p_session_ref\":\"" + jsonEscape(sessionToken) + "\"}", sessionToken);
+}
+
+RpcResult callConsoleUnlink(const SupabaseConfig& cfg, const std::string& sessionToken) {
+    return supabaseRpc(cfg, "console_unlink",
+                       "{\"p_session_ref\":\"" + jsonEscape(sessionToken) + "\"}", sessionToken);
+}
+
+RpcResult callAcUnlock(const SupabaseConfig& cfg, const std::string& itemId, const std::string& userToken) {
+    return supabaseRpc(cfg, "ac_unlock_content",
+                       "{\"p_item_id\":\"" + jsonEscape(itemId) + "\"}", userToken);
+}
+
+ProfileRow fetchProfile(const SupabaseConfig& cfg, const std::string& userId, const std::string& userToken) {
+    ProfileRow p;
+    if (!cfg.ok() || userId.empty()) return p;
+    const std::string tok = userToken.empty() ? cfg.anonKey : userToken;
+    const std::vector<std::pair<std::string, std::string>> headers = {
+        {"apikey", cfg.anonKey},
+        {"Authorization", "Bearer " + tok},
+        {"Accept", "application/json"},
+    };
+    {
+        const HttpPostResult h = httpGetJson(
+            cfg.url + "/rest/v1/profiles?id=eq." + userId + "&select=display_name,username,avatar_url,plan,plan_expires_at&limit=1", headers);
+        if (h.ok && h.statusCode == 200) {
+            const std::vector<std::string> objs = splitJsonObjects(h.body);
+            if (!objs.empty()) {
+                p.ok = true;
+                p.displayName = jsonGetString(objs[0], "display_name");
+                p.username = jsonGetString(objs[0], "username");
+                p.avatarUrl = jsonGetString(objs[0], "avatar_url");
+                p.plan = jsonGetString(objs[0], "plan");
+                p.planExpiresAt = jsonGetString(objs[0], "plan_expires_at");
+            }
+        }
+    }
+    {
+        const HttpPostResult h = httpGetJson(
+            cfg.url + "/rest/v1/ac_wallets?user_id=eq." + userId + "&select=balance&limit=1", headers);
+        if (h.ok && h.statusCode == 200) {
+            const std::vector<std::string> objs = splitJsonObjects(h.body);
+            if (!objs.empty()) p.acBalance = jsonGetInt(objs[0], "balance", 0);
+        }
+    }
+    {
+        const HttpPostResult h = httpGetJson(
+            cfg.url + "/rest/v1/content_downloads?user_id=eq." + userId + "&select=id", headers);
+        if (h.ok && h.statusCode == 200) p.downloads = (long)splitJsonObjects(h.body).size();
+    }
+    return p;
+}
+
+std::vector<WalletRow> fetchWalletTx(const SupabaseConfig& cfg, const std::string& userId, const std::string& userToken, int limit) {
+    std::vector<WalletRow> out;
+    if (!cfg.ok() || userId.empty()) return out;
+    const std::string tok = userToken.empty() ? cfg.anonKey : userToken;
+    const std::vector<std::pair<std::string, std::string>> headers = {
+        {"apikey", cfg.anonKey},
+        {"Authorization", "Bearer " + tok},
+        {"Accept", "application/json"},
+    };
+    const HttpPostResult h = httpGetJson(
+        cfg.url + "/rest/v1/ac_transactions?user_id=eq." + userId +
+        "&order=created_at.desc&limit=" + std::to_string(limit), headers);
+    if (!h.ok || h.statusCode != 200) return out;
+    for (const std::string& obj : splitJsonObjects(h.body)) {
+        WalletRow w;
+        w.amount = jsonGetInt(obj, "amount", 0);
+        w.kind = jsonGetString(obj, "kind");
+        w.label = jsonGetString(obj, "label");
+        if (w.label.empty()) w.label = jsonGetString(obj, "reason");
+        w.at = jsonGetString(obj, "created_at");
+        w.balanceAfter = jsonGetInt(obj, "balance_after", 0);
+        out.push_back(w);
+    }
+    return out;
+}
+
+std::vector<PlanRow> fetchSubscriptionPlans(const SupabaseConfig& cfg) {
+    std::vector<PlanRow> out;
+    if (!cfg.ok()) return out;
+    const std::vector<std::pair<std::string, std::string>> headers = {
+        {"apikey", cfg.anonKey},
+        {"Authorization", "Bearer " + cfg.anonKey},
+        {"Accept", "application/json"},
+    };
+    const HttpPostResult h = httpGetJson(
+        cfg.url + "/rest/v1/subscription_plans?order=price_usd_cents.asc&select=*", headers);
+    if (!h.ok || h.statusCode != 200) return out;
+    for (const std::string& obj : splitJsonObjects(h.body)) {
+        PlanRow p;
+        p.plan = jsonGetString(obj, "plan");
+        if (p.plan.empty()) p.plan = jsonGetString(obj, "slug");
+        p.priceLabel = jsonGetString(obj, "price_label");
+        if (p.priceLabel.empty()) {
+            const std::string cents = jsonGetString(obj, "price_usd_cents");
+            if (!cents.empty() && cents != "null") {
+                char buf[32];
+                std::snprintf(buf, sizeof(buf), "$%.2f", std::strtod(cents.c_str(), nullptr) / 100.0);
+                p.priceLabel = buf;
+            }
+        }
+        p.downloadLimit = jsonGetInt(obj, "download_limit", 0);
+        p.limitPeriod = jsonGetString(obj, "limit_period");
+        out.push_back(p);
+    }
+    return out;
 }
 
 } // namespace pkgtest

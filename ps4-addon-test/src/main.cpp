@@ -1,1142 +1,1132 @@
-// AddonStation "pkg addon test" PS4 Mini-App — full interactive design UI
-//
-// Performance: the UiEngine rasterizes into its own RGBA framebuffer (no SDL
-// textures) and each screen is redrawn ONLY when something changes — the frame
-// is then blitted/presented like the working v0.5 app:
-//     SDL_RenderPresent(renderer); SDL_UpdateWindowSurface(window);
-//
-// Navigation (v0.14): EVERY button has its real action — Welcome (code /
-// email / guest) leads to its own screen; ONLY content cards open the addon
-// install page; category/filter chips apply a filter (visible active chip);
-// banner Back returns; "Shop the sale" opens Deals; L1/R1 switch tabs only
-// inside the app (Home · Deals · Store · Settings) and L2/R2 change
-// the Home offer; Settings rows act (language /
-// auto-launch Minecraft after install / link console / sign out with confirm
-// dialog), text fields open the PS4 system
-// keyboard (sceImeDialog), Download installs content from the GitHub Release.
-// v0.14: splash screen removed entirely (fast boot straight to Welcome) and
-// ○/ESC never exit the app — they only navigate back inside it (no path to
-// the PS home menu from inside the app).
+// ============================================================================
+//  AddonStation PS4 — main.cpp (UI v7.3 final + real Supabase / installer)
+//  Guest-first, code sign-in only, sidebar rail, △ = search, HUD sounds,
+//  language auto-detected from the PS4 system language (8 languages).
+//  Keeps the proven pkg properties: dynamic dual-mode installer, staged .raw
+//  auto-delete + syncWatcher, CE-34878-0-safe IME, natural wording, toasts.
+// ============================================================================
+#include "screens.hpp"
+#include "ui_audio.hpp"
 
-#include "content_config.hpp"
 #include "http_download.hpp"
 #include "ime_dialog.hpp"
 #include "installer.hpp"
-#include "screens.hpp"
 #include "supabase_client.hpp"
 
-#include <SDL2/SDL.h>
-
+#include <SDL.h>
 #include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <deque>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
 
-namespace {
+#if defined(__ORBIS__) || defined(__PROSPERO__)
+extern "C" int sceSystemServiceParamGetInt(int id, int* out);
+#endif
 
-constexpr const char* kStageDir = "/data/AddonStation/installed";
+using namespace pkgtest;
 
-const char* kLangCodes[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
+// ---------------------------------------------------------------- config ----
+static const char* kStageDir = "/data/AddonStation/installed";
+static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
+static const char* kAppVersion = "0.23";
+static const char* kBrandSuffix = " by sliver fox";
 
-enum class Screen {
-    Welcome, CodeLink, Email, Language,
-    Home, Deals, Store, Settings, Detail, Confirm,
-    Search, Profile, Wallet, Plans
-};
+static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
 
-struct AppState {
-    Screen screen = Screen::Welcome;   // بدون splash — الإقلاع مباشرة
-    Screen prevScreen = Screen::Welcome;
-    Screen tabScreen = Screen::Home;   // active L1/R1 tab
-    int focus = 0;
-    int langIndex = 0;
-    pkgtest::DemoState demoState = pkgtest::DemoState::Idle;
-    int progress = 0;
+enum class Btn { None, Up, Down, Left, Right, Cross, Circle, Triangle, Square, L1, R1, L2, R2, Options };
+
+// ---------------------------------------------------------------- helpers ---
+static std::string brandTitle(const std::string& t) {
+    if (t.empty()) return t;
+    if (t.find("sliver fox") != std::string::npos) return t;
+    return t + kBrandSuffix;
+}
+
+static std::time_t isoToTime(const std::string& iso) {
+    int y = 0, mo = 0, d = 0, h = 0, mi = 0, s = 0;
+    if (std::sscanf(iso.c_str(), "%d-%d-%dT%d:%d:%d", &y, &mo, &d, &h, &mi, &s) < 3) return 0;
+    std::tm tm{};
+    tm.tm_year = y - 1900;
+    tm.tm_mon = mo - 1;
+    tm.tm_mday = d;
+    tm.tm_hour = h;
+    tm.tm_min = mi;
+    tm.tm_sec = s;
+    return std::mktime(&tm);
+}
+
+static Tier tierFromPlan(const std::string& p) {
+    if (p == "legendary") return Tier::Legendary;
+    if (p == "epic") return Tier::Epic;
+    return Tier::Free;
+}
+
+static std::map<std::string, std::string> i18nMap(const std::string& raw) {
+    std::map<std::string, std::string> m;
+    static const char* langs[] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
+    for (const char* l : langs) {
+        const std::string v = jsonGetString(raw, l);
+        if (!v.empty() && v != "null") m[l] = v;
+    }
+    return m;
+}
+
+static std::string basenameOf(const std::string& url) {
+    const std::size_t q = url.find('?');
+    const std::string clean = (q == std::string::npos) ? url : url.substr(0, q);
+    const std::size_t s = clean.find_last_of('/');
+    return (s == std::string::npos) ? clean : clean.substr(s + 1);
+}
+
+// ---------------------------------------------------------------- app state -
+enum class Scr { SignIn, Home, Deals, Store, Plans, Profile, Settings, Search, Detail };
+
+struct App {
+    Scr scr = Scr::Home;            // v5: guest Home (no welcome page)
+    Scr back = Scr::Home;
+    std::string lang = "en";
+    int focus = 0, filter = 0, hero = 0, subFocus = -1;
+    int detailIdx = -1;
+    bool askSignIn = false;
+    int askFocus = 0;
+    bool confirmSignOut = false;
+    int confirmFocus = 1;
+    std::string query, notice, code, pollSecret, exchangeId, linkedConsoleId, sessionRef;
+    int codeSecs = 0, codeStatus = 4;
+    bool qrView = false;
+    std::atomic<int> dl{0};          // DemoState
+    std::atomic<int> dlPct{0};
+    std::atomic<bool> busyDownload{false};
+    bool autoLaunch = false;
     std::string toastText;
-    double toastUntil = 0.0;
-
-    // code link
-    std::string code = "K7P 4QX";
-    double codeUntil = 0.0;
-    bool linked = false;
-    std::string pollToken;
-    bool haveSession = false;
-    std::string sessionName;
-    std::string sessionPlan;
-    long sessionAc = 0;
-
-    // v2 screens (search / profile / wallet / plans / triangle menu)
-    std::string searchQuery;
-    int searchFilter = 0;
-    bool menuOpen = false;
-    int menuFocus = 0;
-
-    // محتوى Supabase المرتبط (بانرات + عناصر منشورة)
-    std::vector<pkgtest::BannerData> banners;
-    std::vector<pkgtest::ItemData> items;
-    int contentStamp = 0;
-    std::string detailItemId;
-    std::string detailTitle;
-
-    // email
-    std::string email;
-    std::string pass;
-    bool emailError = false;
-
-    int heroIndex = 0;
-    int filterIndex = 0;   // Home category chip 0..6
-    int storeFilter = 0;   // Store filter chip 0..2
-    int dealsFilter = 0;   // Deals chip 0..4
-    bool autoLaunch = false;   // «تشغيل Minecraft تلقائياً بعد التثبيت» (يُقرأ من الإعدادات)
-    bool saved = false;
-
-    std::atomic<bool> installing{false};
+    int toastUntil = 0;              // ms timestamp
+    std::atomic<bool> dirty{true};
 };
+static App A;
 
-double nowSeconds() {
-    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+static SupabaseConfig gCfg;
+static LinkSession gSession;
+static std::mutex gSessionMx;
+static std::deque<Btn> gBtnQ;
+static std::mutex gBtnMx;
+
+// cover queue: worker downloads -> UI thread decodes (engine is not thread safe)
+struct CoverBlob { std::string name; std::vector<unsigned char> data; };
+static std::deque<CoverBlob> gCoverQ;
+static std::mutex gCoverMx;
+static std::map<std::string, bool> gCoverRequested;
+
+static UiEngine* gEngine = nullptr;
+
+static void toast(const std::string& text, int ms = 4200) {
+    A.toastText = text;
+    A.toastUntil = (int)(std::chrono::duration_cast<std::chrono::milliseconds>(
+                             std::chrono::steady_clock::now().time_since_epoch()).count()) + ms;
+    A.dirty = true;
 }
 
-const char* kHomeChips[7] = {"All", "Addons", "Worlds", "Free", "Epic", "Legendary", "New"};
-const char* kStoreFilters[3] = {"Addons", "Worlds", "Newest"};
-const char* kDealsChips[5] = {"All", "Addons", "Worlds", "Under 100 AC", "Biggest discount"};
-
-std::string toLowerCopy(const std::string& v) {
-    std::string o;
-    for (unsigned char c : v) o += static_cast<char>(std::tolower(c));
-    return o;
+// ---------------------------------------------------------------- settings --
+static void saveUiSettings() {
+    FILE* f = std::fopen(kUiCfgPath, "w");
+    if (!f) return;
+    std::fprintf(f, "lang=%s\ntheme=%s\n", A.lang.c_str(), themeLight() ? "light" : "dark");
+    std::fclose(f);
 }
 
-int planIndexFrom(const std::string& plan) {
-    if (plan == "epic") return 1;
-    if (plan == "legendary") return 2;
+static void loadUiSettings() {
+    FILE* f = std::fopen(kUiCfgPath, "r");
+    if (!f) return;
+    char line[128];
+    while (std::fgets(line, sizeof(line), f)) {
+        std::string s(line);
+        while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+        const std::size_t eq = s.find('=');
+        if (eq == std::string::npos) continue;
+        const std::string k = s.substr(0, eq), v = s.substr(eq + 1);
+        if (k == "lang") {
+            for (const char* l : kLangs) if (v == l) A.lang = v;
+        } else if (k == "theme") {
+            setThemeLight(v == "light");
+        }
+    }
+    std::fclose(f);
+}
+
+static int hookSystemLanguage() {
+#if defined(__ORBIS__) || defined(__PROSPERO__)
+    int lang = 1;
+    sceSystemServiceParamGetInt(1 /* SCE_SYSTEM_SERVICE_PARAM_ID_LANG */, &lang);
+    return lang;
+#else
+    const char* env = std::getenv("PS4_LANG");
+    std::string v = env ? env : "";
+    if (v.rfind("ar", 0) == 0) return 21;
+    if (v.rfind("fr", 0) == 0) return 2;
+    if (v.rfind("tr", 0) == 0) return 19;
+    if (v.rfind("es", 0) == 0) return 3;
+    if (v.rfind("ru", 0) == 0) return 8;
+    if (v.rfind("pt", 0) == 0) return 7;
+    if (v.rfind("zh", 0) == 0) return 10;
+    return 1;
+#endif
+}
+
+// ---------------------------------------------------------------- data ------
+static void applyAccountFromSession() {
+    ProfileRow p = fetchProfile(gCfg, gSession.userId, gSession.accessToken);
+    if (!p.ok && gSession.displayName.empty()) return;
+    Account a;
+    a.signedIn = true;
+    a.displayName = p.ok ? p.displayName : gSession.displayName;
+    if (a.displayName.empty()) a.displayName = gSession.username;
+    a.username = p.ok ? p.username : gSession.username;
+    a.plan = tierFromPlan(p.ok ? p.plan : gSession.plan);
+    a.acBalance = p.ok ? p.acBalance : (int)gSession.acBalance;
+    a.downloads = (int)p.downloads;
+    a.favorites = (int)p.favorites;
+    for (const AddonItem& it : catalog())
+        if (it.installed) a.installed += 1;
+    setAccount(a);
+}
+
+static void loadWalletHistory() {
+    if (!gSession.valid || gSession.userId.empty()) return;
+    std::vector<WalletTx> tx;
+    for (const WalletRow& w : fetchWalletTx(gCfg, gSession.userId, gSession.accessToken)) {
+        WalletTx t;
+        t.amount = (int)w.amount;
+        t.kind = w.kind;
+        t.label = w.label;
+        t.at = isoToTime(w.at);
+        t.balanceAfter = (int)w.balanceAfter;
+        tx.push_back(t);
+    }
+    setWalletHistory(tx);
+}
+
+static AddonItem toItem(const ItemData& d) {
+    AddonItem it;
+    it.id = d.id;
+    it.title = brandTitle(d.title);
+    it.creator = d.creatorName.empty() ? std::string("sliver fox") : d.creatorName;
+    it.description = d.description;
+    it.category = d.category.empty() ? d.contentType : d.category;
+    it.isWorld = (d.contentType == "world");
+    it.tier = tierFromPlan(d.plan);
+    it.acPrice = (int)(d.saleAcPrice >= 0 ? d.saleAcPrice : d.acPrice);
+    it.acPriceOld = (d.saleAcPrice >= 0) ? (int)d.acPrice : 0;
+    it.cover = "cv_" + d.id;
+    it.version = d.version;
+    it.fileSize = d.fileSize;
+    it.downloads = (int)d.downloads;
+    it.rating = (float)d.rating;
+    it.ratingCount = (int)d.ratingCount;
+    it.exclusive = d.isExclusive;
+    it.exclusiveSlot = (int)d.exclusiveSlot;
+    it.featured = d.isFeatured;
+    it.installed = isAddonMarkedInstalled(brandTitle(d.title), kStageDir);
+    it.createdAt = isoToTime(d.createdAt);
+    return it;
+}
+
+static void loadCatalogNow() {
+    std::vector<ItemData> items = fetchContentItems(gCfg, 40);
+    std::vector<AddonItem> out;
+    out.reserve(items.size());
+    for (const ItemData& d : items) out.push_back(toItem(d));
+    setCatalog(out);
+    A.dirty = true;
+}
+
+static void loadBannerNow() {
+    SaleBanner none;
+    setSaleBanner(none);
+    for (const BannerData& b : fetchStoreBanners(gCfg)) {
+        SaleBanner s;
+        s.active = true;
+        s.slug = b.slug;
+        s.theme = b.theme;
+        s.kicker = i18nMap(b.kickerI18n);
+        s.title = i18nMap(b.titleI18n);
+        s.subtitle = i18nMap(b.subtitleI18n);
+        s.discountPercent = (int)b.discountPercent;
+        s.artHasTitle = (b.theme == "summer");
+        s.endsAt = isoToTime(b.endsAt);
+        setSaleBanner(s);
+        break;
+    }
+    A.dirty = true;
+}
+
+static void loadPlansNow() {
+    std::vector<PlanInfo> plans;
+    for (const PlanRow& r : fetchSubscriptionPlans(gCfg)) {
+        PlanInfo p;
+        p.tier = tierFromPlan(r.plan);
+        p.priceLabel = r.priceLabel;
+        p.downloadLimit = (int)r.downloadLimit;
+        p.limitPeriod = r.limitPeriod;
+        plans.push_back(p);
+    }
+    setPlans(plans);
+    A.dirty = true;
+}
+
+// covers: download in background, decode on the UI thread
+static void requestCoverAsync(const AddonItem& it) {
+    if (it.cover.empty()) return;
+    {
+        std::lock_guard<std::mutex> lk(gCoverMx);
+        if (gCoverRequested[it.cover]) return;
+        gCoverRequested[it.cover] = true;
+    }
+    // find the source URL from the last fetched catalog rows
+    std::string url;
+    for (const ItemData& d : fetchContentItems(gCfg, 40)) {
+        if (("cv_" + d.id) == it.cover) { url = d.coverUrl; break; }
+    }
+    if (url.empty()) return;
+    const std::string name = it.cover;
+    std::thread([name, url]() {
+        const std::string tmp = std::string(kStageDir) + "/.cover_tmp";
+        DownloadResult r = downloadToFile(url, tmp, nullptr);
+        if (!r.ok) return;
+        FILE* f = std::fopen(tmp.c_str(), "rb");
+        if (!f) return;
+        std::fseek(f, 0, SEEK_END);
+        long sz = std::ftell(f);
+        std::fseek(f, 0, SEEK_SET);
+        CoverBlob blob;
+        blob.name = name;
+        blob.data.resize((std::size_t)(sz > 0 ? sz : 0));
+        if (!blob.data.empty()) std::fread(blob.data.data(), 1, blob.data.size(), f);
+        std::fclose(f);
+        std::remove(tmp.c_str());
+        if (blob.data.empty()) return;
+        std::lock_guard<std::mutex> lk(gCoverMx);
+        gCoverQ.push_back(std::move(blob));
+        A.dirty = true;
+    }).detach();
+}
+
+static void pumpCovers() {
+    std::lock_guard<std::mutex> lk(gCoverMx);
+    while (!gCoverQ.empty()) {
+        CoverBlob& b = gCoverQ.front();
+        if (gEngine) gEngine->loadImageMemory(b.name, b.data.data(), b.data.size(), 640, 360);
+        gCoverQ.pop_front();
+    }
+}
+
+// ---------------------------------------------------------------- sign in ---
+static bool parseCodeCreate(const RpcResult& r, std::string& code, std::string& secret, int& secs) {
+    if (!r.ok) return false;
+    code = jsonGetString(r.body, "code");
+    if (code.empty()) code = jsonGetString(r.body, "p_code");
+    secret = jsonGetString(r.body, "poll_secret");
+    if (secret.empty()) secret = jsonGetString(r.body, "p_poll_secret");
+    if (secret.empty()) secret = jsonGetString(r.body, "poll_token");
+    secs = (int)jsonGetInt(r.body, "expires_in", 600);
+    return !code.empty();
+}
+
+static void newCode() {
+    A.codeStatus = 4;
+    A.dirty = true;
+    std::string code, secret;
+    int secs = 600;
+    RpcResult r = callConsoleCodeCreate(gCfg, "PlayStation 4", kAppVersion, "ps4-console");
+    if (!parseCodeCreate(r, code, secret, secs)) {
+        // fallback: legacy link-code RPCs (40_ps4_and_deals.sql)
+        r = callCreateLinkCode(gCfg, "ps4", "PlayStation 4");
+        parseCodeCreate(r, code, secret, secs);
+    }
+    if (code.empty()) {
+        A.codeStatus = 3;
+    } else {
+        A.code = code;
+        A.pollSecret = secret;
+        A.codeSecs = secs;
+        A.codeStatus = 0;
+    }
+    A.dirty = true;
+}
+
+// returns 0 pending, 1 approved, 2 expired, 3 error
+static int pollCodeOnce() {
+    RpcResult r = callConsoleCodeConsume(gCfg, A.code, A.pollSecret);
+    if (r.ok) {
+        const std::string st = jsonGetString(r.body, "status");
+        A.exchangeId = jsonGetString(r.body, "exchange_id");
+        A.linkedConsoleId = jsonGetString(r.body, "linked_console_id");
+        A.sessionRef = jsonGetString(r.body, "session_ref");
+        if (st == "approved" || jsonGetBool(r.body, "approved", false) || jsonGetBool(r.body, "claimed", false))
+            return 1;
+        if (st == "expired") return 2;
+        if (st == "pending" || st == "waiting" || r.rpcOk) return 0;
+        return 3;
+    }
+    // fallback: legacy poll
+    RpcResult old = callPollLinkCode(gCfg, A.code, A.pollSecret);
+    if (!old.ok) return 3;
+    const std::string st = jsonGetString(old.body, "status");
+    if (st == "linked" || st == "approved" || jsonGetBool(old.body, "ok", false)) return 1;
+    if (st == "expired") return 2;
     return 0;
 }
 
-// indices into state.items matching the search query + filter chip (All/Addons/Worlds)
-std::vector<int> searchMatchIdx(const std::vector<pkgtest::ItemData>& items,
-                                const std::string& query, int filterIndex) {
-    std::vector<int> out;
-    const std::string q = toLowerCopy(query);
-    for (int i = 0; i < static_cast<int>(items.size()) && static_cast<int>(out.size()) < 5; ++i) {
-        const pkgtest::ItemData& it = items[i];
-        const bool isWorld = (it.contentType == "world" || it.contentType == "map");
-        if (filterIndex == 1 && isWorld) continue;
-        if (filterIndex == 2 && !isWorld) continue;
-        if (!q.empty() && toLowerCopy(it.title).find(q) == std::string::npos) continue;
-        out.push_back(i);
+static void finishSignIn() {
+    // complete the exchange (new RPC), then load the account
+    if (!A.exchangeId.empty() || !A.sessionRef.empty())
+        callConsoleCodeComplete(gCfg, A.exchangeId, A.linkedConsoleId, A.sessionRef);
+    {
+        std::lock_guard<std::mutex> lk(gSessionMx);
+        gSession.valid = true;
+        gSession.accessToken = A.sessionRef;
+        gSession.plan = "free";
+    }
+    // the complete/consume response may carry the linked console/user id
+    {
+        std::lock_guard<std::mutex> lk(gSessionMx);
+        if (!A.linkedConsoleId.empty()) gSession.userId = A.linkedConsoleId;
+    }
+    applyAccountFromSession();
+    loadWalletHistory();
+    {
+        std::lock_guard<std::mutex> lk(gSessionMx);
+        if (account().signedIn) {
+            gSession.displayName = account().displayName;
+            gSession.username = account().username;
+            gSession.plan = account().plan == Tier::Legendary ? "legendary"
+                            : account().plan == Tier::Epic ? "epic" : "free";
+            gSession.acBalance = account().acBalance;
+            saveLinkSession(gSession);
+        }
+    }
+}
+
+static void hookSignOut() {
+    callConsoleUnlink(gCfg, gSession.accessToken);
+    clearLinkSession();
+    gSession = LinkSession{};
+    setAccount(Account{});
+    setWalletHistory({});
+    A.dirty = true;
+}
+
+// ---------------------------------------------------------------- install ---
+static void startDownloadFlow(int catIdx) {
+    if (catIdx < 0 || catIdx >= (int)catalog().size()) return;
+    if (A.busyDownload.exchange(true)) return;
+    const AddonItem it = catalog()[(std::size_t)catIdx];
+    A.dl = (int)DemoState::Downloading;
+    A.dlPct = 0;
+    A.notice.clear();
+    A.dirty = true;
+    const std::string lang = A.lang;
+    const bool autoLaunch = A.autoLaunch;
+    std::thread([it, lang, autoLaunch]() {
+        DownloadGrant g = callRecordContentDownload(gCfg, it.id, gSession.accessToken);
+        if (!g.ok || g.ps4RawUrl.empty()) {
+            ui_sfx(Sfx::Error);
+            toast(g.message.empty() ? tr("err_network", lang) : g.message);
+            A.dl = (int)DemoState::Idle;
+            A.busyDownload = false;
+            A.dirty = true;
+            return;
+        }
+        const std::string rawName = basenameOf(g.ps4RawUrl);
+        const std::string rawPath = std::string(kStageDir) + "/" + rawName;
+        DownloadResult dr = downloadToFile(g.ps4RawUrl, rawPath, [](int p) {
+            A.dlPct = p;
+            A.dirty = true;
+        });
+        if (!dr.ok) {
+            ui_sfx(Sfx::Error);
+            toast(tr("err_network", lang));
+            A.dl = (int)DemoState::Idle;
+            A.busyDownload = false;
+            A.dirty = true;
+            return;
+        }
+        A.dl = (int)DemoState::Installing;
+        A.dlPct = 100;
+        A.dirty = true;
+        std::string category = "resource_packs";
+        if (!g.packs.empty() && !g.packs[0].target.empty()) category = g.packs[0].target;
+        else if (it.isWorld) category = "minecraftWorlds";
+        const std::string displayName = it.title;
+        CopyResult r = installOrQueueAddon(
+            rawPath, displayName, kStageDir, "", category, lang,
+            [](InstallPhase phase, int pct) {
+                if (phase == InstallPhase::Installing) {
+                    A.dl = (int)DemoState::Installing;
+                    A.dlPct = pct;
+                    A.dirty = true;
+                }
+            },
+            autoLaunch);
+        if (r.ok) {
+            A.dl = (int)DemoState::Installed;
+            ui_sfx(Sfx::DownloadDone);
+            toast(formatEnjoyNotification(displayName, lang));
+            AddonItem u = it;
+            u.installed = true;
+            upsertCatalogItem(u);
+            A.detailIdx = findItem(u.id);
+        } else {
+            A.dl = (int)DemoState::Idle;
+            ui_sfx(Sfx::Error);
+            toast(r.message.empty() ? tr("err_network", lang) : r.message);
+        }
+        A.busyDownload = false;
+        A.dirty = true;
+    }).detach();
+}
+
+// ---------------------------------------------------------------- input -----
+static void pushBtn(Btn b) {
+    std::lock_guard<std::mutex> lk(gBtnMx);
+    if (gBtnQ.size() < 8) gBtnQ.push_back(b);
+}
+
+static void go(Scr s) {
+    A.scr = s;
+    A.focus = 0;
+    A.filter = 0;
+    A.subFocus = -1;
+    A.notice.clear();
+    A.dirty = true;
+}
+
+static void openItem(int catIdx) {
+    if (catIdx < 0) return;
+    if (!account().signedIn) {
+        A.askSignIn = true;
+        A.askFocus = 0;
+        A.detailIdx = catIdx;
+        A.dirty = true;
+        return;
+    }
+    A.back = A.scr;
+    A.detailIdx = catIdx;
+    A.dl = catalog()[(std::size_t)catIdx].installed ? (int)DemoState::Installed : (int)DemoState::Idle;
+    go(Scr::Detail);
+}
+
+static void startSignIn() {
+    A.back = A.scr;
+    go(Scr::SignIn);
+    A.qrView = false;
+    newCode();
+}
+
+static int focusedCard() {
+    std::vector<int> v;
+    int first = 0, idx = -1;
+    switch (A.scr) {
+        case Scr::Home:   v = viewItems(View::Home, A.filter);  first = scrollOf(View::Home);  idx = A.focus - 12; break;
+        case Scr::Deals:  v = viewItems(View::Deals, A.filter); first = scrollOf(View::Deals); idx = A.focus - 5; break;
+        case Scr::Store:  v = viewItems(View::Store, A.filter); first = scrollOf(View::Store); idx = A.focus; break;
+        case Scr::Search: v = viewItems(View::Search, A.filter, A.query); first = scrollOf(View::Search); idx = A.focus - 4; break;
+        default: return -1;
+    }
+    const int k = first + idx;
+    return (idx >= 0 && k < (int)v.size()) ? v[(std::size_t)k] : -1;
+}
+
+static void clampScroll() {
+    // keep the focused card visible; windows: Home 5, Deals 5, Store 8, Search 5
+    int win = 5, idx = -1;
+    View view = View::Home;
+    if (A.scr == Scr::Home) { idx = A.focus - 12; view = View::Home; }
+    else if (A.scr == Scr::Deals) { idx = A.focus - 5; view = View::Deals; }
+    else if (A.scr == Scr::Store) { idx = A.focus; view = View::Store; win = 8; }
+    else if (A.scr == Scr::Search) { idx = A.focus - 4; view = View::Search; }
+    if (idx < 0) return;
+    int first = scrollOf(view);
+    if (idx < first) first = idx;
+    if (idx > first + win - 1) first = idx - win + 1;
+    if (first < 0) first = 0;
+    if (first != scrollOf(view)) setScroll(view, first);
+}
+
+// focus zones per screen (linear stepping inside a zone; Up/Down crosses zones)
+static void moveFocus(int dx, int dy) {
+    auto clampInto = [](int v, int lo, int hi) { return std::max(lo, std::min(hi, v)); };
+    switch (A.scr) {
+        case Scr::SignIn:
+            if (A.codeStatus == 1) { A.focus = 0; return; }
+            if (A.qrView) { A.focus = 0; return; }
+            A.focus = clampInto(A.focus + dx + dy, 0, 1);
+            break;
+        case Scr::Home: {
+            // zones: hero 0-1 | tabs 5-11 | shelf 12-16
+            const std::vector<int> v = viewItems(View::Home, A.filter);
+            const int shelfN = (int)std::min<std::size_t>(5, v.size());
+            if (A.focus <= 1) {
+                if (dy > 0) A.focus = 5 + std::min(A.filter, 6);
+                else A.focus = clampInto(A.focus + dx, 0, 1);
+            } else if (A.focus <= 11) {
+                if (dy > 0 && shelfN > 0) A.focus = 12;
+                else if (dy < 0) A.focus = clampInto(A.hero, 0, 1);
+                else {
+                    int f = A.focus - 5 + dx;
+                    if (f < 0) f = 6;
+                    if (f > 6) f = 0;
+                    A.focus = 5 + f;
+                }
+            } else {
+                if (dy < 0) A.focus = 5 + std::min(A.filter, 6);
+                else {
+                    int k = A.focus - 12 + dx;
+                    if (shelfN > 0) { if (k < 0) k = shelfN - 1;
+                    if (k > shelfN - 1) k = 0; }
+                    else k = 0;
+                    A.focus = 12 + k;
+                }
+            }
+            break;
+        }
+        case Scr::Deals: {
+            const std::vector<int> v = viewItems(View::Deals, A.filter);
+            const int cardN = (int)std::min<std::size_t>(5, v.size());
+            if (A.focus <= 4) {
+                if (dy > 0 && cardN > 0) A.focus = 5;
+                else {
+                    int f = A.focus + dx;
+                    if (f < 0) f = 4;
+                    if (f > 4) f = 0;
+                    A.focus = f;
+                }
+            } else {
+                if (dy < 0) A.focus = std::min(A.filter, 4);
+                else {
+                    int k = A.focus - 5 + dx;
+                    if (cardN > 0) { if (k < 0) k = cardN - 1;
+                    if (k > cardN - 1) k = 0; }
+                    else k = 0;
+                    A.focus = 5 + k;
+                }
+            }
+            break;
+        }
+        case Scr::Store: {
+            const std::vector<int> v = viewItems(View::Store, A.filter);
+            const int cardN = (int)std::min<std::size_t>(8, v.size());
+            if (A.focus <= 7) {
+                if (dy < 0) { if (cardN == 0) A.focus = 8; }
+                else if (dy > 0) {
+                    if (cardN == 0) A.focus = 9 + std::min(A.filter, 6);
+                    else if (A.focus + 4 < cardN) A.focus += 4;
+                    else A.focus = 8;
+                } else {
+                    int k = A.focus + dx;
+                    if (cardN > 0) { if (k < 0) k = cardN - 1;
+                    if (k > cardN - 1) k = 0; }
+                    else k = 0;
+                    A.focus = k;
+                }
+            } else if (A.focus == 8) {
+                if (dy > 0) A.focus = 9 + std::min(A.filter, 6);
+                else if (dy < 0) A.focus = cardN > 0 ? cardN - 1 : 9;
+            } else if (A.focus <= 15) {
+                if (dy < 0) A.focus = 8;
+                else if (dy > 0) A.focus = 16;
+                else {
+                    int f = A.focus - 9 + dx;
+                    if (f < 0) f = 6;
+                    if (f > 6) f = 0;
+                    A.focus = 9 + f;
+                }
+            } else {
+                if (dy < 0) A.focus = 9 + std::min(A.filter, 6);
+                else if (dx != 0) setStoreSort((storeSort() + (dx > 0 ? 1 : 2)) % 3);
+            }
+            break;
+        }
+        case Scr::Search: {
+            const std::vector<int> v = viewItems(View::Search, A.filter, A.query);
+            const int cardN = (int)std::min<std::size_t>(5, v.size());
+            if (A.focus == 0) {
+                if (dy > 0) A.focus = 1 + std::min(A.filter, 2);
+            } else if (A.focus <= 3) {
+                if (dy < 0) A.focus = 0;
+                else if (dy > 0 && cardN > 0) A.focus = 4;
+                else {
+                    int f = A.focus - 1 + dx;
+                    if (f < 0) f = 2; if (f > 2) f = 0;
+                    A.focus = 1 + f;
+                }
+            } else {
+                if (dy < 0) A.focus = 1 + std::min(A.filter, 2);
+                else {
+                    int k = A.focus - 4 + dx;
+                    if (cardN > 0) { if (k < 0) k = cardN - 1;
+                    if (k > cardN - 1) k = 0; }
+                    else k = 0;
+                    A.focus = 4 + k;
+                }
+            }
+            break;
+        }
+        case Scr::Detail: {
+            const AddonItem& it = catalog()[(std::size_t)A.detailIdx];
+            const bool ac = acUnlockOffered(it);
+            if (dy > 0 || dx > 0) { if (ac) A.focus = 1; }
+            else if (dy < 0 || dx < 0) A.focus = 0;
+            break;
+        }
+        case Scr::Profile: {
+            if (!account().signedIn) { A.focus = 0; break; }
+            A.focus = clampInto(A.focus + dy + dx, 0, 5);
+            break;
+        }
+        case Scr::Settings: {
+            if (A.subFocus >= 0) {
+                const int n = A.focus == 0 ? 8 : 2, cols = 2;
+                if (dx > 0) A.subFocus = std::min(n - 1, A.subFocus + 1);
+                else if (dx < 0) A.subFocus = std::max(0, A.subFocus - 1);
+                else if (dy > 0 && A.focus == 0) A.subFocus = std::min(n - 1, A.subFocus + cols);
+                else if (dy < 0 && A.focus == 0) A.subFocus = std::max(0, A.subFocus - cols);
+            } else {
+                const int rows = account().signedIn ? 6 : 5;
+                A.focus = clampInto(A.focus + dy, 0, rows - 1);
+            }
+            break;
+        }
+        case Scr::Plans:
+            break;   // v6.6 view-only
+    }
+    clampScroll();
+    A.dirty = true;
+}
+
+static void onSettingsCross() {
+    if (A.focus == 0) {
+        if (A.subFocus < 0) { A.subFocus = 0; return; }
+        A.lang = kLangs[A.subFocus];
+        saveUiSettings();
+        A.subFocus = -1;
+        return;
+    }
+    if (A.focus == 1) {
+        if (A.subFocus < 0) { A.subFocus = themeLight() ? 1 : 0; return; }
+        setThemeLight(A.subFocus == 1);
+        saveUiSettings();
+        A.subFocus = -1;
+        return;
+    }
+    if (A.focus == 2 && !account().signedIn) { startSignIn(); return; }
+    if (A.focus == 3) {
+        A.autoLaunch = !A.autoLaunch;
+        saveAutoLaunchSetting(A.autoLaunch);
+        ui_sfx(Sfx::Toggle);
+        return;
+    }
+    if (A.focus == 5 && account().signedIn) {
+        A.confirmSignOut = true;
+        A.confirmFocus = 1;
+    }
+}
+
+static void handle(Btn b) {
+    if (b == Btn::None) return;
+    A.dirty = true;
+    // sounds
+    if (b == Btn::Up || b == Btn::Down || b == Btn::Left || b == Btn::Right) ui_sfx(Sfx::Focus);
+    else if (b == Btn::Cross) ui_sfx(Sfx::Press);
+    else if (b == Btn::Circle) ui_sfx(Sfx::Close);
+    else if (b == Btn::L1 || b == Btn::R1) ui_sfx(Sfx::Tab);
+
+    // ---- dialogs first ----
+    if (A.askSignIn) {
+        if (b == Btn::Up || b == Btn::Down) { A.askFocus ^= 1; }
+        else if (b == Btn::Cross) {
+            A.askSignIn = false;
+            if (A.askFocus == 0) startSignIn();
+        } else if (b == Btn::Circle) A.askSignIn = false;
+        return;
+    }
+    if (A.confirmSignOut) {
+        if (b == Btn::Left || b == Btn::Right) A.confirmFocus ^= 1;
+        else if (b == Btn::Cross) {
+            A.confirmSignOut = false;
+            if (A.confirmFocus == 0) {
+                ui_sfx(Sfx::Toggle);
+                hookSignOut();
+                toast(tr("settings_signout", A.lang));
+                go(Scr::Home);
+            }
+        } else if (b == Btn::Circle) A.confirmSignOut = false;
+        return;
+    }
+    // ---- global: △ = Search (no triangle menu in v5) ----
+    if (b == Btn::Triangle && A.scr != Scr::SignIn && A.scr != Scr::Search) {
+        A.back = A.scr;
+        go(Scr::Search);
+        return;
+    }
+    switch (A.scr) {
+        case Scr::SignIn:
+            if (A.codeStatus == 1) {
+                if (b == Btn::Cross || b == Btn::Circle) go(A.back);
+            } else if (A.qrView) {
+                if (b == Btn::Cross) {
+                    A.qrView = false;
+                    A.focus = 0;
+                    if (A.codeStatus == 2 || A.codeStatus == 3 || A.codeSecs <= 0) newCode();
+                } else if (b == Btn::Circle) { A.qrView = false; A.focus = 1; }
+            } else {
+                if (b == Btn::Up || b == Btn::Down) A.focus ^= 1;
+                else if (b == Btn::Cross) {
+                    if (A.focus == 0) newCode();
+                    else { A.qrView = true; A.focus = 0; }
+                } else if (b == Btn::Circle) go(A.back);
+            }
+            break;
+        case Scr::Settings:
+            if (A.subFocus >= 0) {
+                if (b == Btn::Cross) onSettingsCross();
+                else if (b == Btn::Circle) A.subFocus = -1;
+                else moveFocus(b == Btn::Left ? -1 : b == Btn::Right ? 1 : 0,
+                               b == Btn::Up ? -1 : b == Btn::Down ? 1 : 0);
+            } else {
+                if (b == Btn::Cross) onSettingsCross();
+                else if (b == Btn::Circle) go(Scr::Home);
+                else if (b == Btn::Up) moveFocus(0, -1);
+                else if (b == Btn::Down) moveFocus(0, 1);
+            }
+            break;
+        case Scr::Search:
+            if (b == Btn::Cross && A.focus == 0) {
+                const std::string t = openImeDialog("Search", A.query, 64);
+                if (!t.empty()) {
+                    A.query = t;
+                    setScroll(View::Search, 0);
+                }
+            } else if (b == Btn::Cross && A.focus >= 1 && A.focus <= 3) {
+                A.filter = A.focus - 1;
+                setScroll(View::Search, 0);
+            } else if (b == Btn::Cross) {
+                openItem(focusedCard());
+            } else if (b == Btn::Circle) {
+                go(A.back);
+            } else if (b == Btn::Up) moveFocus(0, -1);
+            else if (b == Btn::Down) moveFocus(0, 1);
+            else if (b == Btn::Left) moveFocus(-1, 0);
+            else if (b == Btn::Right) moveFocus(1, 0);
+            break;
+        case Scr::Detail: {
+            if (A.detailIdx < 0 || A.detailIdx >= (int)catalog().size()) { go(A.back); break; }
+            const AddonItem& it = catalog()[(std::size_t)A.detailIdx];
+            const bool ac = acUnlockOffered(it);
+            if (b == Btn::Up || b == Btn::Left) moveFocus(-1, 0);
+            else if (b == Btn::Down || b == Btn::Right) moveFocus(1, 0);
+            else if (b == Btn::Cross && A.focus == 1 && ac) {
+                // AC unlock (v7 payment rules)
+                RpcResult r = callAcUnlock(gCfg, it.id, gSession.accessToken);
+                if (r.ok && (r.rpcOk || jsonGetBool(r.body, "ok", true))) {
+                    ui_sfx(Sfx::Purchase);
+                    applyAccountFromSession();
+                    loadWalletHistory();
+                    AddonItem u = it;
+                    u.unlocked = true;
+                    upsertCatalogItem(u);
+                    A.detailIdx = findItem(u.id);
+                    A.focus = 0;
+                } else {
+                    ui_sfx(Sfx::Error);
+                    A.notice = tr("err_not_enough_ac", A.lang);
+                }
+            } else if (b == Btn::Cross && A.focus == 0) {
+                switch (accessFor(it)) {
+                    case Access::NeedSignIn: startSignIn(); break;
+                    case Access::Download:
+                        if (it.installed) {
+                            A.dl = (int)DemoState::Installed;
+                        } else {
+                            startDownloadFlow(A.detailIdx);
+                        }
+                        break;
+                    case Access::NeedPlan: go(Scr::Plans); break;
+                }
+            } else if (b == Btn::Circle) {
+                go(A.back);
+            }
+            break;
+        }
+        default:   // Home / Deals / Store / Plans / Profile
+            if (b == Btn::Cross) {
+                if (A.scr == Scr::Plans) break;
+                if (A.scr == Scr::Profile && !account().signedIn) { startSignIn(); break; }
+                if (A.scr == Scr::Home && A.focus <= 1) {
+                    const int s = homeSlideAt(A.hero);
+                    if (s >= 0) openItem(s);
+                    else if (s == -1) go(A.focus == 0 ? Scr::Deals : Scr::Store);
+                    else if (account().signedIn) go(Scr::Plans);
+                    else startSignIn();
+                    break;
+                }
+                if (A.scr == Scr::Home && A.focus >= 5 && A.focus <= 11) {
+                    A.filter = A.focus - 5;
+                    setScroll(View::Home, 0);
+                    break;
+                }
+                if (A.scr == Scr::Deals && A.focus <= 4) {
+                    A.filter = A.focus;
+                    setScroll(View::Deals, 0);
+                    break;
+                }
+                if (A.scr == Scr::Store && A.focus == 16) {
+                    setStoreSort((storeSort() + 1) % 3);
+                    setScroll(View::Store, 0);
+                    ui_sfx(Sfx::Toggle);
+                    break;
+                }
+                if (A.scr == Scr::Store && A.focus >= 9 && A.focus <= 15) {
+                    A.filter = A.focus - 9;
+                    setScroll(View::Store, 0);
+                    break;
+                }
+                if (A.scr == Scr::Store && A.focus == 8) {
+                    if (saleLive()) go(Scr::Deals);
+                    else if (!catalog().empty()) openItem(0);
+                    break;
+                }
+                openItem(focusedCard());
+            } else if (b == Btn::Circle) {
+                if (A.scr == Scr::Home) break;          // never exits the app
+                go(Scr::Home);
+            } else if (b == Btn::Up) moveFocus(0, -1);
+            else if (b == Btn::Down) moveFocus(0, 1);
+            else if (b == Btn::Left) moveFocus(-1, 0);
+            else if (b == Btn::Right) moveFocus(1, 0);
+            if (A.scr == Scr::Home && (b == Btn::L2 || b == Btn::R2)) {
+                const int n = (int)homeSlides().size();
+                if (n > 0) {
+                    A.hero += (b == Btn::R2 ? 1 : -1);
+                    if (A.hero < 0) A.hero = n - 1;
+                    if (A.hero >= n) A.hero = 0;
+                    A.dirty = true;
+                }
+            }
+            if (b == Btn::L1 || b == Btn::R1) {
+                static const Scr order[6] = {Scr::Home, Scr::Deals, Scr::Store, Scr::Plans, Scr::Profile, Scr::Settings};
+                int i = 0;
+                while (i < 6 && order[i] != A.scr) ++i;
+                go(order[(i + (b == Btn::R1 ? 1 : 5)) % 6]);
+            }
+            break;
+    }
+    A.dirty = true;
+}
+
+// ---------------------------------------------------------------- drawing ---
+static void drawFrame(UiEngine& e) {
+    const std::string& L = A.lang;
+    switch (A.scr) {
+        case Scr::SignIn:   drawSignIn(e, A.focus, A.code, A.codeSecs, A.codeStatus, L, A.back != Scr::Home, A.qrView); break;
+        case Scr::Home:     drawHome(e, A.focus, A.hero, A.filter, L); break;
+        case Scr::Deals:    drawDeals(e, A.focus, A.filter, L); break;
+        case Scr::Store:    drawStore(e, A.focus, A.filter, L); break;
+        case Scr::Plans:    drawPlans(e, -1, L); break;
+        case Scr::Profile:  drawProfile(e, A.focus, L); break;
+        case Scr::Settings: drawSettings(e, A.focus, A.subFocus, A.autoLaunch, L); break;
+        case Scr::Search:   drawSearch(e, A.focus, A.query, A.filter, L); break;
+        case Scr::Detail:   drawAddonDetail(e, A.focus, A.detailIdx, (DemoState)A.dl.load(), A.dlPct.load(), L, A.notice); break;
+    }
+    if (A.askSignIn) drawSignInRequired(e, A.askFocus, L);
+    if (A.confirmSignOut)
+        drawConfirmDialog(e, tr("signout_q", L), tr("signout_sub", L), tr("settings_signout", L), tr("cancel", L), A.confirmFocus, L);
+    if (!A.toastText.empty()) drawToast(e, A.toastText, L);
+}
+
+// ---------------------------------------------------------------- main ------
+static std::vector<Btn> drainButtons() {
+    std::vector<Btn> out;
+    std::lock_guard<std::mutex> lk(gBtnMx);
+    while (!gBtnQ.empty()) {
+        out.push_back(gBtnQ.front());
+        gBtnQ.pop_front();
     }
     return out;
 }
 
-std::string makeCode() {
-    static const char* alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    std::string c;
-    for (int i = 0; i < 6; ++i) {
-        if (i == 3) c += ' ';
-        c += alphabet[std::rand() % 32];
-    }
-    return c;
-}
-
-std::mutex gLinkMx;   // يحمي حقول ربط الكود بين خيوط الخلفية وواجهة الرسم
-
-int frameSignature(const AppState& s, double t) {
-    double linkUntil;
-    bool linkDone;
-    {
-        std::lock_guard<std::mutex> lk(gLinkMx);
-        linkUntil = s.codeUntil;
-        linkDone = s.linked;
-    }
-    const int codeSecs = static_cast<int>(std::max(0.0, linkUntil - t));
-    int sig = static_cast<int>(s.screen) * 100000000 +
-              s.focus * 1000000 +
-              s.langIndex * 100000 +
-              static_cast<int>(s.demoState) * 10000 +
-              (s.progress >= 100 ? 99 : s.progress) * 100 +
-              (linkDone ? 11 : (codeSecs % 60));
-    sig += s.heroIndex * 31337 + s.filterIndex * 2711 +
-           s.storeFilter * 397 + s.dealsFilter * 53 +
-           (s.autoLaunch ? 31 : 0) +
-           (s.menuOpen ? 101 : 0) + s.searchFilter * 37 +
-           static_cast<int>(s.searchQuery.size()) * 11 +
-           s.contentStamp * 7919;
-    return sig;
-}
-
-} // namespace
-
 int main(int, char**) {
-    setvbuf(stdout, nullptr, _IONBF, 0);
-    std::srand(static_cast<unsigned>(nowSeconds()));
-
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) {
+        std::fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return 1;
     }
+    SDL_Window* window = SDL_CreateWindow("AddonStation", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                                          UiEngine::kWidth, UiEngine::kHeight, 0);
+    if (!window) return 1;
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0);
+    (void)renderer;
+    if (SDL_NumJoysticks() > 0) SDL_JoystickOpen(0);
 
-    SDL_Window* window = SDL_CreateWindow(
-        "pkg addon test",
-        SDL_WINDOWPOS_UNDEFINED,
-        SDL_WINDOWPOS_UNDEFINED,
-        1920,
-        1080,
-        0);
-    if (!window) {
-        SDL_Quit();
+    UiEngine engine;
+    gEngine = &engine;
+    if (!engine.init("assets/ui.pak")) {
+        std::fprintf(stderr, "ui.pak init failed\n");
         return 1;
     }
+    engine.setScaledCacheBudget(48u * 1024u * 1024u);
 
-    SDL_Surface* windowSurface = SDL_GetWindowSurface(window);
-    SDL_Renderer* renderer = windowSurface ? SDL_CreateSoftwareRenderer(windowSurface) : nullptr;
-    if (!renderer) {
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return 1;
+    // ---- language: saved choice, else the PS4 system language (auto) ----
+    gCfg = loadSupabaseConfig();
+    loadUiSettings();
+    if (A.lang.empty() || A.lang == "en") {
+        // first run: prefer the system language unless the user saved one already
+        FILE* f = std::fopen(kUiCfgPath, "r");
+        const bool haveSaved = (f != nullptr);
+        if (f) std::fclose(f);
+        if (!haveSaved) A.lang = langFromSystem(hookSystemLanguage());
     }
+    A.autoLaunch = loadAutoLaunchSetting();
 
-    std::vector<SDL_Joystick*> joysticks;
-    const int numJoy = SDL_NumJoysticks();
-    for (int i = 0; i < numJoy; ++i) {
-        if (SDL_Joystick* joy = SDL_JoystickOpen(i)) {
-            joysticks.push_back(joy);
+    // ---- HUD sounds (v7.2) ----
+    ui_audio_init("assets/sfx");
+    ui_sfx_volume(80);
+
+    // ---- background data loading (runs while the splash is on screen) ----
+    gSession = loadLinkSession();
+    std::thread([]() {
+        loadCatalogNow();
+        loadBannerNow();
+        loadPlansNow();
+        if (gSession.valid) {
+            applyAccountFromSession();
+            loadWalletHistory();
         }
-    }
-    SDL_JoystickEventState(SDL_ENABLE);
+    }).detach();
 
-    pkgtest::UiEngine engine;
-    engine.init("/app0/assets/ui.pak");
-
-    AppState state;
-    const double bootTime = nowSeconds();
-    state.codeUntil = bootTime + 582.0;   // 9:42 like the design
-    state.autoLaunch = pkgtest::loadAutoLaunchSetting();
-    const pkgtest::SupabaseConfig supaCfg = pkgtest::loadSupabaseConfig();
+    // ---- v5.5 legal splash: fade in -> hold -> fade out -> guest Home ----
     {
-        const pkgtest::LinkSession sess = pkgtest::loadLinkSession();
-        if (sess.valid) {
-            state.haveSession = true;
-            state.sessionName = sess.displayName.empty() ? sess.username : sess.displayName;
-            state.sessionPlan = sess.plan;
-            state.sessionAc = sess.acBalance;
+        const auto t0 = std::chrono::steady_clock::now();
+        for (;;) {
+            const int ms = (int)std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - t0).count();
+            const bool running = drawLegalSplashFade(engine, A.lang, ms);
+            engine.present(SDL_GetWindowSurface(window));
+            SDL_UpdateWindowSurface(window);
+            SDL_Delay(16);
+            if (!running) break;
         }
+        releaseLegalSplash(engine);
+        A.dirty = true;
     }
+    ui_sfx(Sfx::AppStart);
 
-    auto currentLang = [&state]() { return std::string(kLangCodes[state.langIndex]); };
-    auto toast = [&state](const std::string& text) {
-        state.toastText = text;
-        state.toastUntil = nowSeconds() + 4.5;
-    };
+    setAppVersion(kAppVersion);
+    if (!gSession.valid) setAccount(Account{});
+    setCoverRequestHandler([](const AddonItem& it) { requestCoverAsync(it); });
 
-    // ---- نظام الدخول برمز (Supabase) --------------------------------------
-    // كود جديد من الخادم (create_console_link_code) — مع كود تجريبي محلي
-    // إذا لم يُضبط Supabase بعد في content_config.hpp أو supabase.cfg.
-    auto requestNewCode = [&state, &supaCfg, &toast]() {
-        {
-            std::lock_guard<std::mutex> lk(gLinkMx);
-            state.linked = false;
-            state.pollToken.clear();
-        }
-        if (!supaCfg.ok()) {
-            const std::string c = makeCode();
-            std::lock_guard<std::mutex> lk(gLinkMx);
-            state.code = c;
-            state.codeUntil = nowSeconds() + 582.0;
-            return;
-        }
-        {
-            std::lock_guard<std::mutex> lk(gLinkMx);
-            state.code = "------";
-            state.codeUntil = nowSeconds() + 30.0;
-        }
-        std::thread([&state, &supaCfg, &toast]() {
-            const pkgtest::RpcResult r =
-                pkgtest::callCreateLinkCode(supaCfg, "ps4", "PlayStation 4");
-            if (r.ok && r.rpcOk) {
-                std::string code = pkgtest::jsonGetString(r.body, "formatted_code");
-                if (code.empty()) code = pkgtest::jsonGetString(r.body, "code");
-                const std::string token = pkgtest::jsonGetString(r.body, "poll_token");
-                const double secs = static_cast<double>(
-                    pkgtest::jsonGetInt(r.body, "expires_in_seconds", 600));
-                std::lock_guard<std::mutex> lk(gLinkMx);
-                state.code = code;
-                state.pollToken = token;
-                state.codeUntil = nowSeconds() + secs;
-            } else {
-                const std::string c = makeCode();
-                {
-                    std::lock_guard<std::mutex> lk(gLinkMx);
-                    state.code = c;
-                    state.codeUntil = nowSeconds() + 582.0;
-                    state.pollToken.clear();
-                }
-                toast("Link service unavailable \xE2\x80\x94 demo code");
-            }
-        }).detach();
-    };
-
-    // استطلاع حالة الكود كل 3 ثوانٍ (poll_console_link_code)
-    std::thread linkPoller([&state, &supaCfg, &toast, &currentLang]() {
-        while (true) {
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-            std::string code, token;
-            {
-                std::lock_guard<std::mutex> lk(gLinkMx);
-                if (state.linked || state.pollToken.empty()) continue;
-                code = state.code;
-                token = state.pollToken;
-            }
-            const pkgtest::RpcResult r = pkgtest::callPollLinkCode(supaCfg, code, token);
-            if (!r.ok || !r.rpcOk) continue;
-            const std::string status = pkgtest::jsonGetString(r.body, "status");
-            if (status == "waiting") {
-                const double secs = static_cast<double>(
-                    pkgtest::jsonGetInt(r.body, "expires_in_seconds", 600));
-                std::lock_guard<std::mutex> lk(gLinkMx);
-                state.codeUntil = nowSeconds() + secs;
-            } else if (status == "linked") {
-                pkgtest::LinkSession s;
-                s.valid = true;
-                s.userId = pkgtest::jsonGetString(r.body, "user_id");
-                s.username = pkgtest::jsonGetString(r.body, "username");
-                s.displayName = pkgtest::jsonGetString(r.body, "display_name");
-                s.plan = pkgtest::jsonGetString(r.body, "plan");
-                s.acBalance = pkgtest::jsonGetInt(r.body, "ac_balance", 0);
-                s.accessToken = pkgtest::jsonGetString(r.body, "access_token");
-                s.refreshToken = pkgtest::jsonGetString(r.body, "refresh_token");
-                pkgtest::saveLinkSession(s);
-                const std::string name =
-                    s.displayName.empty() ? s.username : s.displayName;
-                {
-                    std::lock_guard<std::mutex> lk(gLinkMx);
-                    state.linked = true;
-                    state.haveSession = true;
-                    state.sessionName = name;
-                    state.sessionPlan = s.plan;
-                    state.sessionAc = s.acBalance;
-                }
-                toast(pkgtest::tr("link_linked", currentLang()));
-            } else if (status == "expired") {
-                {
-                    std::lock_guard<std::mutex> lk(gLinkMx);
-                    state.codeUntil = nowSeconds();
-                    state.pollToken.clear();
-                }
-                toast(pkgtest::tr("link_expired", currentLang()));
-            } else if (status == "consumed") {
-                std::lock_guard<std::mutex> lk(gLinkMx);
-                state.pollToken.clear();
-            }
-        }
-    });
-    linkPoller.detach();
-
-    // تحميل البانرات والمحتوى المنشور من Supabase (اختياري — صامت عند غياب التهيئة)
-    std::thread contentLoader([&state, &supaCfg]() {
-        if (!supaCfg.ok()) return;
-        const std::vector<pkgtest::BannerData> banners = pkgtest::fetchStoreBanners(supaCfg);
-        const std::vector<pkgtest::ItemData> items = pkgtest::fetchContentItems(supaCfg, 20);
-        if (banners.empty() && items.empty()) return;
-        std::lock_guard<std::mutex> lk(gLinkMx);
-        state.banners = banners;
-        state.items = items;
-        ++state.contentStamp;
-    });
-    contentLoader.detach();
-    auto go = [&state](Screen s) {
-        if (state.screen != s) state.prevScreen = state.screen;
-        state.screen = s;
-        state.focus = 0;
-    };
-
-    // Background auto-sync: delivers staged installs the moment com.mojang is
-    // mounted (game open/suspended) — and flips the button to "Installed ✓"
-    // with the completion toast when the deferred install finishes.
-    std::thread syncWatcher([&state, &currentLang, &toast]() {
-        while (true) {
-            if (!state.installing.load()) {
-                const pkgtest::CopyResult res =
-                    pkgtest::syncPendingAddonsIfMounted(kStageDir, "", currentLang());
-                if (res.ok && state.demoState == pkgtest::DemoState::Installing) {
-                    state.demoState = pkgtest::DemoState::Installed;
-                    state.progress = 100;
-                    toast(pkgtest::formatEnjoyNotification(
-                        pkgtest::brandTitle(res.lastAddonName.empty() ? "the addon" : res.lastAddonName),
-                        currentLang()));
-                }
-            }
+    // ---- syncWatcher: staged .raw installs complete when Minecraft mounts ----
+    std::thread([]() {
+        for (;;) {
             std::this_thread::sleep_for(std::chrono::seconds(2));
+            CopyResult r = syncPendingAddonsIfMounted(kStageDir, "", A.lang);
+            if (r.ok && !r.lastAddonName.empty()) {
+                ui_sfx(Sfx::DownloadDone);
+                toast(formatEnjoyNotification(r.lastAddonName, A.lang));
+            }
         }
-    });
-    syncWatcher.detach();
+    }).detach();
 
-    // اختيار عنصر السيرفر للصفحة التفصيلية (بطاقات الحصريات/المتجر/العروض)
-    auto selectDetail = [&state](int idx, bool exclusive) {
-        std::lock_guard<std::mutex> lk(gLinkMx);
-        state.detailItemId.clear();
-        state.detailTitle.clear();
-        int n = 0;
-        for (const pkgtest::ItemData& it : state.items) {
-            if (exclusive && !it.isExclusive) continue;
-            if (n == idx) {
-                state.detailItemId = it.id;
-                state.detailTitle = it.title;
-                break;
-            }
-            ++n;
-        }
-    };
-    auto selectDetailAbs = [&state](int absIdx) {
-        std::lock_guard<std::mutex> lk(gLinkMx);
-        state.detailItemId.clear();
-        state.detailTitle.clear();
-        if (absIdx >= 0 && absIdx < static_cast<int>(state.items.size())) {
-            state.detailItemId = state.items[absIdx].id;
-            state.detailTitle = state.items[absIdx].title;
-        }
-    };
-
-    // Download the .raw from the GitHub Release, then install it (dual-mode)
-    auto triggerInstall = [&state, &currentLang, &toast, &supaCfg]() {
-        if (state.installing.load()) return;
-        std::string itemId, itemTitle;
-        {
-            std::lock_guard<std::mutex> lk(gLinkMx);
-            itemId = state.detailItemId;
-            itemTitle = state.detailTitle;
-        }
-        const pkgtest::LinkSession sess = pkgtest::loadLinkSession();
-        const bool useServer = !itemId.empty() && supaCfg.ok() && sess.valid &&
-                               !sess.accessToken.empty();
-        if (!useServer &&
-            (std::string(pkgtest::content::kAddonFolderName).empty() ||
-             std::string(pkgtest::content::kDownloadUrl).empty())) {
-            state.demoState = pkgtest::DemoState::Idle;
-            state.progress = 0;
-            toast("No content configured yet — add it in content_config.hpp");
-            return;
-        }
-        state.installing.store(true);
-        state.demoState = pkgtest::DemoState::Downloading;
-        state.progress = 0;
-
-        std::thread([&, lang = currentLang(), useServer, itemId, itemTitle, sess]() {
-            if (useServer) {
-                // المسار الرسمي: طلب التحميل المسجَّل ثم تنزيل كل حزمة لوجهتها
-                const pkgtest::DownloadGrant grant =
-                    pkgtest::callRecordContentDownload(supaCfg, itemId, sess.accessToken);
-                if (!grant.ok) {
-                    state.demoState = pkgtest::DemoState::Idle;
-                    state.progress = 0;
-                    toast(pkgtest::tr("link_failed", lang));
-                    state.installing.store(false);
-                    return;
-                }
-                std::vector<pkgtest::PackTarget> packs = grant.packs;
-                if (packs.empty()) {
-                    pkgtest::PackTarget t;
-                    t.target = "resource_packs";
-                    t.destFolder = itemTitle.empty() ? "addon" : itemTitle;
-                    t.ps4RawUrl = grant.ps4RawUrl;
-                    packs.push_back(t);
-                }
-                const int total = static_cast<int>(packs.size());
-                pkgtest::CopyResult lastRes;
-                for (int i = 0; i < total; ++i) {
-                    const pkgtest::PackTarget& pk = packs[static_cast<std::size_t>(i)];
-                    const std::string rawName = pk.rawFile.empty()
-                        ? (pk.destFolder.empty() ? ("pack" + std::to_string(i)) : pk.destFolder)
-                        : pk.rawFile;
-                    const std::string rawPath = std::string(kStageDir) + "/" + rawName + ".raw";
-                    const std::string url = pk.ps4RawUrl.empty() ? grant.ps4RawUrl : pk.ps4RawUrl;
-                    const int base = i * 100 / total;
-                    const pkgtest::DownloadResult dl = pkgtest::downloadToFile(
-                        url, rawPath,
-                        [&](int percent) {
-                            state.demoState = pkgtest::DemoState::Downloading;
-                            state.progress = std::min(99, base + percent / total);
-                        });
-                    if (!dl.ok) {
-                        state.demoState = pkgtest::DemoState::Idle;
-                        state.progress = 0;
-                        toast(pkgtest::tr("link_failed", lang));
-                        state.installing.store(false);
-                        return;
-                    }
-                    state.demoState = pkgtest::DemoState::Installing;
-                    state.progress = 50;
-                    lastRes = pkgtest::installOrQueueAddon(
-                        rawPath,
-                        pk.destFolder.empty() ? itemTitle : pk.destFolder,
-                        kStageDir,
-                        "",
-                        pk.target.empty() ? "resource_packs" : pk.target,
-                        lang,
-                        [&](pkgtest::InstallPhase phase, int percent) {
-                            if (phase == pkgtest::InstallPhase::Installing) {
-                                state.demoState = pkgtest::DemoState::Installing;
-                                state.progress = std::min(99, 50 + percent / 4);
-                            } else if (phase == pkgtest::InstallPhase::Installed) {
-                                state.demoState = pkgtest::DemoState::Installed;
-                                state.progress = 100;
-                            }
-                        },
-                        state.autoLaunch);
-                    if (!lastRes.ok) {
-                        state.demoState = pkgtest::DemoState::Idle;
-                        state.progress = 0;
-                        state.installing.store(false);
-                        return;
-                    }
-                }
-                if (lastRes.ok && lastRes.queuedForMinecraft) {
-                    state.demoState = pkgtest::DemoState::Installing;
-                    state.progress = 75;
-                } else if (lastRes.ok) {
-                    state.demoState = pkgtest::DemoState::Installed;
-                    state.progress = 100;
-                    state.toastText = pkgtest::formatEnjoyNotification(
-                        pkgtest::brandTitle(itemTitle.empty() ? "the addon" : itemTitle), lang);
-                    state.toastUntil = nowSeconds() + 6.0;
-                }
-                state.installing.store(false);
-                return;
-            }
-
-            // المسار التجريبي: من content_config.hpp (GitHub Release مباشرة)
-            const std::string rawPath =
-                std::string(kStageDir) + "/" + pkgtest::content::kAddonFolderName + ".raw";
-
-            const pkgtest::DownloadResult dl = pkgtest::downloadToFile(
-                pkgtest::content::kDownloadUrl,
-                rawPath,
-                [&](int percent) {
-                    state.demoState = pkgtest::DemoState::Downloading;
-                    state.progress = percent;
-                });
-
-            if (!dl.ok) {
-                state.demoState = pkgtest::DemoState::Idle;
-                state.progress = 0;
-                state.installing.store(false);
-                return;
-            }
-
-            state.demoState = pkgtest::DemoState::Installing;
-            state.progress = 10;
-
-            const pkgtest::CopyResult res = pkgtest::installOrQueueAddon(
-                rawPath,
-                pkgtest::content::kAddonFolderName,
-                kStageDir,
-                "",
-                "resource_packs",
-                lang,
-                [&](pkgtest::InstallPhase phase, int percent) {
-                    if (phase == pkgtest::InstallPhase::Installing) {
-                        state.demoState = pkgtest::DemoState::Installing;
-                        state.progress = std::min(100, 10 + percent * 9 / 10);
-                    } else if (phase == pkgtest::InstallPhase::Installed) {
-                        state.demoState = pkgtest::DemoState::Installed;
-                        state.progress = 100;
-                    }
-                },
-                state.autoLaunch);
-
-            if (res.ok && res.queuedForMinecraft) {
-                state.demoState = pkgtest::DemoState::Installing;
-                state.progress = 75;
-            } else if (res.ok) {
-                state.demoState = pkgtest::DemoState::Installed;
-                state.progress = 100;
-                state.toastText = pkgtest::formatEnjoyNotification(pkgtest::brandTitle(pkgtest::content::kAddonFolderName), lang);
-                state.toastUntil = nowSeconds() + 6.0;
-            } else {
-                state.demoState = pkgtest::DemoState::Idle;
-                state.progress = 0;
-            }
-            state.installing.store(false);
-        }).detach();
-    };
-
-    // ---- input helpers -------------------------------------------------
-    // Joystick map (as used by the working v0.5 app): 0=✕ 1=○ 2=□ 3=△ 4=L1 5=R1 6=L2 7=R2
-    auto back = [&]() {
-        if (state.menuOpen) { state.menuOpen = false; return; }
-        switch (state.screen) {
-            case Screen::Welcome: break;  // stay (guest entry screen)
-            case Screen::CodeLink: go(Screen::Welcome); break;
-            case Screen::Email: go(Screen::Welcome); break;
-            case Screen::Language: go(state.prevScreen == Screen::Language ? Screen::Welcome : state.prevScreen); break;
-            case Screen::Home:
-            case Screen::Deals:
-            case Screen::Store:
-            case Screen::Settings:
-                go(Screen::Welcome);
-                break;
-            case Screen::Detail: go(state.prevScreen == Screen::Detail ? state.tabScreen : state.prevScreen); break;
-            case Screen::Search:
-            case Screen::Profile:
-            case Screen::Wallet:
-            case Screen::Plans:
-                go(state.prevScreen == state.screen ? Screen::Home : state.prevScreen);
-                break;
-            case Screen::Confirm: go(Screen::Settings); break;
-        }
-    };
-
-    auto activate = [&](int cross) {
-        (void)cross;
-        if (state.menuOpen) {
-            state.menuOpen = false;
-            if (state.menuFocus == 0) go(Screen::Profile);
-            else if (state.menuFocus == 1) go(Screen::Wallet);
-            else if (state.menuFocus == 2) go(Screen::Plans);
-            else go(Screen::Search);
-            return;
-        }
-        switch (state.screen) {
-            case Screen::Welcome:
-                if (state.focus == 0) { requestNewCode(); go(Screen::CodeLink); }
-                else if (state.focus == 1) go(Screen::Email);
-                else { state.tabScreen = Screen::Home; go(Screen::Home); }
-                break;
-            case Screen::CodeLink:
-                requestNewCode();
-                toast(pkgtest::tr("link_new", currentLang()));
-                break;
-            case Screen::Email:
-                if (state.focus == 0) {
-                    const std::string t = pkgtest::openImeDialog("Email", state.email, 64);
-                    if (!t.empty()) { state.email = t; state.emailError = false; }
-                } else if (state.focus == 1) {
-                    const std::string t = pkgtest::openImeDialog("Password", state.pass, 32);
-                    if (!t.empty()) state.pass = t;
-                } else {
-                    if (state.email.empty()) { state.emailError = true; }
-                    else if (!supaCfg.ok()) {
-                        // بدون تهيئة: دخول تجريبي محلي
-                        state.emailError = false; state.tabScreen = Screen::Home; go(Screen::Home);
-                    } else {
-                        // دخول حقيقي عبر Supabase Auth
-                        const std::string em = state.email;
-                        const std::string pw = state.pass;
-                        std::thread([&state, &supaCfg, &toast, &currentLang, em, pw]() {
-                            const pkgtest::AuthLogin auth =
-                                pkgtest::callEmailLogin(supaCfg, em, pw);
-                            if (!auth.ok) {
-                                state.emailError = true;
-                                toast(pkgtest::tr("login_failed", currentLang()));
-                                return;
-                            }
-                            pkgtest::LinkSession s;
-                            s.valid = true;
-                            s.userId = auth.userId;
-                            s.username = auth.email;
-                            s.displayName = auth.displayName;
-                            s.accessToken = auth.accessToken;
-                            s.refreshToken = auth.refreshToken;
-                            pkgtest::saveLinkSession(s);
-                            {
-                                std::lock_guard<std::mutex> lk(gLinkMx);
-                                state.haveSession = true;
-                                state.sessionName = auth.displayName;
-                                state.sessionPlan = "free";
-                                state.sessionAc = 0;
-                            }
-                            state.emailError = false;
-                            state.tabScreen = Screen::Home;
-                            state.screen = Screen::Home;
-                            state.focus = 0;
-                            toast(pkgtest::tr("login_ok", currentLang()));
-                        }).detach();
-                    }
-                }
-                break;
-            case Screen::Language:
-                state.langIndex = state.focus;
-                go(state.prevScreen == Screen::Language ? Screen::Welcome : state.prevScreen);
-                break;
-            case Screen::Home:
-                // banner primary -> store, banner back -> return,
-                // exclusive/recommended cards -> the addon page,
-                // category chips -> apply a filter (never the install page)
-                if (state.focus == 0) { state.tabScreen = Screen::Store; go(Screen::Store); }
-                else if (state.focus == 1) { back(); }
-                else if (state.focus <= 4) { selectDetail(state.focus - 2, true); go(Screen::Detail); }
-                else if (state.focus <= 11) {
-                    state.filterIndex = state.focus - 5;
-                    toast(std::string("Filter: ") + kHomeChips[state.filterIndex]);
-                } else { selectDetail(state.focus - 12, false); go(Screen::Detail); }
-                break;
-            case Screen::Deals:
-                if (state.focus <= 4) {
-                    state.dealsFilter = state.focus;
-                    toast(std::string("Filter: ") + kDealsChips[state.dealsFilter]);
-                } else { selectDetail(state.focus - 5, false); go(Screen::Detail); }
-                break;
-            case Screen::Store:
-                // cards -> the addon page, promo button -> Deals, chips -> filter
-                if (state.focus <= 4) { selectDetail(state.focus, false); go(Screen::Detail); }
-                else if (state.focus == 8) { state.tabScreen = Screen::Deals; go(Screen::Deals); }
-                else {
-                    state.storeFilter = std::min(2, std::max(0, state.focus - 9));
-                    toast(std::string("Filter: ") + kStoreFilters[state.storeFilter]);
-                }
-                break;
-            case Screen::Settings:
-                if (state.focus == 0) { state.focus = state.langIndex; state.prevScreen = state.screen; state.screen = Screen::Language; }
-                else if (state.focus == 1) {
-                    std::lock_guard<std::mutex> lk(gLinkMx);
-                    toast(state.haveSession ? ("Account: " + state.sessionName)
-                                            : std::string("Account: name@example.com"));
-                }
-                else if (state.focus == 2) {
-                    state.autoLaunch = !state.autoLaunch;
-                    pkgtest::saveAutoLaunchSetting(state.autoLaunch);
-                    toast(pkgtest::tr(state.autoLaunch ? "autolaunch_on" : "autolaunch_off", currentLang()));
-                }
-                else if (state.focus == 3) { requestNewCode(); go(Screen::CodeLink); }
-                else if (state.focus == 4) toast("AddonStation PS4 v0.22 — official app");
-                else go(Screen::Confirm);
-                break;
-            case Screen::Detail:
-                triggerInstall();
-                break;
-            case Screen::Search: {
-                if (state.focus == 0) {
-                    const std::string q = pkgtest::openImeDialog("Search", state.searchQuery, 80);
-                    if (!q.empty()) state.searchQuery = q;
-                } else if (state.focus <= 3) {
-                    state.searchFilter = state.focus - 1;
-                    toast(std::string("Filter: ") + (state.searchFilter == 0 ? "All" :
-                          (state.searchFilter == 1 ? "Addons" : "Worlds")));
-                } else {
-                    std::vector<int> hits;
-                    {
-                        std::lock_guard<std::mutex> lk(gLinkMx);
-                        hits = searchMatchIdx(state.items, state.searchQuery, state.searchFilter);
-                    }
-                    const int j = state.focus - 4;
-                    if (j < static_cast<int>(hits.size())) {
-                        selectDetailAbs(hits[j]);
-                        go(Screen::Detail);
-                    }
-                }
-                break;
-            }
-            case Screen::Profile:
-                if (state.focus == 0) go(Screen::Wallet);
-                else if (state.focus == 1) go(Screen::Plans);
-                else { state.tabScreen = Screen::Settings; go(Screen::Settings); }
-                break;
-            case Screen::Wallet:
-            case Screen::Plans:
-                break;  // view-only screens
-            case Screen::Confirm:
-                if (state.focus == 0) go(Screen::Settings);
-                else {
-                    toast("Signed out");
-                    state.email.clear();
-                    state.pass.clear();
-                    pkgtest::clearLinkSession();
-                    {
-                        std::lock_guard<std::mutex> lk(gLinkMx);
-                        state.haveSession = false;
-                        state.sessionName.clear();
-                        state.sessionPlan.clear();
-                        state.sessionAc = 0;
-                        state.linked = false;
-                        state.pollToken.clear();
-                    }
-                    go(Screen::Welcome);
-                }
-                break;
-        }
-    };
-
-    auto moveFocus = [&](int dx, int dy) {
-        if (state.menuOpen) {
-            if (dy != 0) state.menuFocus = (state.menuFocus + (dy > 0 ? 1 : 3)) % 4;
-            return;
-        }
-        switch (state.screen) {
-            case Screen::Welcome: {
-                if (dy != 0) state.focus = (state.focus + (dy > 0 ? 1 : 2)) % 3;
-                break;
-            }
-            case Screen::Email: {
-                if (dy != 0) state.focus = std::max(0, std::min(2, state.focus + dy));
-                break;
-            }
-            case Screen::Language: {
-                if (dy != 0) state.focus = (state.focus + (dy > 0 ? 1 : 7)) % 8;
-                if (dx != 0) state.focus = (state.focus + (dx > 0 ? 1 : 7)) % 8;
-                break;
-            }
-            case Screen::Home: {
-                // rows: [0-1] banner | [2-4] exclusives | [5-11] chips | [12-16] recommended
-                static const int rowStart[4] = {0, 2, 5, 12};
-                static const int rowLen[4] = {2, 3, 7, 5};
-                int row = 0, col = state.focus;
-                for (int r = 3; r >= 0; --r) {
-                    if (state.focus >= rowStart[r]) { row = r; col = state.focus - rowStart[r]; break; }
-                }
-                if (dy != 0) {
-                    row = std::max(0, std::min(3, row + dy));
-                    col = std::min(col, rowLen[row] - 1);
-                } else if (dx != 0) {
-                    col = (col + dx + rowLen[row]) % rowLen[row];
-                }
-                state.focus = rowStart[row] + col;
-                break;
-            }
-            case Screen::Store: {
-                // rows top->bottom: promo button [8] | filters [9-11] | cards [0-4]
-                int row = (state.focus == 8) ? 0 : (state.focus >= 9 ? 1 : 2);
-                int col = (row == 1) ? state.focus - 9 : (row == 2 ? state.focus : 0);
-                if (dy != 0) {
-                    row = (row + (dy > 0 ? 1 : 2)) % 3;
-                    col = std::min(col, row == 1 ? 2 : (row == 2 ? 4 : 0));
-                } else if (dx != 0 && row != 0) {
-                    const int len = (row == 1 ? 3 : 5);
-                    col = (col + dx + len) % len;
-                }
-                state.focus = (row == 0) ? 8 : (row == 1 ? 9 + col : col);
-                break;
-            }
-            case Screen::Deals: {
-                // rows: filter chips [0-4] | card grid [5-9]
-                int row = state.focus < 5 ? 0 : 1;
-                int col = state.focus - (row ? 5 : 0);
-                if (dy != 0) {
-                    row = 1 - row;
-                    col = std::min(col, 4);
-                } else if (dx != 0) {
-                    col = (col + dx + 5) % 5;
-                }
-                state.focus = row * 5 + col;
-                break;
-            }
-            case Screen::Settings: {
-                if (dy != 0) state.focus = std::max(0, std::min(5, state.focus + dy));
-                break;
-            }
-            case Screen::Confirm: {
-                if (dy != 0) state.focus = 1 - state.focus;
-                break;
-            }
-            case Screen::Search: {
-                // rows: field[0] | filter chips[1-3] | result cards[4-8]
-                if (dy != 0) {
-                    int row = (state.focus == 0) ? 0 : (state.focus <= 3 ? 1 : 2);
-                    row = std::max(0, std::min(2, row + dy));
-                    if (row == 0) state.focus = 0;
-                    else if (row == 1) state.focus = 1 + std::min(2, (state.focus <= 3 ? state.focus - 1 : 0));
-                    else state.focus = 4 + std::min(4, (state.focus >= 4 ? state.focus - 4 : 0));
-                } else if (dx != 0 && state.focus >= 1) {
-                    if (state.focus <= 3) state.focus = 1 + ((state.focus - 1 + dx + 3) % 3);
-                    else state.focus = 4 + ((state.focus - 4 + dx + 5) % 5);
-                }
-                break;
-            }
-            case Screen::Profile: {
-                if (dy != 0) state.focus = std::max(0, std::min(2, state.focus + dy));
-                break;
-            }
-            case Screen::Wallet: {
-                if (dy != 0) state.focus = std::max(0, std::min(5, state.focus + dy));
-                break;
-            }
-            case Screen::Plans: {
-                if (dy != 0) state.focus = std::max(0, std::min(2, state.focus + dy));
-                break;
-            }
-            case Screen::Detail:
-            case Screen::CodeLink:
-                break;
-        }
-    };
-
-    auto switchTab = [&](int dir) {
-        if (state.menuOpen) return;
-        // L1/R1 tabs are ONLY for the app area (Home Deals Store Settings)
-        switch (state.screen) {
-            case Screen::Home:
-            case Screen::Deals:
-            case Screen::Store:
-            case Screen::Settings:
-            case Screen::Detail:
-                break;
-            default:
-                return;
-        }
-        static const Screen tabs[4] = {Screen::Home, Screen::Deals, Screen::Store, Screen::Settings};
-        int idx = 0;
-        if (state.screen == Screen::Deals) idx = 1;
-        else if (state.screen == Screen::Store || state.screen == Screen::Detail) idx = 2;
-        else if (state.screen == Screen::Settings) idx = 3;
-        idx = (idx + dir + 4) % 4;
-        state.tabScreen = tabs[idx];
-        go(tabs[idx]);
-    };
-
+    // ---- main loop: redraw only when something changes (dirty flag) ----
+    std::time_t lastSec = std::time(nullptr);
     bool running = true;
-    SDL_Event ev;
-    int lastSig = -1;
-    bool lastToastVisible = false;
-    bool frameDirty = true;   // first frame must present
-    long long frameCount = 0;
-
     while (running) {
-        const double t = nowSeconds();
-        const std::string lang = currentLang();
-        bool stateChanged = false;
-        bool backRequested = false;
-
+        SDL_Event ev;
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT) {
-                backRequested = true;   // (○ على السوني) — لا خروج من التطبيق
+                pushBtn(Btn::Circle);       // ○ never exits the app
             } else if (ev.type == SDL_JOYHATMOTION) {
                 const Uint8 hat = ev.jhat.value;
-                if (hat & SDL_HAT_UP) moveFocus(0, -1);
-                if (hat & SDL_HAT_DOWN) moveFocus(0, 1);
-                if (hat & SDL_HAT_LEFT) moveFocus(-1, 0);
-                if (hat & SDL_HAT_RIGHT) moveFocus(1, 0);
-                stateChanged = true;
+                if (hat & SDL_HAT_UP) pushBtn(Btn::Up);
+                if (hat & SDL_HAT_DOWN) pushBtn(Btn::Down);
+                if (hat & SDL_HAT_LEFT) pushBtn(Btn::Left);
+                if (hat & SDL_HAT_RIGHT) pushBtn(Btn::Right);
             } else if (ev.type == SDL_JOYBUTTONDOWN) {
                 const Uint8 b = ev.jbutton.button;
-                if (b == 0) { activate(1); stateChanged = true; }
-                else if (b == 1) { backRequested = true; }
-                else if (b == 2) { // square - language on Welcome, favorite on Detail, Search elsewhere
-                    if (state.screen == Screen::Detail) {
-                        state.saved = !state.saved;
-                        toast(state.saved ? "Saved to your favorites" : "Removed from favorites");
-                    } else if (state.screen == Screen::Welcome) {
-                        state.prevScreen = state.screen;
-                        state.focus = state.langIndex;
-                        if (state.screen != Screen::Language) state.screen = Screen::Language;
-                    } else {
-                        state.focus = 0;
-                        go(Screen::Search);
-                    }
-                    stateChanged = true;
-                } else if (b == 3) { // triangle - menu overlay (open Minecraft on Detail)
-                    if (state.screen == Screen::Detail) {
-                        toast("Opening Minecraft\xE2\x80\xA6");
-                        pkgtest::launchMinecraftOnPs4();
-                    } else if (state.menuOpen) {
-                        state.menuOpen = false;
-                    } else if (state.screen != Screen::Welcome && state.screen != Screen::CodeLink &&
-                               state.screen != Screen::Email && state.screen != Screen::Language &&
-                               state.screen != Screen::Confirm) {
-                        state.menuOpen = true;
-                        state.menuFocus = 0;
-                    }
-                    stateChanged = true;
-                } else if (b == 4) { switchTab(-1); stateChanged = true; }             // L1
-                else if (b == 5) { switchTab(1); stateChanged = true; }                // R1
-                else if (b == 6) {                                                   // L2 - prev offer on Home
-                    if (state.screen == Screen::Home) state.heroIndex = (state.heroIndex + 2) % 3;
-                    else switchTab(-1);
-                    stateChanged = true;
-                } else if (b == 7) {                                                 // R2 - next offer on Home
-                    if (state.screen == Screen::Home) state.heroIndex = (state.heroIndex + 1) % 3;
-                    else switchTab(1);
-                    stateChanged = true;
-                }
+                // v0.5 map: 0=✕ 1=○ 2=□ 3=△ 4=L1 5=R1 6=L2 7=R2
+                if (b == 0) pushBtn(Btn::Cross);
+                else if (b == 1) pushBtn(Btn::Circle);
+                else if (b == 2) pushBtn(Btn::Square);
+                else if (b == 3) pushBtn(Btn::Triangle);
+                else if (b == 4) pushBtn(Btn::L1);
+                else if (b == 5) pushBtn(Btn::R1);
+                else if (b == 6) pushBtn(Btn::L2);
+                else if (b == 7) pushBtn(Btn::R2);
             } else if (ev.type == SDL_KEYDOWN) {
                 const SDL_Keycode k = ev.key.keysym.sym;
-                if (k == SDLK_ESCAPE) { backRequested = true; }
-                if (k == SDLK_UP) moveFocus(0, -1);
-                else if (k == SDLK_DOWN) moveFocus(0, 1);
-                else if (k == SDLK_LEFT) moveFocus(-1, 0);
-                else if (k == SDLK_RIGHT) moveFocus(1, 0);
-                else if (k == SDLK_RETURN || k == SDLK_SPACE) activate(1);
-                else if (k == SDLK_BACKSPACE) back();
-                else if (k == SDLK_l) {
-                    state.prevScreen = state.screen;
-                    state.focus = state.langIndex;
-                    if (state.screen != Screen::Language) state.screen = Screen::Language;
-                } else if (k == SDLK_LEFTBRACKET) {
-                    if (state.screen == Screen::Home) state.heroIndex = (state.heroIndex + 2) % 3;
-                    else switchTab(-1);
-                } else if (k == SDLK_RIGHTBRACKET) {
-                    if (state.screen == Screen::Home) state.heroIndex = (state.heroIndex + 1) % 3;
-                    else switchTab(1);
+                if (k == SDLK_UP) pushBtn(Btn::Up);
+                else if (k == SDLK_DOWN) pushBtn(Btn::Down);
+                else if (k == SDLK_LEFT) pushBtn(Btn::Left);
+                else if (k == SDLK_RIGHT) pushBtn(Btn::Right);
+                else if (k == SDLK_RETURN || k == SDLK_SPACE) pushBtn(Btn::Cross);
+                else if (k == SDLK_BACKSPACE || k == SDLK_ESCAPE) pushBtn(Btn::Circle);
+                else if (k == SDLK_t) pushBtn(Btn::Triangle);
+                else if (k == SDLK_s) pushBtn(Btn::Square);
+                else if (k == SDLK_LEFTBRACKET) pushBtn(Btn::L2);
+                else if (k == SDLK_RIGHTBRACKET) pushBtn(Btn::R2);
+                else if (k == SDLK_COMMA) pushBtn(Btn::L1);
+                else if (k == SDLK_PERIOD) pushBtn(Btn::R1);
+            }
+        }
+        for (Btn b : drainButtons()) handle(b);
+
+        const std::time_t now = std::time(nullptr);
+        if (now != lastSec) {
+            if (A.scr == Scr::SignIn && A.codeStatus == 0 && A.codeSecs > 0) {
+                --A.codeSecs;
+                A.dirty = true;
+            }
+            if (now / 60 != lastSec / 60) A.dirty = true;   // clock + sale countdown
+            lastSec = now;
+        }
+        if (A.scr == Scr::SignIn && A.codeStatus == 0) {
+            static std::time_t lastPoll = 0;
+            if (now - lastPoll >= 2) {
+                lastPoll = now;
+                const int r = pollCodeOnce();
+                if (r == 1) {
+                    ui_sfx(Sfx::Success);
+                    finishSignIn();
+                    A.codeStatus = 1;
+                    A.focus = 0;
+                    A.dirty = true;
+                } else if (r == 2 || r == 3) {
+                    A.codeStatus = r;
+                    A.dirty = true;
                 }
-                stateChanged = true;
             }
         }
 
-        // ○ / ESC never exits the app — they only navigate back inside it
-        if (backRequested) {
-            back();
-            stateChanged = true;
+        pumpCovers();
+
+        if (!A.toastText.empty() && (int)(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                              std::chrono::steady_clock::now().time_since_epoch()).count()) > A.toastUntil) {
+            A.toastText.clear();
+            A.dirty = true;
         }
 
-        // code countdown expiry
-        if (state.screen == Screen::CodeLink) {
-            std::lock_guard<std::mutex> lk(gLinkMx);
-            if (!state.linked && t > state.codeUntil) state.codeUntil = t;  // hold at 0
-        }
-
-        // Redraw ONLY when something changed (perf):
-        const int sig = frameSignature(state, t);
-        const bool toastVisible = !state.toastText.empty() && t < state.toastUntil;
-        const bool codeAnim = state.screen == Screen::CodeLink && (frameCount % 20 == 0);
-
-        if (stateChanged || sig != lastSig || toastVisible != lastToastVisible ||
-            codeAnim) {
-            std::string accountCopy;
-            std::string sessionPlanCopy;
-            long sessionAcCopy = 0;
-            bool searchNoResults = false;
-            pkgtest::HeroInfo heroInfos[3];
-            pkgtest::CardInfo exInfos[3];
-            pkgtest::CardInfo gridInfos[5];
-            {
-                std::lock_guard<std::mutex> lk(gLinkMx);
-                accountCopy = state.haveSession ? state.sessionName
-                                                : std::string("name@example.com");
-                sessionPlanCopy = state.sessionPlan;
-                sessionAcCopy = state.sessionAc;
-                for (int i = 0; i < 3 && i < static_cast<int>(state.banners.size()); ++i) {
-                    const pkgtest::BannerData& b = state.banners[i];
-                    heroInfos[i].title = pkgtest::i18nPick(b.titleI18n, lang);
-                    heroInfos[i].subtitle = pkgtest::i18nPick(b.subtitleI18n, lang);
-                    heroInfos[i].kicker = pkgtest::i18nPick(b.kickerI18n, lang);
-                    heroInfos[i].badge = !b.badgeText.empty() ? b.badgeText
-                        : (b.discountPercent > 0 ? ("-" + std::to_string(b.discountPercent) + "%")
-                                                 : std::string());
-                }
-                int exN = 0, gridN = 0;
-                for (const pkgtest::ItemData& it : state.items) {
-                    pkgtest::CardInfo c;
-                    c.title = it.title;
-                    c.price = std::to_string(it.saleAcPrice >= 0 ? it.saleAcPrice : it.acPrice);
-                    if (it.isExclusive && exN < 3) exInfos[exN++] = c;
-                    if (gridN < 5) gridInfos[gridN++] = c;
-                }
-                if (state.screen == Screen::Search) {
-                    const std::vector<int> hits =
-                        searchMatchIdx(state.items, state.searchQuery, state.searchFilter);
-                    for (int j = 0; j < 5; ++j) gridInfos[j] = pkgtest::CardInfo{};
-                    for (int j = 0; j < 5 && j < static_cast<int>(hits.size()); ++j) {
-                        const pkgtest::ItemData& it = state.items[hits[j]];
-                        gridInfos[j].title = it.title;
-                        gridInfos[j].price = std::to_string(it.saleAcPrice >= 0 ? it.saleAcPrice
-                                                                                : it.acPrice);
-                    }
-                    searchNoResults = !state.searchQuery.empty() && hits.empty();
-                }
-            }
-            pkgtest::setServerContent(heroInfos, exInfos, gridInfos);
-            {
-                std::lock_guard<std::mutex> lk(gLinkMx);
-                pkgtest::setDetailTitle(state.detailTitle);
-            }
-            engine.clear(pkgtest::theme::BG);
-            switch (state.screen) {
-                case Screen::Welcome:
-                    pkgtest::drawWelcome(engine, state.focus, lang);
-                    break;
-                case Screen::CodeLink: {
-                    std::string codeCopy;
-                    int secsLeft = 0;
-                    bool linkedCopy = false;
-                    {
-                        std::lock_guard<std::mutex> lk(gLinkMx);
-                        codeCopy = state.code;
-                        secsLeft = static_cast<int>(std::max(0.0, state.codeUntil - t));
-                        linkedCopy = state.linked;
-                    }
-                    pkgtest::drawCodeLink(engine, codeCopy, secsLeft, linkedCopy, lang);
-                    break;
-                }
-                case Screen::Email:
-                    pkgtest::drawEmailSignin(engine, state.focus, state.email, state.pass,
-                                             state.emailError, lang);
-                    break;
-                case Screen::Language:
-                    pkgtest::drawLanguageDialog(engine, state.focus, lang);
-                    break;
-                case Screen::Home:
-                    pkgtest::drawHome(engine, state.focus, state.heroIndex, state.filterIndex, lang);
-                    break;
-                case Screen::Store:
-                    pkgtest::drawStore(engine, state.focus, state.storeFilter, lang);
-                    break;
-                case Screen::Deals:
-                    pkgtest::drawDeals(engine, state.focus, state.dealsFilter, lang);
-                    break;
-                case Screen::Settings:
-                    pkgtest::drawSettings(engine, state.focus, state.autoLaunch,
-                                          accountCopy, lang);
-                    break;
-                case Screen::Detail:
-                    pkgtest::drawInstallDemo(engine, state.demoState, state.progress, lang);
-                    break;
-                case Screen::Confirm:
-                    pkgtest::drawSettings(engine, state.focus, state.autoLaunch,
-                                          accountCopy, lang);
-                    pkgtest::drawConfirmDialog(engine, "Sign out?",
-                                               "You can sign in again any time with a code.",
-                                               "Sign out", "Cancel",
-                                               state.focus, lang);
-                    break;
-                case Screen::Search:
-                    pkgtest::drawSearch(engine, state.focus, state.searchQuery,
-                                        state.searchFilter, searchNoResults, lang);
-                    break;
-                case Screen::Profile:
-                    pkgtest::drawProfile(engine, state.focus, accountCopy,
-                                         planIndexFrom(sessionPlanCopy),
-                                         static_cast<int>(sessionAcCopy), 24, 8, 5, lang);
-                    break;
-                case Screen::Wallet:
-                    pkgtest::drawWallet(engine, state.focus,
-                                        static_cast<int>(sessionAcCopy), lang);
-                    break;
-                case Screen::Plans:
-                    pkgtest::drawPlans(engine, state.focus,
-                                       planIndexFrom(sessionPlanCopy), lang);
-                    break;
-            }
-            if (state.menuOpen) {
-                pkgtest::drawMenuOverlay(engine, state.menuFocus, lang);
-            }
-            if (toastVisible) {
-                pkgtest::drawToast(engine, state.toastText, lang);
-            }
-            lastSig = sig;
-            lastToastVisible = toastVisible;
-            frameDirty = true;
-        }
-
-        // Present ONLY when the frame actually changed — idle frames cost nothing
-        // (PS-menu feel: controller polls fast, CPU stays quiet).
-        if (frameDirty) {
-            engine.present(windowSurface);
-            SDL_RenderPresent(renderer);
+        if (A.dirty.exchange(false)) {
+            drawFrame(engine);
+            engine.present(SDL_GetWindowSurface(window));
             SDL_UpdateWindowSurface(window);
-            frameDirty = false;
         }
-        ++frameCount;
-        SDL_Delay(8);   // 120Hz command polling -> snappy navigation
+        SDL_Delay(8);       // 120 Hz input polling — PS-menu responsiveness
     }
-
-    state.installing.store(true);
-    for (SDL_Joystick* joy : joysticks) {
-        SDL_JoystickClose(joy);
-    }
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+    ui_audio_shutdown();
     return 0;
 }
