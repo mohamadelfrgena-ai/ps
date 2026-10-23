@@ -114,9 +114,20 @@ struct ItemData {
     long ratingCount = 0;
     long exclusiveSlot = 0;
     std::string createdAt;    // ISO timestamp (UTC)
+    std::string updatedAt;    // ISO timestamp (UTC) — live-publish sync
+    bool isPublished = true;
     std::string ps4RawUrl;
     std::string packTargetsRaw; // raw jsonb (pack_targets)
 };
+
+// v7.3 live-publish sync: light touch list (id + timestamp + published flag)
+struct ItemTouch {
+    std::string id;
+    std::string touchAt;   // updated_at (or created_at fallback)
+    bool published = true;
+};
+std::vector<ItemTouch> fetchContentItemsTouch(const SupabaseConfig& cfg);
+std::vector<ItemData> fetchContentItemsByIds(const SupabaseConfig& cfg, const std::vector<std::string>& ids);
 
 // قراءة البانرات والمحتوى المنشور (anon)
 std::vector<BannerData> fetchStoreBanners(const SupabaseConfig& cfg);

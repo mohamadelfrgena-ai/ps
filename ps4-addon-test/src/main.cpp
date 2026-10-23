@@ -124,6 +124,11 @@ static std::deque<CoverBlob> gCoverQ;
 static std::mutex gCoverMx;
 static std::map<std::string, bool> gCoverRequested;
 
+// ---- v7.3 live-publish sync: a phone publish appears on PS4/PS5 at once ----
+static std::mutex gSyncMx;
+static std::map<std::string, std::string> gTouchSeen;   // id -> updated_at/created_at
+static std::string gDetailId;
+
 static UiEngine* gEngine = nullptr;
 
 static void toast(const std::string& text, int ms = 4200) {
@@ -241,9 +246,65 @@ static void loadCatalogNow() {
     std::vector<ItemData> items = fetchContentItems(gCfg, 40);
     std::vector<AddonItem> out;
     out.reserve(items.size());
-    for (const ItemData& d : items) out.push_back(toItem(d));
+    {
+        std::lock_guard<std::mutex> lk(gSyncMx);
+        for (const ItemData& d : items) {
+            out.push_back(toItem(d));
+            gTouchSeen[d.id] = d.updatedAt.empty() ? d.createdAt : d.updatedAt;
+        }
+    }
     setCatalog(out);
     A.dirty = true;
+}
+
+// Live-publish sync (phone -> PS4 & PS5 at once): cheap poll every few seconds.
+// New / changed rows are fetched by id and upserted; unpublished rows disappear.
+static void syncCatalogLive() {
+    const std::vector<ItemTouch> touches = fetchContentItemsTouch(gCfg);
+    if (touches.empty()) return;
+    std::vector<std::string> need;
+    bool changed = false;
+    {
+        std::lock_guard<std::mutex> lk(gSyncMx);
+        for (const ItemTouch& t : touches) {
+            const int idx = findItem(t.id);
+            if (!t.published) {
+                if (idx >= 0) {
+                    removeCatalogItem(t.id);
+                    changed = true;
+                }
+                gTouchSeen.erase(t.id);
+                continue;
+            }
+            const auto it = gTouchSeen.find(t.id);
+            if (it == gTouchSeen.end() || it->second != t.touchAt || idx < 0) {
+                need.push_back(t.id);
+                gTouchSeen[t.id] = t.touchAt;
+            }
+        }
+    }
+    if (!need.empty()) {
+        const std::vector<ItemData> rows = fetchContentItemsByIds(gCfg, need);
+        for (const ItemData& d : rows) {
+            if (!d.isPublished) continue;
+            AddonItem u = toItem(d);
+            const int old = findItem(u.id);
+            if (old >= 0) {
+                const AddonItem& o = catalog()[(std::size_t)old];
+                u.unlocked = o.unlocked;          // keep AC unlocks across live updates
+                if (o.installed) u.installed = true;
+            }
+            upsertCatalogItem(u);
+            changed = true;
+        }
+    }
+    if (changed) {
+        if (A.scr == Scr::Detail && !gDetailId.empty()) {
+            A.detailIdx = findItem(gDetailId);
+            if (A.detailIdx < 0) { A.scr = A.back; A.focus = 0; }
+        }
+        A.dirty = true;
+    }
 }
 
 static void loadBannerNow() {
@@ -518,6 +579,7 @@ static void openItem(int catIdx) {
     }
     A.back = A.scr;
     A.detailIdx = catIdx;
+    gDetailId = catalog()[(std::size_t)catIdx].id;
     A.dl = catalog()[(std::size_t)catIdx].installed ? (int)DemoState::Installed : (int)DemoState::Idle;
     go(Scr::Detail);
 }
@@ -1029,6 +1091,18 @@ int main(int, char**) {
     setAppVersion(kAppVersion);
     if (!gSession.valid) setAccount(Account{});
     setCoverRequestHandler([](const AddonItem& it) { requestCoverAsync(it); });
+
+    // ---- v7.3 live-publish sync: phone publishes appear here within seconds ----
+    std::thread([]() {
+        int cycle = 0;
+        for (;;) {
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            ++cycle;
+            syncCatalogLive();
+            if (cycle % 6 == 0) loadBannerNow();       // 30s: sale banner goes live at once
+            if (cycle % 60 == 0) loadPlansNow();       // 5min: plan changes
+        }
+    }).detach();
 
     // ---- syncWatcher: staged .raw installs complete when Minecraft mounts ----
     std::thread([]() {

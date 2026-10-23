@@ -363,6 +363,9 @@ std::vector<ItemData> fetchContentItems(const SupabaseConfig& cfg, int limit) {
         it.ratingCount = jsonGetInt(obj, "rating_count", 0);
         it.exclusiveSlot = jsonGetInt(obj, "exclusive_slot", 0);
         it.createdAt = jsonGetString(obj, "created_at");
+        it.updatedAt = jsonGetString(obj, "updated_at");
+        if (it.updatedAt.empty()) it.updatedAt = it.createdAt;
+        it.isPublished = jsonGetBool(obj, "is_published", true);
         it.ps4RawUrl = jsonGetString(obj, "ps4_raw_url");
         it.packTargetsRaw = jsonGetRaw(obj, "pack_targets");
         out.push_back(it);
@@ -582,6 +585,95 @@ std::vector<PlanRow> fetchSubscriptionPlans(const SupabaseConfig& cfg) {
         p.downloadLimit = jsonGetInt(obj, "download_limit", 0);
         p.limitPeriod = jsonGetString(obj, "limit_period");
         out.push_back(p);
+    }
+    return out;
+}
+
+// ============================================================================
+//  v7.3 — live-publish sync (a phone publish appears on PS4/PS5 at once)
+// ============================================================================
+std::vector<ItemTouch> fetchContentItemsTouch(const SupabaseConfig& cfg) {
+    std::vector<ItemTouch> out;
+    if (!cfg.ok()) return out;
+    const std::vector<std::pair<std::string, std::string>> headers = {
+        {"apikey", cfg.anonKey},
+        {"Authorization", "Bearer " + cfg.anonKey},
+        {"Accept", "application/json"},
+    };
+    auto parse = [&](const std::string& body, bool withUpdated) {
+        for (const std::string& obj : splitJsonObjects(body)) {
+            ItemTouch t;
+            t.id = jsonGetString(obj, "id");
+            if (t.id.empty()) continue;
+            t.touchAt = withUpdated ? jsonGetString(obj, "updated_at") : std::string();
+            if (t.touchAt.empty()) t.touchAt = jsonGetString(obj, "created_at");
+            t.published = jsonGetBool(obj, "is_published", true);
+            out.push_back(t);
+        }
+    };
+    HttpPostResult h = httpGetJson(
+        cfg.url + "/rest/v1/content_items?select=id,updated_at,created_at,is_published"
+                 "&order=updated_at.desc.nullslast&limit=200", headers);
+    if (h.ok && h.statusCode == 200) {
+        parse(h.body, true);
+    } else {
+        // fallback: table without updated_at
+        out.clear();
+        h = httpGetJson(
+            cfg.url + "/rest/v1/content_items?select=id,created_at,is_published"
+                     "&order=created_at.desc&limit=200", headers);
+        if (h.ok && h.statusCode == 200) parse(h.body, false);
+    }
+    return out;
+}
+
+std::vector<ItemData> fetchContentItemsByIds(const SupabaseConfig& cfg, const std::vector<std::string>& ids) {
+    std::vector<ItemData> out;
+    if (!cfg.ok() || ids.empty()) return out;
+    std::string list;
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+        if (i) list += ",";
+        list += ids[i];
+    }
+    const std::vector<std::pair<std::string, std::string>> headers = {
+        {"apikey", cfg.anonKey},
+        {"Authorization", "Bearer " + cfg.anonKey},
+        {"Accept", "application/json"},
+    };
+    const HttpPostResult h = httpGetJson(
+        cfg.url + "/rest/v1/content_items?id=in.(" + list + ")&select=*", headers);
+    if (!h.ok || h.statusCode != 200) return out;
+    for (const std::string& obj : splitJsonObjects(h.body)) {
+        ItemData it;
+        it.id = jsonGetString(obj, "id");
+        it.title = jsonGetString(obj, "title");
+        it.slug = jsonGetString(obj, "slug");
+        it.contentType = jsonGetString(obj, "content_type");
+        it.plan = jsonGetString(obj, "plan");
+        it.acPrice = jsonGetInt(obj, "ac_price", 0);
+        const std::string sale = jsonGetString(obj, "sale_ac_price");
+        it.saleAcPrice = (sale.empty() || sale == "null") ? -1 : std::strtol(sale.c_str(), nullptr, 10);
+        it.isFeatured = jsonGetBool(obj, "is_featured", false);
+        it.isExclusive = jsonGetBool(obj, "is_exclusive", false);
+        it.description = jsonGetString(obj, "description");
+        it.category = jsonGetString(obj, "category");
+        it.coverUrl = jsonGetString(obj, "cover_url");
+        it.version = jsonGetString(obj, "version");
+        it.fileSize = (long long)jsonGetInt(obj, "file_size", 0);
+        it.downloads = jsonGetInt(obj, "downloads_count", 0);
+        {
+            const std::string r = jsonGetString(obj, "rating");
+            if (!r.empty() && r != "null") it.rating = std::strtod(r.c_str(), nullptr);
+        }
+        it.ratingCount = jsonGetInt(obj, "rating_count", 0);
+        it.exclusiveSlot = jsonGetInt(obj, "exclusive_slot", 0);
+        it.createdAt = jsonGetString(obj, "created_at");
+        it.updatedAt = jsonGetString(obj, "updated_at");
+        if (it.updatedAt.empty()) it.updatedAt = it.createdAt;
+        it.isPublished = jsonGetBool(obj, "is_published", true);
+        it.ps4RawUrl = jsonGetString(obj, "ps4_raw_url");
+        it.packTargetsRaw = jsonGetRaw(obj, "pack_targets");
+        out.push_back(it);
     }
     return out;
 }
