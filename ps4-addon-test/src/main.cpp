@@ -28,8 +28,12 @@
 #include <vector>
 
 #if defined(__ORBIS__) || defined(__PROSPERO__)
-// weak: absent on some toolchains — guarded call keeps the link safe
-extern "C" __attribute__((weak)) int sceSystemServiceParamGetInt(int id, int* out);
+// sceSystemServiceParamGetInt lives in libSceSystemService.sprx (no static stub in the
+// OpenOrbis toolchain) — resolve it at RUNTIME via libkernel so the link stays clean.
+extern "C" {
+int32_t sceKernelDlsym(int32_t handle, const char* symbol, void** address);
+uint32_t sceKernelLoadStartModule(const char* path, size_t args, const void* argp, uint32_t flags, void* opt, void* res);
+}
 #endif
 
 using namespace pkgtest;
@@ -168,8 +172,26 @@ static void loadUiSettings() {
 
 static int hookSystemLanguage() {
 #if defined(__ORBIS__) || defined(__PROSPERO__)
+    typedef int (*ParamGetIntFn)(int, int*);
+    static ParamGetIntFn fn = nullptr;
+    static bool resolved = false;
+    if (!resolved) {
+        resolved = true;
+        void* sym = nullptr;
+        static const char* kMods[] = {
+            "libSceSystemService.sprx",
+            "/system/common/lib/libSceSystemService.sprx",
+        };
+        for (const char* mod : kMods) {
+            const uint32_t h = sceKernelLoadStartModule(mod, 0, nullptr, 0, nullptr, nullptr);
+            if (h != 0 && sceKernelDlsym((int32_t)h, "sceSystemServiceParamGetInt", &sym) == 0 && sym) break;
+            sym = nullptr;
+        }
+        if (!sym) sceKernelDlsym(0, "sceSystemServiceParamGetInt", &sym);
+        fn = reinterpret_cast<ParamGetIntFn>(sym);
+    }
     int lang = 1;
-    if (sceSystemServiceParamGetInt) sceSystemServiceParamGetInt(1 /* SCE_SYSTEM_SERVICE_PARAM_ID_LANG */, &lang);
+    if (fn) fn(1 /* SCE_SYSTEM_SERVICE_PARAM_ID_LANG */, &lang);
     return lang;
 #else
     const char* env = std::getenv("PS4_LANG");
