@@ -28,7 +28,8 @@
 #include <vector>
 
 #if defined(__ORBIS__) || defined(__PROSPERO__)
-extern "C" int sceSystemServiceParamGetInt(int id, int* out);
+// weak: absent on some toolchains — guarded call keeps the link safe
+extern "C" __attribute__((weak)) int sceSystemServiceParamGetInt(int id, int* out);
 #endif
 
 using namespace pkgtest;
@@ -168,7 +169,7 @@ static void loadUiSettings() {
 static int hookSystemLanguage() {
 #if defined(__ORBIS__) || defined(__PROSPERO__)
     int lang = 1;
-    sceSystemServiceParamGetInt(1 /* SCE_SYSTEM_SERVICE_PARAM_ID_LANG */, &lang);
+    if (sceSystemServiceParamGetInt) sceSystemServiceParamGetInt(1 /* SCE_SYSTEM_SERVICE_PARAM_ID_LANG */, &lang);
     return lang;
 #else
     const char* env = std::getenv("PS4_LANG");
