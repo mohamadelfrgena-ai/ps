@@ -17,32 +17,11 @@
 #      include <orbis/AudioOut.h>
 #      undef PKGTEST_AUDIO_HDR
 #      define PKGTEST_AUDIO_HDR 1
-#    elif __has_include(<orbis/audioout.h>)
-#      include <orbis/audioout.h>
-#      undef PKGTEST_AUDIO_HDR
-#      define PKGTEST_AUDIO_HDR 1
 #    elif __has_include(<audioout.h>)
 #      include <audioout.h>
 #      undef PKGTEST_AUDIO_HDR
 #      define PKGTEST_AUDIO_HDR 1
-#    elif __has_include(<audio_out.h>)
-#      include <audio_out.h>
-#      undef PKGTEST_AUDIO_HDR
-#      define PKGTEST_AUDIO_HDR 1
 #    endif
-#    if __has_include(<orbis/UserService.h>)
-#      include <orbis/UserService.h>
-#    endif
-#  endif
-// Fallbacks if the toolchain headers are missing these (audio then fails soft: silent UI)
-#  ifndef SCE_AUDIO_OUT_PORT_TYPE_MAIN
-#    define SCE_AUDIO_OUT_PORT_TYPE_MAIN 0
-#  endif
-#  ifndef SCE_AUDIO_OUT_PARAM_FORMAT_S16_STEREO
-#    define SCE_AUDIO_OUT_PARAM_FORMAT_S16_STEREO 0
-#  endif
-#  ifndef SCE_USER_SERVICE_USER_ID_INTERACTIVE
-#    define SCE_USER_SERVICE_USER_ID_INTERACTIVE 1
 #  endif
 #  if !PKGTEST_AUDIO_HDR
 extern "C" {
@@ -155,9 +134,19 @@ void mixBlock(int16_t* dst, int frames) {
 void audioThreadOrbis() {
     const int frames = kRate * kBlockMs / 1000;      // 480
     const int grain = 256;
-    int32_t hnd = sceAudioOutOpen(SCE_USER_SERVICE_USER_ID_INTERACTIVE,
-                                  SCE_AUDIO_OUT_PORT_TYPE_MAIN, 0,
-                                  frames, kRate, SCE_AUDIO_OUT_PARAM_FORMAT_S16_STEREO);
+#if PKGTEST_AUDIO_HDR
+    // OpenOrbis: (userId, enum OrbisAudioOutPort, index, length, sample_rate, param_type)
+    int32_t hnd = sceAudioOutOpen(1, ORBIS_AUDIO_OUT_PORT_TYPE_MAIN, 0,
+                                  (uint32_t)frames, (uint32_t)kRate,
+                                  (uint32_t)ORBIS_AUDIO_OUT_PARAM_FORMAT_S16_STEREO);
+    if (hnd < 0)
+        hnd = sceAudioOutOpen(0xFF, ORBIS_AUDIO_OUT_PORT_TYPE_MAIN, 0,
+                              (uint32_t)frames, (uint32_t)kRate,
+                              (uint32_t)ORBIS_AUDIO_OUT_PARAM_FORMAT_S16_STEREO);
+#else
+    int32_t hnd = sceAudioOutOpen(1, 0, 0, frames, kRate, 1);
+    if (hnd < 0) hnd = sceAudioOutOpen(0xFF, 0, 0, frames, kRate, 1);
+#endif
     if (hnd < 0) return;
     std::vector<int16_t> buf(frames * 2);
     while (gRun) {
