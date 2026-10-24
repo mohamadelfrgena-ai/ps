@@ -171,7 +171,7 @@ void audioThreadOrbis() {
 
 #if !(defined(__ORBIS__) || defined(__PROSPERO__))
 // Host fallback (dev machine preview): SDL2 audio.
-#include <SDL.h>
+#include <SDL2/SDL.h>
 static Uint32 gDev = 0;
 void sdlAudioCb(void*, Uint8* stream, int len) {
     mixBlock(reinterpret_cast<int16_t*>(stream), len / 4);

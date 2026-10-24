@@ -2,7 +2,7 @@
 // AddonStation UI engine — v5 header.
 // v5 additions (marked "v5"): runtime image loading (covers downloaded at runtime), lazy decoding of
 // ui.pak images, LRU byte-budget caches, memcpy fast paths.
-#include "SDL.h"
+#include <SDL2/SDL.h>
 #include <cstdint>
 #include <map>
 #include <string>

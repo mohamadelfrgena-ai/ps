@@ -13,7 +13,7 @@
 #include "installer.hpp"
 #include "supabase_client.hpp"
 
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <algorithm>
 #include <atomic>
 #include <chrono>
