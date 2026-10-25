@@ -102,8 +102,8 @@ jobs:
                 echo "::error::FL: $line"
               done ) || true
             if [ -f ps4-addon-test/pkg.gp4 ]; then
-              ( tr '\n' '~' < ps4-addon-test/pkg.gp4 | grep -oE "<rootdir>.*</rootdir>" | head -c 1100 | while IFS= read -r line; do
-                echo "::error::GP4: $line"
+              ( grep -oE "targ_path=\"[^\"]*\"" ps4-addon-test/pkg.gp4 | tr '\n' ',' | head -c 1100 | while IFS= read -r line; do
+                echo "::error::GFILES: $line"
               done ) || true
             fi
             exit 1
