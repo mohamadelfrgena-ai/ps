@@ -140,7 +140,7 @@ assets/ui.pak: tools/build_ui_pak.py $(wildcard assets/v73/*)
 	python3 tools/build_ui_pak.py assets/ui.pak
 
 $(PKG_FILE): eboot.bin sce_sys/param.sfo assets/ui.pak | prepare-runtime
-	$(CREATE_GP4) -out pkg.gp4 --content-id=$(CONTENT_ID) --files="$(PKG_FILES)"
+	python3 tools/build_gp4.py pkg.gp4 "$(CONTENT_ID)" $(PKG_FILES)
 	$(PKG_TOOL) pkg_build pkg.gp4 .
 	cp "$(RAW_PKG)" "$(PKG_FILE)"
 

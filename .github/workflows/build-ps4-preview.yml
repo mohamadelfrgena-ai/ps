@@ -98,14 +98,6 @@ jobs:
             ( grep -E "Unhandled|   at |error:|No such|no such|not found|Error [0-9]|fatal" /tmp/pkg-build.log | grep -v -- "-Werror" | tail -n 7 | while IFS= read -r line; do
               echo "::error::E: $line"
             done ) || true
-            ( grep -o -- "--files=.*" /tmp/pkg-build.log | head -c 1100 | while IFS= read -r line; do
-                echo "::error::FL: $line"
-              done ) || true
-            if [ -f ps4-addon-test/pkg.gp4 ]; then
-              ( tail -c +700 ps4-addon-test/pkg.gp4 | head -c 750 | tr '\n' '~'; echo ) | while IFS= read -r line; do
-                echo "::error::MID: $line"
-              done
-            fi
             exit 1
           fi
           test -s ps4-addon-test/pkg-addon-test.pkg
