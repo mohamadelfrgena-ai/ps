@@ -3909,6 +3909,9 @@ void drawLegalSplash(UiEngine& e, const std::string& /*langCode*/) {
         int y = 836 - static_cast<int>(lines.size() > 1 ? 14 : 0);
         for (const auto& ln : lines) { e.drawText(ln, left + 112, y, 22, SDL_Color{236, 236, 236, 255}, FontRole::Body, false, false); y += 28; }
     }
+    // blue App-Shield mark, bottom-right corner — exact a00_splash_full placement
+    // (measured art bbox 1725,913 + 115x115; crop has 10px padding all around)
+    e.drawImage("splash_shield", 1715, 903, 135, 135);
 }
 
 } // namespace pkgtest
