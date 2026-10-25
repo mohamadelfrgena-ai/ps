@@ -102,8 +102,8 @@ jobs:
                 echo "::error::FL: $line"
               done ) || true
             if [ -f ps4-addon-test/pkg.gp4 ]; then
-              ( grep -oE "targ_path=\"[^\"]*\"" ps4-addon-test/pkg.gp4 | tr '\n' ',' | head -c 1100 | while IFS= read -r line; do
-                echo "::error::GFILES: $line"
+              ( head -c 750 ps4-addon-test/pkg.gp4 | tr '\n' '~' | while IFS= read -r line; do
+                echo "::error::RAW: $line"
               done ) || true
             fi
             exit 1
