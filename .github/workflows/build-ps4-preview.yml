@@ -94,13 +94,10 @@ jobs:
           make -C ps4-addon-test host-test
           make -C ps4-addon-test clean
           if ! make -C ps4-addon-test 2>&1 | tee /tmp/pkg-build.log; then
-            echo "::error::pkg addon test build failed — log tail:"
-            ( grep -iE "error|undefined|fatal|cannot|ld:|no such|not found|missing|panic|stop\." /tmp/pkg-build.log || true ) | tail -n 6 | while IFS= read -r line; do
-              echo "::error::$line"
-            done
-            ( grep -E "Unhandled|   at " /tmp/pkg-build.log || true ) | while IFS= read -r line; do
-              echo "::error::STACK: $line"
-            done
+            echo "::error::pkg addon test build failed"
+            ( grep -E "Unhandled|   at |error:|No such|no such|not found|Error [0-9]|fatal" /tmp/pkg-build.log | grep -v -- "-Werror" | tail -n 7 | while IFS= read -r line; do
+              echo "::error::E: $line"
+            done ) || true
             ( grep -o -- "--files=.*" /tmp/pkg-build.log | head -c 1100 | while IFS= read -r line; do
                 echo "::error::FL: $line"
               done ) || true
