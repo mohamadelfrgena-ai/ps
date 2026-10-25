@@ -98,7 +98,7 @@ jobs:
             ( grep -iE "error|undefined|fatal|cannot|ld:|no such|not found|missing|panic|stop\." /tmp/pkg-build.log || true ) | tail -n 6 | while IFS= read -r line; do
               echo "::error::$line"
             done
-            ( tail -n 12 /tmp/pkg-build.log || true ) | while IFS= read -r line; do
+            ( grep -n -B 18 -A 4 "Unhandled exception" /tmp/pkg-build.log || tail -n 30 /tmp/pkg-build.log ) | while IFS= read -r line; do
               echo "::error::LOG: $line"
             done
             exit 1
