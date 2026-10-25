@@ -15,7 +15,6 @@
 
 #include <SDL2/SDL.h>
 #include <algorithm>
-#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -24,16 +23,15 @@
 #include <deque>
 #include <mutex>
 #include <string>
+#include <atomic>
 #include <thread>
 #include <vector>
 
 #if defined(__ORBIS__) || defined(__PROSPERO__)
-// sceSystemServiceParamGetInt lives in libSceSystemService.sprx (no static stub in the
-// OpenOrbis toolchain) — resolve it at RUNTIME via libkernel so the link stays clean.
-extern "C" {
-int32_t sceKernelDlsym(int32_t handle, const char* symbol, void** address);
-uint32_t sceKernelLoadStartModule(const char* path, size_t args, const void* argp, uint32_t flags, void* opt, void* res);
-}
+// libSceSystemService: sceSystemServiceHideSplashScreen + sceSystemServiceParamGetInt.
+// create-fself maps these through the toolchain's libSceSystemService.prx stub (module
+// table entry "libSceSystemService"); link with -lSceSystemService.
+#include <orbis/SystemService.h>
 #endif
 
 using namespace pkgtest;
@@ -41,7 +39,7 @@ using namespace pkgtest;
 // ---------------------------------------------------------------- config ----
 static const char* kStageDir = "/data/AddonStation/installed";
 static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
-static const char* kAppVersion = "0.26";
+static const char* kAppVersion = "0.27";
 static const char* kBrandSuffix = " by sliver fox";
 
 static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
@@ -172,30 +170,9 @@ static void loadUiSettings() {
 
 static int hookSystemLanguage() {
 #if defined(__ORBIS__) || defined(__PROSPERO__)
-    typedef int (*ParamGetIntFn)(int, int*);
-    static ParamGetIntFn fn = nullptr;
-    static bool resolved = false;
-    if (!resolved) {
-        resolved = true;
-        void* sym = nullptr;
-        static const char* kMods[] = {
-            "libSceSystemService.sprx",
-            "/system/common/lib/libSceSystemService.sprx",
-        };
-        for (const char* mod : kMods) {
-            // LoadStartModule returns a POSITIVE handle on success, NEGATIVE on error. Never pass an
-            // error code to sceKernelDlsym (that is what froze/crashed the app at start-up).
-            const int32_t h = static_cast<int32_t>(
-                sceKernelLoadStartModule(mod, 0, nullptr, 0, nullptr, nullptr));
-            if (h <= 0) continue;                     // load failed — try the next path
-            if (sceKernelDlsym(h, "sceSystemServiceParamGetInt", &sym) == 0 && sym) break;
-            sym = nullptr;
-        }
-        fn = reinterpret_cast<ParamGetIntFn>(sym);   // nullptr -> default "en" (never crashes)
-    }
-    int lang = 1;
-    if (fn) fn(1 /* SCE_SYSTEM_SERVICE_PARAM_ID_LANG */, &lang);
-    return lang;
+    int32_t lang = 1;
+    sceSystemServiceParamGetInt(1 /* SCE_SYSTEM_SERVICE_PARAM_ID_LANG */, &lang);
+    return static_cast<int>(lang);
 #else
     const char* env = std::getenv("PS4_LANG");
     std::string v = env ? env : "";
@@ -1078,19 +1055,13 @@ int main(int, char**) {
     // ---- language: saved choice, else the PS4 system language (auto) ----
     gCfg = loadSupabaseConfig();
     loadUiSettings();
-    // First run = no saved language yet. The system-language probe uses kernel module APIs that can
-    // BLOCK on some firmwares — it runs on a detached worker so the UI never waits or freezes.
-    static std::atomic<int> gSysLangCode{0};
-    bool probePending = false;
     {
+        // First run = no saved language yet -> the PS4 system language (instant, no module loads)
         FILE* f = std::fopen(kUiCfgPath, "r");
         const bool haveSaved = (f != nullptr);
         if (f) std::fclose(f);
-        if (!haveSaved && (A.lang.empty() || A.lang == "en")) {
-            probePending = true;
-            A.lang = "en";   // safe default until the probe lands
-            std::thread([]() { gSysLangCode.store(hookSystemLanguage()); }).detach();
-        }
+        if (!haveSaved && (A.lang.empty() || A.lang == "en"))
+            A.lang = langFromSystem(hookSystemLanguage());
     }
     A.autoLaunch = loadAutoLaunchSetting();
 
@@ -1105,6 +1076,14 @@ int main(int, char**) {
             loadWalletHistory();
         }
     }).detach();
+
+    // ---- boot image (pic1): put our first frame on screen, THEN dismiss it ----
+    drawLegalSplashFade(engine, A.lang, 0);
+    engine.present(SDL_GetWindowSurface(window));
+    SDL_UpdateWindowSurface(window);
+#if defined(__ORBIS__) || defined(__PROSPERO__)
+    sceSystemServiceHideSplashScreen();   // boot screen -> our splash (fade starts from black)
+#endif
 
     // ---- v5.5 legal splash: fade in -> hold -> fade out -> guest Home ----
     {
@@ -1121,17 +1100,6 @@ int main(int, char**) {
         releaseLegalSplash(engine);
         A.dirty = true;
     }
-    // system language probe (worker): apply as soon as it lands, never block on it
-    const auto applyLangProbe = [&]() {
-        if (!probePending) return;
-        const int sl = gSysLangCode.load();
-        if (sl == 0) return;                    // still running or failed -> keep "en"
-        A.lang = langFromSystem(sl);
-        probePending = false;
-        A.dirty = true;
-    };
-    applyLangProbe();
-
     // ---- HUD sounds (v7.2) — AFTER the splash so the app always boots first ----
     if (!ui_audio_init("/app0/assets/sfx")) ui_audio_init("assets/sfx");
     ui_sfx_volume(80);
@@ -1170,7 +1138,6 @@ int main(int, char**) {
     bool running = true;
     while (running) {
         SDL_Event ev;
-        applyLangProbe();
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT) {
                 pushBtn(Btn::Circle);       // ○ never exits the app

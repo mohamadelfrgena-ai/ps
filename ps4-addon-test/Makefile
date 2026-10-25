@@ -1,7 +1,7 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
 # AddonStation PS4 — v0.23 (UI v7.3 final)
-VERSION     := 0.26
+VERSION     := 0.27
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
@@ -35,6 +35,7 @@ OO_SDL_SAMPLE := $(TOOLCHAIN)/samples/SDL2
 PKG_FILES   := eboot.bin \
                sce_sys/param.sfo \
                sce_sys/icon0.png \
+               sce_sys/pic1.png \
                sce_sys/about/right.sprx \
                sce_module/libc.prx \
                sce_module/libSceFios2.prx \
@@ -45,7 +46,7 @@ OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/http_download
                $(OBJ_DIR)/ime_dialog.o $(OBJ_DIR)/ui_engine.o $(OBJ_DIR)/screens.o \
                $(OBJ_DIR)/ui_audio.o $(OBJ_DIR)/jbc.o
 
-LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut \
+LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceSystemService -lSceVideoOut -lSceAudioOut \
                -lScePad -lSceSysmodule -lSDL2 -lSceNet -lSceSsl -lSceHttp -lSceImeDialog
 COMMONFLAGS := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
                -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include
@@ -132,8 +133,7 @@ prepare-runtime: check-toolchain
 	  cp "$$sample/sce_module/libSceFios2.prx" sce_module/libSceFios2.prx; \
 	  cp "$$sample/sce_sys/about/right.sprx" sce_sys/about/right.sprx; \
 	  cp "assets/ps4/icon0.png" sce_sys/icon0.png; \
-	  # v0.26: NO pic1 boot image — the app never calls sceSystemServiceHideSplashScreen,
-	  # so a pic1 startup image would cover the UI forever (v0.22 shipped without it and worked).
+	  cp "assets/ps4/pic1.png" sce_sys/pic1.png
 
 assets/ui.pak: tools/build_ui_pak.py $(wildcard assets/v73/*)
 	python3 tools/build_ui_pak.py assets/ui.pak
