@@ -102,9 +102,9 @@ jobs:
                 echo "::error::FL: $line"
               done ) || true
             if [ -f ps4-addon-test/pkg.gp4 ]; then
-              ( head -c 750 ps4-addon-test/pkg.gp4 | tr '\n' '~' | while IFS= read -r line; do
+              ( head -c 750 ps4-addon-test/pkg.gp4 | tr '\n' '~'; echo ) | while IFS= read -r line; do
                 echo "::error::RAW: $line"
-              done ) || true
+              done
             fi
             exit 1
           fi
