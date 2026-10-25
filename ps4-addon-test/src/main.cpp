@@ -39,7 +39,7 @@ using namespace pkgtest;
 // ---------------------------------------------------------------- config ----
 static const char* kStageDir = "/data/AddonStation/installed";
 static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
-static const char* kAppVersion = "0.27";
+static const char* kAppVersion = "0.28";
 static const char* kBrandSuffix = " by sliver fox";
 
 static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
@@ -232,6 +232,7 @@ static AddonItem toItem(const ItemData& d) {
     it.acPrice = (int)(d.saleAcPrice >= 0 ? d.saleAcPrice : d.acPrice);
     it.acPriceOld = (d.saleAcPrice >= 0) ? (int)d.acPrice : 0;
     it.cover = "cv_" + d.id;
+    it.coverUrl = d.coverUrl;
     it.version = d.version;
     it.fileSize = d.fileSize;
     it.downloads = (int)d.downloads;
@@ -344,40 +345,52 @@ static void loadPlansNow() {
     A.dirty = true;
 }
 
-// covers: download in background, decode on the UI thread
+// covers: ONE serial worker downloads (never floods the HTTP pool), decode on the UI thread.
+// The cover URL travels on the item — no network refetch per cover.
+struct CoverJob { std::string name; std::string url; };
+static std::deque<CoverJob> gCoverJobs;
+static std::mutex gCoverJobMx;
+static bool gCoverWorkerOn = false;
+
 static void requestCoverAsync(const AddonItem& it) {
-    if (it.cover.empty()) return;
+    if (it.cover.empty() || it.coverUrl.empty()) return;
     {
         std::lock_guard<std::mutex> lk(gCoverMx);
         if (gCoverRequested[it.cover]) return;
         gCoverRequested[it.cover] = true;
     }
-    // find the source URL from the last fetched catalog rows
-    std::string url;
-    for (const ItemData& d : fetchContentItems(gCfg, 40)) {
-        if (("cv_" + d.id) == it.cover) { url = d.coverUrl; break; }
-    }
-    if (url.empty()) return;
-    const std::string name = it.cover;
-    std::thread([name, url]() {
-        const std::string tmp = std::string(kStageDir) + "/.cover_tmp";
-        DownloadResult r = downloadToFile(url, tmp, nullptr);
-        if (!r.ok) return;
-        FILE* f = std::fopen(tmp.c_str(), "rb");
-        if (!f) return;
-        std::fseek(f, 0, SEEK_END);
-        long sz = std::ftell(f);
-        std::fseek(f, 0, SEEK_SET);
-        CoverBlob blob;
-        blob.name = name;
-        blob.data.resize((std::size_t)(sz > 0 ? sz : 0));
-        if (!blob.data.empty()) std::fread(blob.data.data(), 1, blob.data.size(), f);
-        std::fclose(f);
-        std::remove(tmp.c_str());
-        if (blob.data.empty()) return;
-        std::lock_guard<std::mutex> lk(gCoverMx);
-        gCoverQ.push_back(std::move(blob));
-        A.dirty = true;
+    std::lock_guard<std::mutex> jk(gCoverJobMx);
+    gCoverJobs.push_back(CoverJob{it.cover, it.coverUrl});
+    if (gCoverWorkerOn) return;
+    gCoverWorkerOn = true;
+    std::thread([]() {
+        for (;;) {
+            CoverJob job;
+            {
+                std::lock_guard<std::mutex> lk(gCoverJobMx);
+                if (gCoverJobs.empty()) { gCoverWorkerOn = false; return; }
+                job = gCoverJobs.front();
+                gCoverJobs.pop_front();
+            }
+            const std::string tmp = std::string(kStageDir) + "/.cover_tmp";
+            DownloadResult r = downloadToFile(job.url, tmp, nullptr);
+            if (!r.ok) continue;
+            FILE* f = std::fopen(tmp.c_str(), "rb");
+            if (!f) continue;
+            std::fseek(f, 0, SEEK_END);
+            long sz = std::ftell(f);
+            std::fseek(f, 0, SEEK_SET);
+            CoverBlob blob;
+            blob.name = job.name;
+            blob.data.resize((std::size_t)(sz > 0 ? sz : 0));
+            if (!blob.data.empty()) std::fread(blob.data.data(), 1, blob.data.size(), f);
+            std::fclose(f);
+            std::remove(tmp.c_str());
+            if (blob.data.empty()) continue;
+            std::lock_guard<std::mutex> lk(gCoverMx);
+            gCoverQ.push_back(std::move(blob));
+            A.dirty = true;
+        }
     }).detach();
 }
 
@@ -402,30 +415,51 @@ static bool parseCodeCreate(const RpcResult& r, std::string& code, std::string& 
     return !code.empty();
 }
 
+static std::atomic<bool> gCodeBusy{false};
 static void newCode() {
+    if (gCodeBusy.exchange(true)) return;      // one request at a time
     A.codeStatus = 4;
     A.dirty = true;
-    std::string code, secret;
-    int secs = 600;
-    RpcResult r = callConsoleCodeCreate(gCfg, "PlayStation 4", kAppVersion, "ps4-console");
-    if (!parseCodeCreate(r, code, secret, secs)) {
-        // fallback: legacy link-code RPCs (40_ps4_and_deals.sql)
-        r = callCreateLinkCode(gCfg, "ps4", "PlayStation 4");
-        parseCodeCreate(r, code, secret, secs);
-    }
-    if (code.empty()) {
-        A.codeStatus = 3;
-    } else {
-        A.code = code;
-        A.pollSecret = secret;
-        A.codeSecs = secs;
-        A.codeStatus = 0;
-    }
-    A.dirty = true;
+    std::thread([]() {
+        std::string code, secret;
+        int secs = 600;
+        // legacy RPC first — 40_ps4_and_deals.sql defines create_console_link_code on the live DB
+        RpcResult r = callCreateLinkCode(gCfg, "ps4", "PlayStation 4");
+        if (!parseCodeCreate(r, code, secret, secs)) {
+            r = callConsoleCodeCreate(gCfg, "PlayStation 4", kAppVersion, "ps4-console");
+            parseCodeCreate(r, code, secret, secs);
+        }
+        if (code.empty()) {
+            A.codeStatus = 3;
+        } else {
+            A.code = code;
+            A.pollSecret = secret;
+            A.codeSecs = secs;
+            A.codeStatus = 0;
+        }
+        gCodeBusy = false;
+        A.dirty = true;
+    }).detach();
 }
 
 // returns 0 pending, 1 approved, 2 expired, 3 error
 static int pollCodeOnce() {
+    // legacy poll first — poll_console_link_code (40_ps4_and_deals.sql)
+    RpcResult old = callPollLinkCode(gCfg, A.code, A.pollSecret);
+    if (old.ok) {
+        const std::string st = jsonGetString(old.body, "status");
+        if (st == "linked" || st == "approved") {
+            // one-shot response: carry the session + profile back to the app
+            A.sessionRef = jsonGetString(old.body, "access_token");
+            A.linkedConsoleId = jsonGetString(old.body, "user_id");
+            A.exchangeId.clear();
+            return 1;
+        }
+        if (st == "expired") return 2;
+        if (st == "waiting" || st == "pending") return 0;   // "ok":true while waiting — NOT linked
+        return 3;
+    }
+    // fallback: console_code_* RPCs (newer schema)
     RpcResult r = callConsoleCodeConsume(gCfg, A.code, A.pollSecret);
     if (r.ok) {
         const std::string st = jsonGetString(r.body, "status");
@@ -438,13 +472,7 @@ static int pollCodeOnce() {
         if (st == "pending" || st == "waiting" || r.rpcOk) return 0;
         return 3;
     }
-    // fallback: legacy poll
-    RpcResult old = callPollLinkCode(gCfg, A.code, A.pollSecret);
-    if (!old.ok) return 3;
-    const std::string st = jsonGetString(old.body, "status");
-    if (st == "linked" || st == "approved" || jsonGetBool(old.body, "ok", false)) return 1;
-    if (st == "expired") return 2;
-    return 0;
+    return 3;
 }
 
 static void finishSignIn() {
@@ -558,6 +586,13 @@ static void startDownloadFlow(int catIdx) {
 
 // ---------------------------------------------------------------- input -----
 static void pushBtn(Btn b) {
+    // Arabic (RTL): the layout mirrors horizontally, so the horizontal controls mirror too
+    if (A.lang == "ar") {
+        if (b == Btn::Left) b = Btn::Right;
+        else if (b == Btn::Right) b = Btn::Left;
+        else if (b == Btn::L2) b = Btn::R2;
+        else if (b == Btn::R2) b = Btn::L2;
+    }
     std::lock_guard<std::mutex> lk(gBtnMx);
     if (gBtnQ.size() < 8) gBtnQ.push_back(b);
 }
@@ -1187,19 +1222,22 @@ int main(int, char**) {
         }
         if (A.scr == Scr::SignIn && A.codeStatus == 0) {
             static std::time_t lastPoll = 0;
-            if (now - lastPoll >= 2) {
+            static std::atomic<bool> pollBusy{false};
+            if (now - lastPoll >= 2 && !pollBusy.exchange(true)) {
                 lastPoll = now;
-                const int r = pollCodeOnce();
-                if (r == 1) {
-                    ui_sfx(Sfx::Success);
-                    finishSignIn();
-                    A.codeStatus = 1;
-                    A.focus = 0;
+                std::thread([]() {
+                    const int r = pollCodeOnce();
+                    if (r == 1) {
+                        ui_sfx(Sfx::Success);
+                        finishSignIn();
+                        A.codeStatus = 1;
+                        A.focus = 0;
+                    } else if (r == 2 || r == 3) {
+                        A.codeStatus = r;
+                    }
+                    pollBusy = false;
                     A.dirty = true;
-                } else if (r == 2 || r == 3) {
-                    A.codeStatus = r;
-                    A.dirty = true;
-                }
+                }).detach();
             }
         }
 

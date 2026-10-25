@@ -60,6 +60,7 @@ struct AddonItem {
     int acPrice = 0;             // effective_item_ac_price(id)  (sale applied). 0 = no AC unlock offered
     int acPriceOld = 0;          // content_items.ac_price when a sale price is active (else 0)
     std::string cover;           // engine image name for the cover (e.g. "cv_" + id). Loaded lazily — see setCoverRequestHandler
+    std::string coverUrl;        // source URL for the cover download (content_items.cover_url)
     std::string version;         // content_items.version
     long long fileSize = 0;      // bytes (content_items.file_size)
     int downloads = 0;           // content_items.downloads_count

@@ -1,7 +1,7 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
 # AddonStation PS4 — v0.23 (UI v7.3 final)
-VERSION     := 0.27
+VERSION     := 0.28
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
@@ -39,7 +39,8 @@ PKG_FILES   := eboot.bin \
                sce_sys/about/right.sprx \
                sce_module/libc.prx \
                sce_module/libSceFios2.prx \
-               assets/ui.pak
+               assets/ui.pak \
+               $(wildcard assets/sfx/*.wav)
 
 OBJECTS     := $(OBJ_DIR)/main.o $(OBJ_DIR)/installer.o $(OBJ_DIR)/http_download.o \
                $(OBJ_DIR)/supabase_client.o \

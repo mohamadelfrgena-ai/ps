@@ -1,4 +1,5 @@
 #include "http_download.hpp"
+#include <mutex>
 
 #ifdef __ORBIS__
 
@@ -26,6 +27,9 @@ struct HttpStack {
     bool ready = false;
 
     bool init() {
+        // MANY threads request HTTP (catalog, covers, RPCs) — serialize the one-time stack init
+        static std::mutex initMx;
+        std::lock_guard<std::mutex> lk(initMx);
         if (ready) return true;
         if (sceSysmoduleLoadModuleInternal(ORBIS_SYSMODULE_INTERNAL_NET) < 0) return false;
         if (sceSysmoduleLoadModuleInternal(ORBIS_SYSMODULE_INTERNAL_HTTP) < 0) return false;
