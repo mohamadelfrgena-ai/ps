@@ -3779,6 +3779,12 @@ bool drawLegalSplashFade(UiEngine& e, const std::string& langCode, int elapsedMs
     const int a = static_cast<int>(op * 255.f + 0.5f);
     if (a <= 0) { e.clear(SDL_Color{0, 0, 0, 255}); return elapsedMs < legalSplashTotalMs(); }
     e.drawImage("__splash", 0, 0, 1920, 1080);              // opaque straight copy
+    // Minecraft-style autosave indicator: 9-frame loop at 10 fps (save_0..save_8), bottom-right
+    // corner. One tiny drawImage per splash frame — zero cost to the app after the splash ends.
+    {
+        const std::string name = "save_" + std::to_string((elapsedMs / 100) % 9);
+        if (e.hasImage(name.c_str())) e.drawImage(name.c_str(), 1750, 910, 64, 120);
+    }
     if (a < 255) e.fadeToBlack(static_cast<Uint8>(a));     // one fast pass towards black (splash bg is black)
     return elapsedMs < legalSplashTotalMs();
 }
@@ -3909,9 +3915,6 @@ void drawLegalSplash(UiEngine& e, const std::string& /*langCode*/) {
         int y = 836 - static_cast<int>(lines.size() > 1 ? 14 : 0);
         for (const auto& ln : lines) { e.drawText(ln, left + 112, y, 22, SDL_Color{236, 236, 236, 255}, FontRole::Body, false, false); y += 28; }
     }
-    // blue App-Shield mark, bottom-right corner — exact a00_splash_full placement
-    // (measured art bbox 1725,913 + 115x115; crop has 10px padding all around)
-    e.drawImage("splash_shield", 1715, 903, 135, 135);
 }
 
 } // namespace pkgtest
