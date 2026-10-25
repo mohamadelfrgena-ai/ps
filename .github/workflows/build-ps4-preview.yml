@@ -101,10 +101,13 @@ jobs:
             ( grep -E "Unhandled|   at " /tmp/pkg-build.log || true ) | while IFS= read -r line; do
               echo "::error::STACK: $line"
             done
-            if [ -f pkg.gp4 ]; then
-              ( tr '\n' '~' < pkg.gp4 | grep -oE "<rootdir>.*</rootdir>" || tr '\n' '~' < pkg.gp4 | grep -oE "<files.*</files>" ) | head -c 1200 | while IFS= read -r line; do
+            ( grep -o -- "--files=.*" /tmp/pkg-build.log | head -c 1100 | while IFS= read -r line; do
+                echo "::error::FL: $line"
+              done ) || true
+            if [ -f ps4-addon-test/pkg.gp4 ]; then
+              ( tr '\n' '~' < ps4-addon-test/pkg.gp4 | grep -oE "<rootdir>.*</rootdir>" | head -c 1100 | while IFS= read -r line; do
                 echo "::error::GP4: $line"
-              done
+              done ) || true
             fi
             exit 1
           fi
