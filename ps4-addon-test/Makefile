@@ -1,7 +1,7 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 TITLE       := pkg addon test
 # AddonStation PS4 — v0.23 (UI v7.3 final)
-VERSION     := 0.25
+VERSION     := 0.26
 TITLE_ID    := ATST00002
 CONTENT_ID  := IV0000-ATST00002_00-PKGADDONTEST0000
 
@@ -35,7 +35,6 @@ OO_SDL_SAMPLE := $(TOOLCHAIN)/samples/SDL2
 PKG_FILES   := eboot.bin \
                sce_sys/param.sfo \
                sce_sys/icon0.png \
-               sce_sys/pic1.png \
                sce_sys/about/right.sprx \
                sce_module/libc.prx \
                sce_module/libSceFios2.prx \
@@ -133,7 +132,8 @@ prepare-runtime: check-toolchain
 	  cp "$$sample/sce_module/libSceFios2.prx" sce_module/libSceFios2.prx; \
 	  cp "$$sample/sce_sys/about/right.sprx" sce_sys/about/right.sprx; \
 	  cp "assets/ps4/icon0.png" sce_sys/icon0.png; \
-	  cp "assets/ps4/pic1.png" sce_sys/pic1.png
+	  # v0.26: NO pic1 boot image — the app never calls sceSystemServiceHideSplashScreen,
+	  # so a pic1 startup image would cover the UI forever (v0.22 shipped without it and worked).
 
 assets/ui.pak: tools/build_ui_pak.py $(wildcard assets/v73/*)
 	python3 tools/build_ui_pak.py assets/ui.pak
