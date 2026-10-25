@@ -41,7 +41,7 @@ using namespace pkgtest;
 // ---------------------------------------------------------------- config ----
 static const char* kStageDir = "/data/AddonStation/installed";
 static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
-static const char* kAppVersion = "0.24";
+static const char* kAppVersion = "0.25";
 static const char* kBrandSuffix = " by sliver fox";
 
 static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
@@ -183,9 +183,12 @@ static int hookSystemLanguage() {
             "/system/common/lib/libSceSystemService.sprx",
         };
         for (const char* mod : kMods) {
-            const uint32_t h = sceKernelLoadStartModule(mod, 0, nullptr, 0, nullptr, nullptr);
-            if (h == 0) continue;                     // load failed — try the next path
-            if (sceKernelDlsym((int32_t)h, "sceSystemServiceParamGetInt", &sym) == 0 && sym) break;
+            // LoadStartModule returns a POSITIVE handle on success, NEGATIVE on error. Never pass an
+            // error code to sceKernelDlsym (that is what froze/crashed the app at start-up).
+            const int32_t h = static_cast<int32_t>(
+                sceKernelLoadStartModule(mod, 0, nullptr, 0, nullptr, nullptr));
+            if (h <= 0) continue;                     // load failed — try the next path
+            if (sceKernelDlsym(h, "sceSystemServiceParamGetInt", &sym) == 0 && sym) break;
             sym = nullptr;
         }
         fn = reinterpret_cast<ParamGetIntFn>(sym);   // nullptr -> default "en" (never crashes)
@@ -1075,12 +1078,19 @@ int main(int, char**) {
     // ---- language: saved choice, else the PS4 system language (auto) ----
     gCfg = loadSupabaseConfig();
     loadUiSettings();
-    if (A.lang.empty() || A.lang == "en") {
-        // first run: prefer the system language unless the user saved one already
+    // First run = no saved language yet. The system-language probe uses kernel module APIs that can
+    // BLOCK on some firmwares — it runs on a detached worker so the UI never waits or freezes.
+    static std::atomic<int> gSysLangCode{0};
+    bool probePending = false;
+    {
         FILE* f = std::fopen(kUiCfgPath, "r");
         const bool haveSaved = (f != nullptr);
         if (f) std::fclose(f);
-        if (!haveSaved) A.lang = langFromSystem(hookSystemLanguage());
+        if (!haveSaved && (A.lang.empty() || A.lang == "en")) {
+            probePending = true;
+            A.lang = "en";   // safe default until the probe lands
+            std::thread([]() { gSysLangCode.store(hookSystemLanguage()); }).detach();
+        }
     }
     A.autoLaunch = loadAutoLaunchSetting();
 
@@ -1111,6 +1121,17 @@ int main(int, char**) {
         releaseLegalSplash(engine);
         A.dirty = true;
     }
+    // system language probe (worker): apply as soon as it lands, never block on it
+    const auto applyLangProbe = [&]() {
+        if (!probePending) return;
+        const int sl = gSysLangCode.load();
+        if (sl == 0) return;                    // still running or failed -> keep "en"
+        A.lang = langFromSystem(sl);
+        probePending = false;
+        A.dirty = true;
+    };
+    applyLangProbe();
+
     // ---- HUD sounds (v7.2) — AFTER the splash so the app always boots first ----
     if (!ui_audio_init("/app0/assets/sfx")) ui_audio_init("assets/sfx");
     ui_sfx_volume(80);
@@ -1149,6 +1170,7 @@ int main(int, char**) {
     bool running = true;
     while (running) {
         SDL_Event ev;
+        applyLangProbe();
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT) {
                 pushBtn(Btn::Circle);       // ○ never exits the app
