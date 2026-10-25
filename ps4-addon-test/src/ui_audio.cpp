@@ -25,6 +25,7 @@
 #  endif
 #  if !PKGTEST_AUDIO_HDR
 extern "C" {
+int32_t sceAudioOutInit(void);
 int32_t sceAudioOutOpen(int32_t userId, int32_t type, int32_t index, int32_t len, int32_t freq, int32_t format);
 int32_t sceAudioOutOutput(int32_t handle, const void* data);
 int32_t sceAudioOutClose(int32_t handle);
@@ -134,20 +135,22 @@ void mixBlock(int16_t* dst, int frames) {
 void audioThreadOrbis() {
     const int frames = kRate * kBlockMs / 1000;      // 480
     const int grain = 256;
+    sceAudioOutInit();                       // required before open on some firmwares
 #if PKGTEST_AUDIO_HDR
     // OpenOrbis: (userId, enum OrbisAudioOutPort, index, length, sample_rate, param_type)
-    int32_t hnd = sceAudioOutOpen(1, ORBIS_AUDIO_OUT_PORT_TYPE_MAIN, 0,
+    // system user (0xFF) first — always present; then the interactive user
+    int32_t hnd = sceAudioOutOpen(0xFF, ORBIS_AUDIO_OUT_PORT_TYPE_MAIN, 0,
                                   (uint32_t)frames, (uint32_t)kRate,
                                   (uint32_t)ORBIS_AUDIO_OUT_PARAM_FORMAT_S16_STEREO);
     if (hnd < 0)
-        hnd = sceAudioOutOpen(0xFF, ORBIS_AUDIO_OUT_PORT_TYPE_MAIN, 0,
+        hnd = sceAudioOutOpen(1, ORBIS_AUDIO_OUT_PORT_TYPE_MAIN, 0,
                               (uint32_t)frames, (uint32_t)kRate,
                               (uint32_t)ORBIS_AUDIO_OUT_PARAM_FORMAT_S16_STEREO);
 #else
-    int32_t hnd = sceAudioOutOpen(1, 0, 0, frames, kRate, 1);
-    if (hnd < 0) hnd = sceAudioOutOpen(0xFF, 0, 0, frames, kRate, 1);
+    int32_t hnd = sceAudioOutOpen(0xFF, 0, 0, frames, kRate, 1);
+    if (hnd < 0) hnd = sceAudioOutOpen(1, 0, 0, frames, kRate, 1);
 #endif
-    if (hnd < 0) return;
+    if (hnd < 0) return;                     // no audio device -> silent UI (never crash)
     std::vector<int16_t> buf(frames * 2);
     while (gRun) {
         for (int off = 0; off < frames; off += grain)

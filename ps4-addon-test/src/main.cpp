@@ -184,11 +184,11 @@ static int hookSystemLanguage() {
         };
         for (const char* mod : kMods) {
             const uint32_t h = sceKernelLoadStartModule(mod, 0, nullptr, 0, nullptr, nullptr);
-            if (h != 0 && sceKernelDlsym((int32_t)h, "sceSystemServiceParamGetInt", &sym) == 0 && sym) break;
+            if (h == 0) continue;                     // load failed — try the next path
+            if (sceKernelDlsym((int32_t)h, "sceSystemServiceParamGetInt", &sym) == 0 && sym) break;
             sym = nullptr;
         }
-        if (!sym) sceKernelDlsym(0, "sceSystemServiceParamGetInt", &sym);
-        fn = reinterpret_cast<ParamGetIntFn>(sym);
+        fn = reinterpret_cast<ParamGetIntFn>(sym);   // nullptr -> default "en" (never crashes)
     }
     int lang = 1;
     if (fn) fn(1 /* SCE_SYSTEM_SERVICE_PARAM_ID_LANG */, &lang);
@@ -1047,20 +1047,26 @@ static std::vector<Btn> drainButtons() {
 }
 
 int main(int, char**) {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) {
-        std::fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
-        return 1;
-    }
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) return 1;
     SDL_Window* window = SDL_CreateWindow("AddonStation", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                           UiEngine::kWidth, UiEngine::kHeight, 0);
-    if (!window) return 1;
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0);
-    (void)renderer;
-    if (SDL_NumJoysticks() > 0) SDL_JoystickOpen(0);
+    if (!window) { SDL_Quit(); return 1; }
+    // v0.22-proven: SOFTWARE renderer bound to the window surface (never GPU)
+    SDL_Surface* windowSurface = SDL_GetWindowSurface(window);
+    SDL_Renderer* renderer = windowSurface ? SDL_CreateSoftwareRenderer(windowSurface) : nullptr;
+    if (!renderer) { SDL_DestroyWindow(window); SDL_Quit(); return 1; }
+
+    std::vector<SDL_Joystick*> joysticks;
+    const int numJoy = SDL_NumJoysticks();
+    for (int i = 0; i < numJoy; ++i)
+        if (SDL_Joystick* joy = SDL_JoystickOpen(i)) joysticks.push_back(joy);
+    SDL_JoystickEventState(SDL_ENABLE);
 
     UiEngine engine;
     gEngine = &engine;
-    if (!engine.init("assets/ui.pak")) {
+    // PS4 app root is /app0 — plain relative paths do not exist on the console
+    if (!engine.init("/app0/assets/ui.pak") && !engine.init("assets/ui.pak")) {
         std::fprintf(stderr, "ui.pak init failed\n");
         return 1;
     }
@@ -1077,10 +1083,6 @@ int main(int, char**) {
         if (!haveSaved) A.lang = langFromSystem(hookSystemLanguage());
     }
     A.autoLaunch = loadAutoLaunchSetting();
-
-    // ---- HUD sounds (v7.2) ----
-    ui_audio_init("assets/sfx");
-    ui_sfx_volume(80);
 
     // ---- background data loading (runs while the splash is on screen) ----
     gSession = loadLinkSession();
@@ -1109,6 +1111,9 @@ int main(int, char**) {
         releaseLegalSplash(engine);
         A.dirty = true;
     }
+    // ---- HUD sounds (v7.2) — AFTER the splash so the app always boots first ----
+    if (!ui_audio_init("/app0/assets/sfx")) ui_audio_init("assets/sfx");
+    ui_sfx_volume(80);
     ui_sfx(Sfx::AppStart);
 
     setAppVersion(kAppVersion);
