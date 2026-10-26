@@ -77,10 +77,18 @@ def http(
             return response.status, response.read(), response.headers
     except urllib.error.HTTPError as exc:
         body = exc.read()
-        if allow_404 and exc.code == 404:
-            return exc.code, body, exc.headers
-        detail = body.decode("utf-8", "replace")[:400]
-        raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
+        detail = body.decode("utf-8", "replace")
+        # Storage currently reports a missing private object either as a real
+        # HTTP 404 or as HTTP 400 with a nested 404/Object-not-found payload.
+        # Only normalize that exact absence signal; every other 400 remains a
+        # deployment failure rather than being silently treated as missing.
+        missing_object = exc.code == 404 or (
+            exc.code == 400
+            and ("Object not found" in detail or '"statusCode":"404"' in detail)
+        )
+        if allow_404 and missing_object:
+            return 404, body, exc.headers
+        raise RuntimeError(f"HTTP {exc.code}: {detail[:400]}") from exc
 
 
 def encoded(path: str) -> str:
