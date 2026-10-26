@@ -1,12 +1,10 @@
-# طلب رفع عبر سير العمل Upload profile banners
-#   mode: upload      ⇒ رفع كل Banner.zip + التسجيل
-#   mode: seed-only   ⇒ تسجيل الصفوف فقط (الصور مرفوعة)
-#   mode: admin-gifs  ⇒ رفع أغلفة الأدمن بخطة admin
-#   mode: brand       ⇒ رفع شعار AddonStation إلى site-assets/brand/ (لقوالب البريد)
+# طلب رفع عبر سير العمل Upload requested profile assets
+#   mode: upload      ⇒ ارفع حزمة banner الجديدة وحزمة verification وتحقق منهما
 #   mode: dry-run     ⇒ تجربة بلا رفع
 # دفع هذا الملف (أو تغييره) يشغّل سير العمل تلقائياً.
-mode: brand
-zip: https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/Banner.zip
+mode: upload
+zip: https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/banner.zip
+run: 2
 
-# الهدف: رفع brand/addonstation-logo.png وطباعة الرابط العام لاستخدامه في
-# قوالب البريد (docs/07-EMAIL-BRANDING-AR.md)
+# طلب 2026-10-26: حذف Nature والنسخ العامة القديمة، ثم رفع 56 أصلاً إلى
+# site-assets/admin-assets قبل تطبيق migration 48.

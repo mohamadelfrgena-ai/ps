@@ -22,7 +22,7 @@ name: Upload requested profile assets
 on:
   # دفعُ ملف `.upload-request` يشغّل السير تلقائياً (نفس أسلوب `.build-request`)
   push:
-    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps ]
+    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps, arena/75fb0e28-ps ]
     paths:
       - '.upload-request'
   workflow_dispatch:
