@@ -1,26 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-فاحص: **إطار الاختيار** في شاشة «تعديل الملف الشخصي» (طلب المستخدم).
+"""تحقق من إطار العنصر المختار في محرر الملف الشخصي وفق مواصفة التحرير الحالية.
 
-المطلوب: حين يختار المستخدم أفاتاراً أو غلافاً أو أداة، يبقى المختار مُؤطَّراً
-بلون واضح يعرف منه ماذا اختار — لا حدّاً رمادياً رفيعاً لا يُرى.
-
-يتحقّق الفاحص من `ProfileScreens.kt`:
-  • الخلية المختارة تُزيّن بهالة `Modifier.shadow` بلون أخضر (خارج البطاقة)؛
-  • حدّ المختار **أسمك** من حدّ غير المختار (2.5dp مقابل 1dp)؛
-  • خلفية المختار مُلوّنة (أخضر بشفافية) لا رمادية عادية؛
-  • علامة `✓` تظهر فوق زاوية الخلية المختارة وحدها؛
-  • اسم المختار مكتوب بلون أخضر.
-
-يفشل إن عاد أيٌّ من ذلك إلى الحالة الباهتة السابقة.
+يجب أن تُظهر خلايا الأفاتار والغلاف والأداة التحديد بإطار أزرق 3dp (مقابل
+1dp لغير المختار) وشارة تحقق في الزاوية العليا الخارجية؛ وتبرز الأداة المختارة
+بلون أزرق أيضاً. هذا الفحص يتابع المكوّنات الفعلية في EditProfileEditor.kt.
 """
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-KOTLIN = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/profile/ProfileScreens.kt"
+KOTLIN = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/profile/EditProfileEditor.kt"
+
+
+def composable_block(src: str, name: str) -> str:
+    start = src.find(f"private fun {name}(")
+    if start < 0:
+        return ""
+    end = src.find("\n@Composable\nprivate fun ", start + 1)
+    return src[start:end if end >= 0 else len(src)]
 
 
 def main() -> int:
@@ -28,65 +27,57 @@ def main() -> int:
         print(f"✗ الملف مفقود: {KOTLIN}")
         return 1
     src = KOTLIN.read_text(encoding="utf-8")
+    tiles = {
+        name: composable_block(src, name)
+        for name in ("AvatarAssetTile", "BannerAssetTile", "ItemAssetTile")
+    }
+    badge = composable_block(src, "SelectionBadge")
+    checks = []
+    for name, block in tiles.items():
+        checks.extend([
+            (
+                f"{name}: حدّ أزرق 3dp للمختار و1dp لغيره",
+                bool(re.search(
+                    r"\.border\(\s*if\s*\(selected\)\s*3\.dp\s*else\s*1\.dp\s*,\s*"
+                    r"if\s*\(selected\)\s*EditBlue\s*else\s*palette\.border",
+                    block,
+                )),
+            ),
+            (
+                f"{name}: شارة التحقق عند أعلى نهاية الخلية",
+                bool(re.search(
+                    r"if\s*\(selected\)\s*SelectionBadge\(Modifier\.align\(Alignment\.TopEnd\)",
+                    block,
+                )),
+            ),
+        ])
+    checks.extend([
+        (
+            "الأداة المختارة لها خلفية زرقاء خفيفة",
+            "background(if (selected) palette.blue.copy(alpha = 0.12f) else palette.surface)" in tiles["ItemAssetTile"],
+        ),
+        (
+            "اسم الأداة المختارة يبرز بالأزرق الفاتح",
+            "color = if (selected) EditBlueLight else palette.textMuted" in tiles["ItemAssetTile"],
+        ),
+        (
+            "شارة الاختيار دائرة زرقاء 24dp بعلامة تحقق بيضاء",
+            "size(24.dp)" in badge and ".background(EditBlue)" in badge
+            and "Icons.Filled.Check" in badge and "tint = Color.White" in badge,
+        ),
+    ])
 
-    # شريحة خلايا الأصول وحدها (من «val selected = when (kind)» إلى نهاية حلقة الصفوف)
-    start = src.find("val selected = when (kind)")
-    end = src.find("// خلايا فارغة تكمل الصف الأخير")
-    if start == -1 or end == -1 or end < start:
-        print("✗ لم تُوجد شريحة خلايا الأصول في ProfileScreens.kt")
-        return 1
-    cell_block = src[start:end]
-
-    checks = [
-        (
-            "هالة خضراء حول المختار (Modifier.shadow بـ ambientColor)",
-            re.search(
-                r"Modifier\.shadow\s*\(\s*[\d.]+\.dp\s*,\s*\w+\s*,"
-                r"[^)]*ambientColor\s*=\s*AppColors\.Green",
-                cell_block,
-                re.S,
-            ),
-        ),
-        (
-            "حدّ المختار أسمك من غير المختار (2.5dp / 1dp)",
-            re.search(
-                r"\.border\s*\(\s*if\s*\(selected\)\s*[\d.]+\.dp\s*else\s*[\d.]+\.dp\s*,",
-                cell_block,
-            ),
-        ),
-        (
-            "خلفية المختار مُلوّنة بالأخضر",
-            re.search(
-                r"if\s*\(selected\)\s*AppColors\.Green\.copy\(alpha\s*=[\s\d.]*f\)",
-                cell_block,
-            ),
-        ),
-        (
-            "علامة ✓ فوق زاوية المختار وحده",
-            re.search(r'if\s*\(selected\)\s*\{[^}]*"✓"', cell_block, re.S),
-        ),
-        (
-            "اسم المختار بالأخضر",
-            re.search(
-                r"color\s*=\s*if\s*\(selected\)\s*AppColors\.Green\s*else\s*AppColors\.Muted",
-                cell_block,
-            ),
-        ),
-    ]
-
-    print("الفحص | النتيجة")
+    print("فحص إطار الاختيار | النتيجة")
     print("----------------------------------------------")
-    bad = 0
-    for label, hit in checks:
-        ok = hit is not None
+    failed = []
+    for label, ok in checks:
+        print(f"{label:<64} | {'✅' if ok else '❌'}")
         if not ok:
-            bad += 1
-        print(f"{label:<52} | {'✅' if ok else '❌'}")
-
-    if bad:
-        print(f"\n✗ عدد المشاكل: {bad}")
+            failed.append(label)
+    if failed:
+        print(f"\n✗ عدد المشاكل: {len(failed)}")
         return 1
-    print("\n🟢 المختار مُؤطَّر بلون واضح: هالة + حدّ سميك + خلفية مُلوّنة + علامة ✓ واسم أخضر.")
+    print("\n🟢 خلايا الأفاتار والغلاف والأداة تبيّن الاختيار بإطار وشارة واضحين.")
     return 0
 
 

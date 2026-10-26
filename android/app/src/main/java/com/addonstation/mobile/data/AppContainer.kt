@@ -7,6 +7,7 @@ import com.addonstation.mobile.data.repo.AuthRepository
 import com.addonstation.mobile.data.repo.AssetsRepository
 import com.addonstation.mobile.data.repo.ChatRepository
 import com.addonstation.mobile.data.repo.ContentRepository
+import com.addonstation.mobile.data.repo.ConsoleLinkRepository
 import com.addonstation.mobile.data.repo.CreatorRepository
 import com.addonstation.mobile.data.repo.NotificationsRepository
 import com.addonstation.mobile.data.repo.PlansRepository
@@ -35,6 +36,7 @@ class AppContainer(context: Context) {
 
     val auth = AuthRepository(supabase, sessionStore)
     val profile = ProfileRepository(supabase, state)
+    val consoleLinks = ConsoleLinkRepository(supabase)
     val content = ContentRepository(supabase, state)
     val plans = PlansRepository(supabase, state)
     val ac = AcRepository(supabase, state)
@@ -43,7 +45,7 @@ class AppContainer(context: Context) {
 
     /** الإشعارات الفورية: تسجيل الجهاز · التفضيلات · إشعار تجريبي · نبضة الحضور. */
     val push = PushRepository(supabase)
-    val creators = CreatorRepository(supabase)
+    val creators = CreatorRepository(supabase, state)
     val admin = AdminRepository(supabase)
     val assets = AssetsRepository(supabase, state)
 
@@ -64,12 +66,23 @@ class AppContainer(context: Context) {
 
     fun currentConfig(): SupabaseConfig? = config
 
-    /** رابط عام لملف داخل مخزن site-assets (الصور الرمزية والأغلفة والأدوات والملصقات). */
-    fun siteAssetUrl(path: String?): String? {
+    /**
+     * رابط أصل واجهة. الأصول العادية من site-assets العام؛ أما المسار المحجوز
+     * admin-private/ فلا يُرجع إلا رابطاً موقّعاً سبق أن حصل عليه حساب admin.
+     */
+    fun siteAssetUrl(
+        path: String?,
+        privateAssetUrls: Map<String, String> = state.privateAssetUrls.value,
+    ): String? {
         if (path.isNullOrBlank()) return null
+        val clean = path.trim().trimStart('/')
+        if (!state.isAdmin && state.isAdminOnlyAssetValue(clean)) return null
         if (path.startsWith("http://") || path.startsWith("https://")) return path
+        if (isPrivateAdminAssetPath(clean)) {
+            return if (state.isAdmin) privateAssetUrls[clean] else null
+        }
         val cfg = config ?: return null
-        return cfg.publicUrl("site-assets", path)
+        return cfg.publicUrl("site-assets", clean)
     }
 }
 

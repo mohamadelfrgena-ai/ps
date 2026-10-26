@@ -65,7 +65,7 @@ has("المطابقة تستبدلها في مكانها", "it.copy(message = me
 
 # ── 3) الشارة للآخرين فقط ───────────────────────────────────────────────
 has("شارة «رسائل بالأسفل» لا تُرفع برسائلي",
-    "mapped.any { it.message.userId != myId }" in vm)
+    "mapped.firstOrNull { it.message.userId != myId }" in vm)
 
 # ── 4) الصورة تظهر ──────────────────────────────────────────────────────
 has("مقاس ثابت للصورة (لا عرض صفر)", "private fun ChatImageTile(" in screen

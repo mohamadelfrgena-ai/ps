@@ -20,6 +20,15 @@
 --      → 26_fix_site_assets_sequence (صلاحية تسلسل site_assets للتسجيل عبر REST)
 --      → 27_admin_only_assets (Enchanted Bedrock · PFP 4 · أغلفة الأدمن = admin فقط)
 --      → 28_chat_cleanup (تنظيف غرف الشات: حذف/إخفاء الرسائل — أقسام اختيارية)
+--      → 40_admin_asset_privacy (أصول الأدمن لا تظهر لغيره + مخزن خاص)
+--      → 41_console_link_codes (ربط PlayStation الآمن برمز مؤقت وموافقة صريحة)
+--      → 42_visible_profiles_access → 44_fix_profile_asset_guard
+--      → 45_single_attached_free_avatar → 46_profile_avatar_packs
+--      → 47_bulk_content_import (استيراد ZIP جماعي ذري وآمن للأدمن)
+--      → 48_creator_verification_and_featured_banners (بانرات جديدة + عناصر المبدعين/الأدمن)
+--  ⚠️ ارفع ملفات supabase/profile-pack-files إلى مخزن site-assets قبل تشغيل 46؛
+--     يتحقق الترحيل من الأحجام والبصمات ويرفض إنشاء أي صف ذي صورة ناقصة.
+--  (43_content_download_integrity إصلاح بيانات إنتاجية مستقل، وليس للتنصيب الجديد.)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --
@@ -80,7 +89,7 @@ create table if not exists public.profiles (
   id                 uuid primary key references auth.users(id) on delete cascade,
   username           citext unique,
   display_name       text,
-  avatar_url         text default 'profiles/onefree.png',   -- مسار نسبي داخل مخزن site-assets
+  avatar_url         text default 'profiles/profiles/onefree.png', -- the single free avatar in site-assets
   banner_url         text,
   custom_status      text check (custom_status is null or char_length(custom_status) <= 60),
   bio                text check (bio is null or char_length(bio) <= 400),
@@ -583,8 +592,8 @@ begin
     v_username := v_username || floor(random()*10)::int;
   end loop;
 
-  insert into public.profiles (id, username, display_name)
-  values (new.id, v_username, v_username)
+  insert into public.profiles (id, username, display_name, avatar_url)
+  values (new.id, v_username, v_username, 'profiles/profiles/onefree.png')
   on conflict (id) do nothing;
 
   insert into public.ac_wallets (user_id, balance, total_earned)
@@ -616,6 +625,17 @@ as $$
 declare
   v_actor_role text;
 begin
+  -- Server-side maintenance has no end-user JWT and remains allowed.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  -- Validated SECURITY DEFINER profile RPCs set this transaction-local flag.
+  -- End-user REST clients still lack UPDATE grants on protected columns.
+  if coalesce(current_setting('app.allow_profile_write', true), '') = '1' then
+    return new;
+  end if;
+
   -- من له دور admin يستطيع تغيير كل شيء
   select role into v_actor_role from public.profiles where id = auth.uid();
 
@@ -798,8 +818,9 @@ returns jsonb
 language plpgsql security definer set search_path = public
 as $$
 declare
-  v_uid  uuid := auth.uid();
-  v_item public.content_items;
+  v_uid         uuid := auth.uid();
+  v_item        public.content_items;
+  v_object_size bigint;
 begin
   if v_uid is null then
     return jsonb_build_object('ok', false, 'message', 'sign_in_required');
@@ -810,7 +831,16 @@ begin
     return jsonb_build_object('ok', false, 'message', 'not_found');
   end if;
 
-  if coalesce(v_item.file_path,'') = '' then
+  if coalesce(v_item.file_path, '') = '' then
+    return jsonb_build_object('ok', false, 'message', 'file_not_uploaded');
+  end if;
+
+  select coalesce((o.metadata ->> 'size')::bigint, v_item.file_size)
+    into v_object_size
+    from storage.objects o
+   where o.bucket_id = 'content-files'
+     and o.name = v_item.file_path;
+  if not found then
     return jsonb_build_object('ok', false, 'message', 'file_not_uploaded');
   end if;
 
@@ -826,9 +856,39 @@ begin
   update public.content_items set downloads_count = downloads_count + 1 where id = p_item_id;
 
   return jsonb_build_object('ok', true, 'bucket', 'content-files', 'path', v_item.file_path,
-                            'title', v_item.title);
+                            'size', v_object_size, 'title', v_item.title);
 end;
 $$;
+
+-- Never publish metadata that points to a missing protected Storage object.
+-- This guard runs only for inserts and publication/path changes, so ordinary
+-- view/download counter updates do not pay for the Storage lookup.
+create or replace function public.ensure_published_content_file()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if new.is_published and (
+    coalesce(new.file_path, '') = ''
+    or not exists (
+      select 1
+        from storage.objects o
+       where o.bucket_id = 'content-files'
+         and o.name = new.file_path
+    )
+  ) then
+    raise exception using errcode = '23514', message = 'file_not_uploaded';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.ensure_published_content_file() from public;
+
+drop trigger if exists content_items_require_uploaded_file on public.content_items;
+create trigger content_items_require_uploaded_file
+  before insert or update of is_published, file_path on public.content_items
+  for each row execute function public.ensure_published_content_file();
 
 -- ---------------------------------------------------------------------------
 -- 3) المفضلة
@@ -1310,6 +1370,11 @@ begin
     return jsonb_build_object('ok', false, 'message', 'invalid_kind');
   end if;
 
+  -- This validated SECURITY DEFINER RPC is the only non-admin path allowed to
+  -- change protected profile asset columns. The trigger remains strict for
+  -- direct table updates.
+  perform set_config('app.allow_profile_write', '1', true);
+
   -- السماح بإعادة التعيين للقيمة الافتراضية
   if p_value is null or p_value = '' or p_value = 'none' then
     if p_kind = 'avatar' then
@@ -1324,9 +1389,15 @@ begin
              updated_at = now()
        where id = v_uid;
     elsif p_kind = 'banner' then
-      update public.profiles set banner_url = null where id = v_uid;
+      update public.profiles
+         set banner_url = null,
+             updated_at = now()
+       where id = v_uid;
     else
-      update public.profiles set equipped_item_id = 'none' where id = v_uid;
+      update public.profiles
+         set equipped_item_id = 'none',
+             updated_at = now()
+       where id = v_uid;
     end if;
     return jsonb_build_object('ok', true, 'value', 'none');
   end if;
@@ -1388,6 +1459,10 @@ begin
       return jsonb_build_object('ok', false, 'message', 'username_taken');
     end if;
   end if;
+
+  -- Username changes are validated above and must pass the protected-column
+  -- trigger through this trusted RPC only.
+  perform set_config('app.allow_profile_write', '1', true);
 
   update public.profiles
      set username = coalesce(p_username, username),
@@ -2319,7 +2394,11 @@ begin
    order by created_at desc limit 1;
 
   select exists(select 1 from public.chat_bans where user_id = v_uid and active) into v_banned;
-  select exists(select 1 from public.chat_rule_acceptances where user_id = v_uid) into v_accepted;
+  -- Keep v1 aligned with ChatRepository.COMMUNITY_RULES_VERSION; mismatches must re-accept.
+  select exists(
+    select 1 from public.chat_rule_acceptances acceptance
+     where acceptance.user_id = v_uid and acceptance.version = 'v1'
+  ) into v_accepted;
 
   return jsonb_build_object(
     'signed_in', true,
@@ -2989,7 +3068,10 @@ create policy tips_admin_write on public.creator_tips
 -- ---------------------------------------------------------------------------
 drop policy if exists assets_read on public.site_assets;
 create policy assets_read on public.site_assets
-  for select using (enabled = true or public.is_admin());
+  for select using (
+    public.is_admin()
+    or (enabled = true and required_plan <> 'admin')
+  );
 
 drop policy if exists assets_admin on public.site_assets;
 create policy assets_admin on public.site_assets
@@ -3031,7 +3113,20 @@ revoke insert, update, delete on public.creator_submissions from anon, authentic
 revoke insert, update, delete on public.creator_applications from anon, authenticated;
 revoke insert, update, delete on public.user_friends from anon, authenticated;
 
-grant select on public.profiles to anon, authenticated;
+-- بعد تنفيذ 40_admin_asset_privacy تُقرأ الملفات الشخصية من العرض المنقّح فقط.
+-- نبقي توافق الإعداد الأول: إن لم يُنشأ العرض بعد، تعمل النسخ القديمة مؤقتاً؛
+-- وإعادة تنفيذ هذا الملف لاحقاً لا تعيد فتح الجدول الأساسي بالخطأ.
+do $$
+begin
+  if to_regclass('public.visible_profiles') is not null then
+    revoke select on public.profiles from public, anon, authenticated;
+    grant select on public.visible_profiles to anon, authenticated;
+  else
+    grant select on public.profiles to anon, authenticated;
+  end if;
+end;
+$$;
+
 grant update (bio, custom_status, show_online_status, last_seen_at, country, display_name) on public.profiles to authenticated;
 
 
@@ -3816,6 +3911,17 @@ order by tablename;
 -- ---------------------------------------------------------------------------
 grant select on all tables in schema public to anon, authenticated;
 
+-- إن كانت خصوصية أصول الأدمن (40) مطبقة، لا تعِد فتح profiles عند إعادة هذا
+-- الملف لاحقاً؛ القراءة تكون من العرض المنقّح فقط.
+do $$
+begin
+  if to_regclass('public.visible_profiles') is not null then
+    revoke select on public.profiles from public, anon, authenticated;
+    grant select on public.visible_profiles to anon, authenticated;
+  end if;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- 2) الكتابة المباشرة التي يحتاجها التطبيق (بقية الكتابة تتم عبر دوال RPC)
 --    RLS تتحقق من الدور: أدمن للوحة، وصاحب الحساب لملفه الشخصي
@@ -3831,9 +3937,12 @@ begin
 
   -- الملف الشخصي: منح على مستوى العمود (المستخدم يعدّل حقوله المسموحة فقط)
   begin
+    -- اختيار الأفاتار/الغلاف/الأداة يمر حصراً عبر set_profile_asset كي تُفحص
+    -- الخطة وadmin على الخادم؛ لا نمنح equipped_item_id مباشرةً.
     grant update (display_name, bio, custom_status, show_online_status, country,
-                  last_seen_at, equipped_item_id)
+                  last_seen_at)
       on public.profiles to authenticated;
+    revoke update (equipped_item_id) on public.profiles from authenticated;
   exception when undefined_table or undefined_column then null;
   end;
 
@@ -4213,7 +4322,7 @@ select
 --
 --  يولّده tools/build_assets_sql.py من assets-manifest.json — لا تعدّله يدوياً.
 --
---  المحتوى: 123 أفاتاراً · 193 ملصقاً · 176 أداة  =  492 أصلاً
+--  final content after free-avatar cleanup: 66 avatars · 193 stickers · 176 items = 435 assets
 --  منها 214 ملفاً متحرّكاً (GIF) يعمل داخل التطبيق مع المعاينات.
 --
 --  ⚠️ هذا الملف **يحذف كل الأصول القديمة** (أفاتارات/ملصقات/أدوات) ثم يزرع الجديدة.
@@ -4811,19 +4920,15 @@ on conflict (file_url) do update
       enabled = true;
 
 -- ---------------------------------------------------------------------------
--- الأفاتار المجاني = واحد فقط (onefree)
+-- Keep exactly one free avatar record: the owner's canonical onefree image.
 -- ---------------------------------------------------------------------------
--- طلب المالك: «أريد هذه الصورة المجانية الافتراضية لكل الحساب، والصور التي
--- معيّنة مجانية والافتراضية القديمة أزلها.»
--- ⇒ نُعطّل (لا نحذف) كل أفاتار مجاني قديم، فيبقى مفعّلاً أصلٌ واحد:
---    profiles/onefree.png  (يُثبَّته ويُفعَّل في 31_single_free_avatar.sql).
--- التعطيل يكفي: التطبيق يستعلم بـ enabled=eq.true فلا تظهر المعطَّلات أصلاً،
--- والصفوف باقية في القاعدة ⇒ إرجاع أي صورة سطر UPDATE واحد.
-update public.site_assets
-   set enabled = false
+-- Old free/default avatar records are intentionally removed rather than merely
+-- hidden. Migration 45 maps any legacy profile references before enforcing the
+-- same invariant on existing installations.
+delete from public.site_assets
  where asset_type = 'avatar'
    and required_plan = 'free'
-   and lower(file_url) not like '%onefree%';
+   and file_url <> 'profiles/profiles/onefree.png';
 
 -- ---------------------------------------------------------------------------
 -- تحقق: يجب أن ترى 21 قسماً والأعداد كما في الجدول أدناه
@@ -4834,7 +4939,7 @@ select asset_type as "النوع", collection as "القسم", count(*) as "ال
  group by asset_type, collection, collection_order
  order by asset_type, collection_order;
 
--- الإجمالي المتوقّع: avatar = 123 · sticker = 193 · item = 176
+-- Expected final totals: avatar = 66 · sticker = 193 · item = 176
 select asset_type, count(*) as total, count(*) filter (where animated) as animated
   from public.site_assets group by asset_type order by asset_type;
 
@@ -5938,9 +6043,8 @@ $$;
 --
 --  ⚠️ المسار المعتمد هو ما هو موجود فعلاً في المخزن:
 --       site-assets/profiles/profiles/onefree.png
---     (التطبيق يجرب المسارين — profiles/profiles/onefree.png ثم
---      profiles/onefree.png — ثم أيقونة محلية أخيرة، فلا تعطل الصورة أبداً.
---      وملف 32_onefree_canonical_path يوحّد كل شيء على المسار الموجود.)
+--     (التطبيق يستخدم هذا المسار وحده، ثم نسخة محلية مطابقة للصورة نفسها عند
+--      تعذر الشبكة. وملفا 32 و45 يثبتان المسار والسجل المجاني الوحيد.)
 --
 --  يُنفَّذ مرة واحدة في Supabase → SQL Editor.
 -- ============================================================================
@@ -7039,7 +7143,11 @@ begin
   v_muted := found;
 
   select exists(select 1 from public.chat_bans where user_id = v_uid and active) into v_banned;
-  select exists(select 1 from public.chat_rule_acceptances where user_id = v_uid) into v_accepted;
+  -- Keep v1 aligned with ChatRepository.COMMUNITY_RULES_VERSION; mismatches must re-accept.
+  select exists(
+    select 1 from public.chat_rule_acceptances acceptance
+     where acceptance.user_id = v_uid and acceptance.version = 'v1'
+  ) into v_accepted;
 
   if public.is_admin(v_uid) then
     v_scope := jsonb_build_object('all_rooms', true, 'channels', '[]'::jsonb);
@@ -7171,168 +7279,166 @@ comment on table public.chat_messages is
 -- ############################################################################
 
 -- ============================================================================
---  AddonStation Mobile — 31) أفاتار مجاني واحد: onefree لكل الحسابات
+-- AddonStation Mobile — keep one free/default avatar only
 --
---  الطلب (حرفياً): «أنا أنشئ حساباً جديداً — أريد هذه الصورة المجانية
---  الافتراضية لكل الحساب [onefree.png]، والصور التي معيّنة مجانية
---  والافتراضية القديمة أزلها.»
+-- The canonical image is the owner's onefree.png at:
+--   site-assets/profiles/profiles/onefree.png
 --
---  القرار المتّفق عليه:
---      • الأفاتارات المجانية القديمة (58 صورة: PFP · Profiles · Pack One
---        ومنها «Default Profile») **تُعطَّل** (enabled = false) لا تُحذف:
---        تبقى صفوفها في القاعدة مخفيّة عن التطبيق، وإرجاعها سطر واحد.
---      • الصورة المجانية المفعّلة تبقى **واحدة فقط**: profiles/onefree.png.
---      • كل حساب يستعمل صورة مجانية قديمة يُحوَّل إلى onefree
---        («لكل الحساب»).
---
---  لماذا التعطيل يكفي؟ التطبيق يقرأ الأصول بـ
---      select=*&asset_type=eq.avatar&enabled=eq.true
---  (AssetsRepository.byType) ⇒ المعطَّل لا يظهر في تبويب الأفاتار أصلاً.
---
---  آمن لإعادة التنفيذ (idempotent).
---
---  ⚠️ الملف نفسه مرفوع في المخزن على المسار:
---        site-assets/profiles/profiles/onefree.png   ← المسار المعتمد
---     (نسخة محفوظة في المستودع: supabase/site-assets/profiles/onefree.png
---      — ارفعها على المسار أعلاه إن احتجت، و32 يوحّد كل شيء عليه)
---
---  يُنفَّذ مرة واحدة في Supabase → SQL Editor.
+-- Unlike the previous revision, obsolete free avatar database records are
+-- deleted rather than only disabled. Paid/admin avatars and the separate guest
+-- image used before sign-in are not changed.
 -- ============================================================================
 
--- ---------------------------------------------------------------------------
--- ٠) فهرس فريد على file_url (يحتاجه الـ upsert أدناه) + تنظيف أي تكرار قديم
--- ---------------------------------------------------------------------------
+begin;
+
+-- The upsert below relies on one row per storage path.
 delete from public.site_assets a
  using public.site_assets b
  where a.file_url = b.file_url
    and a.id > b.id;
 
-do $$
-begin
-  if not exists (
-        select 1 from pg_indexes
-         where schemaname = 'public' and indexname = 'site_assets_file_url_uidx'
-     ) then
-    execute 'create unique index site_assets_file_url_uidx on public.site_assets (file_url)';
-  end if;
-end $$;
+create unique index if not exists site_assets_file_url_uidx
+  on public.site_assets (file_url);
 
--- ---------------------------------------------------------------------------
--- ١) تعطيل كل الأفاتارات المجانية القديمة (تبقى في القاعدة · مخفيّة عن التطبيق)
--- ---------------------------------------------------------------------------
-update public.site_assets
-   set enabled = false
- where asset_type = 'avatar'
-   and required_plan = 'free'
-   and lower(file_url) not like '%onefree%';
-
--- المسار المعتمد **واحد فقط**: profiles/profiles/onefree.png — وهو المسار
--- الذي رُفعت إليه الصورة فعلاً في المخزن (تحقّق منه فاحص 99). أي صف onefree
--- آخر (مثل profiles/onefree.png) يُعطَّل، ولا يظهر مرّتين في تبويب الأفاتار.
-update public.site_assets
-   set enabled = false
- where asset_type = 'avatar'
-   and lower(file_url) like '%onefree%'
-   and file_url <> 'profiles/profiles/onefree.png';
-
--- ---------------------------------------------------------------------------
--- ٢) تثبيت الأصل المجاني الوحيد: profiles/profiles/onefree.png (موجود في المخزن)
--- ---------------------------------------------------------------------------
-insert into public.site_assets (asset_type, name, file_url, required_plan, animated, sort_order, enabled)
-values ('avatar', 'Onefree', 'profiles/profiles/onefree.png', 'free', false, 1, true)
+-- Establish the canonical free row before migrating old references.
+insert into public.site_assets
+  (asset_type, name, file_url, required_plan, animated, collection,
+   collection_order, sort_order, enabled)
+values
+  ('avatar', 'Default Free Avatar', 'profiles/profiles/onefree.png', 'free',
+   false, 'Default', 1, 1, true)
 on conflict (file_url) do update
-   set asset_type    = excluded.asset_type,
-       name          = excluded.name,
-       required_plan = excluded.required_plan,
-       animated      = excluded.animated,
-       sort_order    = excluded.sort_order,
-       enabled       = true;
+   set asset_type       = excluded.asset_type,
+       name             = excluded.name,
+       required_plan    = excluded.required_plan,
+       animated         = excluded.animated,
+       collection       = excluded.collection,
+       collection_order = excluded.collection_order,
+       sort_order       = excluded.sort_order,
+       enabled          = true;
 
--- ---------------------------------------------------------------------------
--- ٣) توحيد مسار onefree في الحسابات: profiles/profiles/onefree.png ⇒ profiles/…
--- ---------------------------------------------------------------------------
-update public.profiles
-   set avatar_url = 'profiles/onefree.png',
-       updated_at = now()
- where lower(avatar_url) like '%onefree%'
-   and avatar_url <> 'profiles/onefree.png';
-
--- ---------------------------------------------------------------------------
--- ٤) كل حساب يستعمل صورة مجانية قديمة (معطَّلة الآن) ⇒ onefree
---    المطابقة من الجهتين لأن المسار قد يكون مسبوقاً بـ profiles/
--- ---------------------------------------------------------------------------
+-- Move missing, legacy-onefree, and obsolete-free references to the canonical
+-- image before deleting their asset records.
 update public.profiles p
-   set avatar_url = 'profiles/onefree.png',
+   set avatar_url = 'profiles/profiles/onefree.png',
        updated_at = now()
- where exists (
-        select 1
-          from public.site_assets a
-         where a.asset_type    = 'avatar'
-           and a.required_plan = 'free'
-           and a.enabled       = false
-           and lower(a.file_url) not like '%onefree%'
-           and (   p.avatar_url = a.file_url
-                or p.avatar_url = 'profiles/' || a.file_url
-                or a.file_url   = 'profiles/' || p.avatar_url )
+ where p.avatar_url is null
+    or btrim(p.avatar_url) = ''
+    or lower(btrim(p.avatar_url)) = 'none'
+    or p.avatar_url = 'profiles/onefree.png'
+    or exists (
+         select 1
+           from public.site_assets a
+          where a.asset_type = 'avatar'
+            and a.required_plan = 'free'
+            and a.file_url <> 'profiles/profiles/onefree.png'
+            and (
+                 p.avatar_url = a.file_url
+              or p.avatar_url = 'profiles/' || a.file_url
+              or a.file_url = 'profiles/' || p.avatar_url
+            )
        );
 
--- ---------------------------------------------------------------------------
--- ٥) تحقّق: أفاتار مجاني مفعّل واحد فقط · ولا حساب بلا صورة
--- ---------------------------------------------------------------------------
-select count(*)                                    as "كل الأفاتارات",
-       count(*) filter (where required_plan = 'free' and enabled)     as "مجاني مفعّل",
-       count(*) filter (where required_plan = 'free' and not enabled)  as "مجاني معطّل (قديم)",
-       count(*) filter (where required_plan = 'epic')                  as "epic",
-       count(*) filter (where required_plan = 'legendary')             as "legendary"
-  from public.site_assets
- where asset_type = 'avatar';
+-- Remove every other free avatar record. This is deliberately stricter than
+-- enabled=false so a stale client or admin query cannot expose old defaults.
+delete from public.site_assets
+ where asset_type = 'avatar'
+   and required_plan = 'free'
+   and file_url <> 'profiles/profiles/onefree.png';
 
-select count(*)                                       as "كل الحسابات",
-       count(*) filter (where avatar_url is null
-                           or btrim(avatar_url) = '')  as "بلا صورة",
-       count(*) filter (where lower(avatar_url) like '%onefree%') as "يستعمل onefree"
-  from public.profiles;
+alter table public.profiles
+  alter column avatar_url set default 'profiles/profiles/onefree.png';
 
+-- Every newly created account starts on the free plan with this exact avatar.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_username text;
+  v_welcome  int := 50;
+begin
+  v_username := coalesce(
+    nullif(new.raw_user_meta_data->>'username', ''),
+    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+    'player_' || substr(new.id::text, 1, 8)
+  );
+
+  while exists (select 1 from public.profiles p where p.username = v_username) loop
+    v_username := v_username || floor(random() * 10)::int;
+  end loop;
+
+  insert into public.profiles (id, username, display_name, avatar_url)
+  values (new.id, v_username, v_username, 'profiles/profiles/onefree.png')
+  on conflict (id) do nothing;
+
+  insert into public.ac_wallets (user_id, balance, total_earned)
+  values (new.id, v_welcome, v_welcome)
+  on conflict (user_id) do nothing;
+
+  insert into public.ac_transactions
+    (user_id, amount, kind, reason, request_key, balance_after)
+  values
+    (new.id, v_welcome, 'welcome', 'Welcome reward',
+     'welcome:' || new.id::text, v_welcome)
+  on conflict (request_key) do nothing;
+
+  return new;
+end;
+$$;
+
+-- Fail atomically if another free/default avatar survived.
 do $$
 declare
-  v_enabled int;
-  v_missing int;
+  v_free_count integer;
+  v_canonical_count integer;
+  v_legacy_profiles integer;
   v_default text;
-  v_name    text;
 begin
-  select count(*) into v_enabled
+  select count(*) into v_free_count
     from public.site_assets
-   where asset_type = 'avatar' and required_plan = 'free' and enabled;
+   where asset_type = 'avatar' and required_plan = 'free';
 
-  select count(*) into v_missing
+  select count(*) into v_canonical_count
+    from public.site_assets
+   where asset_type = 'avatar'
+     and required_plan = 'free'
+     and enabled
+     and file_url = 'profiles/profiles/onefree.png';
+
+  select count(*) into v_legacy_profiles
     from public.profiles
-   where avatar_url is null or btrim(avatar_url) = '';
+   where avatar_url is null
+      or btrim(avatar_url) = ''
+      or lower(btrim(avatar_url)) = 'none'
+      or avatar_url = 'profiles/onefree.png';
 
   select column_default into v_default
     from information_schema.columns
-   where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url';
+   where table_schema = 'public'
+     and table_name = 'profiles'
+     and column_name = 'avatar_url';
 
-  select name into v_name
-    from public.site_assets
-   where asset_type = 'avatar' and required_plan = 'free' and enabled
-   limit 1;
-
-  if v_enabled <> 1 then
-    raise exception '✗ عدد الأفاتارات المجانية المفعّلة = % (المطلوب 1 فقط)', v_enabled;
+  if v_free_count <> 1 or v_canonical_count <> 1 then
+    raise exception 'Expected exactly one canonical free avatar; free=%, canonical=%',
+      v_free_count, v_canonical_count;
   end if;
-
-  if v_missing > 0 then
-    raise exception '✗ ما زال هناك % حساباً بلا صورة', v_missing;
+  if v_legacy_profiles <> 0 then
+    raise exception 'Found % profiles without the canonical default path', v_legacy_profiles;
   end if;
-
-  if v_default is null or v_default not like '%onefree%' then
-    raise exception '✗ افتراضي avatar_url ليس onefree: %', coalesce(v_default, '(بلا)');
+  if v_default is null
+     or v_default not like '%profiles/profiles/onefree.png%'
+  then
+    raise exception 'Unexpected profiles.avatar_url default: %', coalesce(v_default, '(none)');
   end if;
-
-  raise notice '✅ 31_single_free_avatar: الأفاتار المجاني المفعّل = % (واحد فقط) · '
-               'وكل الحسابات صورتها onefree', v_name;
 end;
 $$;
+
+commit;
+
+notify pgrst, 'reload schema';
 
 
 -- ############################################################################
@@ -7357,9 +7463,9 @@ $$;
 --      3) دالة `handle_new_user()` ⇒ كل حساب جديد؛
 --      4) وكل حساب يشير إلى المسار غير الموجود (`profiles/onefree.png`).
 --
---  ملاحظة: التطبيق يجرب المسارين تلقائياً (Common.kt) فالصورة كانت تظهر
---  بالفعل — لكن التوحيد يمنع طلباً فاشلاً (404) لكل حساب عند كل عرض.
---  النتيجة: 123 أفاتاراً · ومفعّل مجاني واحد · وملفه موجود فعلاً.
+--  التطبيق الآن يستخدم المسار المعتمد وحده، ثم نسخة محلية مطابقة عند تعذر
+--  الشبكة؛ لذلك لا يوجد طلب 404 لمسار قديم ولا يظهر بديل بصري مختلف.
+--  النتيجة النهائية بعد ملف 45: 66 أفاتاراً · وسجل مجاني واحد فقط · وملفه موجود فعلاً.
 --
 --  آمن لإعادة التنفيذ (idempotent) · يُنفَّذ مرة واحدة في Supabase → SQL Editor.
 -- ============================================================================
@@ -7379,14 +7485,12 @@ delete from public.site_assets
 -- ٢) تثبيت الصف المعتمد: المسار الموجود في المخزن · مجاني · مفعّل
 -- ---------------------------------------------------------------------------
 update public.site_assets
-   set asset_type    = 'avatar',
-       required_plan = 'free',
-       enabled       = true,
-       collection    = coalesce(collection, 'Profiles'),
-       collection_order = case when coalesce(collection_order, 0) = 0 then 2
-                               else collection_order end,
-       sort_order    = case when coalesce(sort_order, 0) = 0 then 40
-                            else sort_order end
+   set asset_type       = 'avatar',
+       required_plan    = 'free',
+       enabled          = true,
+       collection       = 'Default',
+       collection_order = 1,
+       sort_order       = 1
  where file_url = 'profiles/profiles/onefree.png';
 
 -- وإن لم يوجد الصف أصلاً (تنصيب جديد) أدرجه
@@ -7395,11 +7499,14 @@ insert into public.site_assets
    collection_order, sort_order, enabled)
 values
   ('avatar', 'Onefree', 'profiles/profiles/onefree.png', 'free', false,
-   'Profiles', 2, 40, true)
+   'Default', 1, 1, true)
 on conflict (file_url) do update
-   set asset_type    = excluded.asset_type,
-       required_plan = excluded.required_plan,
-       enabled       = true;
+   set asset_type       = excluded.asset_type,
+       required_plan    = excluded.required_plan,
+       collection       = excluded.collection,
+       collection_order = excluded.collection_order,
+       sort_order       = excluded.sort_order,
+       enabled          = true;
 
 -- ---------------------------------------------------------------------------
 -- ٣) الأفاتار المجاني المفعّل = onefree وحده (ولا شيء غيره)
@@ -7497,6 +7604,10 @@ begin
     return jsonb_build_object('ok', false, 'message', 'invalid_kind');
   end if;
 
+  -- This validated RPC is allowed through guard_profile_update; direct writes
+  -- to protected asset columns remain unavailable to authenticated clients.
+  perform set_config('app.allow_profile_write', '1', true);
+
   -- السماح بإعادة التعيين للقيمة الافتراضية
   if p_value is null or p_value = '' or p_value = 'none' then
     if p_kind = 'avatar' then
@@ -7511,9 +7622,15 @@ begin
              updated_at = now()
        where id = v_uid;
     elsif p_kind = 'banner' then
-      update public.profiles set banner_url = null where id = v_uid;
+      update public.profiles
+         set banner_url = null,
+             updated_at = now()
+       where id = v_uid;
     else
-      update public.profiles set equipped_item_id = 'none' where id = v_uid;
+      update public.profiles
+         set equipped_item_id = 'none',
+             updated_at = now()
+       where id = v_uid;
     end if;
     return jsonb_build_object('ok', true, 'value', 'none');
   end if;
@@ -7779,13 +7896,13 @@ create or replace function public.my_blocked_users()
 returns table (
   user_id    uuid,
   username   text,
-  full_name  text,
+  display_name text,
   avatar_url text,
   blocked_at timestamptz
 )
 language sql stable security definer set search_path = public
 as $$
-  select b.blocked_id, p.username, p.full_name, p.avatar_url, b.created_at
+  select b.blocked_id, p.username, p.display_name, p.avatar_url, b.created_at
     from public.user_blocks b
     join public.profiles p on p.id = b.blocked_id
    where b.blocker_id = auth.uid()
@@ -8235,7 +8352,7 @@ begin
   end if;
 
   -- اسم المرسل وصورته: الصورة تظهر كأيكونة بجانب الإشعار (شات/صداقة)
-  select coalesce(nullif(username, ''), full_name, '—'),
+  select coalesce(nullif(username, ''), display_name, '—'),
          nullif(btrim(coalesce(avatar_url, '')), '')
     into v_actor_name, v_actor_avatar
     from public.profiles where id = new.actor_id;
@@ -8667,3 +8784,3603 @@ begin
   raise notice '٣٤) الإشعارات جاهزة: 5 أقسام · ساعات هدوء · تجميع · تذكير غياب كل 14 يوماً · إشعارات بصور الأغلفة وصور المرسلين · عرض اشتراك واحد كل 30 يوماً للمجانيين.';
   raise notice 'الخطوة التالية: انشر دالة send-push على Supabase وضع مفاتيح FCM (docs/11-PUSH-AR.md).';
 end $$;
+
+
+-- ############################################################################
+-- ##  القسم: 35_push_live.sql
+-- ############################################################################
+
+-- ============================================================================
+--  AddonStation Mobile — ٣٥) تشغيل الإشعارات **الحقيقية** (تصل في ثوانٍ لا في يوم)
+--
+--  المشكلة التي يحلّها هذا الملف:
+--    الملف 34 بنى كل شيء: الأجهزة · التفضيلات · الطابور · الزنادات · ساعات
+--    الهدوء · التجميع. لكن **مَن يُفرّغ الطابور؟** كان الجواب: نداء يدوي
+--    أو مهمة يومية واحدة — أي أن رسالة شات تصل بعد ساعات، وهذا ما يجعل
+--    الإشعار «تجريبياً» في الإحساس. هنا نُشغّله فعلاً:
+--
+--      ١) كل **دقيقة**: إن كان في الطابور شيء مستحق ⇒ نداء دالة الإرسال.
+--      ٢) **فوراً** لِما لا يحتمل التأخير (منشن/ردّ): نداء عند الإدراج نفسه.
+--      ٣) مرة يومياً: تذكير الغياب · عرض الاشتراك · تنظيف السجل.
+--
+--  لماذا من القاعدة مباشرة (pg_cron + pg_net)؟
+--    • لا خدمة جدولة خارجية، ولا حساب إضافي، ولا شيء يعتمد على جهازك.
+--    • مجاني تماماً، ويعمل والهاتف مغلق.
+--
+--  مفتاح الإرسال السري (FCM) يبقى في **دالة الإرسال على Supabase** ولا يدخل
+--  التطبيق ولا القاعدة. أما سرّ النداء (x-push-secret) فيبقى في جدول إعدادات
+--  محجوب تماماً عن التطبيق (RLS بلا سياسات + سحب كل الصلاحيات).
+--
+--  التشغيل بخطوة واحدة (بعد نشر دالة الإرسال — انظر docs/11-PUSH-AR.md):
+--      select public.push_live_enable(
+--        'https://<مَعْرِف-مشروعك>.supabase.co/functions/v1/send-push',
+--        'السرّ-الذي-اخترته-في-أسرار-الدالة');
+--
+--  ثم للفحص في أي وقت:
+--      select * from public.push_doctor();
+--
+--  آمن لإعادة التنفيذ بالكامل في أي وقت (create if not exists · create or
+--  replace · drop trigger if exists). لا يحذف أي بيانات ولا يُرسل شيئاً بنفسه.
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1) إعدادات التشغيل (صف واحد) — محجوب عن التطبيق تماماً
+-- ---------------------------------------------------------------------------
+create table if not exists public.push_config (
+  id           int primary key default 1 check (id = 1),
+  function_url text,                              -- رابط دالة الإرسال على Supabase
+  cron_secret  text,                              -- السرّ الذي في أسرار الدالة (x-push-secret)
+  enabled      boolean not null default true,
+  updated_at   timestamptz not null default now()
+);
+
+-- RLS بلا أي سياسة ⇒ لا يقرأ ولا يكتب من التطبيق، وسحب الصلاحيات صراحةً
+-- (لأن سوبابيز تمنح الجداول الجديدة لـ anon تلقائياً).
+alter table public.push_config enable row level security;
+revoke all on public.push_config from anon, authenticated;
+grant all on public.push_config to service_role;
+
+insert into public.push_config(id) values (1) on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- 2) الإضافات: pg_cron (الجدولة) و pg_net (النداء المتجه للخارج)
+--    كل واحدة في كتلة مستقلة: إن فشلت واحدة لا يسقط الملف كله، ويُطبع تنبيه
+--    واضح بالعربية يقول ما يجب فعله من لوحة سوبابيز.
+-- ---------------------------------------------------------------------------
+do $$ begin
+  begin
+    create extension if not exists pg_cron;
+    raise notice '✓ pg_cron مفعّلة (جدولة المهام).';
+  exception when others then
+    raise notice '! pg_cron غير مفعّلة — فعّلها من Supabase → Database → Extensions → pg_cron ثم أعد تنفيذ هذا الملف.';
+  end;
+  begin
+    create extension if not exists pg_net;
+    raise notice '✓ pg_net مفعّلة (النداء المتجه للخارج).';
+  exception when others then
+    raise notice '! pg_net غير مفعّلة — فعّلها من Supabase → Database → Extensions → pg_net ثم أعد تنفيذ هذا الملف.';
+  end;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 3) نداء دالة الإرسال — فقط إن كان في الطابور شيء مستحق فعلاً
+--
+--    • قفل واحد (advisory xact) ⇒ لا تشغيلان متوازيان يرسلان الصف نفسه مرتين.
+--    • لا نداء شبكة بلا داعٍ: نفحص الطابور أولاً فتبقى المهمة الدقيقة رخيصة.
+--    • أي فشل هنا **يُسكَت** ولا يُسقط الإدراج الذي استدعانا (رسالة الشات
+--      تُكتب في القاعدة مهما حدث للشبكة — الإشعار يُعاد عليه في الدقيقة القادمة).
+-- ---------------------------------------------------------------------------
+create or replace function public.push_dispatch_tick(p_limit int default 200)
+returns bigint
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_url    text;
+  v_secret text;
+  v_due    int;
+  v_req    bigint;
+begin
+  -- قفل على مستوى المعاملة: يُحرَّر تلقائياً عند نهايتها (لا يتراكم)
+  if not pg_try_advisory_xact_lock(918273645) then
+    return null;
+  end if;
+
+  begin
+    select c.function_url, c.cron_secret into v_url, v_secret
+      from public.push_config c where c.id = 1 and c.enabled;
+
+    if coalesce(btrim(v_url), '') = '' or coalesce(btrim(v_secret), '') = '' then
+      return null;                                  -- لم يُشغَّل بعد (push_live_enable)
+    end if;
+
+    select count(*) into v_due
+      from public.push_queue q
+     where q.status = 'pending' and q.scheduled_at <= now();
+
+    if v_due = 0 then return null; end if;          -- لا شيء مستحق ⇒ بلا نداء
+
+    select net.http_post(
+      url  := v_url,
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'x-push-secret', v_secret
+      ),
+      body := jsonb_build_object(
+        'action', 'dispatch',
+        'limit', least(greatest(coalesce(p_limit, 200), 1), 500)
+      ),
+      timeout_milliseconds := 15000
+    ) into v_req;
+
+    return v_req;
+  exception when others then
+    return null;
+  end;
+end $$;
+
+revoke all on function public.push_dispatch_tick(int) from public, anon, authenticated;
+grant execute on function public.push_dispatch_tick(int) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- 4) الدورة اليومية: تذكير الغياب + عرض الاشتراك + التنظيف (كلها في القاعدة)
+-- ---------------------------------------------------------------------------
+create or replace function public.push_daily_tick()
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_re  int;
+  v_off int;
+  v_cl  int;
+begin
+  v_re  := public.push_reengage_scan(500);
+  v_off := public.push_offer_scan(200);
+  v_cl  := public.push_cleanup(7);
+  -- ثم نُفرّغ ما تراكم (تذكيرات مؤجّلة خارج ساعات الهدوء وغيرها)
+  perform public.push_dispatch_tick(500);
+  return jsonb_build_object('reengage', v_re, 'offer', v_off, 'cleanup', v_cl, 'at', now());
+end $$;
+
+revoke all on function public.push_daily_tick() from public, anon, authenticated;
+grant execute on function public.push_daily_tick() to service_role;
+
+-- ---------------------------------------------------------------------------
+-- 5) الفوري: منشن أو ردّ لا يحتمل التأخير ⇒ نداء عند الإدراج نفسه (ثوانٍ)
+--    المهمة الدقيقة تبقى شبكة أمان إن فشل هذا النداء.
+-- ---------------------------------------------------------------------------
+create or replace function public.push_on_queue_urgent()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if new.priority = 'high' then
+    perform public.push_dispatch_tick(50);
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists trg_push_queue_urgent on public.push_queue;
+create trigger trg_push_queue_urgent
+  after insert on public.push_queue
+  for each row execute function public.push_on_queue_urgent();
+
+-- ---------------------------------------------------------------------------
+-- 6) التشغيل بخطوة واحدة + الإيقاف
+-- ---------------------------------------------------------------------------
+create or replace function public.push_live_enable(p_url text, p_secret text)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_cron   boolean := false;
+  v_jobs   int := 0;
+begin
+  if coalesce(btrim(p_url), '') = '' then
+    return jsonb_build_object('ok', false, 'message', 'url_required',
+      'hint', 'مرّر رابط دالة الإرسال: https://<ref>.supabase.co/functions/v1/send-push');
+  end if;
+  if coalesce(btrim(p_secret), '') = '' then
+    return jsonb_build_object('ok', false, 'message', 'secret_required',
+      'hint', 'مرّر نفس قيمة PUSH_CRON_SECRET التي وضعتها في أسرار دالة الإرسال');
+  end if;
+
+  update public.push_config
+     set function_url = btrim(p_url),
+         cron_secret  = btrim(p_secret),
+         enabled      = true,
+         updated_at   = now()
+   where id = 1;
+
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    v_cron := true;
+    perform cron.schedule(
+      'addonstation-push-dispatch', '* * * * *',
+      $cron$select public.push_dispatch_tick(200)$cron$
+    );
+    perform cron.schedule(
+      'addonstation-push-daily', '17 3 * * *',
+      $cron$select public.push_daily_tick()$cron$
+    );
+    select count(*) into v_jobs from cron.job
+     where jobname in ('addonstation-push-dispatch', 'addonstation-push-daily');
+  end if;
+
+  return jsonb_build_object(
+    'ok', true, 'cron', v_cron, 'jobs', v_jobs,
+    'message', case when v_cron then 'تم التشغيل: الطابور يُفرَّغ كل دقيقة، والصيانة يومياً 03:17 UTC.'
+                    else 'حُفظ الرابط والسرّ، لكن pg_cron غير مفعّلة ⇒ فعّلها ثم أعد التنفيذ.' end
+  );
+end $$;
+
+create or replace function public.push_live_disable()
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare v_off int := 0;
+begin
+  update public.push_config set enabled = false, updated_at = now() where id = 1;
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule('addonstation-push-dispatch');
+    perform cron.unschedule('addonstation-push-daily');
+    select count(*) into v_off from cron.job
+     where jobname in ('addonstation-push-dispatch', 'addonstation-push-daily');
+  end if;
+  return jsonb_build_object('ok', true, 'remaining_jobs', v_off);
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 7) الطبيب: سؤال واحد يجيب «لماذا لا تصل إشعاراتي؟»
+--    select * from public.push_doctor();
+-- ---------------------------------------------------------------------------
+create or replace function public.push_doctor()
+returns table (check_ar text, ok boolean, detail text)
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_ext_cron boolean := exists (select 1 from pg_extension where extname = 'pg_cron');
+  v_ext_net  boolean := exists (select 1 from pg_extension where extname = 'pg_net');
+  v_url      text;
+  v_secret   text;
+  v_enabled  boolean;
+  v_devices  int;
+  v_pending  int;
+  v_stuck    int;
+  v_sent24   int;
+  v_failed   int;
+  v_jobs     int := 0;
+  v_last     jsonb;
+begin
+  select c.function_url, c.cron_secret, c.enabled into v_url, v_secret, v_enabled
+    from public.push_config c where c.id = 1;
+
+  select count(*) into v_devices from public.push_devices where enabled;
+  select count(*) into v_pending from public.push_queue
+   where status = 'pending' and scheduled_at <= now();
+  select count(*) into v_stuck  from public.push_queue
+   where status = 'pending' and scheduled_at <= now() - interval '15 minutes';
+  select count(*) into v_sent24 from public.push_queue
+   where status = 'sent' and sent_at > now() - interval '24 hours';
+  select count(*) into v_failed from public.push_queue
+   where status = 'failed' and created_at > now() - interval '24 hours';
+
+  if v_ext_cron then
+    select count(*) into v_jobs from cron.job
+     where jobname in ('addonstation-push-dispatch', 'addonstation-push-daily');
+  end if;
+
+  return query
+  select 'إضافة pg_cron (الجدولة)'::text, v_ext_cron,
+         case when v_ext_cron then 'موجودة' else 'فعّلها من Database → Extensions' end;
+  return query
+  select 'إضافة pg_net (النداء للخارج)'::text, v_ext_net,
+         case when v_ext_net then 'موجودة' else 'فعّلها من Database → Extensions' end;
+  return query
+  select 'رابط دالة الإرسال محفوظ'::text, coalesce(btrim(v_url), '') <> '',
+         coalesce(v_url, 'ناقص — نفّذ push_live_enable');
+  return query
+  select 'سرّ التشغيل محفوظ'::text, coalesce(btrim(v_secret), '') <> '',
+         case when coalesce(btrim(v_secret), '') <> '' then 'موجود' else 'ناقص — نفس PUSH_CRON_SECRET' end;
+  return query
+  select 'التشغيل مفعّل'::text, coalesce(v_enabled, false),
+         case when coalesce(v_enabled, false) then 'نعم' else 'موقوف — نفّذ push_live_enable' end;
+  return query
+  select 'المهام المجدولة (دقيقة + يومية)'::text, v_jobs >= 2,
+         case when v_jobs >= 2 then 'مجدولة (2)'
+              when v_ext_cron then 'ناقصة — نفّذ push_live_enable مرة أخرى'
+              else 'تحتاج pg_cron أولاً' end;
+  return query
+  select 'أجهزة مسجّلة (توكن FCM)'::text, v_devices > 0,
+         case when v_devices > 0 then v_devices::text || ' جهاز'
+              else 'لا جهاز — التطبيق المثبّت يحتاج google-services.json وبناءً جديداً' end;
+  return query
+  select 'إشعارات مُرسلة آخر 24 ساعة'::text, true, v_sent24::text;
+  return query
+  select 'مستحق ولم يُرسل (عالق)'::text, v_stuck = 0,
+         case when v_stuck = 0 then 'لا شيء عالق'
+              else v_stuck::text || ' صفاً — انظر آخر ردّ من الدالة' end;
+  return query
+  select 'إشعارات فشلت آخر 24 ساعة'::text, v_failed = 0,
+         case when v_failed = 0 then 'لا فشل' else v_failed::text || ' صفاً — غالباً مفتاح FCM' end;
+
+  -- آخر ردّ من دالة الإرسال (pg_net تحفظه) — هنا يظهر «missing_secrets» أو «401»
+  if v_ext_net then
+    begin
+      execute $q$select jsonb_build_object('code', status_code, 'body', left(coalesce(content, ''), 400),
+                                           'at', created)
+                  from net._http_response order by created desc limit 1$q$ into v_last;
+    exception when others then
+      v_last := null;
+    end;
+  end if;
+  return query
+  select 'آخر ردّ من دالة الإرسال'::text,
+         (v_last is not null and (v_last ->> 'code') = '200'),
+         case
+           when v_last is null then 'لا ردّ محفوظ بعد (لم تُشغَّل)'
+           when (v_last ->> 'code') = '200' then 'ناجح (200) · ' || coalesce(v_last ->> 'at', '')
+           when position('unauthorized' in coalesce(v_last ->> 'body', '')) > 0
+             then '401 — السرّ في push_live_enable لا يطابق PUSH_CRON_SECRET'
+           when position('missing_secrets' in coalesce(v_last ->> 'body', '')) > 0
+             then 'الدالة تعمل لكن أسرارها ناقصة (FCM_SERVICE_ACCOUNT)'
+           when position('bad_service_account' in coalesce(v_last ->> 'body', '')) > 0
+             then 'مفتاح FCM غير سليم — أعد توليده من Firebase'
+           else 'الرمز ' || coalesce(v_last ->> 'code', '?') || ' · ' || coalesce(left(v_last ->> 'body', 120), '')
+         end;
+
+  return query
+  select 'إجمالي المستحق الآن'::text, true, v_pending::text;
+end $$;
+
+revoke all on function public.push_live_enable(text, text) from public, anon, authenticated;
+revoke all on function public.push_live_disable() from public, anon, authenticated;
+revoke all on function public.push_doctor() from public, anon, authenticated;
+grant execute on function public.push_live_enable(text, text) to service_role;
+grant execute on function public.push_live_disable() to service_role;
+grant execute on function public.push_doctor() to service_role;
+
+-- ---------------------------------------------------------------------------
+-- 7ب) تحديث فهرس PostgREST فوراً
+--
+-- بدونه قد يردّ نداء `push_live_enable` عبر REST بـ404 لثوانٍ (الفهرس القديم
+-- لم يعرف الدالة الجديدة بعد) — وهو ما حدث فعلاً في أول تشغيل آلي. هذا السطر
+-- يجعل الدوال الجديدة مرئية للفور.
+-- ---------------------------------------------------------------------------
+notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- 8) تحقق أخير
+-- ---------------------------------------------------------------------------
+do $$
+declare v_cron boolean := exists (select 1 from pg_extension where extname = 'pg_cron');
+         v_net  boolean := exists (select 1 from pg_extension where extname = 'pg_net');
+         v_fn   int;
+begin
+  select count(*) into v_fn from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname in ('push_dispatch_tick', 'push_daily_tick', 'push_live_enable',
+                       'push_live_disable', 'push_doctor', 'push_on_queue_urgent');
+  raise notice '✓ دالة الإرسال بالطابور: %/6 · pg_cron: % · pg_net: %', v_fn, v_cron, v_net;
+  if v_cron and v_net then
+    raise notice 'الخطوة الأخيرة: select public.push_live_enable(''رابط-الدالة'', ''السرّ'') ثم select * from public.push_doctor();';
+  else
+    raise notice 'فعّل pg_cron و pg_net من لوحة سوبابيز ثم أعد تنفيذ هذا الملف.';
+  end if;
+end $$;
+
+
+-- ############################################################################
+-- ##  القسم: 36_profile_stats.sql
+-- ############################################################################
+
+-- ============================================================================
+--  36) إحصاءات الملف الشخصي — دالة قراءة واحدة للجميع (أرقام فقط)
+-- ============================================================================
+--  لماذا؟
+--    شاشات الملف الشخصي الجديدة (وثيقة AddonStation_profiles) تعرض:
+--      • شريط إحصاءات: أصدقاء · تنزيلات · مفضلة      (لقسم ٢٫٤)
+--      • بطاقة المستوى: «المستوى [N] · [x]/100»       (لقسم ٢٫٥)
+--      • محفظة AC: «[N] يوم متتالٍ» (سلسلة الاستلام)   (لقسم ٢٫٧)
+--    وهذه الأرقام **محميّة** بسياسات RLS: الأصدقاء والمفضّلة والتنزيلات
+--    والمحفظة تُقرأ لصاحبها فقط. فمن يفتح ملف عضو آخر (شاشة B) لا يستطيع
+--    حسابها من التطبيق. الحلّ: دالة `security definer` تُرجِع **أعداداً فقط**
+--    (بلا أي بيانات شخصية) لأي عضو.
+--
+--  قاعدة المستوى (متفق عليها مع المالك):
+--      xp = إجمالي AC المكتسَبة (ac_wallets.total_earned)
+--      كل 100 AC مكتسَبة = مستوى واحد
+--      level = greatest(user_level المحفوظ, 1 + xp/100)
+--        ⇒ تعديل الإدارة للمستوى يبقى فوق القاعدة، والنشاط يرفعه من نفسه.
+--      xp_in_level = xp % 100  (الرقم الذي يظهر «[x]/100 للمستوى التالي»)
+--
+--  مكافأة اليوم: المهمّة اليومية (أول مهمّة نشطة تكرارها daily أو streak مرتّبة
+--  بـ sort_order) — نُرجِع مقدارها وهل استُلمت اليوم، فتُعطَّل زرّ «مكافأة اليوم»
+--  في الواجهة بلا محاولة فاشلة.
+--
+--  سلسلة الأيام (streak): أطول سلسلة منتهية باليوم أو بالأمس من أيام استلام
+--  المهامّ (ac_task_claims) — تُحسب بطريقة «الفواصل والجزر» على التواريخ.
+--
+--  اسم الدالة في فهرس PostgREST: 'profile_stats'
+--      POST /rest/v1/rpc/profile_stats   { "p_user_id": "<uuid>" }
+--      وإذا نُسيت الدالة على الخادم يردّ 404 ⇒ التطبيق يعرض ما يعرفه محلياً بلا كسر.
+--
+--  آمن للتكرار (create or replace) · لا يُغيّر أي بيانات · للقراءة فقط.
+-- ============================================================================
+
+create or replace function public.profile_stats(p_user_id uuid default null)
+returns table (
+  friends     int,
+  downloads   int,
+  favorites   int,
+  level       int,
+  xp_in_level int,
+  xp_to_next  int,
+  streak      int,
+  daily_claimed boolean,
+  daily_reward  int
+)
+language sql
+stable
+security definer
+set search_path = public
+as $fn$
+  with me as (
+    select coalesce(p_user_id, auth.uid()) as uid
+  ),
+  numbers as (
+    select
+      (select count(*)::int from public.user_friends f
+        where f.status = 'accepted'
+          and (f.requester_id = m.uid or f.receiver_id = m.uid)) as friends,
+      (select count(*)::int from public.content_downloads d
+        where d.user_id = m.uid) as downloads,
+      (select count(*)::int from public.content_favorites v
+        where v.user_id = m.uid) as favorites,
+      coalesce((select w.total_earned from public.ac_wallets w
+                 where w.user_id = m.uid), 0) as earned,
+      coalesce((select p.user_level from public.profiles p
+                 where p.id = m.uid), 1) as stored_level,
+      -- المهمّة اليومية (daily_login في البذرة): مقدارها وهل استُلمت اليوم
+      (select t.reward from public.ac_tasks t
+        where t.active and t.frequency in ('daily', 'streak')
+        order by t.sort_order, t.id
+        limit 1) as daily_reward,
+      coalesce((select true from public.ac_task_claims c
+                 join public.ac_tasks t on t.id = c.task_id
+                where c.user_id = m.uid
+                  and t.active and t.frequency in ('daily', 'streak')
+                  and c.day = (now() at time zone 'utc')::date
+                limit 1), false) as daily_claimed
+    from me m
+  ),
+  -- أيام الاستلام (متميّزة) ثم ترقيم لتكوين الجزر المتتالية
+  days as (
+    select distinct c.day
+      from public.ac_task_claims c
+      join me m on m.uid = c.user_id
+  ),
+  numbered as (
+    select d.day, (row_number() over (order by d.day))::int as rn
+      from days d
+  ),
+  runs as (
+    -- (اليوم − رقمه) يبقى ثابتاً داخل السلسلة المتتالية
+    select n.day - n.rn as grp, count(*)::int as len, max(n.day) as last_day
+      from numbered n
+     group by n.day - n.rn
+  ),
+  streak_run as (
+    select coalesce((
+      select r.len
+        from runs r
+       where r.last_day >= (now() at time zone 'utc')::date - 1
+       order by r.last_day desc
+       limit 1
+    ), 0) as streak
+  )
+  select
+    n.friends,
+    n.downloads,
+    n.favorites,
+    greatest(n.stored_level, 1 + (n.earned / 100)) as level,
+    (n.earned % 100)                                as xp_in_level,
+    100                                              as xp_to_next,
+    s.streak,
+    n.daily_claimed,
+    coalesce(n.daily_reward, 0)                      as daily_reward
+  from numbers n, streak_run s;
+$fn$;
+
+comment on function public.profile_stats(uuid) is
+  'إحصاءات الملف الشخصي (أعداد فقط): أصدقاء · تنزيلات · مفضلة · المستوى · تقدّم المستوى · سلسلة الأيام · مكافأة اليوم (مقدارها وهل استُلمت). المستوى = max(user_level, 1 + إجمالي AC/100).';
+
+-- الأمان: لا يقرأها إلا مستخدم مسجَّل (الزائر لا يحتاج أرقام الأعضاء)
+revoke all on function public.profile_stats(uuid) from public, anon;
+grant execute on function public.profile_stats(uuid) to authenticated;
+
+-- تحديث فهرس PostgREST فوراً حتى لا يردّ 404 لدالة جديدة (درس سابق)
+notify pgrst, 'reload schema';
+
+
+-- ############################################################################
+-- ##  القسم: 37_profile_reports.sql
+-- ############################################################################
+
+-- ============================================================================
+--  37) الإبلاغ عن عضو من ملفّه الشخصي — بند الوثيقة §4٫٦ («الإبلاغ»)
+-- ============================================================================
+--  لماذا؟
+--    بطاقة السلامة في شاشة «ملف عضو» فيها ثلاثة: كتم · حظر · إبلاغ. الحظر
+--    والكتم مُنفَّذان (33_user_block · chat_mute_user)، أمّا الإبلاغ فكان
+--    **عن رسالة** فقط (`chat_report_message` يأخذ `message_id`)، وملف العضو
+--    لا يعرض رسالة بعينها ⇒ كان زرّ الإبلاغ سيبقى بلا أثر.
+--
+--  ماذا يفعل هذا الملف؟
+--    ١) يضيف عمود `target_user_id` إلى `chat_reports` (الإبلاغ عن عضو لا رسالة).
+--    ٢) يضيف دالة `chat_report_user(p_user_id, p_reason, p_note)`:
+--         • تسجيل دخول إلزامي · سبب من الأسباب الأربعة نفسها
+--         • **لا يمكن الإبلاغ عن نفسك**، ولا عن عضو غير موجود
+--         • **إبلاغ واحد كل ٢٤ ساعة** لنفس العضو (يمنع الإغراق) — والثاني
+--           يُرجع `ok = true, message = 'already_reported'` بلا تكرار صفّ
+--           (فلا يرى المستخدم خطأً على عمل فعله أصلاً).
+--    ٣) تقرأه لوحة الأدمن كما هي تقرأ بقية الإبلاغات (نفس الجدول والعمود
+--       `status = 'open'`)، ويعرض العمود الجديد العضو المقصود.
+--
+--  آمن للتكرار · لا يحذف شيئاً · الإبلاغات القديمة (عن رسائل) تبقى سليمة
+--  وقيمة `target_user_id` فيها `null`.
+-- ============================================================================
+
+alter table public.chat_reports
+  add column if not exists target_user_id uuid references public.profiles(id) on delete cascade;
+
+comment on column public.chat_reports.target_user_id is
+  'العضو المُبلَّغ عنه من ملفّه الشخصي (null إذا كان الإبلاغ عن رسالة بعينها).';
+
+create index if not exists chat_reports_target_idx
+  on public.chat_reports(target_user_id, created_at desc);
+
+create or replace function public.chat_report_user(
+  p_user_id uuid,
+  p_reason  text,
+  p_note    text default null
+)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $fn$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'message', 'sign_in_required'); end if;
+  if p_user_id is null then return jsonb_build_object('ok', false, 'message', 'invalid_user'); end if;
+  if p_user_id = v_uid then return jsonb_build_object('ok', false, 'message', 'cannot_report_self'); end if;
+  if p_reason not in ('spam', 'insult', 'inappropriate', 'other') then
+    return jsonb_build_object('ok', false, 'message', 'invalid_reason');
+  end if;
+  if not exists(select 1 from public.profiles p where p.id = p_user_id) then
+    return jsonb_build_object('ok', false, 'message', 'invalid_user');
+  end if;
+
+  -- إبلاغ واحد كل 24 ساعة لنفس العضو: لا نُغرقه ولا نُغرِق لوحة الإدارة
+  if exists(
+    select 1 from public.chat_reports r
+     where r.reporter_id = v_uid
+       and r.target_user_id = p_user_id
+       and r.created_at > now() - interval '24 hours'
+  ) then
+    return jsonb_build_object('ok', true, 'message', 'already_reported');
+  end if;
+
+  insert into public.chat_reports(reporter_id, target_user_id, reason, note)
+  values (v_uid, p_user_id, p_reason, nullif(btrim(coalesce(p_note, '')), ''));
+
+  return jsonb_build_object('ok', true, 'message', 'reported');
+end;
+$fn$;
+
+comment on function public.chat_report_user(uuid, text, text) is
+  'الإبلاغ عن عضو من ملفّه الشخصي: سبب من (spam · insult · inappropriate · other) · بلا إبلاغ عن النفس · إبلاغ واحد كل 24 ساعة.';
+
+revoke all on function public.chat_report_user(uuid, text, text) from public, anon;
+grant execute on function public.chat_report_user(uuid, text, text) to authenticated;
+
+-- تحديث فهرس PostgREST فوراً حتى لا تردّ الدالة الجديدة 404 (درس سابق)
+notify pgrst, 'reload schema';
+
+
+-- ############################################################################
+-- ##  القسم: 38_user_mute.sql
+-- ############################################################################
+
+-- ============================================================================
+--  38) كتم عضو — زرّ واحد: تُخفى رسائله · ميزة اشتراك Legendary
+-- ============================================================================
+--  طلب المالك: «نحتاج زر واحد ... وينفتح في اشتراك ليغسي» — ثم قراره الأخير:
+--  «اعني الشعارات رجعها كما كنت» ⇒ **الإشعارات رجعت كما كانت**:  الكتم لا يمسّ
+--  الإشعارات إطلاقاً (لا إسقاط صفٍّ ولا مفتاح في الإعدادات ولا عمود جديد)،
+--  وإنما يمنع الرسائل: تُخفى رسائل المكتوم في التطبيق من قائمة المكتومين،
+--  والقائمة تأتي من هذا الملف (user_mutes) فتسري على كل أجهزة المستخدم.
+--
+--  ① «زرّ واحد»: صفٌّ واحد في بطاقة السلامة (كتم هذا العضو / إلغاء الكتم) —
+--      لا زرّ للرسائل وزرّ للإشعارات.
+--  ② «ينفتح في اشتراك Legendary»: الكتم ميزة اشتراك Legendary — الخادم يرفض
+--      `legendary_required` لمن لا اشتراك له (والإدارة/المشرفون مستثنون لتجربة
+--      الميزة). والحظر والإبلاغ يبقيان للجميع (سياسة Google Play — لا يُقيَّدان).
+--  ③ الإشعارات: لا شأن لها بهذا الملف — زناد الإشعارات (34) وطابور الدفع (35)
+--      يعملان كما كانا لكل الرسائل، مكتوماً كان المرسل أو غير مكتوم.
+--
+--  أسماء الكائنات كما يسأل عنها الفاحص: الجدول 'user_mutes' · الدوال
+--  'can_mute_members' · 'user_mute' · 'user_unmute' · 'my_muted_users' ·
+--  'i_muted_user' · وسياسة 'user_mutes_read'.
+--
+--  آمن للتكرار · لا يحذف شيئاً · ويعيد تفعيل RLS على `user_blocks` (كانت
+--  مُعطَّلة فيه، فيقرأ أيُّ مستخدمٍ كلَّ الحظرات — إصلاح أمني بسيط هنا).
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1) جدول الكتم: من كتم من
+-- ---------------------------------------------------------------------------
+create table if not exists public.user_mutes (
+  muter_id   uuid not null references public.profiles(id) on delete cascade,
+  muted_id   uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (muter_id, muted_id),
+  constraint user_mutes_not_self check (muter_id <> muted_id)
+);
+
+comment on table public.user_mutes is
+  'كتم عضو: صاحب الصفّ (muter_id) لا يرى رسائل (muted_id) في التطبيق — ولا شأن للإشعارات به (قرار المالك: الإشعارات كما كانت).';
+
+alter table public.user_mutes enable row level security;
+
+drop policy if exists user_mutes_read on public.user_mutes;
+create policy user_mutes_read on public.user_mutes
+  for select using (muter_id = auth.uid());
+
+revoke all on public.user_mutes from anon, authenticated;
+grant select on public.user_mutes to authenticated;
+grant all on public.user_mutes to service_role;
+
+-- إصلاح أمني: الحظر كان بلا RLS مفعّلة (سياسة بلا تفعيل = كل الصفوف مقروءة).
+-- مغلّف بشرطٍ لأن جدول `user_blocks` يأتي من ملف الحظر (33) وقد لا يكون على القاعدة بعد؛
+-- فحينها لا تُسقط هذه الجملة بقية الملف.
+do $do$
+begin
+  if to_regclass('public.user_blocks') is not null then
+    execute 'alter table public.user_blocks enable row level security';
+  end if;
+end
+$do$;
+
+-- ---------------------------------------------------------------------------
+-- 2) من يحقّ له الكتم؟ اشتراك Legendary (أو إدارة/مشرف للتجربة)
+-- ---------------------------------------------------------------------------
+create or replace function public.can_mute_members(p_user uuid default auth.uid())
+returns boolean
+language sql stable security definer set search_path = public
+as $fn$
+  select public.effective_plan(p_user) = 'legendary' or public.is_staff(p_user);
+$fn$;
+
+comment on function public.can_mute_members(uuid) is
+  'هل يملك هذا المستخدم ميزة كتم الأعضاء؟ اشتراك Legendary (والإدارة/المشرف مستثنون للتجربة).';
+
+-- ---------------------------------------------------------------------------
+-- 3) دوال الاستعمال (للمستخدم نفسه فقط)
+-- ---------------------------------------------------------------------------
+create or replace function public.user_mute(p_user_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $fn$
+declare v_uid uuid := auth.uid();
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'message', 'sign_in_required'); end if;
+  if p_user_id is null or p_user_id = v_uid then
+    return jsonb_build_object('ok', false, 'message', 'invalid_user');
+  end if;
+  if not public.can_mute_members(v_uid) then
+    return jsonb_build_object('ok', false, 'message', 'legendary_required');
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = p_user_id) then
+    return jsonb_build_object('ok', false, 'message', 'invalid_user');
+  end if;
+
+  insert into public.user_mutes(muter_id, muted_id)
+  values (v_uid, p_user_id)
+  on conflict (muter_id, muted_id) do nothing;
+
+  return jsonb_build_object('ok', true);
+end;
+$fn$;
+
+comment on function public.user_mute(uuid) is
+  'كتم عضو (رسائله فقط): يشترط اشتراك Legendary — ويُخزَّن على الخادم فتسري القائمة على كل الأجهزة.';
+
+create or replace function public.user_unmute(p_user_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $fn$
+declare v_uid uuid := auth.uid();
+begin
+  if v_uid is null then return jsonb_build_object('ok', false, 'message', 'sign_in_required'); end if;
+
+  delete from public.user_mutes
+   where muter_id = v_uid and muted_id = p_user_id;
+
+  return jsonb_build_object('ok', true);
+end;
+$fn$;
+
+comment on function public.user_unmute(uuid) is
+  'إلغاء كتم عضو — متاح للجميع (الإلغاء لا يحتاج اشتراكاً).';
+
+-- نُسقطها أولاً لأن نسخةً سابقة على القاعدة ترجع أعمدةً أكثر (PostgreSQL
+-- يرفض تغيير نوع الإرجاع بـ`create or replace` وحده: 42P13).
+drop function if exists public.my_muted_users();
+
+create or replace function public.my_muted_users()
+returns table (muted_id uuid, created_at timestamptz)
+language sql stable security definer set search_path = public
+as $fn$
+  select m.muted_id, m.created_at
+    from public.user_mutes m
+   where m.muter_id = auth.uid()
+   order by m.created_at desc;
+$fn$;
+
+comment on function public.my_muted_users() is
+  'قائمة المكتومين عندي — يقرأها التطبيق ليُخفي رسائلهم.';
+
+create or replace function public.i_muted_user(p_user_id uuid)
+returns boolean
+language sql stable security definer set search_path = public
+as $fn$
+  select exists (
+    select 1 from public.user_mutes
+     where muter_id = auth.uid() and muted_id = p_user_id
+  );
+$fn$;
+
+comment on function public.i_muted_user(uuid) is
+  'هل أنا كاتم هذا العضو؟ — لعرض صفّ «إلغاء الكتم» بدل «كتم العضو».';
+
+-- ---------------------------------------------------------------------------
+-- 4) المنح
+-- ---------------------------------------------------------------------------
+revoke all on function public.can_mute_members(uuid) from public, anon;
+grant execute on function public.can_mute_members(uuid) to authenticated;
+grant execute on function public.user_mute(uuid) to authenticated;
+grant execute on function public.user_unmute(uuid) to authenticated;
+grant execute on function public.my_muted_users() to authenticated;
+grant execute on function public.i_muted_user(uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
+
+-- ############################################################################
+-- ##  القسم: 39_notif_revert.sql
+-- ############################################################################
+
+-- ============================================================================
+--  39) إرجاع الإشعارات كما كانت — تنظيف ما نُفِّذ سابقاً
+-- ============================================================================
+--  قرار المالك: «اعني الشعارات رجعها كما كنت» ⇒ تُزال آثار «كتم إشعارات
+--  المكتومين» التي نُفِّذت على القاعدة، فيرجع الإشعار يجي من أي عضو مهما كان
+--  مكتوماً، وترجع دالة `push_set_prefs` بعشرة وسائط كما في 34، ويختفي عمود
+--  `push_prefs.muted_users` (لم يبقَ له مستعمل في التطبيق ولا في الخادم).
+--
+--  الكتم نفسه باقٍ كما هو (`user_mutes` في 38): رسائل المكتوم تُخفى في التطبيق،
+--  والإشعارات لا شأن لها به.
+--
+--  آمن للتكرار · على قاعدةٍ جديدة لا يجد شيئاً فيُكمل بلا أثر.
+--  أسماء الكائنات كما يسأل عنها الفاحص: الزناد 'trg_push_drop_muted_actor' ·
+--  الدالة 'push_drop_muted_actor' · 'is_muted_by' · العمود 'muted_users'.
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1) زناد إسقاط إشعارات المكتومين — يُزال
+-- ---------------------------------------------------------------------------
+drop trigger if exists trg_push_drop_muted_actor on public.chat_notifications;
+drop function if exists public.push_drop_muted_actor();
+drop function if exists public.is_muted_by(uuid, uuid);
+
+-- ---------------------------------------------------------------------------
+-- 2) عمود المفتاح في الإعدادات — يُزال
+-- ---------------------------------------------------------------------------
+alter table public.push_prefs drop column if exists muted_users;
+
+-- ---------------------------------------------------------------------------
+-- 3) push_set_prefs: نسخة 34 بعشرة وسائط (بلا p_muted_users)
+--    (نُسقط النسخة الأحد عشرية أولاً وإلا صار لدينا نسختان يتحيّر PostgREST)
+-- ---------------------------------------------------------------------------
+drop function if exists public.push_set_prefs(
+  boolean, boolean, boolean, boolean, boolean, boolean, boolean, int, int, int, boolean);
+
+create or replace function public.push_set_prefs(
+  p_master        boolean default null,
+  p_chat          boolean default null,
+  p_content       boolean default null,
+  p_social        boolean default null,
+  p_account       boolean default null,
+  p_reminders     boolean default null,
+  p_quiet_enabled boolean default null,
+  p_quiet_from    int default null,
+  p_quiet_to      int default null,
+  p_reengage_days int default null
+)
+returns public.push_prefs
+language plpgsql security definer set search_path = public
+as $fn$
+declare v_uid uuid := auth.uid(); v public.push_prefs;
+begin
+  if v_uid is null then return null; end if;
+  perform public.push_prefs_for(v_uid);
+
+  update public.push_prefs
+     set master        = coalesce(p_master, master),
+         chat          = coalesce(p_chat, chat),
+         content       = coalesce(p_content, content),
+         social        = coalesce(p_social, social),
+         account       = coalesce(p_account, account),
+         reminders     = coalesce(p_reminders, reminders),
+         quiet_enabled = coalesce(p_quiet_enabled, quiet_enabled),
+         quiet_from    = coalesce(p_quiet_from, quiet_from),
+         quiet_to      = coalesce(p_quiet_to, quiet_to),
+         reengage_days = coalesce(p_reengage_days, reengage_days),
+         updated_at    = now()
+   where user_id = v_uid
+   returning * into v;
+  return v;
+end $fn$;
+
+revoke all on function public.push_set_prefs(
+  boolean, boolean, boolean, boolean, boolean, boolean, boolean, int, int, int) from public, anon;
+grant execute on function public.push_set_prefs(
+  boolean, boolean, boolean, boolean, boolean, boolean, boolean, int, int, int) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 4) تحقّق سريع: لا زناد إسقاط · لا عمود muted_users · والعشر وسائط قائمة
+-- ---------------------------------------------------------------------------
+select 'زناد إسقاط إشعارات المكتومين' as "المكوّن",
+       (select count(*) from pg_trigger where tgname = 'trg_push_drop_muted_actor'
+          and not tgisinternal)::text as "الموجود", '0' as "المتوقّع"
+union all select 'عمود push_prefs.muted_users',
+       (select count(*) from information_schema.columns
+         where table_schema = 'public' and table_name = 'push_prefs'
+           and column_name = 'muted_users')::text, '0'
+union all select 'وسائط push_set_prefs',
+       (select count(*) from information_schema.parameters p
+          join information_schema.routines r on r.specific_name = p.specific_name
+         where r.routine_schema = 'public' and r.routine_name = 'push_set_prefs')::text, '10';
+
+notify pgrst, 'reload schema';
+
+
+-- ############################################################################
+-- ##  القسم: 40_admin_asset_privacy.sql
+-- ############################################################################
+
+-- ============================================================================
+--  AddonStation Mobile - 40) Admin Asset Privacy
+--
+--  Policy:
+--    * Assets with required_plan = 'admin' are hidden from regular users.
+--    * If an admin selects a private avatar, banner, or item, its value is
+--      redacted from every non-admin account.
+--    * New admin files are stored in the private admin-assets bucket and can
+--      only be read by users with the admin role.
+--    * Regular user profiles and assets remain visible as before.
+--
+--  Deployment order:
+--    First distribute an app version that reads visible_profiles (with its
+--    legacy-schema fallback), and then run this file. Older app versions read
+--    profiles directly.
+--
+--  Important for legacy assets:
+--    This file hides rows and profile values immediately, but SQL cannot move
+--    Storage object bytes between buckets. Run
+--    tools/migrate_admin_assets_private.py afterward to move legacy files from
+--    the public site-assets bucket to the private admin-assets bucket and
+--    safely remove the public copies.
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1) Asset catalog: only admins can read admin rows
+-- ---------------------------------------------------------------------------
+drop policy if exists assets_read on public.site_assets;
+create policy assets_read on public.site_assets
+  for select using (
+    public.is_admin()
+    or (enabled = true and required_plan <> 'admin')
+  );
+
+-- ---------------------------------------------------------------------------
+-- 2) Stable canonical path for private assets
+--
+--    Update profile references before the catalog row. This keeps rerunning
+--    00_ALL_IN_ONE safe after file migration: migrations 15/27 may restore the
+--    public path, while migration 40 always restores admin-private/... and the
+--    physical file remains in admin-assets.
+-- ---------------------------------------------------------------------------
+update public.profiles p
+   set avatar_url = 'admin-private/' || ltrim(p.avatar_url, '/')
+ where p.avatar_url not like 'admin-private/%'
+   and exists (
+     select 1 from public.site_assets a
+      where a.required_plan = 'admin'
+        and a.asset_type = 'avatar'
+        and a.file_url = p.avatar_url
+   );
+
+update public.profiles p
+   set banner_url = 'admin-private/' || ltrim(p.banner_url, '/')
+ where p.banner_url is not null
+   and p.banner_url not like 'admin-private/%'
+   and exists (
+     select 1 from public.site_assets a
+      where a.required_plan = 'admin'
+        and a.asset_type = 'banner'
+        and a.file_url = p.banner_url
+   );
+
+-- Very old app versions stored the item path instead of its name.
+update public.profiles p
+   set equipped_item_id = 'admin-private/' || ltrim(p.equipped_item_id, '/')
+ where p.equipped_item_id not like 'admin-private/%'
+   and exists (
+     select 1 from public.site_assets a
+      where a.required_plan = 'admin'
+        and a.asset_type = 'item'
+        and a.file_url = p.equipped_item_id
+   );
+
+update public.site_assets
+   set file_url = 'admin-private/' || ltrim(file_url, '/')
+ where required_plan = 'admin'
+   and file_url not like 'admin-private/%';
+
+-- ---------------------------------------------------------------------------
+-- 3) Internal function that detects an admin-only avatar, banner, or item
+--    SECURITY DEFINER is required because non-admin users cannot read the
+--    underlying admin asset row. It remains available only to privileged
+--    maintenance code. The public view inlines this check because PostgreSQL
+--    otherwise requires callers to have EXECUTE on every function it invokes.
+-- ---------------------------------------------------------------------------
+create or replace function public.is_admin_only_profile_asset(
+  p_kind text,
+  p_value text
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(p_value, '') <> ''
+     and exists (
+       select 1
+         from public.site_assets a
+        where a.required_plan = 'admin'
+          and a.enabled
+          and a.asset_type = case when p_kind = 'item' then 'item' else p_kind end
+          and (a.file_url = p_value or a.name = p_value)
+     );
+$$;
+
+revoke all on function public.is_admin_only_profile_asset(text, text) from public;
+revoke all on function public.is_admin_only_profile_asset(text, text) from anon, authenticated;
+
+comment on function public.is_admin_only_profile_asset(text, text) is
+  'Internal: detects whether a profile value references an admin-only asset; visible_profiles uses it for redaction.';
+
+-- ---------------------------------------------------------------------------
+-- 4) Public profile view: the same columns with admin-only assets redacted
+--
+--    The view runs with owner privileges so it can read profiles after direct
+--    SELECT is revoked, but visibility is evaluated for the actual caller via
+--    auth.uid()/public.is_admin().
+-- ---------------------------------------------------------------------------
+create or replace view public.visible_profiles
+with (security_barrier = true)
+as
+select
+  p.id,
+  p.username,
+  p.display_name,
+  case
+    when public.is_admin()
+      or coalesce(p.avatar_url, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'avatar'
+           and (a.file_url = p.avatar_url or a.name = p.avatar_url)
+      )
+      then p.avatar_url
+    else null
+  end as avatar_url,
+  case
+    when public.is_admin()
+      or coalesce(p.banner_url, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'banner'
+           and (a.file_url = p.banner_url or a.name = p.banner_url)
+      )
+      then p.banner_url
+    else null
+  end as banner_url,
+  p.custom_status,
+  p.bio,
+  p.country,
+  p.role,
+  p.plan,
+  p.plan_expires_at,
+  p.user_level,
+  case
+    when public.is_admin()
+      or coalesce(p.equipped_item_id, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'item'
+           and (a.file_url = p.equipped_item_id or a.name = p.equipped_item_id)
+      )
+      then p.equipped_item_id
+    else 'none'
+  end as equipped_item_id,
+  p.show_online_status,
+  p.last_seen_at,
+  p.created_at,
+  p.updated_at
+from public.profiles p;
+
+comment on view public.visible_profiles is
+  'Public profile read interface; redacts admin-only avatars, banners, and items from non-admin users.';
+
+revoke all on public.visible_profiles from public;
+grant select on public.visible_profiles to anon, authenticated;
+
+-- Prevent REST clients from bypassing the view through the base table, and
+-- prevent direct item assignment that bypasses set_profile_asset and its
+-- required_plan validation.
+revoke select on public.profiles from public, anon, authenticated;
+revoke update (equipped_item_id) on public.profiles from authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 5) Private admin asset bucket (reserved app path: admin-private/...)
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'admin-assets',
+  'admin-assets',
+  false,
+  5242880,
+  array['image/png','image/jpeg','image/webp','image/gif','image/svg+xml']
+)
+on conflict (id) do update
+  set public = false,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "admin_assets_read" on storage.objects;
+create policy "admin_assets_read" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'admin-assets' and public.is_admin());
+
+drop policy if exists "admin_assets_insert" on storage.objects;
+create policy "admin_assets_insert" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'admin-assets' and public.is_admin());
+
+drop policy if exists "admin_assets_update" on storage.objects;
+create policy "admin_assets_update" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'admin-assets' and public.is_admin())
+  with check (bucket_id = 'admin-assets' and public.is_admin());
+
+drop policy if exists "admin_assets_delete" on storage.objects;
+create policy "admin_assets_delete" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'admin-assets' and public.is_admin());
+
+-- Make visible_profiles available to PostgREST immediately after execution.
+notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- 6) Informational verification
+--    This does not fail while legacy assets await migration; it reports them.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_hidden int;
+  v_pending int;
+begin
+  select count(*) into v_hidden
+    from public.site_assets
+   where required_plan = 'admin';
+
+  select count(*) into v_pending
+    from public.site_assets a
+   where a.required_plan = 'admin'
+     and (
+       not exists (
+         select 1 from storage.objects o
+          where o.bucket_id = 'admin-assets' and o.name = a.file_url
+       )
+       or exists (
+         select 1 from storage.objects o
+          where o.bucket_id = 'site-assets'
+            and o.name = regexp_replace(a.file_url, '^admin-private/', '')
+       )
+     );
+
+  raise notice 'Admin catalog privacy is active: % asset(s) hidden from non-admin users.', v_hidden;
+  if v_pending > 0 then
+    raise notice '% legacy admin file(s) await migration to private storage via tools/migrate_admin_assets_private.py.', v_pending;
+  else
+    raise notice 'All admin files are registered with private storage paths.';
+  end if;
+end;
+$$;
+
+
+-- ############################################################################
+-- ##  القسم: 41_console_link_codes.sql
+-- ############################################################################
+
+-- ============================================================================
+-- AddonStation Mobile - 41) Secure PlayStation Console Linking
+--
+-- This migration implements the database half of the secure device-code flow:
+--   1. A trusted Edge Function creates a six-character code for the console.
+--   2. The signed-in phone looks up the code and explicitly approves it.
+--   3. The Edge Function proves possession of the poll secret and consumes the
+--      approval.
+--   4. The Edge Function creates a separate, restricted console credential and
+--      records only an opaque credential reference through console_code_complete.
+--
+-- Security properties:
+--   * console_link_codes is never readable from anon/authenticated REST.
+--   * The raw poll secret is returned once and only its SHA-256 hash is stored.
+--   * Access tokens and refresh tokens are never accepted or stored by SQL.
+--   * Phone lookups are limited to five failed attempts per minute per user.
+--   * Approval requires a recent successful lookup by the same signed-in user.
+--   * Console credentials must be issued and revoked by a trusted Edge Function.
+--     Never put the service-role key in the Android or PlayStation application.
+--
+-- Deployment:
+--   Run this migration first, then deploy the console-session Edge Function.
+--   Do not expose the service-role-only RPCs directly to either client.
+-- ============================================================================
+
+begin;
+
+create extension if not exists "pgcrypto";
+
+-- Remove the legacy RPC that accepted the phone's reusable session tokens.
+-- Deploy the updated Android client and console-session Edge Function as one
+-- coordinated release because old clients cannot use the secure contract.
+drop function if exists public.claim_console_link_code(text, text, text);
+
+-- ---------------------------------------------------------------------------
+-- 1) Linked consoles visible to their owner through console_list()
+-- ---------------------------------------------------------------------------
+create table if not exists public.linked_consoles (
+  id                uuid primary key default gen_random_uuid(),
+  user_id           uuid not null references auth.users(id) on delete cascade,
+  device_name       text not null,
+  platform          text not null default 'ps4',
+  app_version       text,
+  created_at        timestamptz not null default now(),
+  activated_at      timestamptz,
+  last_seen_at      timestamptz,
+  revoked_at        timestamptz,
+  session_ref       text,
+  constraint linked_consoles_device_name_length
+    check (char_length(device_name) between 1 and 80),
+  constraint linked_consoles_platform_length
+    check (char_length(platform) between 2 and 24),
+  constraint linked_consoles_app_version_length
+    check (app_version is null or char_length(app_version) <= 40),
+  constraint linked_consoles_session_ref_length
+    check (session_ref is null or char_length(session_ref) between 16 and 200)
+);
+
+-- Upgrade an earlier linked_consoles table without replacing user data.
+alter table public.linked_consoles
+  add column if not exists app_version text,
+  add column if not exists activated_at timestamptz,
+  add column if not exists last_seen_at timestamptz,
+  add column if not exists revoked_at timestamptz,
+  add column if not exists session_ref text;
+
+create index if not exists linked_consoles_user_active_idx
+  on public.linked_consoles(user_id, created_at desc)
+  where revoked_at is null;
+
+create unique index if not exists linked_consoles_session_ref_uidx
+  on public.linked_consoles(session_ref)
+  where session_ref is not null;
+
+-- ---------------------------------------------------------------------------
+-- 2) Private, short-lived device codes
+-- ---------------------------------------------------------------------------
+create table if not exists public.console_link_codes (
+  id                       uuid primary key default gen_random_uuid(),
+  code                     text not null unique,
+  device_name              text not null,
+  platform                 text not null default 'ps4',
+  app_version              text,
+  poll_secret_hash         text not null,
+  request_fingerprint_hash text,
+  created_at               timestamptz not null default now(),
+  expires_at               timestamptz not null,
+  approved_by              uuid references auth.users(id) on delete cascade,
+  approved_at              timestamptz,
+  exchange_id              uuid,
+  exchange_started_at      timestamptz,
+  used_at                  timestamptz,
+  linked_console_id        uuid references public.linked_consoles(id) on delete set null,
+  constraint console_link_codes_code_format
+    check (code ~ '^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$'),
+  constraint console_link_codes_device_name_length
+    check (char_length(device_name) between 1 and 80),
+  constraint console_link_codes_platform_length
+    check (char_length(platform) between 2 and 24),
+  constraint console_link_codes_app_version_length
+    check (app_version is null or char_length(app_version) <= 40),
+  constraint console_link_codes_expiry_order
+    check (expires_at > created_at),
+  constraint console_link_codes_approval_pair
+    check (
+      (approved_by is null and approved_at is null)
+      or (approved_by is not null and approved_at is not null)
+    ),
+  constraint console_link_codes_exchange_pair
+    check (
+      (exchange_id is null and exchange_started_at is null)
+      or (exchange_id is not null and exchange_started_at is not null)
+    )
+);
+
+-- Upgrade an earlier code table without exposing or replacing valid pending
+-- codes. New columns are populated by the secure functions below.
+alter table public.console_link_codes
+  add column if not exists id uuid default gen_random_uuid(),
+  add column if not exists platform text default 'ps4',
+  add column if not exists poll_secret_hash text,
+  add column if not exists request_fingerprint_hash text,
+  add column if not exists approved_by uuid references auth.users(id) on delete cascade,
+  add column if not exists approved_at timestamptz,
+  add column if not exists exchange_id uuid,
+  add column if not exists exchange_started_at timestamptz,
+  add column if not exists used_at timestamptz,
+  add column if not exists linked_console_id uuid references public.linked_consoles(id) on delete set null;
+
+update public.console_link_codes
+   set id = gen_random_uuid()
+ where id is null;
+
+alter table public.console_link_codes
+  alter column id set default gen_random_uuid(),
+  alter column id set not null;
+
+create unique index if not exists console_link_codes_id_uidx
+  on public.console_link_codes(id);
+create unique index if not exists console_link_codes_code_uidx
+  on public.console_link_codes(code);
+
+-- Normalize legacy bytea hashes to lowercase hexadecimal text.
+do $normalize_console_hashes$
+declare
+  v_type text;
+begin
+  select data_type into v_type
+    from information_schema.columns
+   where table_schema = 'public'
+     and table_name = 'console_link_codes'
+     and column_name = 'poll_secret_hash';
+  if v_type = 'bytea' then
+    execute 'alter table public.console_link_codes alter column poll_secret_hash type text using encode(poll_secret_hash, ''hex'')';
+  end if;
+
+  select data_type into v_type
+    from information_schema.columns
+   where table_schema = 'public'
+     and table_name = 'console_link_codes'
+     and column_name = 'request_fingerprint_hash';
+  if v_type = 'bytea' then
+    execute 'alter table public.console_link_codes alter column request_fingerprint_hash type text using encode(request_fingerprint_hash, ''hex'')';
+  end if;
+end;
+$normalize_console_hashes$;
+
+-- Remove any legacy columns that stored reusable phone credentials. CASCADE is
+-- intentional: old polling functions depending on those columns must not stay
+-- callable after the secure Edge Function replaces them.
+do $remove_legacy_console_tokens$
+begin
+  if exists (
+    select 1
+      from information_schema.columns
+     where table_schema = 'public'
+       and table_name = 'console_link_codes'
+       and column_name = 'access_token'
+  ) then
+    execute 'alter table public.console_link_codes drop column access_token cascade';
+  end if;
+
+  if exists (
+    select 1
+      from information_schema.columns
+     where table_schema = 'public'
+       and table_name = 'console_link_codes'
+       and column_name = 'refresh_token'
+  ) then
+    execute 'alter table public.console_link_codes drop column refresh_token cascade';
+  end if;
+end;
+$remove_legacy_console_tokens$;
+
+create index if not exists console_link_codes_expiry_idx
+  on public.console_link_codes(expires_at);
+
+create index if not exists console_link_codes_fingerprint_idx
+  on public.console_link_codes(request_fingerprint_hash, created_at desc)
+  where request_fingerprint_hash is not null;
+
+-- ---------------------------------------------------------------------------
+-- 3) Private audit/rate-limit log; raw codes and poll secrets are never logged
+-- ---------------------------------------------------------------------------
+create table if not exists public.console_link_audit (
+  id                bigint generated always as identity primary key,
+  event_type        text not null,
+  actor_user_id     uuid references auth.users(id) on delete set null,
+  link_code_id      uuid references public.console_link_codes(id) on delete set null,
+  linked_console_id uuid references public.linked_consoles(id) on delete set null,
+  created_at        timestamptz not null default now(),
+  constraint console_link_audit_event_type
+    check (event_type in (
+      'code_created',
+      'lookup_succeeded',
+      'lookup_failed',
+      'approval_succeeded',
+      'approval_failed',
+      'exchange_started',
+      'console_activated',
+      'console_revoked',
+      'console_seen'
+    ))
+);
+
+create index if not exists console_link_audit_rate_idx
+  on public.console_link_audit(actor_user_id, event_type, created_at desc)
+  where actor_user_id is not null;
+
+create index if not exists console_link_audit_console_idx
+  on public.console_link_audit(linked_console_id, created_at desc)
+  where linked_console_id is not null;
+
+-- ---------------------------------------------------------------------------
+-- 4) RLS and table privileges
+--
+-- All client operations use narrowly scoped RPCs. Even a direct REST request
+-- cannot list codes, hashes, fingerprints, audit rows, or session references.
+-- ---------------------------------------------------------------------------
+alter table public.linked_consoles enable row level security;
+alter table public.console_link_codes enable row level security;
+alter table public.console_link_audit enable row level security;
+
+drop policy if exists linked_consoles_select_own on public.linked_consoles;
+create policy linked_consoles_select_own on public.linked_consoles
+  for select to authenticated
+  using (user_id = auth.uid() and revoked_at is null);
+
+revoke all on table public.linked_consoles from public, anon, authenticated;
+revoke all on table public.console_link_codes from public, anon, authenticated;
+revoke all on table public.console_link_audit from public, anon, authenticated;
+
+grant all on table public.linked_consoles to service_role;
+grant all on table public.console_link_codes to service_role;
+grant all on table public.console_link_audit to service_role;
+
+-- ---------------------------------------------------------------------------
+-- 5) Internal helpers
+-- ---------------------------------------------------------------------------
+create or replace function public.console_private_normalize_code(p_code text)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select regexp_replace(upper(coalesce(p_code, '')), '[[:space:]-]+', '', 'g');
+$$;
+
+create or replace function public.console_private_random_code()
+returns text
+language plpgsql
+volatile
+set search_path = public, extensions
+as $$
+declare
+  v_alphabet constant text := '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  v_bytes bytea := gen_random_bytes(6);
+  v_code text := '';
+  v_index integer;
+begin
+  for v_index in 0..5 loop
+    v_code := v_code || substr(
+      v_alphabet,
+      (get_byte(v_bytes, v_index) % 32) + 1,
+      1
+    );
+  end loop;
+  return v_code;
+end;
+$$;
+
+revoke all on function public.console_private_normalize_code(text) from public, anon, authenticated;
+revoke all on function public.console_private_random_code() from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 6) Edge Function: create a code
+--
+-- p_request_fingerprint must be an opaque, server-generated HMAC of the remote
+-- address and installation identifier. Never pass a raw IP address here.
+-- ---------------------------------------------------------------------------
+create or replace function public.console_code_create(
+  p_device_name text default 'PlayStation 4',
+  p_app_version text default null,
+  p_platform text default 'ps4',
+  p_request_fingerprint text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_device_name text := nullif(btrim(p_device_name), '');
+  v_app_version text := nullif(btrim(p_app_version), '');
+  v_platform text := lower(coalesce(nullif(btrim(p_platform), ''), 'ps4'));
+  v_fingerprint_hash text;
+  v_code text;
+  v_poll_secret text;
+  v_code_id uuid;
+  v_expires_at timestamptz := now() + interval '10 minutes';
+  v_try integer;
+begin
+  if v_device_name is null or char_length(v_device_name) > 80 then
+    return jsonb_build_object('ok', false, 'message', 'invalid_device_name');
+  end if;
+  if v_app_version is not null and char_length(v_app_version) > 40 then
+    return jsonb_build_object('ok', false, 'message', 'invalid_app_version');
+  end if;
+  if v_platform !~ '^[a-z0-9_-]{2,24}$' then
+    return jsonb_build_object('ok', false, 'message', 'invalid_platform');
+  end if;
+
+  if nullif(btrim(p_request_fingerprint), '') is not null then
+    v_fingerprint_hash := encode(
+      digest(convert_to(btrim(p_request_fingerprint), 'UTF8'), 'sha256'),
+      'hex'
+    );
+
+    if (
+      select count(*)
+        from public.console_link_codes c
+       where c.request_fingerprint_hash = v_fingerprint_hash
+         and c.created_at > now() - interval '10 minutes'
+    ) >= 5 then
+      return jsonb_build_object('ok', false, 'message', 'too_many_attempts');
+    end if;
+  end if;
+
+  -- A global ceiling protects the database if the public Edge endpoint is
+  -- attacked. Per-client limiting must also be enforced by the Edge Function.
+  if (
+    select count(*)
+      from public.console_link_codes c
+     where c.created_at > now() - interval '1 minute'
+  ) >= 1000 then
+    return jsonb_build_object('ok', false, 'message', 'service_busy');
+  end if;
+
+  v_poll_secret := encode(gen_random_bytes(32), 'hex');
+
+  for v_try in 1..20 loop
+    v_code := public.console_private_random_code();
+    begin
+      insert into public.console_link_codes (
+        code,
+        device_name,
+        platform,
+        app_version,
+        poll_secret_hash,
+        request_fingerprint_hash,
+        expires_at
+      ) values (
+        v_code,
+        v_device_name,
+        v_platform,
+        v_app_version,
+        encode(digest(convert_to(v_poll_secret, 'UTF8'), 'sha256'), 'hex'),
+        v_fingerprint_hash,
+        v_expires_at
+      )
+      returning id into v_code_id;
+      exit;
+    exception when unique_violation then
+      if v_try = 20 then
+        return jsonb_build_object('ok', false, 'message', 'code_generation_failed');
+      end if;
+    end;
+  end loop;
+
+  insert into public.console_link_audit(event_type, link_code_id)
+  values ('code_created', v_code_id);
+
+  return jsonb_build_object(
+    'ok', true,
+    'code', v_code,
+    'expires_at', v_expires_at,
+    'poll_secret', v_poll_secret
+  );
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 7) Phone: look up a code before showing the approval sheet
+-- ---------------------------------------------------------------------------
+create or replace function public.console_code_lookup(p_code text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_code text := public.console_private_normalize_code(p_code);
+  v_row public.console_link_codes%rowtype;
+  v_failed_attempts integer;
+begin
+  if v_user_id is null then
+    return jsonb_build_object('ok', false, 'message', 'sign_in_required');
+  end if;
+
+  select count(*)::integer
+    into v_failed_attempts
+    from public.console_link_audit a
+   where a.actor_user_id = v_user_id
+     and a.event_type in ('lookup_failed', 'approval_failed')
+     and a.created_at > now() - interval '1 minute';
+
+  if v_failed_attempts >= 5 then
+    return jsonb_build_object('ok', false, 'message', 'too_many_attempts');
+  end if;
+
+  if v_code !~ '^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$' then
+    insert into public.console_link_audit(event_type, actor_user_id)
+    values ('lookup_failed', v_user_id);
+    return jsonb_build_object('ok', false, 'message', 'invalid_code');
+  end if;
+
+  select *
+    into v_row
+    from public.console_link_codes c
+   where c.code = v_code;
+
+  if not found then
+    insert into public.console_link_audit(event_type, actor_user_id)
+    values ('lookup_failed', v_user_id);
+    return jsonb_build_object('ok', false, 'message', 'code_not_found');
+  end if;
+
+  if v_row.expires_at <= now() then
+    insert into public.console_link_audit(event_type, actor_user_id, link_code_id)
+    values ('lookup_failed', v_user_id, v_row.id);
+    return jsonb_build_object('ok', false, 'message', 'code_expired');
+  end if;
+
+  if v_row.used_at is not null
+     or (v_row.approved_by is not null and v_row.approved_by <> v_user_id) then
+    insert into public.console_link_audit(event_type, actor_user_id, link_code_id)
+    values ('lookup_failed', v_user_id, v_row.id);
+    return jsonb_build_object('ok', false, 'message', 'code_not_found');
+  end if;
+
+  insert into public.console_link_audit(event_type, actor_user_id, link_code_id)
+  values ('lookup_succeeded', v_user_id, v_row.id);
+
+  return jsonb_build_object(
+    'ok', true,
+    'message', 'code_found',
+    'code', v_row.code,
+    'device_name', v_row.device_name,
+    'platform', v_row.platform,
+    'app_version', v_row.app_version,
+    'requested_at', v_row.created_at,
+    'expires_at', v_row.expires_at
+  );
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 8) Phone: explicitly approve the code
+-- ---------------------------------------------------------------------------
+create or replace function public.console_code_approve(p_code text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_code text := public.console_private_normalize_code(p_code);
+  v_row public.console_link_codes%rowtype;
+  v_link_id uuid;
+  v_failed_attempts integer;
+begin
+  if v_user_id is null then
+    return jsonb_build_object('ok', false, 'message', 'sign_in_required');
+  end if;
+
+  select count(*)::integer
+    into v_failed_attempts
+    from public.console_link_audit a
+   where a.actor_user_id = v_user_id
+     and a.event_type in ('lookup_failed', 'approval_failed')
+     and a.created_at > now() - interval '1 minute';
+
+  if v_failed_attempts >= 5 then
+    return jsonb_build_object('ok', false, 'message', 'too_many_attempts');
+  end if;
+
+  if v_code !~ '^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$' then
+    insert into public.console_link_audit(event_type, actor_user_id)
+    values ('approval_failed', v_user_id);
+    return jsonb_build_object('ok', false, 'message', 'invalid_code');
+  end if;
+
+  select *
+    into v_row
+    from public.console_link_codes c
+   where c.code = v_code
+   for update;
+
+  if not found then
+    insert into public.console_link_audit(event_type, actor_user_id)
+    values ('approval_failed', v_user_id);
+    return jsonb_build_object('ok', false, 'message', 'code_not_found');
+  end if;
+
+  if v_row.expires_at <= now() then
+    insert into public.console_link_audit(event_type, actor_user_id, link_code_id)
+    values ('approval_failed', v_user_id, v_row.id);
+    return jsonb_build_object('ok', false, 'message', 'code_expired');
+  end if;
+
+  if v_row.used_at is not null
+     or (v_row.approved_by is not null and v_row.approved_by <> v_user_id) then
+    insert into public.console_link_audit(event_type, actor_user_id, link_code_id)
+    values ('approval_failed', v_user_id, v_row.id);
+    return jsonb_build_object('ok', false, 'message', 'code_not_found');
+  end if;
+
+  -- Approval is idempotent for the same user and the same active link.
+  if v_row.approved_by = v_user_id and v_row.linked_console_id is not null then
+    select l.id
+      into v_link_id
+      from public.linked_consoles l
+     where l.id = v_row.linked_console_id
+       and l.user_id = v_user_id
+       and l.revoked_at is null;
+
+    if v_link_id is not null then
+      return jsonb_build_object(
+        'ok', true,
+        'message', 'approved',
+        'platform', v_row.platform,
+        'device_name', v_row.device_name
+      );
+    end if;
+  end if;
+
+  -- A direct approve call is not accepted: the same user must have completed a
+  -- successful lookup recently, which is what drives the confirmation sheet.
+  if not exists (
+    select 1
+      from public.console_link_audit a
+     where a.actor_user_id = v_user_id
+       and a.link_code_id = v_row.id
+       and a.event_type = 'lookup_succeeded'
+       and a.created_at > now() - interval '10 minutes'
+  ) then
+    insert into public.console_link_audit(event_type, actor_user_id, link_code_id)
+    values ('approval_failed', v_user_id, v_row.id);
+    return jsonb_build_object('ok', false, 'message', 'lookup_required');
+  end if;
+
+  insert into public.linked_consoles (
+    user_id,
+    device_name,
+    platform,
+    app_version
+  ) values (
+    v_user_id,
+    v_row.device_name,
+    v_row.platform,
+    v_row.app_version
+  )
+  returning id into v_link_id;
+
+  update public.console_link_codes
+     set approved_by = v_user_id,
+         approved_at = now(),
+         linked_console_id = v_link_id
+   where id = v_row.id;
+
+  insert into public.console_link_audit(
+    event_type,
+    actor_user_id,
+    link_code_id,
+    linked_console_id
+  ) values (
+    'approval_succeeded',
+    v_user_id,
+    v_row.id,
+    v_link_id
+  );
+
+  return jsonb_build_object(
+    'ok', true,
+    'message', 'approved',
+    'platform', v_row.platform,
+    'device_name', v_row.device_name
+  );
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 9) Edge Function: consume an approved code using the poll secret
+--
+-- This function does not mint or return a Supabase session. The Edge Function
+-- must create a separate restricted console credential. The five-minute
+-- exchange window makes a network retry safe without exposing the poll secret.
+-- ---------------------------------------------------------------------------
+create or replace function public.console_code_consume(
+  p_code text,
+  p_poll_secret text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_code text := public.console_private_normalize_code(p_code);
+  v_secret_hash text;
+  v_row public.console_link_codes%rowtype;
+  v_exchange_id uuid;
+begin
+  if v_code !~ '^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$'
+     or nullif(p_poll_secret, '') is null
+     or char_length(p_poll_secret) > 256 then
+    return jsonb_build_object('ok', false, 'status', 'invalid');
+  end if;
+
+  v_secret_hash := encode(
+    digest(convert_to(p_poll_secret, 'UTF8'), 'sha256'),
+    'hex'
+  );
+
+  select *
+    into v_row
+    from public.console_link_codes c
+   where c.code = v_code
+   for update;
+
+  if not found or v_row.poll_secret_hash <> v_secret_hash then
+    return jsonb_build_object('ok', false, 'status', 'invalid');
+  end if;
+
+  if v_row.used_at is not null then
+    return jsonb_build_object('ok', false, 'status', 'used');
+  end if;
+
+  if v_row.expires_at <= now()
+     and (v_row.exchange_started_at is null
+          or v_row.exchange_started_at <= now() - interval '5 minutes') then
+    return jsonb_build_object('ok', false, 'status', 'expired');
+  end if;
+
+  if v_row.approved_by is null or v_row.linked_console_id is null then
+    return jsonb_build_object('ok', true, 'status', 'pending');
+  end if;
+
+  if not exists (
+    select 1
+      from public.linked_consoles l
+     where l.id = v_row.linked_console_id
+       and l.user_id = v_row.approved_by
+       and l.revoked_at is null
+  ) then
+    return jsonb_build_object('ok', false, 'status', 'revoked');
+  end if;
+
+  if v_row.exchange_id is null
+     or v_row.exchange_started_at <= now() - interval '5 minutes' then
+    v_exchange_id := gen_random_uuid();
+    update public.console_link_codes
+       set exchange_id = v_exchange_id,
+           exchange_started_at = now()
+     where id = v_row.id;
+
+    insert into public.console_link_audit(
+      event_type,
+      actor_user_id,
+      link_code_id,
+      linked_console_id
+    ) values (
+      'exchange_started',
+      v_row.approved_by,
+      v_row.id,
+      v_row.linked_console_id
+    );
+  else
+    v_exchange_id := v_row.exchange_id;
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'status', 'approved',
+    'exchange_id', v_exchange_id,
+    'user_id', v_row.approved_by,
+    'linked_console_id', v_row.linked_console_id,
+    'device_name', v_row.device_name,
+    'platform', v_row.platform,
+    'app_version', v_row.app_version
+  );
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 10) Edge Function: finish credential issuance
+--
+-- p_session_ref is an opaque identifier only. It must not contain an access
+-- token, refresh token, authorization header, or other reusable credential.
+-- ---------------------------------------------------------------------------
+create or replace function public.console_code_complete(
+  p_exchange_id uuid,
+  p_linked_console_id uuid,
+  p_session_ref text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_row public.console_link_codes%rowtype;
+  v_session_ref text := nullif(btrim(p_session_ref), '');
+begin
+  if p_exchange_id is null
+     or p_linked_console_id is null
+     or v_session_ref is null
+     or char_length(v_session_ref) not between 16 and 200 then
+    return jsonb_build_object('ok', false, 'message', 'invalid_exchange');
+  end if;
+
+  select *
+    into v_row
+    from public.console_link_codes c
+   where c.exchange_id = p_exchange_id
+     and c.linked_console_id = p_linked_console_id
+   for update;
+
+  if not found
+     or v_row.used_at is not null
+     or v_row.exchange_started_at <= now() - interval '5 minutes' then
+    return jsonb_build_object('ok', false, 'message', 'invalid_exchange');
+  end if;
+
+  update public.linked_consoles
+     set session_ref = v_session_ref,
+         activated_at = now(),
+         last_seen_at = now()
+   where id = p_linked_console_id
+     and user_id = v_row.approved_by
+     and revoked_at is null;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'message', 'console_revoked');
+  end if;
+
+  update public.console_link_codes
+     set used_at = now()
+   where id = v_row.id;
+
+  insert into public.console_link_audit(
+    event_type,
+    actor_user_id,
+    link_code_id,
+    linked_console_id
+  ) values (
+    'console_activated',
+    v_row.approved_by,
+    v_row.id,
+    p_linked_console_id
+  );
+
+  return jsonb_build_object('ok', true, 'message', 'activated');
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 11) Phone: list and revoke consoles
+--
+-- Revocation is durable in SQL. The Edge Function must reject the session_ref
+-- immediately and revoke/delete its corresponding external credential.
+-- ---------------------------------------------------------------------------
+create or replace function public.console_list()
+returns table (
+  id uuid,
+  device_name text,
+  platform text,
+  app_version text,
+  created_at timestamptz,
+  last_seen_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    l.id,
+    l.device_name,
+    l.platform,
+    l.app_version,
+    l.created_at,
+    l.last_seen_at
+  from public.linked_consoles l
+  where l.user_id = auth.uid()
+    and l.revoked_at is null
+  order by l.created_at desc;
+$$;
+
+create or replace function public.console_unlink(p_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_link_id uuid;
+begin
+  if v_user_id is null then
+    return jsonb_build_object('ok', false, 'message', 'sign_in_required');
+  end if;
+
+  update public.linked_consoles
+     set revoked_at = now()
+   where id = p_id
+     and user_id = v_user_id
+     and revoked_at is null
+  returning id into v_link_id;
+
+  if v_link_id is null then
+    return jsonb_build_object('ok', false, 'message', 'console_not_found');
+  end if;
+
+  insert into public.console_link_audit(
+    event_type,
+    actor_user_id,
+    linked_console_id
+  ) values (
+    'console_revoked',
+    v_user_id,
+    v_link_id
+  );
+
+  return jsonb_build_object('ok', true, 'message', 'revoked');
+end;
+$$;
+
+create or replace function public.console_unlink_all()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_count integer;
+begin
+  if v_user_id is null then
+    return jsonb_build_object('ok', false, 'message', 'sign_in_required');
+  end if;
+
+  with revoked as (
+    update public.linked_consoles
+       set revoked_at = now()
+     where user_id = v_user_id
+       and revoked_at is null
+    returning id
+  ), audited as (
+    insert into public.console_link_audit(
+      event_type,
+      actor_user_id,
+      linked_console_id
+    )
+    select 'console_revoked', v_user_id, id
+      from revoked
+    returning 1
+  )
+  select count(*)::integer into v_count from audited;
+
+  return jsonb_build_object(
+    'ok', true,
+    'message', 'revoked',
+    'count', coalesce(v_count, 0)
+  );
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 12) Edge Function: heartbeat and credential-status check
+-- ---------------------------------------------------------------------------
+create or replace function public.console_session_touch(
+  p_linked_console_id uuid,
+  p_session_ref text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_link_id uuid;
+  v_user_id uuid;
+begin
+  if p_linked_console_id is null or nullif(btrim(p_session_ref), '') is null then
+    return jsonb_build_object('ok', false, 'message', 'invalid_session');
+  end if;
+
+  update public.linked_consoles
+     set last_seen_at = now()
+   where id = p_linked_console_id
+     and session_ref = p_session_ref
+     and activated_at is not null
+     and revoked_at is null
+  returning id, user_id into v_link_id, v_user_id;
+
+  if v_link_id is null then
+    return jsonb_build_object('ok', false, 'message', 'session_revoked');
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'message', 'active',
+    'user_id', v_user_id
+  );
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 13) Maintenance cleanup (run from a trusted scheduled Edge Function)
+-- ---------------------------------------------------------------------------
+create or replace function public.console_link_cleanup(
+  p_code_retention interval default interval '24 hours',
+  p_audit_retention interval default interval '90 days'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_codes integer;
+  v_audit integer;
+begin
+  delete from public.console_link_codes
+   where expires_at < now() - greatest(p_code_retention, interval '1 hour');
+  get diagnostics v_codes = row_count;
+
+  delete from public.console_link_audit
+   where created_at < now() - greatest(p_audit_retention, interval '7 days');
+  get diagnostics v_audit = row_count;
+
+  return jsonb_build_object(
+    'ok', true,
+    'deleted_codes', v_codes,
+    'deleted_audit_rows', v_audit
+  );
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 14) Function privileges
+-- ---------------------------------------------------------------------------
+revoke all on function public.console_code_create(text, text, text, text)
+  from public, anon, authenticated;
+revoke all on function public.console_code_consume(text, text)
+  from public, anon, authenticated;
+revoke all on function public.console_code_complete(uuid, uuid, text)
+  from public, anon, authenticated;
+revoke all on function public.console_session_touch(uuid, text)
+  from public, anon, authenticated;
+revoke all on function public.console_link_cleanup(interval, interval)
+  from public, anon, authenticated;
+
+grant execute on function public.console_code_create(text, text, text, text)
+  to service_role;
+grant execute on function public.console_code_consume(text, text)
+  to service_role;
+grant execute on function public.console_code_complete(uuid, uuid, text)
+  to service_role;
+grant execute on function public.console_session_touch(uuid, text)
+  to service_role;
+grant execute on function public.console_link_cleanup(interval, interval)
+  to service_role;
+
+revoke all on function public.console_code_lookup(text) from public, anon;
+revoke all on function public.console_code_approve(text) from public, anon;
+revoke all on function public.console_list() from public, anon;
+revoke all on function public.console_unlink(uuid) from public, anon;
+revoke all on function public.console_unlink_all() from public, anon;
+
+grant execute on function public.console_code_lookup(text) to authenticated;
+grant execute on function public.console_code_approve(text) to authenticated;
+grant execute on function public.console_list() to authenticated;
+grant execute on function public.console_unlink(uuid) to authenticated;
+grant execute on function public.console_unlink_all() to authenticated;
+
+comment on table public.console_link_codes is
+  'Private one-time PlayStation link codes. Clients must use RPCs; raw poll secrets and session tokens are never stored.';
+comment on table public.linked_consoles is
+  'User-owned console links. session_ref is an opaque Edge Function credential reference, never a token.';
+comment on function public.console_code_create(text, text, text, text) is
+  'Service role only: creates a short-lived code and returns its raw poll secret once.';
+comment on function public.console_code_lookup(text) is
+  'Authenticated phone: rate-limited lookup before explicit approval.';
+comment on function public.console_code_approve(text) is
+  'Authenticated phone: approves a recently looked-up console code.';
+comment on function public.console_code_consume(text, text) is
+  'Service role only: validates the poll secret and starts a retry-safe credential exchange.';
+comment on function public.console_code_complete(uuid, uuid, text) is
+  'Service role only: activates a linked console using an opaque credential reference.';
+
+commit;
+
+
+-- ############################################################################
+-- ##  القسم: 42_visible_profiles_access.sql
+-- ############################################################################
+
+-- ============================================================================
+--  AddonStation Mobile — restore readable public profile metadata
+--
+--  Existing deployments only need this focused, idempotent migration.
+--  `visible_profiles` previously called a private helper function. PostgreSQL
+--  checks function EXECUTE privileges as the caller even inside an owner-run
+--  view, so `select=*` failed while a pruned `select=id` appeared healthy.
+--
+--  Keep the helper private and evaluate the same redaction directly in the
+--  security-barrier view. The view owner may inspect the asset catalog, but
+--  callers receive only the already-redacted profile columns.
+-- ============================================================================
+
+begin;
+
+revoke all on function public.is_admin_only_profile_asset(text, text) from public;
+revoke all on function public.is_admin_only_profile_asset(text, text) from anon, authenticated;
+
+create or replace view public.visible_profiles
+with (security_barrier = true)
+as
+select
+  p.id,
+  p.username,
+  p.display_name,
+  case
+    when public.is_admin()
+      or coalesce(p.avatar_url, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'avatar'
+           and (a.file_url = p.avatar_url or a.name = p.avatar_url)
+      )
+      then p.avatar_url
+    else null
+  end as avatar_url,
+  case
+    when public.is_admin()
+      or coalesce(p.banner_url, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'banner'
+           and (a.file_url = p.banner_url or a.name = p.banner_url)
+      )
+      then p.banner_url
+    else null
+  end as banner_url,
+  p.custom_status,
+  p.bio,
+  p.country,
+  p.role,
+  p.plan,
+  p.plan_expires_at,
+  p.user_level,
+  case
+    when public.is_admin()
+      or coalesce(p.equipped_item_id, '') = ''
+      or not exists (
+        select 1
+          from public.site_assets a
+         where a.required_plan = 'admin'
+           and a.enabled
+           and a.asset_type = 'item'
+           and (a.file_url = p.equipped_item_id or a.name = p.equipped_item_id)
+      )
+      then p.equipped_item_id
+    else 'none'
+  end as equipped_item_id,
+  p.show_online_status,
+  p.last_seen_at,
+  p.created_at,
+  p.updated_at
+from public.profiles p;
+
+comment on view public.visible_profiles is
+  'Public profile read interface; redacts admin-only avatars, banners, and items from non-admin users.';
+
+revoke all on public.visible_profiles from public;
+grant select on public.visible_profiles to anon, authenticated;
+revoke select on public.profiles from public, anon, authenticated;
+revoke update (equipped_item_id) on public.profiles from authenticated;
+
+commit;
+
+notify pgrst, 'reload schema';
+
+
+-- ############################################################################
+-- ##  القسم: 44_fix_profile_asset_guard.sql
+-- ############################################################################
+
+-- ============================================================================
+-- AddonStation Mobile — allow validated profile RPC writes through the guard
+--
+-- Direct authenticated UPDATE privileges remain limited to safe text columns.
+-- Protected username/avatar/banner/item writes continue to require these
+-- SECURITY DEFINER RPCs, which validate ownership, plan rank, and admin assets
+-- before setting a transaction-local flag consumed by guard_profile_update().
+-- ============================================================================
+
+begin;
+
+create or replace function public.guard_profile_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor_role text;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if coalesce(current_setting('app.allow_profile_write', true), '') = '1' then
+    return new;
+  end if;
+
+  select role into v_actor_role
+    from public.profiles
+   where id = auth.uid();
+
+  if coalesce(v_actor_role, '') = 'admin' then
+    return new;
+  end if;
+
+  if new.role is distinct from old.role
+     or new.plan is distinct from old.plan
+     or new.plan_expires_at is distinct from old.plan_expires_at
+     or new.user_level is distinct from old.user_level
+     or new.username is distinct from old.username
+     or new.equipped_item_id is distinct from old.equipped_item_id
+     or new.avatar_url is distinct from old.avatar_url
+     or new.banner_url is distinct from old.banner_url
+  then
+    raise exception 'forbidden_profile_column';
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace function public.set_profile_asset(p_kind text, p_value text)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid       uuid := auth.uid();
+  v_asset     public.site_assets;
+  v_plan      text;
+  v_is_admin  boolean;
+begin
+  if v_uid is null then
+    return jsonb_build_object('ok', false, 'message', 'sign_in_required');
+  end if;
+
+  if p_kind not in ('avatar', 'banner', 'item') then
+    return jsonb_build_object('ok', false, 'message', 'invalid_kind');
+  end if;
+
+  perform set_config('app.allow_profile_write', '1', true);
+
+  if p_value is null or p_value = '' or p_value = 'none' then
+    if p_kind = 'avatar' then
+      update public.profiles
+         set avatar_url = coalesce(
+               (
+                 select a.file_url
+                   from public.site_assets a
+                  where a.asset_type = 'avatar'
+                    and a.required_plan = 'free'
+                    and a.enabled
+                  order by a.sort_order, a.id
+                  limit 1
+               ),
+               'profiles/profiles/onefree.png'
+             ),
+             updated_at = now()
+       where id = v_uid;
+    elsif p_kind = 'banner' then
+      update public.profiles
+         set banner_url = null,
+             updated_at = now()
+       where id = v_uid;
+    else
+      update public.profiles
+         set equipped_item_id = 'none',
+             updated_at = now()
+       where id = v_uid;
+    end if;
+    return jsonb_build_object('ok', true, 'value', 'none');
+  end if;
+
+  select * into v_asset
+    from public.site_assets
+   where enabled
+     and asset_type = case when p_kind = 'item' then 'item' else p_kind end
+     and (file_url = p_value or name = p_value)
+   limit 1;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'message', 'asset_not_found');
+  end if;
+
+  v_plan := public.effective_plan(v_uid);
+  v_is_admin := public.is_admin(v_uid);
+
+  if v_asset.required_plan = 'admin' and not v_is_admin then
+    return jsonb_build_object('ok', false, 'message', 'admin_only_asset');
+  end if;
+
+  if v_asset.required_plan <> 'admin'
+     and not v_is_admin
+     and public.plan_rank(v_plan) < public.plan_rank(v_asset.required_plan)
+  then
+    return jsonb_build_object(
+      'ok', false,
+      'message', 'plan_too_low',
+      'required_plan', v_asset.required_plan
+    );
+  end if;
+
+  if p_kind = 'avatar' then
+    update public.profiles
+       set avatar_url = v_asset.file_url,
+           updated_at = now()
+     where id = v_uid;
+  elsif p_kind = 'banner' then
+    update public.profiles
+       set banner_url = v_asset.file_url,
+           updated_at = now()
+     where id = v_uid;
+  else
+    update public.profiles
+       set equipped_item_id = coalesce(v_asset.name, v_asset.file_url),
+           updated_at = now()
+     where id = v_uid;
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'value', v_asset.file_url,
+    'required_plan', v_asset.required_plan
+  );
+end;
+$$;
+
+create or replace function public.update_my_profile(
+  p_username text default null,
+  p_bio text default null,
+  p_custom_status text default null,
+  p_show_online boolean default null,
+  p_country text default null
+)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    return jsonb_build_object('ok', false, 'message', 'sign_in_required');
+  end if;
+
+  if p_username is not null then
+    if char_length(p_username) < 3 then
+      return jsonb_build_object('ok', false, 'message', 'username_too_short');
+    end if;
+    if exists (
+      select 1
+        from public.profiles
+       where username = p_username
+         and id <> v_uid
+    ) then
+      return jsonb_build_object('ok', false, 'message', 'username_taken');
+    end if;
+  end if;
+
+  perform set_config('app.allow_profile_write', '1', true);
+
+  update public.profiles
+     set username = coalesce(p_username, username),
+         bio = coalesce(p_bio, bio),
+         custom_status = coalesce(p_custom_status, custom_status),
+         show_online_status = coalesce(p_show_online, show_online_status),
+         country = coalesce(p_country, country),
+         last_seen_at = now(),
+         updated_at = now()
+   where id = v_uid;
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+commit;
+
+notify pgrst, 'reload schema';
+
+
+-- ############################################################################
+-- ##  القسم: 45_single_attached_free_avatar.sql
+-- ############################################################################
+
+-- ============================================================================
+-- AddonStation Mobile — make the owner's attached image the only free avatar
+--
+-- Canonical Storage object:
+--   bucket: site-assets
+--   path:   profiles/profiles/onefree.png
+--   bytes:  271089
+--   SHA-256 of the repository/attached image:
+--   6e2e27187e757d8f213d6dd29c6afe9667e960447e752d3ae2c82b66bb33b7a5
+--
+-- This migration removes obsolete free avatar database records, preserves all
+-- paid/admin avatars, repairs legacy profile references, and guarantees that a
+-- newly created free account receives the canonical image.
+-- ============================================================================
+
+begin;
+
+create unique index if not exists site_assets_file_url_uidx
+  on public.site_assets (file_url);
+
+insert into public.site_assets
+  (asset_type, name, file_url, required_plan, animated, collection,
+   collection_order, sort_order, enabled)
+values
+  ('avatar', 'Default Free Avatar', 'profiles/profiles/onefree.png', 'free',
+   false, 'Default', 1, 1, true)
+on conflict (file_url) do update
+   set asset_type       = excluded.asset_type,
+       name             = excluded.name,
+       required_plan    = excluded.required_plan,
+       animated         = excluded.animated,
+       collection       = excluded.collection,
+       collection_order = excluded.collection_order,
+       sort_order       = excluded.sort_order,
+       enabled          = true;
+
+-- Repair profile references while the obsolete rows are still available for
+-- exact matching.
+update public.profiles p
+   set avatar_url = 'profiles/profiles/onefree.png',
+       updated_at = now()
+ where p.avatar_url is null
+    or btrim(p.avatar_url) = ''
+    or lower(btrim(p.avatar_url)) = 'none'
+    or p.avatar_url = 'profiles/onefree.png'
+    or exists (
+         select 1
+           from public.site_assets a
+          where a.asset_type = 'avatar'
+            and a.required_plan = 'free'
+            and a.file_url <> 'profiles/profiles/onefree.png'
+            and (
+                 p.avatar_url = a.file_url
+              or p.avatar_url = 'profiles/' || a.file_url
+              or a.file_url = 'profiles/' || p.avatar_url
+            )
+       );
+
+-- The owner's canonical image is now the only free avatar record. Storage files
+-- are left untouched so this database-only migration cannot remove unrelated
+-- archival objects.
+delete from public.site_assets
+ where asset_type = 'avatar'
+   and required_plan = 'free'
+   and file_url <> 'profiles/profiles/onefree.png';
+
+alter table public.profiles
+  alter column avatar_url set default 'profiles/profiles/onefree.png';
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_username text;
+  v_welcome  integer := 50;
+begin
+  v_username := coalesce(
+    nullif(new.raw_user_meta_data->>'username', ''),
+    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+    'player_' || substr(new.id::text, 1, 8)
+  );
+
+  while exists (select 1 from public.profiles p where p.username = v_username) loop
+    v_username := v_username || floor(random() * 10)::integer;
+  end loop;
+
+  insert into public.profiles (id, username, display_name, avatar_url)
+  values (new.id, v_username, v_username, 'profiles/profiles/onefree.png')
+  on conflict (id) do nothing;
+
+  insert into public.ac_wallets (user_id, balance, total_earned)
+  values (new.id, v_welcome, v_welcome)
+  on conflict (user_id) do nothing;
+
+  insert into public.ac_transactions
+    (user_id, amount, kind, reason, request_key, balance_after)
+  values
+    (new.id, v_welcome, 'welcome', 'Welcome reward',
+     'welcome:' || new.id::text, v_welcome)
+  on conflict (request_key) do nothing;
+
+  return new;
+end;
+$$;
+
+do $$
+declare
+  v_free_count integer;
+  v_canonical_count integer;
+  v_bad_profiles integer;
+  v_default text;
+begin
+  select count(*) into v_free_count
+    from public.site_assets
+   where asset_type = 'avatar' and required_plan = 'free';
+
+  select count(*) into v_canonical_count
+    from public.site_assets
+   where asset_type = 'avatar'
+     and required_plan = 'free'
+     and enabled
+     and file_url = 'profiles/profiles/onefree.png';
+
+  select count(*) into v_bad_profiles
+    from public.profiles
+   where avatar_url is null
+      or btrim(avatar_url) = ''
+      or lower(btrim(avatar_url)) = 'none'
+      or avatar_url = 'profiles/onefree.png';
+
+  select column_default into v_default
+    from information_schema.columns
+   where table_schema = 'public'
+     and table_name = 'profiles'
+     and column_name = 'avatar_url';
+
+  if v_free_count <> 1 or v_canonical_count <> 1 then
+    raise exception 'Expected one canonical free avatar; free=%, canonical=%',
+      v_free_count, v_canonical_count;
+  end if;
+  if v_bad_profiles <> 0 then
+    raise exception 'Found % missing or legacy profile avatar paths', v_bad_profiles;
+  end if;
+  if v_default is null
+     or v_default not like '%profiles/profiles/onefree.png%'
+  then
+    raise exception 'Unexpected profiles.avatar_url default: %', coalesce(v_default, '(none)');
+  end if;
+  if position(
+       'profiles/profiles/onefree.png'
+       in pg_get_functiondef('public.handle_new_user()'::regprocedure)
+     ) = 0
+  then
+    raise exception 'handle_new_user does not assign the canonical free avatar';
+  end if;
+end;
+$$;
+
+commit;
+
+notify pgrst, 'reload schema';
+
+
+-- ############################################################################
+-- ##  القسم: 46_profile_avatar_packs.sql
+-- ############################################################################
+
+-- ============================================================================
+-- AddonStation Mobile — 46) Replace Profiles and add Profile 2
+--
+-- Generated by tools/build_profile_packs_sql.py from
+-- supabase/profile-packs.json. Do not edit asset rows manually.
+--
+-- Profiles: 24 Epic avatars from the pinned profiles.zip archive.
+-- Profile 2: 11 Legendary avatars from the pinned porfile.zip archive.
+-- The canonical onefree.png remains the only free/default avatar.
+--
+-- Upload the manifest files to site-assets before applying this migration.
+-- A storage hash/size assertion prevents broken database rows.
+-- Safe to re-run: both paid collections are replaced atomically.
+-- ============================================================================
+
+begin;
+
+alter table public.site_assets add column if not exists collection text;
+alter table public.site_assets add column if not exists collection_order int not null default 0;
+
+-- Preserve and normalize the sole free avatar outside either paid pack.
+insert into public.site_assets
+  (asset_type, name, file_url, sticker_pack, required_plan, animated, enabled,
+   collection, collection_order, sort_order)
+values
+  ('avatar', 'Default Free Avatar', 'profiles/profiles/onefree.png', null, 'free', false, true,
+   'Default', 1, 1)
+on conflict (file_url) do update
+  set asset_type = 'avatar',
+      name = 'Default Free Avatar',
+      sticker_pack = null,
+      required_plan = 'free',
+      animated = false,
+      enabled = true,
+      collection = 'Default',
+      collection_order = 1,
+      sort_order = 1;
+
+-- Remove every prior member/stale object row from the two package namespaces.
+-- onefree.png is explicitly excluded because it is the account default, not a pack item.
+delete from public.site_assets
+ where asset_type = 'avatar'
+   and file_url <> 'profiles/profiles/onefree.png'
+   and (
+     collection in ('Profiles', 'Profile 2')
+     or file_url like 'profiles/profiles/%'
+     or file_url like 'profiles/profile-2/%'
+   );
+
+insert into public.site_assets
+  (asset_type, name, file_url, sticker_pack, required_plan, animated, enabled,
+   collection, collection_order, sort_order)
+values
+  ('avatar', 'Aelx With TheBoat', 'profiles/profiles/aelx-with-theboat.jpg', null, 'epic', false, true, 'Profiles', 2, 1),
+  ('avatar', 'Axolotl Aquarium', 'profiles/profiles/axolotl-aquarium.jpg', null, 'epic', false, true, 'Profiles', 2, 2),
+  ('avatar', 'Cheems Doge Minecraft', 'profiles/profiles/cheems-doge-minecraft.jpg', null, 'epic', false, true, 'Profiles', 2, 3),
+  ('avatar', 'Cherry Blossom Biom', 'profiles/profiles/cherry-blossom-biom.jpg', null, 'epic', false, true, 'Profiles', 2, 4),
+  ('avatar', 'Cozy Furnace Corner', 'profiles/profiles/cozy-furnace-corner.jpg', null, 'epic', false, true, 'Profiles', 2, 5),
+  ('avatar', 'Cute Enderman Girl', 'profiles/profiles/cute-enderman-girl.jpg', null, 'epic', false, true, 'Profiles', 2, 6),
+  ('avatar', 'Cute Girl', 'profiles/profiles/cute-girl.jpg', null, 'epic', false, true, 'Profiles', 2, 7),
+  ('avatar', 'Diamond Armor Glow', 'profiles/profiles/diamond-armor-glow.jpg', null, 'epic', false, true, 'Profiles', 2, 8),
+  ('avatar', 'Giant Minecraft Cookie', 'profiles/profiles/giant-minecraft-cookie.jpg', null, 'epic', false, true, 'Profiles', 2, 9),
+  ('avatar', 'Gigachad Doge Minecraft', 'profiles/profiles/gigachad-doge-minecraft.jpg', null, 'epic', false, true, 'Profiles', 2, 10),
+  ('avatar', 'Golden Helmet Steve', 'profiles/profiles/golden-helmet-steve.jpg', null, 'epic', false, true, 'Profiles', 2, 11),
+  ('avatar', 'Lush Cave Axolotls', 'profiles/profiles/lush-cave-axolotls.jpg', null, 'epic', false, true, 'Profiles', 2, 12),
+  ('avatar', 'Minecraft Bed Explosion', 'profiles/profiles/minecraft-bed-explosion.jpg', null, 'epic', false, true, 'Profiles', 2, 13),
+  ('avatar', 'Minecraft Cat Meme', 'profiles/profiles/minecraft-cat-meme.jpg', null, 'epic', false, true, 'Profiles', 2, 14),
+  ('avatar', 'Minecraft Cute Wolf', 'profiles/profiles/minecraft-cute-wolf.jpg', null, 'epic', false, true, 'Profiles', 2, 15),
+  ('avatar', 'Minecraft Music Disc', 'profiles/profiles/minecraft-music-disc.jpg', null, 'epic', false, true, 'Profiles', 2, 16),
+  ('avatar', 'Minecraft Rose Painting', 'profiles/profiles/minecraft-rose-painting.jpg', null, 'epic', false, true, 'Profiles', 2, 17),
+  ('avatar', 'Minecraft Warden Cave', 'profiles/profiles/minecraft-warden-cave.jpg', null, 'epic', false, true, 'Profiles', 2, 18),
+  ('avatar', 'Netherite Armor Steve', 'profiles/profiles/netherite-armor-steve.jpg', null, 'epic', false, true, 'Profiles', 2, 19),
+  ('avatar', 'Netherite Warrior Spear', 'profiles/profiles/netherite-warrior-spear.jpg', null, 'epic', false, true, 'Profiles', 2, 20),
+  ('avatar', 'Steve Mining Creeper', 'profiles/profiles/steve-mining-creeper.jpg', null, 'epic', false, true, 'Profiles', 2, 21),
+  ('avatar', 'Tall Enderman Girl', 'profiles/profiles/tall-enderman-girl.jpg', null, 'epic', false, true, 'Profiles', 2, 22),
+  ('avatar', 'Waguri-chan Is Minecraft', 'profiles/profiles/waguri-chan-is-minecraft.jpg', null, 'epic', false, true, 'Profiles', 2, 23),
+  ('avatar', 'Zombie Climbing Ladder', 'profiles/profiles/zombie-climbing-ladder.jpg', null, 'epic', false, true, 'Profiles', 2, 24),
+  ('avatar', 'Profile 2 1', 'profiles/profile-2/024d6c2e-1313-427c-b3d2-9d745a8c7240.jpeg', null, 'legendary', false, true, 'Profile 2', 3, 1),
+  ('avatar', 'Profile 2 2', 'profiles/profile-2/0b051321-02fa-4061-b772-ffbf3085109b.jpeg', null, 'legendary', false, true, 'Profile 2', 3, 2),
+  ('avatar', 'Profile 2 3', 'profiles/profile-2/0b1ca480-8465-4860-a800-fec2e1f9d0f6.jpeg', null, 'legendary', false, true, 'Profile 2', 3, 3),
+  ('avatar', 'Profile 2 4', 'profiles/profile-2/32205688-2867-485c-b465-dccba70e34de.jpeg', null, 'legendary', false, true, 'Profile 2', 3, 4),
+  ('avatar', 'Profile 2 5', 'profiles/profile-2/535d9fb5-800d-4fb6-ba33-715c8b5d6698.jpeg', null, 'legendary', false, true, 'Profile 2', 3, 5),
+  ('avatar', 'Profile 2 6', 'profiles/profile-2/548059f8-d6b3-4e2b-b42c-d7ce8610eb13.jpeg', null, 'legendary', false, true, 'Profile 2', 3, 6),
+  ('avatar', 'Profile 2 7', 'profiles/profile-2/54c7efe5-4104-4e0e-9e35-727bb93c686c.jpeg', null, 'legendary', false, true, 'Profile 2', 3, 7),
+  ('avatar', 'Profile 2 8', 'profiles/profile-2/8b1edb7a-8351-4bdd-9a74-d0a460bf25ee.jpeg', null, 'legendary', false, true, 'Profile 2', 3, 8),
+  ('avatar', 'Profile 2 9', 'profiles/profile-2/9a837664-9d9b-44fe-a505-6c107be15fad.jpeg', null, 'legendary', false, true, 'Profile 2', 3, 9),
+  ('avatar', 'Profile 2 10', 'profiles/profile-2/b78f5e0f-0328-44ac-bfea-072214c17446.jpeg', null, 'legendary', false, true, 'Profile 2', 3, 10),
+  ('avatar', 'Kermit The Frog', 'profiles/profile-2/profile-kermit-the-frog.webp', null, 'legendary', false, true, 'Profile 2', 3, 11)
+on conflict (file_url) do update
+  set asset_type = excluded.asset_type,
+      name = excluded.name,
+      sticker_pack = excluded.sticker_pack,
+      required_plan = excluded.required_plan,
+      animated = excluded.animated,
+      enabled = excluded.enabled,
+      collection = excluded.collection,
+      collection_order = excluded.collection_order,
+      sort_order = excluded.sort_order;
+
+-- Remove stale rows even if a former migration assigned them another collection label.
+delete from public.site_assets
+ where asset_type = 'avatar'
+   and file_url <> 'profiles/profiles/onefree.png'
+   and (file_url like 'profiles/profiles/%' or file_url like 'profiles/profile-2/%')
+   and file_url not in (
+    'profiles/profiles/aelx-with-theboat.jpg',
+    'profiles/profiles/axolotl-aquarium.jpg',
+    'profiles/profiles/cheems-doge-minecraft.jpg',
+    'profiles/profiles/cherry-blossom-biom.jpg',
+    'profiles/profiles/cozy-furnace-corner.jpg',
+    'profiles/profiles/cute-enderman-girl.jpg',
+    'profiles/profiles/cute-girl.jpg',
+    'profiles/profiles/diamond-armor-glow.jpg',
+    'profiles/profiles/giant-minecraft-cookie.jpg',
+    'profiles/profiles/gigachad-doge-minecraft.jpg',
+    'profiles/profiles/golden-helmet-steve.jpg',
+    'profiles/profiles/lush-cave-axolotls.jpg',
+    'profiles/profiles/minecraft-bed-explosion.jpg',
+    'profiles/profiles/minecraft-cat-meme.jpg',
+    'profiles/profiles/minecraft-cute-wolf.jpg',
+    'profiles/profiles/minecraft-music-disc.jpg',
+    'profiles/profiles/minecraft-rose-painting.jpg',
+    'profiles/profiles/minecraft-warden-cave.jpg',
+    'profiles/profiles/netherite-armor-steve.jpg',
+    'profiles/profiles/netherite-warrior-spear.jpg',
+    'profiles/profiles/steve-mining-creeper.jpg',
+    'profiles/profiles/tall-enderman-girl.jpg',
+    'profiles/profiles/waguri-chan-is-minecraft.jpg',
+    'profiles/profiles/zombie-climbing-ladder.jpg',
+    'profiles/profile-2/024d6c2e-1313-427c-b3d2-9d745a8c7240.jpeg',
+    'profiles/profile-2/0b051321-02fa-4061-b772-ffbf3085109b.jpeg',
+    'profiles/profile-2/0b1ca480-8465-4860-a800-fec2e1f9d0f6.jpeg',
+    'profiles/profile-2/32205688-2867-485c-b465-dccba70e34de.jpeg',
+    'profiles/profile-2/535d9fb5-800d-4fb6-ba33-715c8b5d6698.jpeg',
+    'profiles/profile-2/548059f8-d6b3-4e2b-b42c-d7ce8610eb13.jpeg',
+    'profiles/profile-2/54c7efe5-4104-4e0e-9e35-727bb93c686c.jpeg',
+    'profiles/profile-2/8b1edb7a-8351-4bdd-9a74-d0a460bf25ee.jpeg',
+    'profiles/profile-2/9a837664-9d9b-44fe-a505-6c107be15fad.jpeg',
+    'profiles/profile-2/b78f5e0f-0328-44ac-bfea-072214c17446.jpeg',
+    'profiles/profile-2/profile-kermit-the-frog.webp'
+   );
+
+do $$
+declare
+  profiles_count int;
+  profile2_count int;
+  free_count int;
+  missing_storage_count int;
+begin
+  select count(*) into profiles_count
+    from public.site_assets
+   where asset_type = 'avatar' and enabled and collection = 'Profiles'
+     and required_plan = 'epic';
+  if profiles_count <> 24 then
+    raise exception 'Profiles must contain exactly 24 enabled Epic avatars; found %', profiles_count;
+  end if;
+
+  select count(*) into profile2_count
+    from public.site_assets
+   where asset_type = 'avatar' and enabled and collection = 'Profile 2'
+     and required_plan = 'legendary';
+  if profile2_count <> 11 then
+    raise exception 'Profile 2 must contain exactly 11 enabled Legendary avatars; found %', profile2_count;
+  end if;
+
+  if exists (
+    select 1 from public.site_assets
+     where asset_type = 'avatar' and collection = 'Profiles'
+       and (not enabled or required_plan <> 'epic')
+  ) then
+    raise exception 'Profiles contains a disabled or non-Epic avatar';
+  end if;
+
+  if exists (
+    select 1 from public.site_assets
+     where asset_type = 'avatar' and collection = 'Profile 2'
+       and (not enabled or required_plan <> 'legendary')
+  ) then
+    raise exception 'Profile 2 contains a disabled or non-Legendary avatar';
+  end if;
+
+  select count(*) into free_count
+    from public.site_assets
+   where asset_type = 'avatar' and enabled and required_plan = 'free';
+  if free_count <> 1 or not exists (
+    select 1 from public.site_assets
+     where asset_type = 'avatar' and enabled and required_plan = 'free'
+       and file_url = 'profiles/profiles/onefree.png' and collection = 'Default'
+  ) then
+    raise exception 'onefree.png must remain the sole enabled free avatar';
+  end if;
+
+  select count(*) into missing_storage_count
+    from (values
+      ('profiles/profiles/aelx-with-theboat.jpg', 33044::bigint, '63fc3a53915d74a7d0f06112db68f065'),
+      ('profiles/profiles/axolotl-aquarium.jpg', 37128::bigint, '0081f82013a08a0b8f5ad64c73863a86'),
+      ('profiles/profiles/cheems-doge-minecraft.jpg', 31644::bigint, 'afee5ca9f1fcff025227d33a4a44e7b8'),
+      ('profiles/profiles/cherry-blossom-biom.jpg', 96011::bigint, '057a1b8d69bd082659d1a22c063a1d6f'),
+      ('profiles/profiles/cozy-furnace-corner.jpg', 21514::bigint, 'd3ad10ec1adc2f4a9904a57276512b0d'),
+      ('profiles/profiles/cute-enderman-girl.jpg', 64875::bigint, '25c54c411decd7e8e2b3b3ee0b620be8'),
+      ('profiles/profiles/cute-girl.jpg', 66422::bigint, '1fe12d7fc32cd7a6bf2b63070dd296c9'),
+      ('profiles/profiles/diamond-armor-glow.jpg', 61656::bigint, '636d7a6d8baad317e3756be7de2a18e0'),
+      ('profiles/profiles/giant-minecraft-cookie.jpg', 32051::bigint, '2da12b052ba49c1653e7fabe9c9ca23e'),
+      ('profiles/profiles/gigachad-doge-minecraft.jpg', 29946::bigint, '696ffe9f62541b71edad41b2bab3ef86'),
+      ('profiles/profiles/golden-helmet-steve.jpg', 36724::bigint, '17c4df70c6ec104a1a797e512046b52b'),
+      ('profiles/profiles/lush-cave-axolotls.jpg', 122453::bigint, 'f91309cbe09d57b18fd3c3ec960ac2d6'),
+      ('profiles/profiles/minecraft-bed-explosion.jpg', 36959::bigint, '457733fcab398fdea161ffef2ab3f2eb'),
+      ('profiles/profiles/minecraft-cat-meme.jpg', 44677::bigint, '289a55a36289bd1a6e7f6c1598fcbdbd'),
+      ('profiles/profiles/minecraft-cute-wolf.jpg', 75583::bigint, 'c23e961beb8d918b0bd0a45548c18376'),
+      ('profiles/profiles/minecraft-music-disc.jpg', 25021::bigint, '1a0c4e1ba3bddf2d09fe4b2694b70fe8'),
+      ('profiles/profiles/minecraft-rose-painting.jpg', 11620::bigint, 'd7a23bf0b19eee1e197cf458dd748e7c'),
+      ('profiles/profiles/minecraft-warden-cave.jpg', 42397::bigint, 'b0a4845dd4d710286277e1f0086652a5'),
+      ('profiles/profiles/netherite-armor-steve.jpg', 30665::bigint, 'c65bd78c6f371723a5241ad3966dc291'),
+      ('profiles/profiles/netherite-warrior-spear.jpg', 26352::bigint, 'f4d92e6688c81efc6c93b71ebb686ee2'),
+      ('profiles/profiles/steve-mining-creeper.jpg', 66312::bigint, '961ffa90a54fac2bdc0ecea9119f098d'),
+      ('profiles/profiles/tall-enderman-girl.jpg', 84906::bigint, 'fa4cc5ae650752a7f4af7e298ad97c62'),
+      ('profiles/profiles/waguri-chan-is-minecraft.jpg', 88758::bigint, 'db0babb25fccfcbce9fe25c2a108104f'),
+      ('profiles/profiles/zombie-climbing-ladder.jpg', 58574::bigint, 'ca40843b3393dbe878453deb78285ee3'),
+      ('profiles/profile-2/024d6c2e-1313-427c-b3d2-9d745a8c7240.jpeg', 112545::bigint, 'eef6a7ab0fb7752a9926834f6a7ac1b5'),
+      ('profiles/profile-2/0b051321-02fa-4061-b772-ffbf3085109b.jpeg', 72863::bigint, '40a5f963ac976adf25434dca79b81f2d'),
+      ('profiles/profile-2/0b1ca480-8465-4860-a800-fec2e1f9d0f6.jpeg', 52334::bigint, 'a77455b6eca25d103a2722c6759bd442'),
+      ('profiles/profile-2/32205688-2867-485c-b465-dccba70e34de.jpeg', 86939::bigint, '65dde7fac9633f9db3e518915817ef59'),
+      ('profiles/profile-2/535d9fb5-800d-4fb6-ba33-715c8b5d6698.jpeg', 139109::bigint, '173c1ebb34d8526d92164fb3ef4aae2e'),
+      ('profiles/profile-2/548059f8-d6b3-4e2b-b42c-d7ce8610eb13.jpeg', 44132::bigint, '554f6c65c5c94966d27f458e62a2f90a'),
+      ('profiles/profile-2/54c7efe5-4104-4e0e-9e35-727bb93c686c.jpeg', 49528::bigint, '391dcb969193f7a14f35b82250d3893f'),
+      ('profiles/profile-2/8b1edb7a-8351-4bdd-9a74-d0a460bf25ee.jpeg', 64232::bigint, 'baf9beb88a59869c23864bbf6d733840'),
+      ('profiles/profile-2/9a837664-9d9b-44fe-a505-6c107be15fad.jpeg', 59008::bigint, '1551ff9c0a95546d3556748e5b1a6779'),
+      ('profiles/profile-2/b78f5e0f-0328-44ac-bfea-072214c17446.jpeg', 46237::bigint, 'cc20dcaaa4f38f00f1f3251bf508c57a'),
+      ('profiles/profile-2/profile-kermit-the-frog.webp', 17262::bigint, 'e3473532f96faf7d0431b1a18a585a5a')
+    ) as expected(path, bytes, md5)
+    left join storage.objects object
+      on object.bucket_id = 'site-assets' and object.name = expected.path
+   where object.id is null
+      or coalesce((object.metadata ->> 'size')::bigint, -1) <> expected.bytes
+      or trim(both '"' from coalesce(object.metadata ->> 'eTag', '')) <> expected.md5;
+  if missing_storage_count <> 0 then
+    raise exception '% profile pack storage object(s) are absent or do not match the pinned archives', missing_storage_count;
+  end if;
+end
+$$;
+
+commit;
+
+-- Expected: Default/free=1, Profiles/epic=24, Profile 2/legendary=11.
+select collection, required_plan, count(*) as total
+  from public.site_assets
+ where asset_type = 'avatar'
+   and collection in ('Default', 'Profiles', 'Profile 2')
+ group by collection, required_plan, collection_order
+ order by collection_order, collection;
+
+
+-- ############################################################################
+-- ##  القسم: 47_bulk_content_import.sql
+-- ############################################################################
+
+-- ============================================================================
+-- AddonStation Mobile — 47) Safe, atomic bulk content import
+--
+-- The Android admin panel streams a ZIP (up to 1 GiB) locally, uploads each
+-- validated cover/content object with an admin JWT, then calls the RPC below.
+-- This migration provides the atomic database commit, idempotent batch key,
+-- Storage existence/size checks, and an auditable import history.
+-- ============================================================================
+
+begin;
+
+create table if not exists public.content_import_batches (
+  id              uuid primary key,
+  actor_id        uuid not null references public.profiles(id) on delete restrict,
+  archive_name    text not null check (char_length(archive_name) between 1 and 255),
+  archive_size    bigint not null check (archive_size between 1 and 1073741824),
+  archive_sha256  text not null check (archive_sha256 ~ '^[0-9a-f]{64}$'),
+  content_type    text not null check (content_type in ('addon', 'world')),
+  category        text not null check (category in ('adventure','survival','pvp','building','skins','other')),
+  plan            text not null check (plan in ('free','epic','legendary')),
+  item_count      int not null check (item_count between 1 and 200),
+  content_ids     uuid[] not null,
+  manifest        jsonb not null,
+  result          jsonb not null,
+  created_at      timestamptz not null default now()
+);
+
+create index if not exists content_import_batches_actor_idx
+  on public.content_import_batches(actor_id, created_at desc);
+
+alter table public.content_import_batches enable row level security;
+
+drop policy if exists content_import_batches_admin_read on public.content_import_batches;
+create policy content_import_batches_admin_read
+  on public.content_import_batches
+  for select
+  to authenticated
+  using (public.is_admin());
+
+revoke all on table public.content_import_batches from public, anon, authenticated;
+grant select on table public.content_import_batches to authenticated;
+
+create or replace function public.admin_bulk_import_content(
+  p_batch_id uuid,
+  p_archive_name text,
+  p_archive_size bigint,
+  p_archive_sha256 text,
+  p_content_type text,
+  p_category text,
+  p_plan text,
+  p_ac_price int,
+  p_is_published boolean,
+  p_items jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, storage
+as $$
+declare
+  v_uid             uuid := auth.uid();
+  v_batch_text      text;
+  v_count           int;
+  v_existing        public.content_import_batches%rowtype;
+  v_item            jsonb;
+  v_ordinal         bigint;
+  v_source          text;
+  v_title           text;
+  v_description     text;
+  v_version         text;
+  v_cover_path      text;
+  v_file_path       text;
+  v_file_size_text  text;
+  v_file_size       bigint;
+  v_total_file_size bigint := 0;
+  v_file_sha256     text;
+  v_storage_size    bigint;
+  v_slug_base       text;
+  v_slug            text;
+  v_content_id      uuid;
+  v_content_ids     uuid[] := array[]::uuid[];
+  v_seen_sources    text[] := array[]::text[];
+  v_seen_files      text[] := array[]::text[];
+  v_seen_covers     text[] := array[]::text[];
+  v_result_items    jsonb := '[]'::jsonb;
+  v_result          jsonb;
+begin
+  if v_uid is null then
+    return jsonb_build_object('ok', false, 'message', 'sign_in_required');
+  end if;
+  if not public.is_admin() then
+    return jsonb_build_object('ok', false, 'message', 'not_admin');
+  end if;
+  if p_batch_id is null then
+    return jsonb_build_object('ok', false, 'message', 'bulk_batch_id_required');
+  end if;
+
+  v_batch_text := p_batch_id::text;
+  perform pg_advisory_xact_lock(hashtextextended(v_batch_text, 0));
+
+  select * into v_existing
+    from public.content_import_batches
+   where id = p_batch_id;
+  if found then
+    if v_existing.actor_id <> v_uid
+       or v_existing.archive_sha256 <> lower(coalesce(p_archive_sha256, '')) then
+      return jsonb_build_object('ok', false, 'message', 'bulk_batch_conflict');
+    end if;
+    return v_existing.result;
+  end if;
+
+  if coalesce(char_length(btrim(p_archive_name)), 0) not between 1 and 255 then
+    return jsonb_build_object('ok', false, 'message', 'bulk_archive_name_invalid');
+  end if;
+  if coalesce(p_archive_size, 0) not between 1 and 1073741824 then
+    return jsonb_build_object('ok', false, 'message', 'bulk_archive_size_invalid');
+  end if;
+  if lower(coalesce(p_archive_sha256, '')) !~ '^[0-9a-f]{64}$' then
+    return jsonb_build_object('ok', false, 'message', 'bulk_archive_hash_invalid');
+  end if;
+  if p_content_type is null or p_content_type not in ('addon', 'world') then
+    return jsonb_build_object('ok', false, 'message', 'bulk_content_type_invalid');
+  end if;
+  if p_category is null or p_category not in ('adventure','survival','pvp','building','skins','other') then
+    return jsonb_build_object('ok', false, 'message', 'bulk_category_invalid');
+  end if;
+  if p_plan is null or p_plan not in ('free','epic','legendary') then
+    return jsonb_build_object('ok', false, 'message', 'bulk_plan_invalid');
+  end if;
+  if coalesce(p_ac_price, 0) < 0 then
+    return jsonb_build_object('ok', false, 'message', 'bulk_ac_price_invalid');
+  end if;
+  if coalesce(jsonb_typeof(p_items), 'null') <> 'array'
+     or pg_column_size(p_items) > 1048576 then
+    return jsonb_build_object('ok', false, 'message', 'bulk_items_invalid');
+  end if;
+
+  v_count := jsonb_array_length(p_items);
+  if v_count not between 1 and 200 then
+    return jsonb_build_object('ok', false, 'message', 'bulk_item_count_invalid');
+  end if;
+
+  for v_item, v_ordinal in
+    select value, ordinality
+      from jsonb_array_elements(p_items) with ordinality
+  loop
+    if jsonb_typeof(v_item) <> 'object' then
+      return jsonb_build_object('ok', false, 'message', 'bulk_item_invalid', 'item', v_ordinal);
+    end if;
+
+    v_source := btrim(coalesce(v_item ->> 'source_folder', ''));
+    v_title := btrim(coalesce(v_item ->> 'title', ''));
+    v_description := nullif(left(btrim(coalesce(v_item ->> 'description', '')), 5000), '');
+    v_version := nullif(left(btrim(coalesce(v_item ->> 'version', '')), 40), '');
+    v_cover_path := btrim(coalesce(v_item ->> 'cover_path', ''));
+    v_file_path := btrim(coalesce(v_item ->> 'file_path', ''));
+    v_file_size_text := btrim(coalesce(v_item ->> 'file_size', ''));
+    v_file_sha256 := lower(btrim(coalesce(v_item ->> 'file_sha256', '')));
+
+    if char_length(v_source) not between 1 and 300
+       or v_source like '/%'
+       or v_source ~ '(^|/)\.\.(/|$)'
+       or position(chr(92) in v_source) > 0 then
+      return jsonb_build_object('ok', false, 'message', 'bulk_source_folder_invalid', 'item', v_ordinal);
+    end if;
+    if lower(v_source) = any(v_seen_sources) then
+      return jsonb_build_object('ok', false, 'message', 'bulk_source_folder_duplicate', 'item', v_ordinal);
+    end if;
+    v_seen_sources := array_append(v_seen_sources, lower(v_source));
+
+    if char_length(v_title) not between 1 and 120 then
+      return jsonb_build_object('ok', false, 'message', 'bulk_title_invalid', 'item', v_ordinal);
+    end if;
+    if v_file_size_text !~ '^[0-9]{1,12}$' then
+      return jsonb_build_object('ok', false, 'message', 'bulk_file_size_invalid', 'item', v_ordinal);
+    end if;
+    v_file_size := v_file_size_text::bigint;
+    if v_file_size not between 1 and 536870912 then
+      return jsonb_build_object('ok', false, 'message', 'bulk_file_size_invalid', 'item', v_ordinal);
+    end if;
+    v_total_file_size := v_total_file_size + v_file_size;
+    if v_total_file_size > 8589934592 then
+      return jsonb_build_object('ok', false, 'message', 'bulk_total_size_invalid', 'item', v_ordinal);
+    end if;
+    if v_file_sha256 !~ '^[0-9a-f]{64}$' then
+      return jsonb_build_object('ok', false, 'message', 'bulk_file_hash_invalid', 'item', v_ordinal);
+    end if;
+
+    if char_length(v_file_path) not between 45 and 500
+       or v_file_path not like ('bulk/' || v_batch_text || '/%')
+       or v_file_path like '%..%'
+       or v_file_path like '%//%'
+       or position(chr(92) in v_file_path) > 0 then
+      return jsonb_build_object('ok', false, 'message', 'bulk_file_path_invalid', 'item', v_ordinal);
+    end if;
+    if char_length(v_cover_path) not between 51 and 500
+       or v_cover_path not like ('items/bulk/' || v_batch_text || '/%')
+       or v_cover_path like '%..%'
+       or v_cover_path like '%//%'
+       or position(chr(92) in v_cover_path) > 0 then
+      return jsonb_build_object('ok', false, 'message', 'bulk_cover_path_invalid', 'item', v_ordinal);
+    end if;
+    if lower(v_file_path) = any(v_seen_files)
+       or lower(v_cover_path) = any(v_seen_covers) then
+      return jsonb_build_object('ok', false, 'message', 'bulk_object_path_duplicate', 'item', v_ordinal);
+    end if;
+    if (p_content_type = 'addon' and lower(v_file_path) !~ '\.(mcaddon|mcpack|zip)$')
+       or (p_content_type = 'world' and lower(v_file_path) !~ '\.(mcworld|zip)$')
+       or lower(v_cover_path) !~ '/cover\.jpg$' then
+      return jsonb_build_object('ok', false, 'message', 'bulk_object_extension_invalid', 'item', v_ordinal);
+    end if;
+    v_seen_files := array_append(v_seen_files, lower(v_file_path));
+    v_seen_covers := array_append(v_seen_covers, lower(v_cover_path));
+
+    select (o.metadata ->> 'size')::bigint into v_storage_size
+      from storage.objects o
+     where o.bucket_id = 'content-files'
+       and o.name = v_file_path;
+    if not found or v_storage_size is distinct from v_file_size then
+      return jsonb_build_object('ok', false, 'message', 'bulk_content_object_mismatch', 'item', v_ordinal);
+    end if;
+
+    if not exists (
+      select 1 from storage.objects o
+       where o.bucket_id = 'site-assets'
+         and o.name = v_cover_path
+         and coalesce((o.metadata ->> 'size')::bigint, 0) between 1 and 5242880
+    ) then
+      return jsonb_build_object('ok', false, 'message', 'bulk_cover_object_missing', 'item', v_ordinal);
+    end if;
+
+  end loop;
+
+  -- Validation is deliberately completed for every manifest entry before the
+  -- first content row is inserted. Structured validation failures therefore
+  -- cannot leave a partially imported batch behind.
+  for v_item, v_ordinal in
+    select value, ordinality
+      from jsonb_array_elements(p_items) with ordinality
+  loop
+    v_source := btrim(v_item ->> 'source_folder');
+    v_title := btrim(v_item ->> 'title');
+    v_description := nullif(left(btrim(coalesce(v_item ->> 'description', '')), 5000), '');
+    v_version := nullif(left(btrim(coalesce(v_item ->> 'version', '')), 40), '');
+    v_cover_path := btrim(v_item ->> 'cover_path');
+    v_file_path := btrim(v_item ->> 'file_path');
+    v_file_size := (btrim(v_item ->> 'file_size'))::bigint;
+    v_file_sha256 := lower(btrim(v_item ->> 'file_sha256'));
+
+    v_slug_base := trim(both '-' from lower(regexp_replace(v_title, '[^[:alnum:]]+', '-', 'g')));
+    if v_slug_base = '' then v_slug_base := 'content'; end if;
+    v_slug := left(v_slug_base, 70) || '-' || left(replace(v_batch_text, '-', ''), 10) || '-' || v_ordinal::text;
+
+    insert into public.content_items(
+      title, slug, description, content_type, category, plan, version,
+      cover_url, file_path, file_size, ac_price,
+      is_published, is_featured, is_exclusive, created_by
+    ) values (
+      v_title, v_slug, v_description, p_content_type, p_category, p_plan, v_version,
+      v_cover_path, v_file_path, v_file_size, coalesce(p_ac_price, 0),
+      coalesce(p_is_published, false), false, false, v_uid
+    )
+    returning id into v_content_id;
+
+    v_content_ids := array_append(v_content_ids, v_content_id);
+    v_result_items := v_result_items || jsonb_build_array(jsonb_build_object(
+      'id', v_content_id,
+      'title', v_title,
+      'source_folder', v_source,
+      'file_path', v_file_path,
+      'cover_path', v_cover_path,
+      'file_size', v_file_size,
+      'file_sha256', v_file_sha256
+    ));
+  end loop;
+
+  v_result := jsonb_build_object(
+    'ok', true,
+    'batch_id', p_batch_id,
+    'count', v_count,
+    'items', v_result_items
+  );
+
+  insert into public.content_import_batches(
+    id, actor_id, archive_name, archive_size, archive_sha256,
+    content_type, category, plan, item_count, content_ids, manifest, result
+  ) values (
+    p_batch_id, v_uid, btrim(p_archive_name), p_archive_size, lower(p_archive_sha256),
+    p_content_type, p_category, p_plan, v_count, v_content_ids, p_items, v_result
+  );
+
+  insert into public.admin_audit_log(actor_id, action, target_type, target_id, details)
+  values (
+    v_uid,
+    'content_bulk_imported',
+    'content_import_batch',
+    p_batch_id::text,
+    jsonb_build_object(
+      'archive_name', btrim(p_archive_name),
+      'archive_size', p_archive_size,
+      'archive_sha256', lower(p_archive_sha256),
+      'content_type', p_content_type,
+      'category', p_category,
+      'plan', p_plan,
+      'count', v_count,
+      'published', coalesce(p_is_published, false)
+    )
+  );
+
+  return v_result;
+end;
+$$;
+
+revoke all on function public.admin_bulk_import_content(
+  uuid, text, bigint, text, text, text, text, int, boolean, jsonb
+) from public, anon;
+grant execute on function public.admin_bulk_import_content(
+  uuid, text, bigint, text, text, text, text, int, boolean, jsonb
+) to authenticated;
+
+commit;
+
+notify pgrst, 'reload schema';
+
+
+-- ############################################################################
+-- ##  القسم: 48_creator_verification_and_featured_banners.sql
+-- ############################################################################
+
+-- ============================================================================
+-- AddonStation Mobile — creator verification pack and featured profile assets
+--
+-- This migration:
+--   * adds a creator-only catalog tier and enforces it in RLS and profile RPCs;
+--   * removes every Nature banner and replaces missing/Nature profile banners
+--     with the single free default banner;
+--   * registers the new Featured banners and three Animated profile pictures;
+--   * replaces legacy verification duplicates with one creator-only pack,
+--     except Twitterverified and Verified Blue, which are admin-only;
+--   * raises the public image object limit to 10 MiB for the supplied GIFs.
+--
+-- Upload the matching files with tools/deploy_requested_profile_assets.py.
+-- The SQL is idempotent and can be rerun safely.
+-- ============================================================================
+
+begin;
+
+-- ---------------------------------------------------------------------------
+-- 1) Creator-only catalog tier and read policy
+-- ---------------------------------------------------------------------------
+alter table public.site_assets
+  drop constraint if exists site_assets_required_plan_check;
+
+alter table public.site_assets
+  add constraint site_assets_required_plan_check
+  check (required_plan in ('free', 'epic', 'legendary', 'creator', 'admin'));
+
+drop policy if exists assets_read on public.site_assets;
+create policy assets_read on public.site_assets
+  for select using (
+    public.is_admin()
+    or (
+      enabled = true
+      and required_plan not in ('admin', 'creator')
+    )
+    or (
+      enabled = true
+      and required_plan = 'creator'
+      and public.current_role_of() = 'creator'
+    )
+  );
+
+-- The largest supplied animated profile picture is about 7.5 MiB.
+update storage.buckets
+   set file_size_limit = 10485760
+ where id = 'site-assets';
+
+-- ---------------------------------------------------------------------------
+-- 2) Remove Nature and establish one canonical free/default banner
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_default_banner constant text := 'banners/featured/06aa4e3ff6eab5eecad52378a694114a.jpg';
+begin
+  update public.profiles
+     set banner_url = v_default_banner,
+         updated_at = now()
+   where banner_url is null
+      or btrim(banner_url) = ''
+      or banner_url like 'banners/nature/%'
+      or exists (
+        select 1
+          from public.site_assets a
+         where a.asset_type = 'banner'
+           and (a.file_url = public.profiles.banner_url or a.name = public.profiles.banner_url)
+           and (
+             a.file_url like 'banners/nature/%'
+             or lower(coalesce(a.collection, '')) like 'nature%'
+           )
+      );
+
+  delete from public.site_assets
+   where asset_type = 'banner'
+     and (
+       file_url like 'banners/nature/%'
+       or lower(coalesce(collection, '')) like 'nature%'
+     );
+
+  -- No other banner may be free.
+  update public.site_assets
+     set required_plan = 'epic'
+   where asset_type = 'banner'
+     and required_plan = 'free'
+     and file_url <> v_default_banner;
+
+  alter table public.profiles
+    alter column banner_url set default 'banners/featured/06aa4e3ff6eab5eecad52378a694114a.jpg';
+end
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 3) Featured banners: exactly one free default, every other supplied banner
+--    requires Epic. Animated formats remain marked animated.
+-- ---------------------------------------------------------------------------
+insert into public.site_assets (
+  asset_type, name, file_url, required_plan, animated,
+  sort_order, enabled, collection, collection_order
+)
+values
+  ('banner', 'Default Banner', 'banners/featured/06aa4e3ff6eab5eecad52378a694114a.jpg', 'free', false, 1, true, 'Featured', 22),
+  ('banner', 'Featured Banner 01', 'banners/featured/033e72294c7c0ceb6913f47570f6dbc1.jpg', 'epic', false, 2, true, 'Featured', 22),
+  ('banner', 'Featured Banner 02', 'banners/featured/0559559ec27203deaaae999c685e4e34.jpg', 'epic', false, 3, true, 'Featured', 22),
+  ('banner', 'Featured Banner 03', 'banners/featured/0d5cf7852c973310b52d27caebbc3a0e.jpg', 'epic', false, 4, true, 'Featured', 22),
+  ('banner', 'Featured Banner 04', 'banners/featured/0e7bcc376ea3b644dae38e19b04cc867.jpg', 'epic', false, 5, true, 'Featured', 22),
+  ('banner', 'Featured Banner 05', 'banners/featured/146072c42f732ede7d30af1be84d01c0.jpg', 'epic', false, 6, true, 'Featured', 22),
+  ('banner', 'Featured Banner 06', 'banners/featured/15d168d25632cfaa51fab80b586ff7b2.jpg', 'epic', false, 7, true, 'Featured', 22),
+  ('banner', 'Featured Banner 07', 'banners/featured/16bec9a832a1b90ca555c363c4837401.jpg', 'epic', false, 8, true, 'Featured', 22),
+  ('banner', 'Featured Banner 08', 'banners/featured/2107e6d162a8bd983e45612eab08822f.jpg', 'epic', false, 9, true, 'Featured', 22),
+  ('banner', 'Featured Banner 09', 'banners/featured/246e40182865cb70d43fa69f79576f5a.jpg', 'epic', false, 10, true, 'Featured', 22),
+  ('banner', 'Featured Banner 10', 'banners/featured/26fe63c20193c74b57183a058ee321e5.jpg', 'epic', false, 11, true, 'Featured', 22),
+  ('banner', 'Featured Banner 11', 'banners/featured/404d66f8b76c24057325a49b64427ef5.jpg', 'epic', false, 12, true, 'Featured', 22),
+  ('banner', 'Featured Banner 12', 'banners/featured/60cb2c6d2bb3ece37fa9f7e1fdccdef2.jpg', 'epic', false, 13, true, 'Featured', 22),
+  ('banner', 'Featured Banner 13', 'banners/featured/688e447b12909607c988197eb8e2e819.jpg', 'epic', false, 14, true, 'Featured', 22),
+  ('banner', 'Featured Banner 14', 'banners/featured/7103078dcc0550fb85ad3126b17686f4.jpg', 'epic', false, 15, true, 'Featured', 22),
+  ('banner', 'Featured Banner 15', 'banners/featured/71e0eefd21a78b260924bfb6c055c2b2.jpg', 'epic', false, 16, true, 'Featured', 22),
+  ('banner', 'Featured Banner 16', 'banners/featured/77e3e3a1802f5c8ade684d03eb28e8a2.jpg', 'epic', false, 17, true, 'Featured', 22),
+  ('banner', 'Featured Banner 17', 'banners/featured/933f45462954966f2af3fed2053c70e2.jpg', 'epic', false, 18, true, 'Featured', 22),
+  ('banner', 'Featured Banner 18', 'banners/featured/a22a441f7a71c1d0d517a4c1caed12e8.jpg', 'epic', false, 19, true, 'Featured', 22),
+  ('banner', 'Featured Banner 19', 'banners/featured/b4c9daa33946ff3f4f285a46c3398980.png', 'epic', false, 20, true, 'Featured', 22),
+  ('banner', 'Featured Banner 20', 'banners/featured/bbfa6c2a24e75048585431229846cba6.jpg', 'epic', false, 21, true, 'Featured', 22),
+  ('banner', 'Featured Banner 21', 'banners/featured/c9cba4a4fe7c3790f347853d8eceb5ca.jpg', 'epic', false, 22, true, 'Featured', 22),
+  ('banner', 'Featured Banner 22', 'banners/featured/cdefeac0a46e4eb3a2f1db4f05f5ab1a.jpg', 'epic', false, 23, true, 'Featured', 22),
+  ('banner', 'Featured Banner 23', 'banners/featured/d32ef64138ed622d6c8ed3b3f7b1096a.jpg', 'epic', false, 24, true, 'Featured', 22),
+  ('banner', 'Featured Banner 24', 'banners/featured/dc3ecdab0fa15f3bd29d1e20718648e6.gif', 'epic', true, 25, true, 'Featured', 22),
+  ('banner', 'Featured Banner 25', 'banners/featured/e25aaf29ef9d1f5cb5a122c240d75e28.jpg', 'epic', false, 26, true, 'Featured', 22),
+  ('banner', 'Featured Banner 26', 'banners/featured/ec81643ed29ad01f9fb29035a5cd7901.jpg', 'epic', false, 27, true, 'Featured', 22),
+  ('banner', 'Featured Banner 27', 'banners/featured/fb49068c8de7e8232613b4996aeb477e.jpg', 'epic', false, 28, true, 'Featured', 22),
+  ('banner', 'Featured Banner 28', 'banners/featured/fec1f9dcc3e7cd68f38ec231a3f33b72.jpg', 'epic', false, 29, true, 'Featured', 22),
+  ('banner', 'Featured Banner 29', 'banners/featured/giphy-1.gif', 'epic', true, 30, true, 'Featured', 22),
+  ('banner', 'Featured Banner 30', 'banners/featured/giphy-1.webp', 'epic', true, 31, true, 'Featured', 22),
+  ('banner', 'Featured Banner 31', 'banners/featured/giphy_s-1.gif', 'epic', true, 32, true, 'Featured', 22)
+on conflict (file_url) do update set
+  asset_type = excluded.asset_type,
+  name = excluded.name,
+  required_plan = excluded.required_plan,
+  animated = excluded.animated,
+  sort_order = excluded.sort_order,
+  enabled = true,
+  collection = excluded.collection,
+  collection_order = excluded.collection_order;
+
+-- ---------------------------------------------------------------------------
+-- 4) Three supplied GIFs belong to the existing Animated profile collection
+-- ---------------------------------------------------------------------------
+insert into public.site_assets (
+  asset_type, name, file_url, required_plan, animated,
+  sort_order, enabled, collection, collection_order
+)
+values
+  ('avatar', 'Animated Giphy 1', 'profiles/animated/giphy.gif', 'legendary', true, 124, true, 'Animated', 11),
+  ('avatar', 'Animated Giphy 2', 'profiles/animated/giphy-2.gif', 'legendary', true, 125, true, 'Animated', 11),
+  ('avatar', 'Animated Giphy 3', 'profiles/animated/giphy-3.gif', 'legendary', true, 126, true, 'Animated', 11)
+on conflict (file_url) do update set
+  asset_type = excluded.asset_type,
+  name = excluded.name,
+  required_plan = excluded.required_plan,
+  animated = true,
+  sort_order = excluded.sort_order,
+  enabled = true,
+  collection = excluded.collection,
+  collection_order = excluded.collection_order;
+
+-- ---------------------------------------------------------------------------
+-- 5) Verification pack. Delete legacy rows by filename/name first so an old
+--    unrestricted copy can never remain visible beside the restricted row.
+-- ---------------------------------------------------------------------------
+delete from public.site_assets
+ where asset_type = 'item'
+   and (
+     lower(regexp_replace(file_url, '^.*/', '')) = any (array[
+       '1422-black-verify.gif', '14586-babypinkcheck.gif',
+       '16841-twitterverified.png', '2872_purpleverify.png',
+       '3488-brown-checkmark.gif', '4166-orange-verification.gif',
+       '4166-yellow-verification.gif', '4650_pinkverify.png',
+       '4731-verified-red.gif', '4869-verify-light-pink.gif',
+       '5647-verifyed-pink.gif', '5707-lightpurplecheck.gif',
+       '60530-metaverified.png', '6390-verifyed-yellow.gif',
+       '6600-discord-verify-green.gif', '7041-verify-pastel-pink.png',
+       '7137-white-verify.gif', '7762-verified-blue.gif',
+       '8393-verify-yellow.gif', '9434-lightblue-verification.gif',
+       '9434-purple-verification.gif'
+     ])
+     or lower(name) in ('verified blue', 'twitterverified', 'twitter verified')
+   );
+
+insert into public.site_assets (
+  asset_type, name, file_url, required_plan, animated,
+  sort_order, enabled, collection, collection_order
+)
+values
+  ('item', 'Black Verify', 'items/verification/1422-black-verify.gif', 'creator', true, 177, true, 'Verification', 22),
+  ('item', 'Baby Pink Check', 'items/verification/14586-babypinkcheck.gif', 'creator', true, 178, true, 'Verification', 22),
+  ('item', 'Twitterverified', 'admin-private/items/verification/16841-twitterverified.png', 'admin', false, 179, true, 'Verification', 22),
+  ('item', 'Purple Verify', 'items/verification/2872_purpleverify.png', 'creator', false, 180, true, 'Verification', 22),
+  ('item', 'Brown Checkmark', 'items/verification/3488-brown-checkmark.gif', 'creator', true, 181, true, 'Verification', 22),
+  ('item', 'Orange Verification', 'items/verification/4166-orange-verification.gif', 'creator', true, 182, true, 'Verification', 22),
+  ('item', 'Yellow Verification', 'items/verification/4166-yellow-verification.gif', 'creator', true, 183, true, 'Verification', 22),
+  ('item', 'Pink Verify', 'items/verification/4650_pinkverify.png', 'creator', false, 184, true, 'Verification', 22),
+  ('item', 'Verified Red', 'items/verification/4731-verified-red.gif', 'creator', true, 185, true, 'Verification', 22),
+  ('item', 'Verify Light Pink', 'items/verification/4869-verify-light-pink.gif', 'creator', true, 186, true, 'Verification', 22),
+  ('item', 'Verified Pink', 'items/verification/5647-verifyed-pink.gif', 'creator', true, 187, true, 'Verification', 22),
+  ('item', 'Light Purple Check', 'items/verification/5707-lightpurplecheck.gif', 'creator', true, 188, true, 'Verification', 22),
+  ('item', 'Meta Verified', 'items/verification/60530-metaverified.png', 'creator', false, 189, true, 'Verification', 22),
+  ('item', 'Verified Yellow', 'items/verification/6390-verifyed-yellow.gif', 'creator', true, 190, true, 'Verification', 22),
+  ('item', 'Discord Verify Green', 'items/verification/6600-discord-verify-green.gif', 'creator', true, 191, true, 'Verification', 22),
+  ('item', 'Verify Pastel Pink', 'items/verification/7041-verify-pastel-pink.png', 'creator', false, 192, true, 'Verification', 22),
+  ('item', 'White Verify', 'items/verification/7137-white-verify.gif', 'creator', true, 193, true, 'Verification', 22),
+  ('item', 'Verified Blue', 'admin-private/items/verification/7762-verified-blue.gif', 'admin', true, 194, true, 'Verification', 22),
+  ('item', 'Verify Yellow', 'items/verification/8393-verify-yellow.gif', 'creator', true, 195, true, 'Verification', 22),
+  ('item', 'Light Blue Verification', 'items/verification/9434-lightblue-verification.gif', 'creator', true, 196, true, 'Verification', 22),
+  ('item', 'Purple Verification', 'items/verification/9434-purple-verification.gif', 'creator', true, 197, true, 'Verification', 22)
+on conflict (file_url) do update set
+  asset_type = excluded.asset_type,
+  name = excluded.name,
+  required_plan = excluded.required_plan,
+  animated = excluded.animated,
+  sort_order = excluded.sort_order,
+  enabled = true,
+  collection = excluded.collection,
+  collection_order = excluded.collection_order;
+
+-- Reassert the one-free-banner invariant after every upsert.
+update public.site_assets
+   set required_plan = 'epic'
+ where asset_type = 'banner'
+   and file_url <> 'banners/featured/06aa4e3ff6eab5eecad52378a694114a.jpg'
+   and required_plan = 'free';
+
+-- ---------------------------------------------------------------------------
+-- 6) Server-side selection guard. Creator assets are usable only by creators;
+--    admin assets remain usable only by admins. Catalog visibility alone is
+--    never treated as authorization.
+-- ---------------------------------------------------------------------------
+create or replace function public.set_profile_asset(p_kind text, p_value text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid        uuid := auth.uid();
+  v_asset      public.site_assets;
+  v_plan       text;
+  v_actor_role text;
+begin
+  if v_uid is null then
+    return jsonb_build_object('ok', false, 'message', 'sign_in_required');
+  end if;
+
+  if p_kind not in ('avatar', 'banner', 'item') then
+    return jsonb_build_object('ok', false, 'message', 'invalid_kind');
+  end if;
+
+  perform set_config('app.allow_profile_write', '1', true);
+
+  if p_value is null or p_value = '' or p_value = 'none' then
+    if p_kind = 'avatar' then
+      update public.profiles
+         set avatar_url = coalesce(
+               (
+                 select a.file_url
+                   from public.site_assets a
+                  where a.asset_type = 'avatar'
+                    and a.required_plan = 'free'
+                    and a.enabled
+                  order by a.sort_order, a.id
+                  limit 1
+               ),
+               'profiles/profiles/onefree.png'
+             ),
+             updated_at = now()
+       where id = v_uid;
+    elsif p_kind = 'banner' then
+      update public.profiles
+         set banner_url = 'banners/featured/06aa4e3ff6eab5eecad52378a694114a.jpg',
+             updated_at = now()
+       where id = v_uid;
+    else
+      update public.profiles
+         set equipped_item_id = 'none',
+             updated_at = now()
+       where id = v_uid;
+    end if;
+    return jsonb_build_object('ok', true, 'value', 'none');
+  end if;
+
+  select * into v_asset
+    from public.site_assets
+   where enabled
+     and asset_type = case when p_kind = 'item' then 'item' else p_kind end
+     and (file_url = p_value or name = p_value)
+   limit 1;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'message', 'asset_not_found');
+  end if;
+
+  select role into v_actor_role
+    from public.profiles
+   where id = v_uid;
+  v_actor_role := coalesce(v_actor_role, 'user');
+  v_plan := public.effective_plan(v_uid);
+
+  if v_asset.required_plan = 'admin' and v_actor_role <> 'admin' then
+    return jsonb_build_object('ok', false, 'message', 'admin_only_asset');
+  end if;
+
+  if v_asset.required_plan = 'creator' and v_actor_role <> 'creator' then
+    return jsonb_build_object('ok', false, 'message', 'creator_only_asset');
+  end if;
+
+  if v_asset.required_plan not in ('admin', 'creator')
+     and v_actor_role <> 'admin'
+     and public.plan_rank(v_plan) < public.plan_rank(v_asset.required_plan)
+  then
+    return jsonb_build_object(
+      'ok', false,
+      'message', 'plan_too_low',
+      'required_plan', v_asset.required_plan
+    );
+  end if;
+
+  if p_kind = 'avatar' then
+    update public.profiles
+       set avatar_url = v_asset.file_url,
+           updated_at = now()
+     where id = v_uid;
+  elsif p_kind = 'banner' then
+    update public.profiles
+       set banner_url = v_asset.file_url,
+           updated_at = now()
+     where id = v_uid;
+  else
+    update public.profiles
+       set equipped_item_id = coalesce(v_asset.name, v_asset.file_url),
+           updated_at = now()
+     where id = v_uid;
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'value', v_asset.file_url,
+    'required_plan', v_asset.required_plan
+  );
+end;
+$$;
+
+revoke all on function public.set_profile_asset(text, text) from public, anon;
+grant execute on function public.set_profile_asset(text, text) to authenticated, service_role;
+
+notify pgrst, 'reload schema';
+
+commit;

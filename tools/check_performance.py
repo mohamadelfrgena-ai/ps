@@ -101,7 +101,7 @@ for fn in ("cachedFeatured", "cachedLatest", "cachedRecommended"):
 for seed in ("cachedFeatured()", "cachedLatest()", "cachedRecommended()", "cachedCreators()"):
     if seed not in home:
         problems.append("الشاشة الرئيسية لا تُبذر من الذاكرة (%s)" % seed)
-if "loading && featured.isEmpty()" not in home:
+if not re.search(r"loading\s*&&\s*\w+\.isEmpty\(\)", home):
     problems.append("الشاشة الرئيسية تُظهر مؤقّت تحميل فوق بيانات موجودة")
 
 print("الفحص                                   | النتيجة")

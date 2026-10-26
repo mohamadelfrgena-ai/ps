@@ -15,6 +15,12 @@ data class DownloadedFile(
     val signedUrl: String,
 )
 
+/** One server download row paired with its current content metadata. */
+data class ContentDownloadEntry(
+    val item: ContentItem,
+    val downloadedAt: String?,
+)
+
 /** حالة وصول المستخدم إلى عنصر: مجاني/مشترك/يحتاج ترقية/يحتاج AC. */
 sealed interface AccessState {
     data object Free : AccessState
@@ -218,46 +224,76 @@ class ContentRepository(
 
     // ---------------------------------------------------------------- التحميلات
 
-    suspend fun downloads(): List<ContentItem> {
+    suspend fun downloadEntries(): List<ContentDownloadEntry> {
         val id = uid ?: return emptyList()
         val rows = supabase.select(
             "content_downloads",
             "select=item_id,created_at&user_id=eq.$id&order=created_at.desc&limit=100",
         )
-        val ids = runCatching {
-            supabase.json.parseToJsonElement(rows.toString())
-                .let { it as? kotlinx.serialization.json.JsonArray }
-                ?.mapNotNull { row -> (row as? kotlinx.serialization.json.JsonObject)?.str("item_id") }
-                ?.distinct() ?: emptyList()
-        }.getOrElse { emptyList() }
-        return byIds(ids)
+        val raw = (rows as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { row ->
+                val objectRow = row as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+                val itemId = objectRow.str("item_id") ?: return@mapNotNull null
+                itemId to objectRow.str("created_at")
+            }
+            .orEmpty()
+        val latest = LinkedHashMap<String, String?>()
+        raw.forEach { (itemId, createdAt) -> latest.putIfAbsent(itemId, createdAt) }
+        val indexed = byIds(latest.keys.toList()).associateBy(ContentItem::id)
+        return latest.mapNotNull { (itemId, createdAt) ->
+            indexed[itemId]?.let { ContentDownloadEntry(it, createdAt) }
+        }
+    }
+
+    suspend fun downloads(): List<ContentItem> = downloadEntries().map(ContentDownloadEntry::item)
+
+    /** Number of actual download events in the current local calendar month. */
+    suspend fun downloadsThisMonthCount(): Int {
+        val id = uid ?: return 0
+        val calendar = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.DAY_OF_MONTH, 1)
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val start = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
+            .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+            .format(calendar.time)
+        val rows = supabase.select(
+            "content_downloads",
+            "select=id&user_id=eq.$id&created_at=gte.$start&limit=1000",
+        )
+        return (rows as? kotlinx.serialization.json.JsonArray)?.size ?: 0
     }
 
     /**
-     * تنزيل ملف عنصر: تستدعي record_content_download → ترجع bucket/path → رابط موقّع 60 ثانية → البايتات.
-     * كل شروط الخطة والحد اليومي تُفرض داخل الدالة على الخادم.
+     * تنزيل ملف عنصر: تستدعي record_content_download → ترجع bucket/path → رابط موقّع 60 ثانية.
+     * يُنقل الملف streaming إلى ملف مؤقت ثم يُنقل إلى وجهته فقط بعد اكتماله؛
+     * كل شروط الخطة والحد اليومي ووجود object فعلي تُفرض داخل الدالة على الخادم.
      */
     suspend fun download(context: android.content.Context, item: ContentItem): Result<DownloadedFile> = runCatching {
         val result = supabase.rpc("record_content_download", params("p_item_id" to p(item.id)), signedOnly = true)
         val outcome = result.toOutcome()
-        if (!outcome.ok) throw ApiError(ApiErrorKind.NO_PERMISSION, outcome.message)
+        if (!outcome.ok) throw com.addonstation.mobile.data.apiErrorFromMessage(outcome.message)
         val bucket = outcome.data.str("bucket") ?: "content-files"
         val path = outcome.data.str("path") ?: item.filePath
             ?: throw ApiError(ApiErrorKind.FILE_NOT_UPLOADED)
         val signed = supabase.signedUrl(bucket, path, expiresInSeconds = 60)
-        val bytes = supabase.downloadBytes(signed)
-        val fileName = path.substringAfterLast('/').ifBlank { "${item.slug ?: item.id}.zip" }
+        val fileName = path.substringAfterLast('/').takeIf {
+            it.isNotBlank() && it != "." && it != ".." && '\u0000' !in it
+        } ?: "${item.slug ?: item.id}.mcaddon"
         val dir = java.io.File(context.getExternalFilesDir(null) ?: context.filesDir, "AddonStation")
-        if (!dir.exists()) dir.mkdirs()
         val file = java.io.File(dir, fileName)
-        file.writeBytes(bytes)
+        val expectedSize = outcome.data["size"].asLong()?.takeIf { it > 0L } ?: item.fileSize
+        supabase.downloadToFile(signed, file, expectedSize = expectedSize)
         DownloadedFile(file = file, fileName = fileName, signedUrl = signed)
     }
 
     /** فتح قفل عنصر بالعملات AC (للمحتوى المدفوع بـ AC). */
     suspend fun unlockWithAc(itemId: String): Result<Int> = runCatching {
         val outcome = supabase.rpc("ac_unlock_content", params("p_item_id" to p(itemId)), signedOnly = true).toOutcome()
-        if (!outcome.ok) throw ApiError(ApiErrorKind.NOT_ENOUGH_AC, outcome.message)
+        if (!outcome.ok) throw com.addonstation.mobile.data.apiErrorFromMessage(outcome.message)
         outcome.data.num("charged") ?: 0
     }
 

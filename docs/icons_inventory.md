@@ -11,7 +11,6 @@
 
 | صورة المالك | ما استُخرج | الملفات |
 |---|---|---|
-| `1.png` | شعار شاشة الترحيب (بدل ADDONSTATION فوق DREAM IT) | `splash_logo.png` 1200×238 |
 | `2.png` | عملة AC (بدل القديمة) | `coin_ac.png` 384×384 |
 | `3.png` | ورقة 10 أيقونات إعدادات (فُصلت，一只 quaisquer اثنتين) | `ic_set_*` العشرة 160×160 |
 | `4.png` | الصورة الرمزية الافتراضية | `ic_user.png` 256×256 |
@@ -88,7 +87,7 @@
 
 | الملف | الحجم | الموضع |
 |---|---|---|
-| `splash_logo.png` | 900×131 | شاشة البداية (SplashScreen) |
+| `drawable-nodpi/splash_cave_chase.jpg` | 1080×1920 | خلفية شاشة البداية السينمائية الجديدة |
 | `mipmap-mdpi/ic_launcher.png` | 48×48 | أيقونة التطبيق |
 | `mipmap-hdpi/ic_launcher.png` | 72×72 | أيقونة التطبيق |
 | `mipmap-xhdpi/ic_launcher.png` | 96×96 | أيقونة التطبيق |

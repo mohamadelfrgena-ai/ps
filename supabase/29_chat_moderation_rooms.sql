@@ -361,7 +361,11 @@ begin
   v_muted := found;
 
   select exists(select 1 from public.chat_bans where user_id = v_uid and active) into v_banned;
-  select exists(select 1 from public.chat_rule_acceptances where user_id = v_uid) into v_accepted;
+  -- Keep v1 aligned with ChatRepository.COMMUNITY_RULES_VERSION; mismatches must re-accept.
+  select exists(
+    select 1 from public.chat_rule_acceptances acceptance
+     where acceptance.user_id = v_uid and acceptance.version = 'v1'
+  ) into v_accepted;
 
   if public.is_admin(v_uid) then
     v_scope := jsonb_build_object('all_rooms', true, 'channels', '[]'::jsonb);

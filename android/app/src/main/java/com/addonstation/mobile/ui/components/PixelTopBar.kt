@@ -32,7 +32,7 @@ import com.addonstation.mobile.ui.theme.AppText
 
 /**
  * الشريط العلوي (≈56dp + شريط الحالة): أيقونة التطبيق على اليسار، عنوان الصفحة في الوسط،
- * وشريحة محفظة AC على اليمين (تظهر «—» أثناء التحميل).
+ * وشريحة محفظة AC على اليمين (تظهر 0 حتى تصل القيمة الفعلية).
  */
 @Composable
 fun PixelTopBar(
@@ -106,7 +106,7 @@ fun PixelTopBar(
             ) {
                 CoinIcon(size = 15.dp)
                 Text(
-                    text = walletBalance?.toString() ?: "—",
+                    text = (walletBalance ?: 0).toString(),
                     style = AppText.small,
                     color = AppColors.Text,
                 )
