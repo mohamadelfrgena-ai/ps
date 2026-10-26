@@ -25,7 +25,8 @@
     <string name="phone_item_read_less">Свернуть</string>
     <string name="phone_item_share">Поделиться</string>
     <string name="phone_item_share_failed">Не найдено совместимое приложение для отправки этого элемента.</string>
-    <string name="phone_item_open_failed">Не найдено совместимое приложение для открытия файла.</string>
+    <string name="phone_item_open_failed">Не удалось открыть этот файл в Minecraft.</string>
+    <string name="phone_item_minecraft_required">Перед открытием этого файла необходимо установить Minecraft.</string>
     <string name="phone_item_unlock_ac">Открыть за AC · %1$d</string>
     <string name="phone_item_upgrade_epic">Перейти на Epic</string>
     <string name="phone_item_upgrade_legendary">Перейти на Legendary</string>

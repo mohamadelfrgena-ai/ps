@@ -13,6 +13,8 @@
             <data android:scheme="mailto" />
         </intent>
         <package android:name="com.google.android.gm" />
+        <!-- The downloaded-file action targets only the official Minecraft app. -->
+        <package android:name="com.mojang.minecraftpe" />
     </queries>
 
     <application
@@ -43,8 +45,8 @@
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_push_notification" />
 
-        <!-- Grants Minecraft (or another compatible app) temporary read-only
-             access when the user opens or shares a downloaded addon file. -->
+        <!-- Grants Minecraft temporary read-only access when opening an addon,
+             or the explicitly selected target when the user chooses Share. -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

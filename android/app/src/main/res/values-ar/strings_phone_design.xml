@@ -25,7 +25,8 @@
     <string name="phone_item_read_less">عرض أقل</string>
     <string name="phone_item_share">مشاركة</string>
     <string name="phone_item_share_failed">لم يتم العثور على تطبيق متوافق لمشاركة هذا العنصر.</string>
-    <string name="phone_item_open_failed">لم يتم العثور على تطبيق متوافق لفتح هذا الملف.</string>
+    <string name="phone_item_open_failed">تعذّر على Minecraft فتح هذا الملف.</string>
+    <string name="phone_item_minecraft_required">يجب عليك تحميل لعبة Minecraft أولاً لفتح هذا الملف.</string>
     <string name="phone_item_unlock_ac">فتح بـ AC · %1$d</string>
     <string name="phone_item_upgrade_epic">الترقية إلى Epic</string>
     <string name="phone_item_upgrade_legendary">الترقية إلى Legendary</string>

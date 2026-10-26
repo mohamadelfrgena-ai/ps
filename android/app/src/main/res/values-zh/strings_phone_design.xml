@@ -25,7 +25,8 @@
     <string name="phone_item_read_less">收起</string>
     <string name="phone_item_share">分享</string>
     <string name="phone_item_share_failed">未找到可分享此项目的兼容应用。</string>
-    <string name="phone_item_open_failed">未找到可打开此文件的兼容应用。</string>
+    <string name="phone_item_open_failed">Minecraft 无法打开此文件。</string>
+    <string name="phone_item_minecraft_required">必须先安装 Minecraft 才能打开此文件。</string>
     <string name="phone_item_unlock_ac">使用 AC 解锁 · %1$d</string>
     <string name="phone_item_upgrade_epic">升级到 Epic</string>
     <string name="phone_item_upgrade_legendary">升级到 Legendary</string>

@@ -25,7 +25,8 @@
     <string name="phone_item_read_less">Daha az göster</string>
     <string name="phone_item_share">Paylaş</string>
     <string name="phone_item_share_failed">Bu öğeyi paylaşacak uyumlu bir uygulama bulunamadı.</string>
-    <string name="phone_item_open_failed">Bu dosyayı açacak uyumlu bir uygulama bulunamadı.</string>
+    <string name="phone_item_open_failed">Minecraft bu dosyayı açamadı.</string>
+    <string name="phone_item_minecraft_required">Bu dosyayı açmadan önce Minecraft’ı yüklemelisiniz.</string>
     <string name="phone_item_unlock_ac">AC ile aç · %1$d</string>
     <string name="phone_item_upgrade_epic">Epic’e yükselt</string>
     <string name="phone_item_upgrade_legendary">Legendary’ye yükselt</string>

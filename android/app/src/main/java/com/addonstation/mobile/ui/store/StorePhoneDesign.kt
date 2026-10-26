@@ -1,9 +1,11 @@
 package com.addonstation.mobile.ui.store
 
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.webkit.MimeTypeMap
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -90,6 +92,9 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 private const val NEW_ITEM_WINDOW_MILLIS = 14L * 24L * 60L * 60L * 1000L
+private const val MINECRAFT_ANDROID_PACKAGE = "com.mojang.minecraftpe"
+
+private enum class MinecraftOpenResult { OPENED, NOT_INSTALLED, FAILED }
 
 @Composable
 internal fun DesignedStoreContentCard(
@@ -339,6 +344,7 @@ internal fun DesignedContentDetailScreen(
     val signInMessage = stringResource(R.string.msg_sign_in_needed)
     val genericError = stringResource(R.string.item_download_failed)
     val openFailed = stringResource(R.string.phone_item_open_failed)
+    val minecraftRequired = stringResource(R.string.phone_item_minecraft_required)
     val shareFailed = stringResource(R.string.phone_item_share_failed)
 
     LaunchedEffect(itemId, reloadTick, signedIn) {
@@ -544,7 +550,17 @@ internal fun DesignedContentDetailScreen(
                     DetailMode.PAID_AC -> unlockWithAc(current)
                     DetailMode.DOWNLOADED -> {
                         val file = downloaded
-                        if (file == null || !openDownloadedFile(context, file)) notice = openFailed
+                        when {
+                            file == null -> notice = openFailed
+                            else -> when (openDownloadedFile(context, file)) {
+                                MinecraftOpenResult.OPENED -> notice = null
+                                MinecraftOpenResult.NOT_INSTALLED -> {
+                                    notice = minecraftRequired
+                                    Toast.makeText(context, minecraftRequired, Toast.LENGTH_LONG).show()
+                                }
+                                MinecraftOpenResult.FAILED -> notice = openFailed
+                            }
+                        }
                     }
                     DetailMode.FAILED -> startDownload(current)
                     DetailMode.NO_FILE, DetailMode.DOWNLOADING -> Unit
@@ -1187,17 +1203,42 @@ private fun shareItemText(context: Context, item: ContentItem): Boolean = runCat
     context.startActivity(Intent.createChooser(intent, item.title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }.isSuccess
 
-private fun openDownloadedFile(context: Context, downloaded: DownloadedFile): Boolean = runCatching {
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", downloaded.file)
-    val extension = downloaded.file.extension.lowercase(Locale.ROOT)
-    val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "application/zip"
-    val intent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, mime)
-        clipData = ClipData.newRawUri(downloaded.fileName, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+private fun openDownloadedFile(context: Context, downloaded: DownloadedFile): MinecraftOpenResult {
+    if (context.packageManager.getLaunchIntentForPackage(MINECRAFT_ANDROID_PACKAGE) == null) {
+        return MinecraftOpenResult.NOT_INSTALLED
     }
-    context.startActivity(Intent.createChooser(intent, downloaded.fileName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-}.isSuccess
+
+    val intent = runCatching {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", downloaded.file)
+        val extension = downloaded.file.extension.lowercase(Locale.ROOT)
+        val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "application/zip"
+        Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mime)
+            setPackage(MINECRAFT_ANDROID_PACKAGE)
+            clipData = ClipData.newRawUri(downloaded.fileName, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }.getOrElse { return MinecraftOpenResult.FAILED }
+
+    if (intent.resolveActivity(context.packageManager) == null) {
+        return MinecraftOpenResult.FAILED
+    }
+
+    return try {
+        // An explicit package prevents Android from offering file managers,
+        // browsers, archive tools, or any application other than Minecraft.
+        context.startActivity(intent)
+        MinecraftOpenResult.OPENED
+    } catch (_: ActivityNotFoundException) {
+        if (context.packageManager.getLaunchIntentForPackage(MINECRAFT_ANDROID_PACKAGE) == null) {
+            MinecraftOpenResult.NOT_INSTALLED
+        } else {
+            MinecraftOpenResult.FAILED
+        }
+    } catch (_: SecurityException) {
+        MinecraftOpenResult.FAILED
+    }
+}
 
 private fun shareDownloadedFile(context: Context, downloaded: DownloadedFile): Boolean = runCatching {
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", downloaded.file)

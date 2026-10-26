@@ -30,6 +30,9 @@ def main() -> int:
     repository = read("android/app/src/main/java/com/addonstation/mobile/data/repo/ContentRepository.kt")
     creator = read("android/app/src/main/java/com/addonstation/mobile/data/repo/CreatorRepository.kt")
     screen = read("android/app/src/main/java/com/addonstation/mobile/ui/store/StorePhoneDesign.kt")
+    open_file_block = screen.split("private fun openDownloadedFile", 1)[-1].split(
+        "private fun shareDownloadedFile", 1
+    )[0]
     manifest = read("android/app/src/main/AndroidManifest.xml")
     provider_paths = read("android/app/src/main/res/xml/download_file_paths.xml")
 
@@ -54,6 +57,11 @@ def main() -> int:
     require(screen, "DetailStage.NO_FILE", "content detail", problems)
     require(screen, "ApiErrorKind.FILE_NOT_UPLOADED -> DetailStage.NO_FILE", "content detail", problems)
     require(screen, "clipData = ClipData.newRawUri", "FileProvider intents", problems)
+    require(open_file_block, 'setPackage(MINECRAFT_ANDROID_PACKAGE)', "Minecraft-only open", problems)
+    require(open_file_block, 'MinecraftOpenResult.NOT_INSTALLED', "Minecraft missing state", problems)
+    forbid(open_file_block, "Intent.createChooser", "Minecraft-only open", problems)
+    require(screen, "R.string.phone_item_minecraft_required", "Minecraft install message", problems)
+    require(manifest, '<package android:name="com.mojang.minecraftpe" />', "Minecraft package visibility", problems)
     require(manifest, "androidx.core.content.FileProvider", "Android manifest", problems)
     require(provider_paths, 'path="AddonStation/"', "FileProvider paths", problems)
 

@@ -25,7 +25,8 @@
     <string name="phone_item_read_less">Leer menos</string>
     <string name="phone_item_share">Compartir</string>
     <string name="phone_item_share_failed">No se encontró una aplicación compatible para compartir este elemento.</string>
-    <string name="phone_item_open_failed">No se encontró una aplicación compatible para abrir este archivo.</string>
+    <string name="phone_item_open_failed">Minecraft no pudo abrir este archivo.</string>
+    <string name="phone_item_minecraft_required">Debes instalar Minecraft antes de abrir este archivo.</string>
     <string name="phone_item_unlock_ac">Desbloquear con AC · %1$d</string>
     <string name="phone_item_upgrade_epic">Mejorar a Epic</string>
     <string name="phone_item_upgrade_legendary">Mejorar a Legendary</string>
