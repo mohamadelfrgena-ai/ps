@@ -2622,7 +2622,7 @@ static bool gRtcOk = false;
 static bool deviceHHMM(char* buf, std::size_t n) {
     if (!gRtcTried) {
         gRtcTried = 1;
-        sceSysmoduleLoadModule(0x00A1);   // SCE_SYSMODULE_RTC -> loads libSceRtc
+        sceSysmoduleLoadModule(static_cast<OrbisSysModule>(0x00A1));   // SCE_SYSMODULE_RTC -> loads libSceRtc
         gRtcOk = true;
     }
     if (gRtcOk) {
