@@ -29,7 +29,7 @@ name: Build APK
 
 permissions:
   contents: write
-  actions: read        # يلزم لوظيفة apk-commit لقراءة مُخرَج آخر بناء (بدونه 403)
+  actions: write       # قراءة مُخرَج آخر بناء + حذف المخرجات القديمة (امتلاء الحصة يمنع الرفع)
 
 on:
   workflow_dispatch:
@@ -89,6 +89,51 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # تحرير حصة مخرجات GitHub: المخرجات القديمة (نسخ قديمة من PKG/APK محفوظة
+      # أصلاً في git) امتلأت لها الحصة ⇒ رفع أي مُخرَج جديد يفشل. نحذف القديم ونُبقي
+      # أحدث مُخرَج APK فقط (مرجع وظيفة apk-commit).
+      - name: تحرير حصة المخرجات (حذف القديم)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          token = os.environ["GH_TOKEN"]
+          repo = "${{ github.repository }}"
+          def api(method, path):
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{repo}{path}",
+                  method=method,
+                  headers={"Authorization": f"token {token}", "Accept": "application/vnd.github+json"},
+              )
+              try:
+                  with urllib.request.urlopen(req) as r:
+                      return r.status, r.read()
+              except Exception as e:
+                  return 0, str(e).encode()
+          arts = []
+          for page in range(1, 8):
+              _st, body = api("GET", f"/actions/artifacts?per_page=100&page={page}")
+              got = json.loads(body or b"{}").get("artifacts", [])
+              arts.extend(got)
+              if len(got) < 100:
+                  break
+          keep = None
+          for a in arts:
+              if a["name"] == "addonstation-debug-apk" and not a.get("expired"):
+                  if keep is None or a["created_at"] > keep["created_at"]:
+                      keep = a
+          deleted, freed = 0, 0
+          for a in arts:
+              if keep and a["id"] == keep["id"]:
+                  continue
+              st, _ = api("DELETE", f"/actions/artifacts/{a['id']}")
+              if st in (204, 200):
+                  deleted += 1
+                  freed += a.get("size_in_bytes", 0)
+          print(f"deleted {deleted} artifacts, freed {freed/1048576:.0f} MB (kept {keep['id'] if keep else 'none'})")
+          PY
 
       - uses: actions/setup-java@v4
         with:
