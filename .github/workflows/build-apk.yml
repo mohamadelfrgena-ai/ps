@@ -251,6 +251,7 @@ jobs:
 
       - name: Upload build log
         if: always()
+        continue-on-error: true      # حصة المخرجات الممتلئة لا تُفشل البناء
         uses: actions/upload-artifact@v4
         with:
           name: gradle-build-log
@@ -259,11 +260,36 @@ jobs:
 
       - name: Upload APK
         if: success()
+        continue-on-error: true      # مسار احتياطي فقط — التسليم الأساسي في المستودع أدناه
         uses: actions/upload-artifact@v4
         with:
           name: addonstation-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      # تسليم مباشر في المستودع (مثل PKG): يسجّل APK الناجح في الجذر باسم
+      # apk-debug.apk ⇒ رابط تحميل ثابت يعمل فوراً بلا اعتماد على حصة المخرجات.
+      - name: تسجيل APK في المستودع (apk-debug.apk)
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          SRC=$(ls android/app/build/outputs/apk/debug/*.apk | head -1)
+          cp "$SRC" apk-debug.apk
+          SIZE=$(stat -c %s apk-debug.apk)
+          echo "APK size: $SIZE bytes"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apk-debug.apk
+          if git diff --cached --quiet; then
+            echo "لا تغيير في APK"
+          else
+            git commit -m "Build debug APK ($SIZE bytes) [skip ci]"
+            git pull --rebase origin "${GITHUB_REF_NAME}" || true
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+            echo "✓ سُجّل apk-debug.apk في الفرع"
+          fi
 
 
   # ==========================================================================
