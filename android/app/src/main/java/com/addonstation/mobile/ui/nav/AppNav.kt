@@ -94,6 +94,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val PROFILE = "profile"
     const val APP_ABOUT = "about-app"
+    const val LINK_CONSOLE = "link-console"
     const val PRIVACY = "privacy-policy"
     const val TERMS = "terms-of-use"
 
@@ -637,8 +638,15 @@ private fun MainNavigation(
                         onOpenPlans = { go(Routes.PLANS) },
                         onOpenAdmin = { go(Routes.ADMIN) },
                         onOpenAbout = { go(Routes.APP_ABOUT) },
+                        onLinkConsole = { go(Routes.LINK_CONSOLE) },
                         onOpenPrivacy = { go(Routes.PRIVACY) },
                         onOpenTerms = { go(Routes.TERMS) },
+                        onBack = { back() },
+                    )
+                }
+
+                composable(Routes.LINK_CONSOLE) {
+                    com.addonstation.mobile.ui.settings.LinkConsoleScreen(
                         onBack = { back() },
                     )
                 }

@@ -39,7 +39,7 @@ using namespace pkgtest;
 // ---------------------------------------------------------------- config ----
 static const char* kStageDir = "/data/AddonStation/installed";
 static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
-static const char* kAppVersion = "0.30";
+static const char* kAppVersion = "0.31";
 static const char* kBrandSuffix = " by sliver fox";
 
 static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
@@ -102,7 +102,7 @@ struct App {
     int askFocus = 0;
     bool confirmSignOut = false;
     int confirmFocus = 1;
-    std::string query, notice, code, pollSecret, exchangeId, linkedConsoleId, sessionRef;
+    std::string query, notice, code, pollSecret, exchangeId, linkedConsoleId, sessionRef, sessionRefresh;
     int codeSecs = 0, codeStatus = 4;
     bool qrView = false;
     std::atomic<int> dl{0};          // DemoState
@@ -188,7 +188,26 @@ static int hookSystemLanguage() {
 }
 
 // ---------------------------------------------------------------- data ------
+// v0.31: JWT الهاتف ينتهي بعد ساعة — نجدّده عبر refresh_token قبل كل استخدام،
+// وبلا محاذاة صارمة (كل 40 دقيقة). فشل التحديث لا يُسقط الجلسة إطلاقاً.
+static Uint32 gTokenAtMs = 0;
+static void ensureFreshSession() {
+    if (!gSession.valid || gSession.refreshToken.empty()) return;
+    const Uint32 nowMs = SDL_GetTicks();
+    if (gTokenAtMs != 0 && nowMs - gTokenAtMs < 40u * 60u * 1000u) return;
+    AuthLogin r = callRefreshSession(gCfg, gSession.refreshToken);
+    if (r.ok) {
+        std::lock_guard<std::mutex> lk(gSessionMx);
+        gSession.accessToken = r.accessToken;
+        if (!r.refreshToken.empty()) gSession.refreshToken = r.refreshToken;
+        saveLinkSession(gSession);
+        gTokenAtMs = nowMs;
+    }
+    // فشل التحديث: نُبقي الجلسة كما هي (لا خروج قسري أبداً)
+}
+
 static void applyAccountFromSession() {
+    ensureFreshSession();
     ProfileRow p = fetchProfile(gCfg, gSession.userId, gSession.accessToken);
     if (!p.ok && gSession.displayName.empty()) return;
     Account a;
@@ -451,6 +470,7 @@ static int pollCodeOnce() {
         if (st == "linked" || st == "approved") {
             // one-shot response: carry the session + profile back to the app
             A.sessionRef = jsonGetString(old.body, "access_token");
+            A.sessionRefresh = jsonGetString(old.body, "refresh_token");
             A.linkedConsoleId = jsonGetString(old.body, "user_id");
             A.exchangeId.clear();
             return 1;
@@ -466,6 +486,7 @@ static int pollCodeOnce() {
         A.exchangeId = jsonGetString(r.body, "exchange_id");
         A.linkedConsoleId = jsonGetString(r.body, "linked_console_id");
         A.sessionRef = jsonGetString(r.body, "session_ref");
+        if (A.sessionRefresh.empty()) A.sessionRefresh = jsonGetString(r.body, "refresh_token");
         if (st == "approved" || jsonGetBool(r.body, "approved", false) || jsonGetBool(r.body, "claimed", false))
             return 1;
         if (st == "expired") return 2;
@@ -483,7 +504,9 @@ static void finishSignIn() {
         std::lock_guard<std::mutex> lk(gSessionMx);
         gSession.valid = true;
         gSession.accessToken = A.sessionRef;
+        gSession.refreshToken = A.sessionRefresh;
         gSession.plan = "free";
+        gTokenAtMs = SDL_GetTicks();   // توكن جديد — لا حاجة لتجديد فوري
     }
     // the complete/consume response may carry the linked console/user id
     {
@@ -812,7 +835,8 @@ static void moveFocus(int dx, int dy) {
                 else if (dy > 0 && cardN > 0) A.focus = 4;
                 else {
                     int f = A.focus - 1 + dx;
-                    if (f < 0) f = 2; if (f > 2) f = 0;
+                    if (f < 0) f = 2;
+                    if (f > 2) f = 0;
                     A.focus = 1 + f;
                 }
             } else {

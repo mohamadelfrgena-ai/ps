@@ -843,4 +843,21 @@ CREATE IT.</string>
     <string name="edit_profile_tab_item">Item</string>
     <string name="edit_profile_tab_about">About</string>
     <string name="edit_profile_message_preview">[Message text]</string>
+
+    <string name="link_console_row_title">Link a console</string>
+    <string name="link_console_row_sub">Pair your PlayStation with this account</string>
+    <string name="link_title">Link a console</string>
+    <string name="link_card_title">Connect your PlayStation</string>
+    <string name="link_intro">Open AddonStation on your console and choose Sign in — a 6-character code appears on the TV. Type it here to link this account to the console.</string>
+    <string name="link_code_hint">6-character code</string>
+    <string name="link_button">Link console</string>
+    <string name="link_working">Linking…</string>
+    <string name="link_success">Console linked ✓</string>
+    <string name="link_success_sub">You can close this screen — the console is signed in as you now.</string>
+    <string name="link_steps">On the console: AddonStation ← Sign in ← New code. The code expires after 10 minutes.</string>
+    <string name="link_error_invalid">Check the code — it is 6 characters.</string>
+    <string name="link_error_notfound">No console is waiting for this code.</string>
+    <string name="link_error_expired">This code expired — request a new one on the console.</string>
+    <string name="link_error_signin">Sign in first to link a console.</string>
+    <string name="link_error_network">Something went wrong — try again.</string>
 </resources>

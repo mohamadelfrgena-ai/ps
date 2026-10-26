@@ -827,4 +827,21 @@
     <string name="edit_profile_tab_item">الأداة</string>
     <string name="edit_profile_tab_about">نبذة</string>
     <string name="edit_profile_message_preview">[نص الرسالة]</string>
+
+    <string name="link_console_row_title">ربط جهاز</string>
+    <string name="link_console_row_sub">اربط جهاز PlayStation بهذا الحساب</string>
+    <string name="link_title">ربط جهاز</string>
+    <string name="link_card_title">صِل جهاز PlayStation</string>
+    <string name="link_intro">افتح AddonStation على السوني واختر تسجيل الدخول — يظهر كود من 6 محارف على الشاشة. اكتبه هنا ليُربط الحساب بالجهاز.</string>
+    <string name="link_code_hint">كود من 6 محارف</string>
+    <string name="link_button">اربط الجهاز</string>
+    <string name="link_working">جارٍ الربط…</string>
+    <string name="link_success">تم ربط الجهاز ✓</string>
+    <string name="link_success_sub">يمكنك إغلاق هذه الشاشة — السوني دخل بحسابك الآن.</string>
+    <string name="link_steps">على السوني: AddonStation ← تسجيل الدخول ← كود جديد. الكود صالح لمدة 10 دقائق.</string>
+    <string name="link_error_invalid">تحقق من الكود — هو 6 محارف.</string>
+    <string name="link_error_notfound">لا يوجد جهاز ينتظر هذا الكود.</string>
+    <string name="link_error_expired">انتهت صلاحية الكود — اطلب كوداً جديداً من السوني.</string>
+    <string name="link_error_signin">سجّل الدخول أولاً لربط جهاز.</string>
+    <string name="link_error_network">حدث خطأ — حاول مرة أخرى.</string>
 </resources>

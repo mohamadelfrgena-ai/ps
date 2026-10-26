@@ -64,6 +64,9 @@ struct AuthLogin {
     std::string accessToken;
     std::string refreshToken;
 };
+// v0.31: تجديد جلسة الهاتف (تنتهي بعد ساعة) عبر refresh_token — يبقي الربط حيّاً
+AuthLogin callRefreshSession(const SupabaseConfig& cfg, const std::string& refreshToken);
+
 AuthLogin callEmailLogin(const SupabaseConfig& cfg,
                          const std::string& email,
                          const std::string& password);

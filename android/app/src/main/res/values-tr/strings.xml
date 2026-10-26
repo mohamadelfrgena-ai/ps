@@ -829,4 +829,21 @@ YARAT.</string>
     <string name="edit_profile_tab_item">Eşya</string>
     <string name="edit_profile_tab_about">Hakkında</string>
     <string name="edit_profile_message_preview">[Mesaj metni]</string>
+
+    <string name="link_console_row_title">Konsol eşleştir</string>
+    <string name="link_console_row_sub">PlayStation\'ınızı bu hesapla eşleştirin</string>
+    <string name="link_title">Konsol eşleştir</string>
+    <string name="link_card_title">PlayStation\'ınızı bağlayın</string>
+    <string name="link_intro">Konsolunuzda AddonStation\'ı açıp Giriş yap\'ı seçin — TV\'de 6 karakterli bir kod görünür. Bu hesabı konsolla eşleştirmek için kodu buraya yazın.</string>
+    <string name="link_code_hint">6 karakterli kod</string>
+    <string name="link_button">Konsolu eşleştir</string>
+    <string name="link_working">Eşleştiriliyor…</string>
+    <string name="link_success">Konsol eşleştirildi ✓</string>
+    <string name="link_success_sub">Bu ekranı kapatabilirsiniz — konsol artık sizin hesabınızla giriş yaptı.</string>
+    <string name="link_steps">Konsolda: AddonStation ← Giriş yap ← Yeni kod. Kod 10 dakika sonra geçersiz olur.</string>
+    <string name="link_error_invalid">Kodu kontrol edin — 6 karakterdir.</string>
+    <string name="link_error_notfound">Bu kodu bekleyen bir konsol yok.</string>
+    <string name="link_error_expired">Bu kodun süresi doldu — konsoldan yeni kod isteyin.</string>
+    <string name="link_error_signin">Konsol eşleştirmek iönce giriş yapın.</string>
+    <string name="link_error_network">Bir şeyler ters gitti — tekrar deneyin.</string>
 </resources>

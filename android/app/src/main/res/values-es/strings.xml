@@ -829,4 +829,21 @@ CRÉALO.</string>
     <string name="edit_profile_tab_item">Objeto</string>
     <string name="edit_profile_tab_about">Acerca de</string>
     <string name="edit_profile_message_preview">[Texto del mensaje]</string>
+
+    <string name="link_console_row_title">Vincular una consola</string>
+    <string name="link_console_row_sub">Vincula tu PlayStation a esta cuenta</string>
+    <string name="link_title">Vincular una consola</string>
+    <string name="link_card_title">Conecta tu PlayStation</string>
+    <string name="link_intro">Abre AddonStation en tu consola y elige Iniciar sesión — aparecerá un código de 6 caracteres en la TV. Escríbelo aquí para vincular esta cuenta a la consola.</string>
+    <string name="link_code_hint">Código de 6 caracteres</string>
+    <string name="link_button">Vincular consola</string>
+    <string name="link_working">Vinculando…</string>
+    <string name="link_success">Consola vinculada ✓</string>
+    <string name="link_success_sub">Puedes cerrar esta pantalla — la consola inició sesión como tú.</string>
+    <string name="link_steps">En la consola: AddonStation ← Iniciar sesión ← Código nuevo. El código caduca a los 10 minutos.</string>
+    <string name="link_error_invalid">Revisa el código — tiene 6 caracteres.</string>
+    <string name="link_error_notfound">Ninguna consola está esperando este código.</string>
+    <string name="link_error_expired">Este código caducó — pide uno nuevo en la consola.</string>
+    <string name="link_error_signin">Inicia sesión primero para vincular una consola.</string>
+    <string name="link_error_network">Algo salió mal — inténtalo de nuevo.</string>
 </resources>

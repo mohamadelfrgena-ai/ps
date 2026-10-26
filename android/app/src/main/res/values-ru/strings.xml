@@ -829,4 +829,21 @@
     <string name="edit_profile_tab_item">Предмет</string>
     <string name="edit_profile_tab_about">О себе</string>
     <string name="edit_profile_message_preview">[Текст сообщения]</string>
+
+    <string name="link_console_row_title">Привязать консоль</string>
+    <string name="link_console_row_sub">Свяжите PlayStation с этим аккаунтом</string>
+    <string name="link_title">Привязать консоль</string>
+    <string name="link_card_title">Подключите PlayStation</string>
+    <string name="link_intro">Откройте AddonStation на консоли и выберите «Войти» — на экране появится код из 6 символов. Введите его здесь, чтобы привязать аккаунт к консоли.</string>
+    <string name="link_code_hint">Код из 6 символов</string>
+    <string name="link_button">Привязать консоль</string>
+    <string name="link_working">Привязка…</string>
+    <string name="link_success">Консоль привязана ✓</string>
+    <string name="link_success_sub">Можно закрыть этот экран — консоль вошла в ваш аккаунт.</string>
+    <string name="link_steps">На консоли: AddonStation ← Войти ← Новый код. Код действует 10 минут.</string>
+    <string name="link_error_invalid">Проверьте код — в нём 6 символов.</string>
+    <string name="link_error_notfound">Никакая консоль не ждёт этот код.</string>
+    <string name="link_error_expired">Срок кода истёк — запросите новый на консоли.</string>
+    <string name="link_error_signin">Сначала войдите, чтобы привязать консоль.</string>
+    <string name="link_error_network">Что-то пошло не так — попробуйте снова.</string>
 </resources>

@@ -829,4 +829,21 @@ CRIE.</string>
     <string name="edit_profile_tab_item">Item</string>
     <string name="edit_profile_tab_about">Sobre</string>
     <string name="edit_profile_message_preview">[Texto da mensagem]</string>
+
+    <string name="link_console_row_title">Ligar uma consola</string>
+    <string name="link_console_row_sub">Ligue a sua PlayStation a esta conta</string>
+    <string name="link_title">Ligar uma consola</string>
+    <string name="link_card_title">Ligue a sua PlayStation</string>
+    <string name="link_intro">Abra o AddonStation na consola e escolha Iniciar sessão — aparece um código de 6 caracteres na TV. Escreva-o aqui para ligar esta conta à consola.</string>
+    <string name="link_code_hint">Código de 6 caracteres</string>
+    <string name="link_button">Ligar consola</string>
+    <string name="link_working">A ligar…</string>
+    <string name="link_success">Consola ligada ✓</string>
+    <string name="link_success_sub">Pode fechar este ecrã — a consola iniciou sessão como você.</string>
+    <string name="link_steps">Na consola: AddonStation ← Iniciar sessão ← Novo código. O código expira ao fim de 10 minutos.</string>
+    <string name="link_error_invalid">Verifique o código — tem 6 caracteres.</string>
+    <string name="link_error_notfound">Nenhuma consola está à espera deste código.</string>
+    <string name="link_error_expired">Este código expirou — peÃ§a um novo na consola.</string>
+    <string name="link_error_signin">Inicie sessão primeiro para ligar uma consola.</string>
+    <string name="link_error_network">Algo correu mal — tente novamente.</string>
 </resources>

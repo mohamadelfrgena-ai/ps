@@ -829,4 +829,21 @@
     <string name="edit_profile_tab_item">道具</string>
     <string name="edit_profile_tab_about">关于</string>
     <string name="edit_profile_message_preview">[消息内容]</string>
+
+    <string name="link_console_row_title">绑定主机</string>
+    <string name="link_console_row_sub">将 PlayStation 与此账户绑定</string>
+    <string name="link_title">绑定主机</string>
+    <string name="link_card_title">连接你的 PlayStation</string>
+    <string name="link_intro">在主机上打开 AddonStation 并选择登录—电视上会显示 6 位字符代码。在此输入即可将此账户绑定到主机。</string>
+    <string name="link_code_hint">6 位字符代码</string>
+    <string name="link_button">绑定主机</string>
+    <string name="link_working">绑定中…</string>
+    <string name="link_success">主机已绑定 ✓</string>
+    <string name="link_success_sub">可以关闭此屏幕—主机已以你的身份登录。</string>
+    <string name="link_steps">主机上：AddonStation ← 登录 ← 新代码。代码 10 分钟后过期。</string>
+    <string name="link_error_invalid">请检查代码—共 6 位字符。</string>
+    <string name="link_error_notfound">没有主机在等待此代码。</string>
+    <string name="link_error_expired">代码已过期—请在主机上获取新代码。</string>
+    <string name="link_error_signin">请先登录再绑定主机。</string>
+    <string name="link_error_network">出错了—请重试。</string>
 </resources>

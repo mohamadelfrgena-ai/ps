@@ -49,7 +49,7 @@ on:
   push:
     # ملاحظة: تُضاف فروع الجلسات هنا ليُبنى منها APK عند طلب الملف .build-request
     # — يمكن حذفها لاحقاً بعد دمج الفرع في main.
-    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps, arena/8379e662-ps, arena/75fb0e28-ps ]
+    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps, arena/8379e662-ps, arena/75fb0e28-ps, arena/5622bbf6-ps ]
     paths:
       - '.build-request'
 

@@ -252,6 +252,37 @@ RpcResult callPollLinkCode(const SupabaseConfig& cfg,
     return supabaseRpc(cfg, "poll_console_link_code", body);
 }
 
+AuthLogin callRefreshSession(const SupabaseConfig& cfg, const std::string& refreshToken) {
+    AuthLogin out;
+    if (!cfg.ok() || refreshToken.empty()) {
+        out.message = "not_configured";
+        return out;
+    }
+    const std::string url = cfg.url + "/auth/v1/token?grant_type=refresh_token";
+    const std::vector<std::pair<std::string, std::string>> headers = {
+        {"apikey", cfg.anonKey},
+        {"Content-Type", "application/json"},
+        {"Accept", "application/json"},
+    };
+    const std::string body = "{\"refresh_token\":\"" + jsonEscape(refreshToken) + "\"}";
+    const HttpPostResult http = httpPostJson(url, headers, body);
+    if (!http.ok) {
+        out.message = http.message;
+        return out;
+    }
+    out.accessToken = jsonGetString(http.body, "access_token");
+    out.refreshToken = jsonGetString(http.body, "refresh_token");
+    if (out.accessToken.empty()) {
+        out.message = jsonGetString(http.body, "error_description");
+        if (out.message.empty()) out.message = jsonGetString(http.body, "msg");
+        if (out.message.empty()) out.message = "refresh_failed";
+        return out;
+    }
+    out.ok = true;
+    out.userId = jsonGetString(http.body, "id");
+    return out;
+}
+
 AuthLogin callEmailLogin(const SupabaseConfig& cfg,
                          const std::string& email,
                          const std::string& password) {

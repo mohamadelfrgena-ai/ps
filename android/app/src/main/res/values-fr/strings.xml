@@ -829,4 +829,21 @@ CRÉE-LE.</string>
     <string name="edit_profile_tab_item">Objet</string>
     <string name="edit_profile_tab_about">À propos</string>
     <string name="edit_profile_message_preview">[Texte du message]</string>
+
+    <string name="link_console_row_title">Associer une console</string>
+    <string name="link_console_row_sub">Associez votre PlayStation à ce compte</string>
+    <string name="link_title">Associer une console</string>
+    <string name="link_card_title">Connectez votre PlayStation</string>
+    <string name="link_intro">Ouvrez AddonStation sur votre console et choisissez Connexion — un code à 6 caractères apparaît sur la TV. Saisissez-le ici pour associer ce compte à la console.</string>
+    <string name="link_code_hint">Code à 6 caractères</string>
+    <string name="link_button">Associer la console</string>
+    <string name="link_working">Association…</string>
+    <string name="link_success">Console associée ✓</string>
+    <string name="link_success_sub">Vous pouvez fermer cet écran — la console est connectée à votre place.</string>
+    <string name="link_steps">Sur la console : AddonStation ← Connexion ← Nouveau code. Le code expire après 10 minutes.</string>
+    <string name="link_error_invalid">Vérifiez le code — il a 6 caractères.</string>
+    <string name="link_error_notfound">Aucune console n\'attend ce code.</string>
+    <string name="link_error_expired">Ce code a expiré — demandez-en un nouveau sur la console.</string>
+    <string name="link_error_signin">Connectez-vous d\'abord pour associer une console.</string>
+    <string name="link_error_network">Une erreur est survenue — réessayez.</string>
 </resources>

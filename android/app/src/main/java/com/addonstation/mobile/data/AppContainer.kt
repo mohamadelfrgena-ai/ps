@@ -46,6 +46,7 @@ class AppContainer(context: Context) {
     val creators = CreatorRepository(supabase)
     val admin = AdminRepository(supabase)
     val assets = AssetsRepository(supabase, state)
+    val consoleLink = ConsoleLinkRepository(supabase)
 
     init {
         config = SupabaseConfig.fromBuild.takeIf { it.isConfigured }

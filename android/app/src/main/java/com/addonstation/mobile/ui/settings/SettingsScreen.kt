@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.Warning
@@ -139,6 +140,7 @@ fun SettingsScreen(
     onOpenPlans: () -> Unit = {},
     onOpenAdmin: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
+    onLinkConsole: () -> Unit = {},
     onOpenPrivacy: () -> Unit = {},
     onOpenTerms: () -> Unit = {},
     onBack: () -> Unit = {},
@@ -328,6 +330,15 @@ fun SettingsScreen(
                             onClick = { if (signedOut) onLogin() else requestPasswordReset() },
                         )
                     },
+                )
+                AuthSettingsDivider()
+                AuthSettingsRow(
+                    title = stringResource(R.string.link_console_row_title),
+                    subtitle = stringResource(R.string.link_console_row_sub),
+                    clickable = true,
+                    onClick = onLinkConsole,
+                    chevron = true,
+                    tile = { AuthSettingsIconTile(Icons.Outlined.Tv, AppColors.AuthAccentBlue) },
                 )
                 if ((profileLoadStatus == ProfileLoadStatus.FAILED || profileLoadStatus == ProfileLoadStatus.MISSING) && signedIn && profile == null) {
                     ErrorState(onRetry = { profileRetryTick += 1 })
