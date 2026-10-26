@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""معاينة شاشة الترحيب بخلفيتها الجديدة (لقطة من إعلان Minecraft الرسمي).
+"""معاينة شاشة البداية السينمائية الجديدة فوق صورة الكهف الطولية.
 
-يرسم نفس تركيب SplashScreen: الخلفية (نسخة xxhdpi من drawable-xxhdpi/splash_bg.jpg)
-+ تعتيم متدرّج + الشعار + القاعدة الرفيعة + الكلمات الثلاث + العلامة التجارية.
-النصوص من ملفات الموارد الفعلية. يُنتج `splash_background_preview.png` في الجذر.
+يرسم تقريباً طبقات SplashScreen الحالية: المشهد + التعتيم السينمائي + شارة
+AddonStation + DREAM/BUILD/CREATE بألوان الضوء والماس واللافا.
 """
 import io
 import os
@@ -16,13 +15,12 @@ from bidi.algorithm import get_display
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RES = os.path.join(ROOT, "android", "app", "src", "main", "res")
-# نسخة xxhdpi (1080×2340) — نفس ما يراه هاتف بكثافة عالية
-BG = os.path.join(RES, "drawable-xxhdpi", "splash_bg.jpg")
-LOGO = os.path.join(RES, "drawable-nodpi", "splash_logo.png")
+BG = os.path.join(RES, "drawable-nodpi", "splash_cave_chase.jpg")
+APP_ICON = os.path.join(RES, "drawable-nodpi", "app_icon.png")
 OUT = os.path.join(ROOT, "splash_background_preview.png")
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-SCURVE = [(0.0, 140), (0.26, 69), (0.45, 80), (0.65, 94), (0.85, 107), (1.0, 134)]
+SCURVE = [(0.0, 225), (0.20, 110), (0.42, 20), (0.70, 0), (0.86, 112), (1.0, 240)]
 
 
 def rtl(t):
@@ -58,7 +56,7 @@ def scrim(w, h):
 def screen(locale, label, w=430, h=880):
     """يعيد صورة شاشة كاملة بنفس طبقات SplashScreen."""
     base = Image.open(BG).convert("RGB")
-    # ContentScale.Crop + TopCenter
+    # ContentScale.Crop + Center
     k = max(w / base.width, h / base.height)
     nw, nh = int(base.width * k + 1), int(base.height * k + 1)
     base = base.resize((nw, nh), Image.LANCZOS)
@@ -66,41 +64,41 @@ def screen(locale, label, w=430, h=880):
     black, mask = scrim(w, h)
     img = Image.composite(black, base, mask)
 
-    # خطوط مسح باهتة (ScanLines)
     d = ImageDraw.Draw(img, "RGBA")
-    for i in range(0, h, 19):
-        d.line((0, i, w, i), fill=(255, 255, 255, 8 if i % 57 else 12), width=1)
+    f_line = ImageFont.truetype(FONT_BOLD, 27)
+    f_brand = ImageFont.truetype(FONT_BOLD, 14)
 
-    f_line = ImageFont.truetype(FONT_BOLD, 25)
-    f_brand = ImageFont.truetype(FONT_BOLD, 21)
+    # شارة AddonStation الزجاجية أعلى المشهد.
+    d.rounded_rectangle((w // 2 - 104, 24, w // 2 + 104, 76), radius=22,
+                        fill=(7, 11, 18, 190), outline=(245, 248, 252, 46), width=1)
+    icon = Image.open(APP_ICON).convert("RGBA").resize((40, 40), Image.LANCZOS)
+    img.paste(icon, (w // 2 - 96, 30), icon)
+    brand = string_of(locale, "brand_wordmark").upper()
+    d.text((w // 2 - 42, 50), brand, font=f_brand, fill="#F5F8FC", anchor="lm")
 
-    y = int(h * 0.30)
-    logo = Image.open(LOGO).convert("RGBA")
-    lk = (w * 0.92) / logo.width
-    logo = logo.resize((int(logo.width * lk), int(logo.height * lk)), Image.LANCZOS)
-    shadow = Image.new("RGBA", logo.size, (0, 0, 0, 190))
-    img.paste(shadow, ((w - logo.width) // 2, y + 3), shadow)
-    img.paste(logo, ((w - logo.width) // 2, y), logo)
-    y += logo.height + 12
-    d.rectangle((w // 2 - 60, y, w // 2 + 60, y + 2), fill=(0, 112, 204, 153))
-
-    y += 40
-    for key in ("splash_dream_it", "splash_build_it", "splash_create_it"):
+    # الكلمات بالتتابع: ضوء، ماسة، لافا.
+    y = int(h * 0.16)
+    colours = ("#F5F8FC", "#36D7E0", "#FFB12B")
+    for key, colour in zip(("splash_dream_it", "splash_build_it", "splash_create_it"), colours):
         text = string_of(locale, key)
-        if locale.startswith("values-ar") or locale.startswith("values-ru") or locale.startswith("values-zh"):
+        if locale == "values-ar":
             text = rtl(text)
-        for dx, dy in ((2, 2),):
-            d.text((w // 2 + dx, y + dy), text, font=f_line, fill=(0, 0, 0, 220), anchor="mm")
-        d.text((w // 2, y), text, font=f_line, fill=(255, 255, 255), anchor="mm")
-        y += 41
+        d.text((w // 2 + 2, y + 2), text, font=f_line, fill=(0, 0, 0, 235), anchor="mm")
+        d.text((w // 2, y), text, font=f_line, fill=colour, anchor="mm")
+        y += 40
+    d.rounded_rectangle((w // 2 - 65, y + 3, w // 2 - 3, y + 6), radius=2, fill="#36D7E0")
+    d.rounded_rectangle((w // 2 + 3, y + 3, w // 2 + 65, y + 6), radius=2, fill="#FFB12B")
 
-    y += 32
-    brand = string_of(locale, "brand_wordmark")
-    d.text((w // 2, y), brand, font=f_brand, fill=(255, 255, 255), anchor="mm")
-    for i in range(180):
-        t = i / 179
-        a = int(255 * (1 - abs(2 * t - 1)))
-        d.line((w // 2 - 90 + i, y + 20, w // 2 - 90 + i + 1, y + 22), fill=(0, 112, 204, a))
+    # وصف المنصة وشريط التحميل الملوّن قرب الحافة السفلية.
+    tagline = string_of(locale, "home_guest_card_title_plain")
+    if locale == "values-ar":
+        tagline = rtl(tagline)
+    d.text((w // 2, h - 80), tagline, font=ImageFont.truetype(FONT_BOLD, 11),
+           fill="#C7D1DC", anchor="mm")
+    x = w // 2 - 118
+    for i in range(10):
+        colour = "#F5F8FC" if i < 3 else "#36D7E0" if i < 7 else "#FFB12B"
+        d.rounded_rectangle((x + i * 24, h - 55, x + i * 24 + 20, h - 47), radius=2, fill=colour)
     return img, label
 
 
@@ -115,7 +113,7 @@ def main() -> int:
     d = ImageDraw.Draw(img)
     d.rectangle((0, 0, W, top - 14), fill="#111823")
     f_h = ImageFont.truetype(FONT_BOLD, 22)
-    d.text((W - 22, 16), rtl("شاشة البداية — الصورة المرفقة مقصوصةً بمقاس شاشة الهاتف خلفيةً للشعار والكلمات"),
+    d.text((W - 22, 16), rtl("شاشة البداية الجديدة — مشهد الكهف الطولي مع حركة DREAM / BUILD / CREATE"),
            font=f_h, fill="#E8EEF5", anchor="ra")
     for i, (scr, label) in enumerate(screens):
         x = pad + i * (w + pad)
@@ -126,9 +124,9 @@ def main() -> int:
     bw, bh = Image.open(BG).size
     bkb = os.path.getsize(BG) / 1024
     note = [
-        "الخلفية: drawable-xxhdpi/splash_bg.jpg (%d×%d · %d KB) — قصّ طولي من منتصف الأصل المرفق (16:9) بنسبة شاشة الهاتف 9:19.5."
+        "الخلفية: drawable-nodpi/splash_cave_chase.jpg (%d×%d · %d KB) — الصورة الطولية الجديدة التي أرسلها المالك."
         % (bw, bh, round(bkb)),
-        "تعتيم متدرّج (شفافية 27%–55%) فوقها ليقرأ الشعار الأبيض والكلمات بوضوح، مع بقاء حركات التلاشي والتكبير وخطوط المسح والجسيمات كما هي.",
+        "الألوان: ضوء أبيض · ماسة سماوية · لافا ذهبية، مع تقريب هادئ وتعتيم علوي/سفلي يحافظ على وضوح المشهد.",
     ]
     for i, line in enumerate(note):
         d.text((W - 22, top + h + 48 + i * 20), rtl(line), font=ImageFont.truetype(FONT_BOLD, 14),

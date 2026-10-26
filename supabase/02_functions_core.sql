@@ -147,8 +147,9 @@ returns jsonb
 language plpgsql security definer set search_path = public
 as $$
 declare
-  v_uid  uuid := auth.uid();
-  v_item public.content_items;
+  v_uid         uuid := auth.uid();
+  v_item        public.content_items;
+  v_object_size bigint;
 begin
   if v_uid is null then
     return jsonb_build_object('ok', false, 'message', 'sign_in_required');
@@ -159,7 +160,16 @@ begin
     return jsonb_build_object('ok', false, 'message', 'not_found');
   end if;
 
-  if coalesce(v_item.file_path,'') = '' then
+  if coalesce(v_item.file_path, '') = '' then
+    return jsonb_build_object('ok', false, 'message', 'file_not_uploaded');
+  end if;
+
+  select coalesce((o.metadata ->> 'size')::bigint, v_item.file_size)
+    into v_object_size
+    from storage.objects o
+   where o.bucket_id = 'content-files'
+     and o.name = v_item.file_path;
+  if not found then
     return jsonb_build_object('ok', false, 'message', 'file_not_uploaded');
   end if;
 
@@ -175,9 +185,39 @@ begin
   update public.content_items set downloads_count = downloads_count + 1 where id = p_item_id;
 
   return jsonb_build_object('ok', true, 'bucket', 'content-files', 'path', v_item.file_path,
-                            'title', v_item.title);
+                            'size', v_object_size, 'title', v_item.title);
 end;
 $$;
+
+-- Never publish metadata that points to a missing protected Storage object.
+-- This guard runs only for inserts and publication/path changes, so ordinary
+-- view/download counter updates do not pay for the Storage lookup.
+create or replace function public.ensure_published_content_file()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if new.is_published and (
+    coalesce(new.file_path, '') = ''
+    or not exists (
+      select 1
+        from storage.objects o
+       where o.bucket_id = 'content-files'
+         and o.name = new.file_path
+    )
+  ) then
+    raise exception using errcode = '23514', message = 'file_not_uploaded';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.ensure_published_content_file() from public;
+
+drop trigger if exists content_items_require_uploaded_file on public.content_items;
+create trigger content_items_require_uploaded_file
+  before insert or update of is_published, file_path on public.content_items
+  for each row execute function public.ensure_published_content_file();
 
 -- ---------------------------------------------------------------------------
 -- 3) المفضلة
@@ -659,6 +699,11 @@ begin
     return jsonb_build_object('ok', false, 'message', 'invalid_kind');
   end if;
 
+  -- This validated SECURITY DEFINER RPC is the only non-admin path allowed to
+  -- change protected profile asset columns. The trigger remains strict for
+  -- direct table updates.
+  perform set_config('app.allow_profile_write', '1', true);
+
   -- السماح بإعادة التعيين للقيمة الافتراضية
   if p_value is null or p_value = '' or p_value = 'none' then
     if p_kind = 'avatar' then
@@ -673,9 +718,15 @@ begin
              updated_at = now()
        where id = v_uid;
     elsif p_kind = 'banner' then
-      update public.profiles set banner_url = null where id = v_uid;
+      update public.profiles
+         set banner_url = null,
+             updated_at = now()
+       where id = v_uid;
     else
-      update public.profiles set equipped_item_id = 'none' where id = v_uid;
+      update public.profiles
+         set equipped_item_id = 'none',
+             updated_at = now()
+       where id = v_uid;
     end if;
     return jsonb_build_object('ok', true, 'value', 'none');
   end if;
@@ -737,6 +788,10 @@ begin
       return jsonb_build_object('ok', false, 'message', 'username_taken');
     end if;
   end if;
+
+  -- Username changes are validated above and must pass the protected-column
+  -- trigger through this trusted RPC only.
+  perform set_config('app.allow_profile_write', '1', true);
 
   update public.profiles
      set username = coalesce(p_username, username),

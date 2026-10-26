@@ -6,7 +6,7 @@
 الملف 99 هو ما يلصقه المالك في Supabase ليتأكّد أن **كل** ملفات SQL نُفِّذت.
 هذا الفاحص يحرسه من الداخل:
 
-  ١) موجود ويحوي بنداً لكل ملف ترحيل (01 → 31)؛
+  ١) موجود ويحوي بنداً لكل ملف ترحيل (01 → 47)؛
   ٢) **لا يكتب شيئاً**: لا insert/update/delete/drop/alter/truncate — قراءة فقط
      (الاستثناء الوحيد: إنشاء دالة التشخيص `public.diag_text`)؛
   ٣) كل جدول/دالة/سياسة/زناد/تسلسل/مخزن **يذكره** موجود فعلاً في ملفات
@@ -43,6 +43,9 @@ def read(path: Path) -> str:
 def catalog():
     tables, funcs, policies, triggers, indexes, sequences, buckets = (set(), set(), set(),
                                                                      set(), set(), set(), set())
+    # كائنات تُسقطها الترحيلات عمداً (مثل 39: إرجاع الإشعارات كما كانت) —
+    # يجوز أن يذكرها الفاحص 99 للتأكد من غيابها.
+    dropped_triggers = set()
     for p in sorted(SUPABASE.glob("*.sql")):
         if p.name in ("00_ALL_IN_ONE.sql", "99_VERIFY_ALL.sql"):
             continue
@@ -52,10 +55,12 @@ def catalog():
         policies |= set(re.findall(r"create policy\s+\"?([A-Za-z_]+)\"?\s+on\s+"
                                    r"(?:public\.|storage\.)?([a-z_]+)", s))
         triggers |= set(re.findall(r"create trigger\s+([a-z_]+)", s))
+        dropped_triggers |= set(re.findall(r"drop trigger if exists\s+([a-z_]+)", s))
         indexes |= set(re.findall(r"create (?:unique )?index(?: if not exists)?\s+([a-z_]+)", s))
         sequences |= set(re.findall(r"sequence\s+public\.([a-z_]+)", s))
         buckets |= set(re.findall(r"\(\s*'([a-z-]+)',\s*'[a-z-]+',\s*(?:true|false),", s))
     return dict(tables=tables, funcs=funcs, policies=policies, triggers=triggers,
+                dropped_triggers=dropped_triggers,
                 indexes=indexes, sequences=sequences, buckets=buckets)
 
 
@@ -190,7 +195,8 @@ def main() -> int:
     rows.append(("لا سياسة مذكورة بغير اسمها الصحيح", not bad_pol, " · ".join(bad_pol)))
 
     # الأزرار (triggers) والتسلسلات والفهارس
-    bad_trig = [t for t in re.findall(r"tgname = '([a-z_]+)'", sql) if t not in cat["triggers"]]
+    bad_trig = [t for t in re.findall(r"tgname = '([a-z_]+)'", sql)
+                if t not in cat["triggers"] and t not in cat["dropped_triggers"]]
     rows.append(("لا زناد مذكوراً بغير اسمه الصحيح", not bad_trig, " · ".join(bad_trig)))
     bad_seq = [t for t in re.findall(r"sequencename = '([a-z_]+)'", sql)
                if t not in cat["sequences"] and t not in ("site_assets_id_seq",)]
@@ -237,9 +243,9 @@ def main() -> int:
     #     post_permission = 'admin' والصحيح 'admin_only').
     migrations_text = "".join(read(p2) for p2 in sorted(SUPABASE.glob("*.sql"))
                               if p2.name not in ("00_ALL_IN_ONE.sql", "99_VERIFY_ALL.sql"))
-    CATALOG_KEYS = {"schemaname", "table_schema", "table_name", "column_name", "policyname",
-                    "tgname", "indexname", "sequencename", "pubname", "relname", "proname",
-                    "column_default"}
+    CATALOG_KEYS = {"schemaname", "table_schema", "table_name", "tablename", "column_name",
+                    "policyname", "tgname", "indexname", "sequencename", "pubname", "relname",
+                    "proname", "oid", "column_default"}
     bad_values = []
     for key, val in comparisons(sql):
         if key in CATALOG_KEYS or val in ("public", "storage", "true", "false"):
@@ -281,8 +287,28 @@ def main() -> int:
                 fields.append("".join(buf).strip())
                 if len(fields) < 9 or fields[0] not in ("avatar", "banner", "sticker", "item"):
                     continue
+                # Migration 45 removes every old free avatar row after the seed;
+                # compare the verifier against that final catalog, not the raw
+                # transient VALUES list in 15_assets_v2.sql.
+                if (fields[0] == "avatar" and fields[4] == "free"
+                        and fields[2] not in (
+                            "profiles/profiles/onefree.png",
+                            # 27_admin_only_assets promotes this row before 45.
+                            "profiles/pfp/download-1.jpg",
+                        )):
+                    continue
                 name = fields[6].strip("'")
                 counts[name] = counts.get(name, 0) + 1
+        # Migration 46 moves the canonical free image out of Profiles, then
+        # atomically replaces Profiles and adds Profile 2 from the pinned
+        # profile-packs manifest. Model that final state rather than the
+        # transient historical rows in migration 15.
+        canonical = counts.pop("Profiles", 0)
+        if canonical != 1:
+            raise AssertionError(f"expected one canonical Profiles seed row before migration 46, found {canonical}")
+        counts["Default"] = 1
+        counts["Profiles"] = 24
+        counts["Profile 2"] = 11
         return counts
 
     seed = seed_collections()

@@ -347,7 +347,7 @@ begin
   end if;
 
   -- اسم المرسل وصورته: الصورة تظهر كأيكونة بجانب الإشعار (شات/صداقة)
-  select coalesce(nullif(username, ''), full_name, '—'),
+  select coalesce(nullif(username, ''), display_name, '—'),
          nullif(btrim(coalesce(avatar_url, '')), '')
     into v_actor_name, v_actor_avatar
     from public.profiles where id = new.actor_id;

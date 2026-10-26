@@ -27,6 +27,71 @@ data class AppPalette(
     val dangerBg: Color, val onGreen: Color,
 )
 
+/** ألوان شاشة Home v2 والشريط المشترك؛ تُحقن بالـ CompositionLocal من الثيم الحالي. */
+@Immutable
+data class HomePalette(
+    val isDark: Boolean,
+    val bg: Color,
+    val surface: Color,
+    val surfaceHigh: Color,
+    val barSurface: Color,
+    val border: Color,
+    val text: Color,
+    val textMuted: Color,
+    val chipText: Color,
+    val blue: Color,
+    val accentBlue: Color,
+    val blueLink: Color,
+    val goldFill: Color,
+    val goldText: Color,
+    val planStart: Color,
+    val planEnd: Color,
+    val planBorder: Color,
+    val planSecondary: Color,
+    val epic: Color,
+    val inactive: Color,
+    val homeInactiveBg: Color,
+    val homeInactiveIcon: Color,
+    val notificationBadge: Color,
+    val heroOverlay: Color,
+    val heroSubtitle: Color,
+    val buttonText: Color,
+    val goldInk: Color,
+    val cardShadow: Color,
+    val barShadow: Color,
+)
+
+object HomePalettes {
+    val Dark = HomePalette(
+        isDark = true,
+        bg = Color(0xFF0A0F1C), surface = Color(0xFF121A2B), surfaceHigh = Color(0xFF1A2438),
+        barSurface = Color(0xFF0E1526), border = Color(0xFF223049), text = Color(0xFFEAF0FA),
+        textMuted = Color(0xFF9DB0CF), chipText = Color(0xFFC4D1E8), blue = Color(0xFF2E7BEF), accentBlue = Color(0xFF4C9AFF),
+        blueLink = Color(0xFF6FA8FF), goldFill = Color(0xFFF0C25E), goldText = Color(0xFFF0C25E),
+        planStart = Color(0xFF3A2A0B), planEnd = Color(0xFF1B1405), planBorder = Color(0xFF8A6A22),
+        planSecondary = Color(0xFFE8D5A3), epic = Color(0xFF9B6BFF), inactive = Color(0xFF8EA0BF),
+        homeInactiveBg = Color(0xFF1A2438), homeInactiveIcon = Color(0xFFC4D1E8),
+        notificationBadge = Color(0xFFFF6B78), heroOverlay = Color(0xFF0A0F1C),
+        heroSubtitle = Color(0xFFD3DDF0), buttonText = Color.White, goldInk = Color(0xFF1B1405),
+        cardShadow = Color.Transparent, barShadow = Color.Black.copy(alpha = 0.50f),
+    )
+    val Light = HomePalette(
+        isDark = false,
+        bg = Color(0xFFF4F7FC), surface = Color(0xFFFFFFFF), surfaceHigh = Color(0xFFE8EEF8),
+        barSurface = Color(0xFFFFFFFF), border = Color(0xFFD5DEEC), text = Color(0xFF0E1526),
+        textMuted = Color(0xFF53627F), chipText = Color(0xFF33425F), blue = Color(0xFF2563D6), accentBlue = Color(0xFF1D4FB8),
+        blueLink = Color(0xFF1D4FB8), goldFill = Color(0xFFF0C25E), goldText = Color(0xFF7A5600),
+        planStart = Color(0xFFFFF3D2), planEnd = Color(0xFFFFE7A8), planBorder = Color(0xFFE0B24A),
+        planSecondary = Color(0xFF5C4300), epic = Color(0xFF7B4FD1), inactive = Color(0xFF53627F),
+        homeInactiveBg = Color(0xFFE8EEF8), homeInactiveIcon = Color(0xFF33425F),
+        notificationBadge = Color(0xFFE5484D), heroOverlay = Color(0xFF0A0F1C),
+        heroSubtitle = Color(0xFFD3DDF0), buttonText = Color.White, goldInk = Color(0xFF1B1405),
+        cardShadow = Color(0x140E1526), barShadow = Color(0x2E0E1526),
+    )
+}
+
+val LocalHomePalette = androidx.compose.runtime.staticCompositionLocalOf { HomePalettes.Dark }
+
 /**
  * ألوان التطبيق — تُقرأ من اللوحة النشطة (داكنة أو فاتحة).
  *
@@ -61,7 +126,7 @@ object AppColors {
 
     /** اللوحة الفاتحة: خلفية فاتحة، نصوص داكنة، وألوان أعمق لتباين كافٍ. */
     val LightPalette = AppPalette(
-        bg = Color(0xFFF2F5F9), surface = Color(0xFFFFFFFF),
+        bg = Color(0xFFF4F7FC), surface = Color(0xFFFFFFFF),
         elevated = Color(0xFFFFFFFF), elevated2 = Color(0xFFE7EDF4),
         border = Color(0xFFDCE4EC), border2 = Color(0xFFC4D1DF),
         text = Color(0xFF0F1B26), muted = Color(0xFF56697C),
@@ -137,6 +202,55 @@ object AppColors {
     val LightElevated: Color get() = LightPalette.elevated2
     val LightBorder: Color get() = LightPalette.border
     val LightText: Color get() = LightPalette.text
+
+    /** لوحة المصادقة والإعدادات تتبع المظهر النشط، مثل بقية التطبيق. */
+    private val authPalette: HomePalette
+        get() = if (isDark) HomePalettes.Dark else HomePalettes.Light
+
+    val AuthWhite = Color(0xFFFFFFFF)
+    val AuthBg: Color get() = authPalette.bg
+    val AuthSurface: Color get() = authPalette.surface
+    val AuthSurfaceHigh: Color get() = authPalette.surfaceHigh
+    val AuthBarSurface: Color get() = authPalette.barSurface
+    val AuthBorder: Color get() = authPalette.border
+    val AuthDivider: Color get() = if (isDark) Color(0xFF1D2940) else Color(0xFFD5DEEC)
+    val AuthText: Color get() = authPalette.text
+    val AuthMuted: Color get() = authPalette.textMuted
+    val AuthChipLabel: Color get() = authPalette.chipText
+    val AuthBlue: Color get() = authPalette.blue
+    val AuthBlueLight: Color get() = authPalette.blueLink
+    /** لون ذهبي فاتح للأسطح والأزرار، منفصل عن الذهبي الداكن المقروء كنص في الوضع الفاتح. */
+    val AuthGoldFill = Color(0xFFF0C25E)
+    val AuthGold: Color get() = authPalette.goldText
+    val AuthGoldDark = Color(0xFF1B1405)
+    val AuthGoldBorder: Color get() = authPalette.planBorder
+    val AuthGoldLine: Color get() = if (isDark) Color(0xFF5A4416) else Color(0xFFE0B24A)
+    val AuthGoldSoft: Color get() = authPalette.planSecondary
+    val AuthWalletTop: Color get() = if (isDark) Color(0xFF3E2D0C) else Color(0xFFFFF3D2)
+    val AuthWalletBottom: Color get() = authPalette.planEnd
+    val AuthStreakBg: Color get() = if (isDark) Color(0xFF1A1710) else Color(0xFFFFF8E5)
+    val AuthStreakBorder: Color get() = if (isDark) Color(0xFF4A3A18) else Color(0xFFE8C66A)
+    val AuthStreakMuted: Color get() = if (isDark) Color(0xFF8A7A52) else Color(0xFF7A5600)
+    val AuthClaimDisabled: Color get() = if (isDark) Color(0xFF3A3220) else Color(0xFFE8EDF4)
+    val AuthNavInactive: Color get() = authPalette.inactive
+    val AuthGreen: Color get() = if (isDark) Color(0xFF3FBF6A) else Color(0xFF1E7A44)
+    val AuthGreenText: Color get() = if (isDark) Color(0xFF7FD99A) else Color(0xFF1E7A44)
+    val AuthPurple: Color get() = authPalette.epic
+    val AuthTeal: Color get() = if (isDark) Color(0xFF2DD4BF) else Color(0xFF11776F)
+    val AuthAccentBlue: Color get() = authPalette.accentBlue
+    val AuthRed: Color get() = if (isDark) Color(0xFFFF6B78) else Color(0xFFB3262E)
+    val AuthRedText: Color get() = if (isDark) Color(0xFFFF8791) else Color(0xFFB3262E)
+    val AuthRedButton: Color get() = if (isDark) Color(0xFFB3414B) else Color(0xFFB32626)
+    val AuthRedBorder: Color get() = if (isDark) Color(0xFF5A2830) else Color(0xFFF2B5B5)
+    val AuthRedBorderStrong: Color get() = if (isDark) Color(0xFF6B2D36) else Color(0xFFD88C8C)
+    val AuthRedTextSoft: Color get() = if (isDark) Color(0xFFE6B3B8) else Color(0xFF7A2E32)
+    val AuthRedTop: Color get() = if (isDark) Color(0xFF22121A) else Color(0xFFFFF1F1)
+    val AuthRedBottom: Color get() = if (isDark) Color(0xFF150B10) else Color(0xFFFFE3E3)
+    val AuthPlanTop: Color get() = authPalette.planStart
+    val AuthPlanBottom: Color get() = authPalette.planEnd
+    val AuthPlanButton: Color get() = if (isDark) Color(0xFF2A2210) else Color(0xFFFFF8E6)
+    val AuthMasterTop: Color get() = if (isDark) Color(0xFF102244) else Color(0xFFE8F2FF)
+    val AuthPermissionBorder: Color get() = if (isDark) Color(0xFF5A4416) else Color(0xFFE0B24A)
 }
 
 /** ألوان شارات الرتب حسب الوثيقة. */

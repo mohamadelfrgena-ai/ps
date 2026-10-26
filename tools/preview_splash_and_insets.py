@@ -22,7 +22,7 @@ BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 REG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 BG, PANEL, TEXT, MUTED, GREEN, DIM, BORDER = (
     "#05080D", "#0E141D", "#E8EEF5", "#8EA0B3", "#3DDC84", "#5A6B7D", "#263240")
-SPLASH_BG = "#020406"
+SPLASH_SCENE = os.path.join(DRAWABLES, "splash_cave_chase.jpg")
 
 
 def rtl(s: str) -> str:
@@ -37,20 +37,30 @@ def string_of(locale: str, name: str) -> str:
 
 
 def draw_splash(img, draw, x0, y0, w, h, locale, label):
-    draw.rounded_rectangle((x0, y0, x0 + w, y0 + h), radius=24, fill=SPLASH_BG, outline=BORDER, width=2)
-    # شعار مبسّط
-    draw.text((x0 + w / 2, y0 + 46), "AddonStation", font=ImageFont.truetype(BOLD, 26),
+    scene = Image.open(SPLASH_SCENE).convert("RGB")
+    scale = max(w / scene.width, h / scene.height)
+    sw, sh = round(scene.width * scale), round(scene.height * scale)
+    scene = scene.resize((sw, sh), Image.LANCZOS)
+    scene = scene.crop(((sw - w) // 2, (sh - h) // 2, (sw - w) // 2 + w, (sh - h) // 2 + h))
+    scene = Image.blend(scene, Image.new("RGB", (w, h), "#070B12"), 0.22)
+    img.paste(scene, (x0, y0))
+    draw.rounded_rectangle((x0, y0, x0 + w, y0 + h), radius=24, outline=BORDER, width=2)
+
+    draw.rounded_rectangle((x0 + w / 2 - 104, y0 + 20, x0 + w / 2 + 104, y0 + 70),
+                           radius=22, fill="#111823", outline="#45505E")
+    draw.text((x0 + w / 2, y0 + 45), "ADDONSTATION", font=ImageFont.truetype(BOLD, 18),
               fill=TEXT, anchor="mm")
-    draw.line((x0 + w * 0.3, y0 + 70, x0 + w * 0.7, y0 + 70), fill="#0070CC", width=2)
-    y = y0 + 120
-    for key in ("splash_dream_it", "splash_build_it", "splash_create_it"):
+    y = y0 + 112
+    colours = ("#F5F8FC", "#36D7E0", "#FFB12B")
+    for key, colour in zip(("splash_dream_it", "splash_build_it", "splash_create_it"), colours):
         text = string_of(locale, key)
-        font = ImageFont.truetype(BOLD, 30)          # عريض في كل اللغات
+        font = ImageFont.truetype(BOLD, 30)
         shown = rtl(text) if locale == "values-ar" else text
-        draw.text((x0 + w / 2, y), shown, font=font, fill=TEXT, anchor="mm")
-        y += 46
-    draw.text((x0 + w / 2, y0 + h - 34), f"{label} · خط عريض (Bold) في كل اللغات",
-              font=ImageFont.truetype(REG, 16), fill=MUTED, anchor="mm")
+        draw.text((x0 + w / 2 + 2, y + 2), shown, font=font, fill="#070B12", anchor="mm")
+        draw.text((x0 + w / 2, y), shown, font=font, fill=colour, anchor="mm")
+        y += 42
+    draw.text((x0 + w / 2, y0 + h - 24), f"{label} · DREAM / BUILD / CREATE",
+              font=ImageFont.truetype(REG, 13), fill=MUTED, anchor="mm")
 
 
 def draw_phone(img, draw, x0, y0, w, h, title):

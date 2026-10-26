@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_rule_1_plain">Уважайте всех участников</string>
+    <string name="chat_rule_2_plain">Без оскорблений и травли</string>
+    <string name="chat_rule_3_plain">Без расизма и дискриминации</string>
+    <string name="chat_rule_4_plain">Без подозрительных ссылок и рекламы</string>
+    <string name="chat_rule_5_plain">Не делитесь личными данными</string>
+    <string name="chat_rule_6_plain">Без неприемлемого контента</string>
+    <string name="chat_rule_7_plain">Без политики</string>
+    <string name="chat_rule_8_plain">Нарушения могут привести к мьюту или бану</string>
+    <string name="chat_rules_title_plain">Правила сообщества</string>
+    <string name="chat_rules_list_description">7 правил</string>
+</resources>

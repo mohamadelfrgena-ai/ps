@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_rule_1_plain">Herkese saygı göster</string>
+    <string name="chat_rule_2_plain">Hakaret ve taciz yok</string>
+    <string name="chat_rule_3_plain">Irkçılık ve ayrımcılık yok</string>
+    <string name="chat_rule_4_plain">Şüpheli bağlantı ve izinsiz reklam yok</string>
+    <string name="chat_rule_5_plain">Kişisel bilgi paylaşma</string>
+    <string name="chat_rule_6_plain">Uygunsuz içerik yok</string>
+    <string name="chat_rule_7_plain">Siyasi tartışma yok</string>
+    <string name="chat_rule_8_plain">İhlaller susturma veya yasaklanmayla sonuçlanabilir</string>
+    <string name="chat_rules_title_plain">Topluluk kuralları</string>
+    <string name="chat_rules_list_description">7 kural</string>
+</resources>

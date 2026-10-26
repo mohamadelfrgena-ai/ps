@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_filter_unread">Okunmamış</string>
+    <string name="chat_search_members">Üye ara</string>
+    <string name="chat_last_seen">Son görülme %1$s</string>
+    <string name="cd_scroll_to_bottom">En son mesajlara git</string>
+    <string name="cd_search_rooms">Odalarda ara</string>
+    <string name="chat_members_no_results">Aramanızla eşleşen üye yok.</string>
+</resources>

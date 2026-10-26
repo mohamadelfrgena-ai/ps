@@ -73,6 +73,7 @@ fun apiErrorFromMessage(message: String?, status: Int = 0): ApiError {
         m.contains("image_format") -> ApiErrorKind.INVALID_IMAGE_FORMAT
         m.contains("image_too_large") -> ApiErrorKind.IMAGE_TOO_LARGE
         m.contains("media_too_large") -> ApiErrorKind.MEDIA_TOO_LARGE
+        status == 401 -> ApiErrorKind.NOT_SIGNED_IN
         status >= 500 -> ApiErrorKind.SERVER
         else -> ApiErrorKind.GENERIC
     }

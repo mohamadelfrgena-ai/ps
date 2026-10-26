@@ -120,7 +120,7 @@
     <string name="common_none">None</string>
     <string name="common_yes">Yes</string>
     <string name="common_no">No</string>
-    <string name="common_guest">Guest</string>
+    <string name="common_guest">User</string>
     <string name="common_soon">Coming soon</string>
     <string name="common_log_out">Log out</string>
     <string name="common_sign_in">Sign in</string>
@@ -647,4 +647,224 @@
     <string name="profile_item_equipped">Equipped</string>
     <string name="profile_content_section">Content</string>
     <string name="profile_no_content_published">No content published yet</string>
+    <string name="auth_confirm_title">Your account is created ✓</string>
+    <string name="auth_confirm_text">We sent a confirmation link to your email. Open it, then tap the button below.</string>
+    <string name="auth_confirm_retry">I confirmed — go to sign in</string>
+    <string name="auth_confirm_resend">Resend the confirmation link</string>
+    <string name="auth_confirm_resent">Confirmation link sent again ✓</string>
+    <string name="auth_confirm_hint">No message? Check the spam folder as well.</string>
+    <string name="notif_prompt_title">Turn on notifications</string>
+    <string name="notif_prompt_text">Get chat messages, mentions and new addons even when the app is closed. You can change every part later from Settings.</string>
+    <string name="notif_prompt_allow">Turn on now</string>
+    <string name="notif_prompt_later">Later</string>
+    <string name="home_hero_slogan">DREAM IT.
+BUILD IT.
+CREATE IT.</string>
+    <string name="home_hero_subtitle">Addons and worlds ready for your adventure</string>
+    <string name="home_hero_start">Start now</string>
+    <string name="home_hero_family">Join the family</string>
+    <string name="home_plan_current">Your current plan</string>
+    <string name="home_plan_free_desc">Free content · Basic access · No subscription</string>
+    <string name="home_legend_title">JOIN LEGENDARY</string>
+    <string name="home_legend_text">Legendary addons · Legendary worlds · Priority access</string>
+    <string name="home_legend_view">View</string>
+    <string name="home_chip_all">All</string>
+    <string name="home_chip_addons">Addons</string>
+    <string name="home_chip_worlds">Worlds</string>
+    <string name="home_chip_favorites">Favorites</string>
+    <string name="home_latest_addons">Latest addons</string>
+    <string name="home_most_downloaded">Most downloaded</string>
+    <string name="home_featured_creators">Featured creators</string>
+    <string name="home_creators_caption">Creator specials selected by AddonStation</string>
+    <string name="home_no_content">No content published yet</string>
+    <string name="home_error">Something went wrong</string>
+    <string name="home_error_tap">Tap to retry</string>
+    <string name="comm_all_rooms">All rooms</string>
+    <string name="comm_rules_banner">⚠️ Community rules · Violations may lead to a mute or a ban</string>
+    <string name="comm_members_only">Chat is for members only — sign in to enter the rooms</string>
+    <string name="chat_online">%1$d online</string>
+    <string name="chat_pinned_strip">Pinned messages · %1$s</string>
+    <string name="home_by_creator">By %1$s</string>
+    <string name="chat_nobody_online">Nobody is online right now</string>
+    <string name="badge_premium">Premium member</string>
+    <string name="badge_creator">Creator</string>
+    <string name="badge_admin">ADMIN</string>
+    <string name="badge_mod">MOD</string>
+    <string name="badge_level">Level %1$d</string>
+    <string name="profile_no_bio">This member has not added a bio yet.</string>
+    <string name="profile_stats_friends">Friends</string>
+    <string name="profile_wallet_title">AC wallet</string>
+    <string name="profile_daily_reward">Daily reward</string>
+    <string name="profile_daily_claimed">Claimed today</string>
+    <string name="profile_day_streak">%1$d day streak</string>
+    <string name="profile_logout">Log out</string>
+    <string name="profile_orders">My orders</string>
+    <string name="profile_view_as_others">View as others</string>
+    <string name="profile_hidden_from_others">Hidden from other users</string>
+    <string name="profile_safety">Safety</string>
+    <string name="profile_moderation">Moderation</string>
+    <string name="profile_msg_user">Message %1$s</string>
+    <string name="profile_friend_request">Friend request</string>
+    <string name="profile_request_sent">Request sent</string>
+    <string name="profile_friends_state">Friends ✓</string>
+    <string name="profile_accept">Accept</string>
+    <string name="profile_reject">Reject</string>
+    <string name="profile_status_online">Online</string>
+    <string name="profile_status_away">Away</string>
+    <string name="profile_status_offline">Offline</string>
+    <string name="profile_ban_user">Ban user</string>
+    <string name="profile_ban_confirm">Are you sure you want to ban %1$s? They will no longer be able to access chat.</string>
+    <string name="profile_delete_message">Delete message</string>
+    <string name="profile_as_others_title">My profile as others see it</string>
+    <string name="profile_member_since_label">MEMBER SINCE</string>
+    <string name="chat_unmute_user">Unmute this user</string>
+    <string name="profile_action_done">Done ✓</string>
+    <string name="profile_action_failed">Couldn’t complete — please try again.</string>
+    <string name="profile_mute_done">Muted — their messages are now hidden from you.</string>
+    <string name="profile_unmute_done">Unmuted — their messages are visible again.</string>
+    <string name="common_more">More</string>
+    <string name="profile_blocked_state">You can’t interact with this member</string>
+    <string name="profile_unfriend">Remove friend</string>
+    <string name="profile_unfriend_confirm">Remove this member from your friends?</string>
+    <string name="mute_member_locked">Legendary</string>
+    <string name="mute_member_needs_plan">Muting members is a Legendary feature — opening the subscription.</string>
+
+    <!-- AddonStation auth/settings redesign -->
+    <string name="auth_email_placeholder">name@example.com</string>
+    <string name="auth_password_placeholder">••••••••</string>
+    <string name="settings_my_plan">My plan</string>
+    <string name="settings_your_plan">Your plan: %1$s</string>
+    <string name="settings_expires_on">Expires on %1$s</string>
+    <string name="settings_upgrade">Upgrade</string>
+    <string name="settings_sections_five">5 SECTIONS</string>
+    <string name="settings_admin_tools">Admin tools</string>
+    <string name="settings_admin_visible">Visible to admin accounts only</string>
+    <string name="settings_open_dashboard">Open Dashboard</string>
+    <string name="settings_account_actions">Account actions</string>
+    <string name="settings_footer">© 2026 AddonStation — All rights reserved</string>
+    <string name="auth_username_placeholder">your_username</string>
+    <string name="crash_report_title">App crash report</string>
+    <string name="crash_report_body">The app stopped unexpectedly on its previous launch. Copy this report and send it to support so we can identify the cause.</string>
+    <string name="crash_report_copy">Copy crash report</string>
+    <string name="crash_report_copied">Report copied. Paste it into this chat.</string>
+    <string name="crash_report_continue">Try opening the app</string>
+
+    <!-- Edit profile detail screen -->
+    <string name="profile_edit_plain">Edit profile</string>
+    <string name="edit_profile_preview">Preview</string>
+    <string name="edit_profile_counter">%1$d/%2$d</string>
+    <string name="edit_profile_discard_title">Discard changes?</string>
+    <string name="edit_profile_discard_body">Your edits will be lost.</string>
+    <string name="edit_profile_discard">Discard</string>
+    <string name="edit_profile_keep_editing">Keep editing</string>
+    <string name="edit_profile_saved">Profile saved</string>
+    <string name="edit_profile_status_hint">What\'s on your mind?</string>
+    <string name="edit_profile_avatar_label">Avatar</string>
+    <string name="edit_profile_epic_item">Epic item</string>
+    <string name="edit_profile_golden_item">Golden item</string>
+    <string name="edit_profile_no_items">No items are available in this section yet.</string>
+    <string name="edit_profile_no_results">No matching pictures.</string>
+    <string name="cd_avatar_selected">%1$s, selected</string>
+    <string name="cd_avatar_locked">%1$s, locked. Requires %2$s</string>
+    <string name="plan_locked_avatars_plain">Locked avatars unlock with Epic or Legendary.</string>
+    <string name="plan_locked_items_plain">Locked chat items require the right plan.</string>
+    <string name="plan_locked_online_plain">Online status is available to Legendary subscribers.</string>
+    <string name="plan_locked_banner_note_plain">All banners are locked — unlock with an Epic or Legendary subscription.</string>
+    <string name="profile_banner_none_plain">No banner yet — pick one from the sections below</string>
+    <string name="profile_about_plain">Bio</string>
+    <string name="msg_username_taken">That username is already in use.</string>
+
+    <!-- Home v2 sections -->
+
+    <!-- Imported missing localized resources from AddonStation_chat_panels_store -->
+
+    <!-- Imported missing localized resources from AddonStation_profile_wallet_admin -->
+
+    <!-- Imported missing localized resources from AddonStation_creators_pages -->
+    <string name="profile_remove_favorite">Remove from favorites</string>
+
+    <!-- Creator form labels -->
+    <string name="creator_file_types">Any file type (*/*)</string>
+    <string name="creator_optional_details">Optional details</string>
+    <string name="creator_required_fields">Complete required fields and accept both confirmations.</string>
+    <string name="creator_category_adventure">Adventure</string>
+    <string name="creator_category_survival">Survival</string>
+    <string name="creator_category_pvp">PvP</string>
+    <string name="creator_category_building">Building</string>
+    <string name="creator_category_skins">Skins</string>
+    <string name="creator_category_other">Other</string>
+
+    <!-- Admin asset confirmations and progress -->
+    <string name="admin_delete_asset">Delete asset</string>
+    <string name="admin_asset_reading">Preparing image…</string>
+    <string name="admin_asset_read_failed">Could not read the selected file.</string>
+    <string name="admin_asset_uploading">Uploading image… (%1$d KB)</string>
+    <string name="admin_asset_uploaded">Uploaded %1$s (%2$d KB)</string>
+    <string name="admin_asset_upload_failed">Upload failed: %1$s</string>
+    <string name="admin_asset_resize_running">Resizing stored images… Do not close this screen.</string>
+    <string name="admin_asset_resize_done">Resized %1$d images.</string>
+    <string name="admin_asset_resize_failed">Resize failed: %1$s</string>
+
+    <!-- Plain plan feature labels -->
+    <string name="plan_free_features_plain">Free access · Basic downloads · No subscription</string>
+    <string name="creator_confirm_required">Confirm both statements before submitting.</string>
+
+    <!-- Admin creator tip review -->
+    <string name="admin_tip_from_to">%1$s → %2$s</string>
+    <string name="admin_tip_approve_confirm">Approve the %1$s LYD tip from %2$s for %3$s?</string>
+    <string name="admin_tip_reject_confirm">Reject the %1$s LYD tip from %2$s for %3$s?</string>
+    <string name="admin_tip_reject_reason">Receipt not verified</string>
+    <string name="admin_tip_approved">Tip approved.</string>
+    <string name="admin_tip_rejected">Tip rejected.</string>
+    <string name="admin_tip_review_failed">Could not update tip: %1$s</string>
+    <string name="admin_tip_receipt_missing">No receipt is attached to this tip.</string>
+    <string name="admin_tip_status_pending">Pending</string>
+    <string name="admin_tip_status_approved">Approved</string>
+    <string name="admin_tip_status_rejected">Rejected</string>
+
+    <!-- Creator moderation copy -->
+    <string name="creator_status_pending">Pending</string>
+    <string name="creator_status_approved">Approved</string>
+    <string name="creator_status_rejected">Rejected</string>
+    <string name="admin_creator_more_info">Request more info</string>
+    <string name="admin_creator_more_info_note">Please send more details.</string>
+    <string name="admin_creator_approved">Creator request approved.</string>
+    <string name="admin_creator_rejected">Creator request rejected.</string>
+    <string name="admin_creator_more_info_sent">More information requested.</string>
+    <string name="admin_creator_review_failed">Could not update the request: %1$s</string>
+    <string name="admin_submission_approved">Content submission approved.</string>
+    <string name="admin_submission_rejected">Content submission rejected.</string>
+    <string name="admin_submission_review_failed">Could not update the submission: %1$s</string>
+    <string name="admin_creator_reject_reason">Not eligible yet.</string>
+    <string name="admin_submission_reject_reason">Needs changes.</string>
+    <string name="creator_status_more_info">More information requested.</string>
+    <string name="chat_admin_only_short">Admin only</string>
+    <string name="edit_profile_tab_item">Item</string>
+    <string name="edit_profile_tab_about">About</string>
+    <string name="edit_profile_message_preview">[Message text]</string>
+
+    <!-- PlayStation console linking -->
+    <string name="console_link_title">Link PlayStation device</string>
+    <string name="console_link_settings_subtitle">Link a PlayStation with a one-time code</string>
+    <string name="console_devices_title">Linked devices</string>
+    <string name="console_devices_settings_subtitle">View linked consoles and remove a device</string>
+    <string name="console_link_help">Generate a 6-character code on your PlayStation. It expires after 10 minutes and can only be used once.</string>
+    <string name="console_link_code_label">6-character code</string>
+    <string name="console_link_action">Link device</string>
+    <string name="console_link_success">Device linked ✓ — %1$s</string>
+    <string name="console_link_invalid_code">Invalid code — enter 6 characters from the allowed alphabet.</string>
+    <string name="console_link_code_not_found">Code not found. Check the code and try again.</string>
+    <string name="console_link_code_expired">Expired or already used — request a new code.</string>
+    <string name="console_link_sign_in_required">Sign in before linking a PlayStation device.</string>
+    <string name="console_link_sign_in_action">Sign in</string>
+    <string name="console_link_view_devices">View linked devices</string>
+    <string name="console_devices_empty">No linked devices yet.</string>
+    <string name="console_devices_load_failed">Could not load your linked devices.</string>
+    <string name="console_device_linked_at">Linked: %1$s</string>
+    <string name="console_device_last_seen">Last seen: %1$s</string>
+    <string name="console_device_unlink">Unlink</string>
+    <string name="console_device_unlink_confirm_title">Unlink this device?</string>
+    <string name="console_device_unlink_confirm_message">Remove %1$s from your linked devices?</string>
+    <string name="console_device_unlink_success">Device unlinked.</string>
+    <string name="console_device_unlink_failed">Could not unlink this device.</string>
 </resources>

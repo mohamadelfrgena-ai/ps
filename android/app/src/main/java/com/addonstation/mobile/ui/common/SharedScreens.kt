@@ -57,9 +57,11 @@ import com.addonstation.mobile.ui.components.GhostButton
 import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.LoadingBox
 import com.addonstation.mobile.ui.components.PixelTopBar
+import com.addonstation.mobile.ui.components.toErrorKind
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
+import java.util.Locale
 
 /** شاشة عامة لقائمة محتوى (مفضلتي / تحميلاتي / الحصريات / محتوى مبدع…). */
 @Composable
@@ -73,11 +75,22 @@ fun ContentListScreen(
     val container = rememberContainer()
     var loading by remember { mutableStateOf(true) }
     var items by remember { mutableStateOf<List<ContentItem>>(emptyList()) }
+    var failure by remember { mutableStateOf<Throwable?>(null) }
+    var reloadTick by remember { mutableStateOf(0) }
 
-    LaunchedEffect(title) {
+    LaunchedEffect(title, reloadTick) {
         loading = true
-        items = runCatching { loader() }.getOrElse { emptyList() }
-        loading = false
+        failure = null
+        try {
+            items = loader()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            android.util.Log.w("ContentListScreen", "Content list load failed", error)
+            failure = error
+        } finally {
+            loading = false
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -85,6 +98,10 @@ fun ContentListScreen(
         ContentColumn(Modifier.weight(1f)) {
             when {
                 loading -> LoadingBox(text = stringResource(R.string.common_loading))
+                failure != null -> com.addonstation.mobile.ui.components.ErrorState(
+                    onRetry = { reloadTick += 1 },
+                    kind = failure!!.toErrorKind(),
+                )
                 items.isEmpty() -> EmptyState(emptyText)
                 else -> LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
@@ -114,9 +131,13 @@ fun planLabelOf(plan: String): String = when (plan) {
     else -> stringResource(R.string.plan_free_name)
 }
 
-/** سطر إحصاءات مبني بدون مفاتيح جديدة: تنزيلات · مشاهدات · تقييم. */
+/**
+ * Compact legacy metadata for surfaces that have not adopted the visual stat row.
+ * Emoji are deliberately excluded; Store and item screens use the supplied
+ * vector stat icons so their appearance is identical on every phone.
+ */
 fun metaOf(item: ContentItem): String =
-    "📥 ${item.downloadsCount} · 👁 ${item.viewsCount}" + if (item.rating > 0) " · ⭐ %.1f".format(item.rating) else ""
+    "${item.downloadsCount} · ${item.viewsCount}" + if (item.rating > 0) " · %.1f".format(Locale.US, item.rating) else ""
 
 /** عارض صورة بملء الشاشة مع تكبير/تحريك وزر إغلاق. */
 @Composable

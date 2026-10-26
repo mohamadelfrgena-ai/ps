@@ -20,7 +20,8 @@ val localProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 fun configValue(key: String): String =
-    (localProps.getProperty(key) ?: project.findProperty(key)?.toString() ?: "").trim()
+    localProps.getProperty(key)?.trim()?.takeIf(String::isNotBlank)
+        ?: project.findProperty(key)?.toString()?.trim().orEmpty()
 
 // ---------------------------------------------------------------------------
 // حماية إلزامية: المفتاح السري (sb_secret_… / service_role) لا يدخل BuildConfig
@@ -52,7 +53,7 @@ android {
         applicationId = "com.addonstation.mobile"
         minSdk = 24
         targetSdk = 35
-        // 1.3: استعادة كلمة المرور · الدخول التلقائي بعد التسجيل · عين كلمة المرور
+        // 1.3: استعادة كلمة المرور · توجيه تأكيد التسجيل إلى Login · عين كلمة المرور
         //      وحقل التأكيد · شريط التنقّل السفلي · إطار الاختيار · استقرار الشات
         versionCode = 4
         versionName = "1.3"          // AddonStation Mobile v1.3

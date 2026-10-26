@@ -16,9 +16,9 @@
 --      3) دالة `handle_new_user()` ⇒ كل حساب جديد؛
 --      4) وكل حساب يشير إلى المسار غير الموجود (`profiles/onefree.png`).
 --
---  ملاحظة: التطبيق يجرب المسارين تلقائياً (Common.kt) فالصورة كانت تظهر
---  بالفعل — لكن التوحيد يمنع طلباً فاشلاً (404) لكل حساب عند كل عرض.
---  النتيجة: 123 أفاتاراً · ومفعّل مجاني واحد · وملفه موجود فعلاً.
+--  التطبيق الآن يستخدم المسار المعتمد وحده، ثم نسخة محلية مطابقة عند تعذر
+--  الشبكة؛ لذلك لا يوجد طلب 404 لمسار قديم ولا يظهر بديل بصري مختلف.
+--  النتيجة النهائية بعد ملف 45: 66 أفاتاراً · وسجل مجاني واحد فقط · وملفه موجود فعلاً.
 --
 --  آمن لإعادة التنفيذ (idempotent) · يُنفَّذ مرة واحدة في Supabase → SQL Editor.
 -- ============================================================================
@@ -38,14 +38,12 @@ delete from public.site_assets
 -- ٢) تثبيت الصف المعتمد: المسار الموجود في المخزن · مجاني · مفعّل
 -- ---------------------------------------------------------------------------
 update public.site_assets
-   set asset_type    = 'avatar',
-       required_plan = 'free',
-       enabled       = true,
-       collection    = coalesce(collection, 'Profiles'),
-       collection_order = case when coalesce(collection_order, 0) = 0 then 2
-                               else collection_order end,
-       sort_order    = case when coalesce(sort_order, 0) = 0 then 40
-                            else sort_order end
+   set asset_type       = 'avatar',
+       required_plan    = 'free',
+       enabled          = true,
+       collection       = 'Default',
+       collection_order = 1,
+       sort_order       = 1
  where file_url = 'profiles/profiles/onefree.png';
 
 -- وإن لم يوجد الصف أصلاً (تنصيب جديد) أدرجه
@@ -54,11 +52,14 @@ insert into public.site_assets
    collection_order, sort_order, enabled)
 values
   ('avatar', 'Onefree', 'profiles/profiles/onefree.png', 'free', false,
-   'Profiles', 2, 40, true)
+   'Default', 1, 1, true)
 on conflict (file_url) do update
-   set asset_type    = excluded.asset_type,
-       required_plan = excluded.required_plan,
-       enabled       = true;
+   set asset_type       = excluded.asset_type,
+       required_plan    = excluded.required_plan,
+       collection       = excluded.collection,
+       collection_order = excluded.collection_order,
+       sort_order       = excluded.sort_order,
+       enabled          = true;
 
 -- ---------------------------------------------------------------------------
 -- ٣) الأفاتار المجاني المفعّل = onefree وحده (ولا شيء غيره)
@@ -156,6 +157,10 @@ begin
     return jsonb_build_object('ok', false, 'message', 'invalid_kind');
   end if;
 
+  -- This validated RPC is allowed through guard_profile_update; direct writes
+  -- to protected asset columns remain unavailable to authenticated clients.
+  perform set_config('app.allow_profile_write', '1', true);
+
   -- السماح بإعادة التعيين للقيمة الافتراضية
   if p_value is null or p_value = '' or p_value = 'none' then
     if p_kind = 'avatar' then
@@ -170,9 +175,15 @@ begin
              updated_at = now()
        where id = v_uid;
     elsif p_kind = 'banner' then
-      update public.profiles set banner_url = null where id = v_uid;
+      update public.profiles
+         set banner_url = null,
+             updated_at = now()
+       where id = v_uid;
     else
-      update public.profiles set equipped_item_id = 'none' where id = v_uid;
+      update public.profiles
+         set equipped_item_id = 'none',
+             updated_at = now()
+       where id = v_uid;
     end if;
     return jsonb_build_object('ok', true, 'value', 'none');
   end if;

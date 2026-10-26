@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_filter_unread">Непрочитанные</string>
+    <string name="chat_search_members">Поиск участников</string>
+    <string name="chat_last_seen">Был(а) в сети %1$s</string>
+    <string name="cd_scroll_to_bottom">К последним сообщениям</string>
+    <string name="cd_search_rooms">Поиск по комнатам</string>
+    <string name="chat_members_no_results">Совпадений не найдено.</string>
+</resources>
