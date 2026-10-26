@@ -187,16 +187,18 @@ def migrate_one(base: str, key: str, asset: Asset) -> str:
         thumb_blob, thumb_mime = public_thumb
         upload(base, key, PRIVATE_BUCKET, thumb_destination, thumb_blob, thumb_mime)
 
-    # حدّث أي حساب اختار الأصل قبل تغيير صف الكتالوج (SQL 40 يفعلها أيضاً؛
-    # التكرار مقصود كي تبقى الأداة آمنة عند تشغيلها منفردة بعد ذلك).
-    if asset.asset_type == "avatar":
-        patch(base, key, "profiles?" + eq_filter("avatar_url", source), {"avatar_url": destination})
-    elif asset.asset_type == "banner":
-        patch(base, key, "profiles?" + eq_filter("banner_url", source), {"banner_url": destination})
-    elif asset.asset_type == "item":
-        patch(base, key, "profiles?" + eq_filter("equipped_item_id", source), {"equipped_item_id": asset.name})
-
+    # If the catalog still has a public path, this tool is being run without
+    # migration 40 and must update profile references itself. When migration 40
+    # already changed the catalog path (the production case), it also changed
+    # those profile references transactionally; do not issue redundant REST
+    # writes against the protected profiles table.
     if catalog_path != destination:
+        if asset.asset_type == "avatar":
+            patch(base, key, "profiles?" + eq_filter("avatar_url", source), {"avatar_url": destination})
+        elif asset.asset_type == "banner":
+            patch(base, key, "profiles?" + eq_filter("banner_url", source), {"banner_url": destination})
+        elif asset.asset_type == "item":
+            patch(base, key, "profiles?" + eq_filter("equipped_item_id", source), {"equipped_item_id": asset.name})
         patch(base, key, f"site_assets?id=eq.{asset.id}", {"file_url": destination})
 
     # آخر خطوة فقط: إزالة أي نسخة عامة بعد التأكد أن النسخة الخاصة موجودة.

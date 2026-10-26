@@ -190,7 +190,15 @@ jobs:
             # bytes had been copied. Finish that pending migration and remove
             # every legacy public admin copy. The two new admin files were
             # uploaded directly to admin-assets by the command above.
+            set +e
             python3 tools/migrate_admin_assets_private.py --apply
+            MIGRATE_STATUS=$?
+            set -e
+            if [ "$MIGRATE_STATUS" -ne 0 ]; then
+              SUMMARY=$(grep -E '✗|  - .*HTTP' "$GITHUB_WORKSPACE/upload-log.txt" | tail -8 | tr '\n' ';' | sed 's/%/%25/g')
+              echo "::error title=Admin asset migration::${SUMMARY:-See upload step output}"
+              exit "$MIGRATE_STATUS"
+            fi
           else
             python3 -m pip install --quiet pillow
             python3 tools/upload_banners.py --zip Banner.zip --seed
