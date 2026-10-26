@@ -169,7 +169,7 @@ int iconStyle();
 void drawLegalSplash(UiEngine& e, const std::string& langCode);   // static frame (used by the fade below)
 // v5.5 start-up splash: appears gradually, stays, disappears gradually. Call every frame with the ms since
 // app start; returns false when finished (then show the app and call releaseLegalSplash to free 8 MB).
-constexpr int kSplashFadeInMs = 800, kSplashHoldMs = 2200, kSplashFadeOutMs = 800;
+constexpr int kSplashFadeInMs = 800, kSplashHoldMs = 3800, kSplashFadeOutMs = 1000;   // v0.29: longer hold so the user can read the splash
 bool drawLegalSplashFade(UiEngine& e, const std::string& langCode, int elapsedMs);
 float legalSplashOpacity(int elapsedMs);                // 0..1 (linear) for your own effects / sounds
 int legalSplashTotalMs();

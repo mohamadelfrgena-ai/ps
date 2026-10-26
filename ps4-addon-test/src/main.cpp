@@ -39,7 +39,7 @@ using namespace pkgtest;
 // ---------------------------------------------------------------- config ----
 static const char* kStageDir = "/data/AddonStation/installed";
 static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
-static const char* kAppVersion = "0.28";
+static const char* kAppVersion = "0.29";
 static const char* kBrandSuffix = " by sliver fox";
 
 static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
@@ -585,19 +585,55 @@ static void startDownloadFlow(int catIdx) {
 }
 
 // ---------------------------------------------------------------- input -----
-static void pushBtn(Btn b) {
+// v0.29: input hardening — PS-menu-style hold-repeat + logical held state (post-RTL).
+static Btn swapRtl(Btn b) {
     // Arabic (RTL): the layout mirrors horizontally, so the horizontal controls mirror too
     if (A.lang == "ar") {
-        if (b == Btn::Left) b = Btn::Right;
-        else if (b == Btn::Right) b = Btn::Left;
-        else if (b == Btn::L2) b = Btn::R2;
-        else if (b == Btn::R2) b = Btn::L2;
+        if (b == Btn::Left) return Btn::Right;
+        if (b == Btn::Right) return Btn::Left;
+        if (b == Btn::L2) return Btn::R2;
+        if (b == Btn::R2) return Btn::L2;
     }
+    return b;
+}
+static void queueBtn(Btn b) {
     std::lock_guard<std::mutex> lk(gBtnMx);
-    if (gBtnQ.size() < 8) gBtnQ.push_back(b);
+    if (gBtnQ.size() < 32) gBtnQ.push_back(b);
+}
+static void pushBtn(Btn b) {
+    queueBtn(swapRtl(b));
+}
+static bool gHeld[static_cast<std::size_t>(Btn::Options) + 1] = {};
+static std::uint32_t gRepeatAt[static_cast<std::size_t>(Btn::Options) + 1] = {};
+static void markHeld(Btn phys, bool down) {
+    const Btn b = swapRtl(phys);
+    const std::size_t i = static_cast<std::size_t>(b);
+    if (down) {
+        if (!gHeld[i]) {
+            gHeld[i] = true;
+            gRepeatAt[i] = SDL_GetTicks() + 380;   // first repeat after 380 ms
+            queueBtn(b);
+        }
+    } else {
+        gHeld[i] = false;
+    }
+}
+static void pumpRepeats() {
+    const std::uint32_t now = SDL_GetTicks();
+    static const Btn kRepeatable[] = {Btn::Up, Btn::Down, Btn::Left, Btn::Right,
+                                      Btn::L1, Btn::R1, Btn::L2, Btn::R2};
+    for (Btn b : kRepeatable) {
+        const std::size_t i = static_cast<std::size_t>(b);
+        if (gHeld[i] && static_cast<int>(now - gRepeatAt[i]) >= 0) {
+            gRepeatAt[i] = now + 120;              // then every 120 ms (PS-menu speed)
+            queueBtn(b);
+        }
+    }
 }
 
+static std::vector<Scr> gBackStk;   // v0.29: real back stack (A.back alone could trap Search)
 static void go(Scr s) {
+    if (s != Scr::Detail && s != Scr::Search && s != Scr::SignIn) gBackStk.clear();
     A.scr = s;
     A.focus = 0;
     A.filter = 0;
@@ -606,6 +642,17 @@ static void go(Scr s) {
     A.dirty = true;
 }
 
+static void pushScr(Scr s) {
+    A.back = A.scr;
+    gBackStk.push_back(A.scr);
+    go(s);
+}
+static void goBack() {
+    Scr s = gBackStk.empty() ? A.back : gBackStk.back();
+    if (!gBackStk.empty()) gBackStk.pop_back();
+    if (s == A.scr) s = Scr::Home;   // never "back" into the same screen (old Search trap)
+    go(s);
+}
 static void openItem(int catIdx) {
     if (catIdx < 0) return;
     if (!account().signedIn) {
@@ -615,16 +662,14 @@ static void openItem(int catIdx) {
         A.dirty = true;
         return;
     }
-    A.back = A.scr;
     A.detailIdx = catIdx;
     gDetailId = catalog()[(std::size_t)catIdx].id;
     A.dl = catalog()[(std::size_t)catIdx].installed ? (int)DemoState::Installed : (int)DemoState::Idle;
-    go(Scr::Detail);
+    pushScr(Scr::Detail);
 }
 
 static void startSignIn() {
-    A.back = A.scr;
-    go(Scr::SignIn);
+    pushScr(Scr::SignIn);
     A.qrView = false;
     newCode();
 }
@@ -871,14 +916,13 @@ static void handle(Btn b) {
     }
     // ---- global: △ = Search (no triangle menu in v5) ----
     if (b == Btn::Triangle && A.scr != Scr::SignIn && A.scr != Scr::Search) {
-        A.back = A.scr;
-        go(Scr::Search);
+        pushScr(Scr::Search);
         return;
     }
     switch (A.scr) {
         case Scr::SignIn:
             if (A.codeStatus == 1) {
-                if (b == Btn::Cross || b == Btn::Circle) go(A.back);
+                if (b == Btn::Cross || b == Btn::Circle) goBack();
             } else if (A.qrView) {
                 if (b == Btn::Cross) {
                     A.qrView = false;
@@ -890,7 +934,7 @@ static void handle(Btn b) {
                 else if (b == Btn::Cross) {
                     if (A.focus == 0) newCode();
                     else { A.qrView = true; A.focus = 0; }
-                } else if (b == Btn::Circle) go(A.back);
+                } else if (b == Btn::Circle) goBack();
             }
             break;
         case Scr::Settings:
@@ -919,14 +963,14 @@ static void handle(Btn b) {
             } else if (b == Btn::Cross) {
                 openItem(focusedCard());
             } else if (b == Btn::Circle) {
-                go(A.back);
+                goBack();
             } else if (b == Btn::Up) moveFocus(0, -1);
             else if (b == Btn::Down) moveFocus(0, 1);
             else if (b == Btn::Left) moveFocus(-1, 0);
             else if (b == Btn::Right) moveFocus(1, 0);
             break;
         case Scr::Detail: {
-            if (A.detailIdx < 0 || A.detailIdx >= (int)catalog().size()) { go(A.back); break; }
+            if (A.detailIdx < 0 || A.detailIdx >= (int)catalog().size()) { goBack(); break; }
             const AddonItem& it = catalog()[(std::size_t)A.detailIdx];
             const bool ac = acUnlockOffered(it);
             if (b == Btn::Up || b == Btn::Left) moveFocus(-1, 0);
@@ -960,7 +1004,7 @@ static void handle(Btn b) {
                     case Access::NeedPlan: go(Scr::Plans); break;
                 }
             } else if (b == Btn::Circle) {
-                go(A.back);
+                goBack();
             }
             break;
         }
@@ -1177,22 +1221,26 @@ int main(int, char**) {
             if (ev.type == SDL_QUIT) {
                 pushBtn(Btn::Circle);       // ○ never exits the app
             } else if (ev.type == SDL_JOYHATMOTION) {
+                // v0.29: track held state so the D-pad repeats like the PS menu
                 const Uint8 hat = ev.jhat.value;
-                if (hat & SDL_HAT_UP) pushBtn(Btn::Up);
-                if (hat & SDL_HAT_DOWN) pushBtn(Btn::Down);
-                if (hat & SDL_HAT_LEFT) pushBtn(Btn::Left);
-                if (hat & SDL_HAT_RIGHT) pushBtn(Btn::Right);
-            } else if (ev.type == SDL_JOYBUTTONDOWN) {
+                markHeld(Btn::Up, (hat & SDL_HAT_UP) != 0);
+                markHeld(Btn::Down, (hat & SDL_HAT_DOWN) != 0);
+                markHeld(Btn::Left, (hat & SDL_HAT_LEFT) != 0);
+                markHeld(Btn::Right, (hat & SDL_HAT_RIGHT) != 0);
+            } else if (ev.type == SDL_JOYBUTTONDOWN || ev.type == SDL_JOYBUTTONUP) {
+                // OpenOrbis SDL-PS4 driver (src/joystick/ps4): 0=✕ 1=○ 2=□ 3=△
+                // 4=L1 5=R1 18=L2 19=R2 (6/7 kept as legacy aliases)
                 const Uint8 b = ev.jbutton.button;
-                // v0.5 map: 0=✕ 1=○ 2=□ 3=△ 4=L1 5=R1 6=L2 7=R2
-                if (b == 0) pushBtn(Btn::Cross);
-                else if (b == 1) pushBtn(Btn::Circle);
-                else if (b == 2) pushBtn(Btn::Square);
-                else if (b == 3) pushBtn(Btn::Triangle);
-                else if (b == 4) pushBtn(Btn::L1);
-                else if (b == 5) pushBtn(Btn::R1);
-                else if (b == 6) pushBtn(Btn::L2);
-                else if (b == 7) pushBtn(Btn::R2);
+                Btn mapped = Btn::None;
+                if (b == 0) mapped = Btn::Cross;
+                else if (b == 1) mapped = Btn::Circle;
+                else if (b == 2) mapped = Btn::Square;
+                else if (b == 3) mapped = Btn::Triangle;
+                else if (b == 4) mapped = Btn::L1;
+                else if (b == 5) mapped = Btn::R1;
+                else if (b == 6 || b == 18) mapped = Btn::L2;
+                else if (b == 7 || b == 19) mapped = Btn::R2;
+                if (mapped != Btn::None) markHeld(mapped, ev.type == SDL_JOYBUTTONDOWN);
             } else if (ev.type == SDL_KEYDOWN) {
                 const SDL_Keycode k = ev.key.keysym.sym;
                 if (k == SDLK_UP) pushBtn(Btn::Up);
@@ -1209,6 +1257,7 @@ int main(int, char**) {
                 else if (k == SDLK_PERIOD) pushBtn(Btn::R1);
             }
         }
+        pumpRepeats();                       // v0.29: PS-menu hold-repeat
         for (Btn b : drainButtons()) handle(b);
 
         const std::time_t now = std::time(nullptr);

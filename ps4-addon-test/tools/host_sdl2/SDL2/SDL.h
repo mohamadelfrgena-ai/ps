@@ -51,6 +51,14 @@ typedef struct SDL_Renderer {
 #define SDL_WINDOWPOS_CENTERED 0
 
 static inline const char* SDL_GetError(void) { return "host sdl stub"; }
+// v0.29: the v7.4 UI animations are time-based (focus glow, icon motion)
+#include <chrono>
+static inline Uint32 SDL_GetTicks(void) {
+    using namespace std::chrono;
+    static const steady_clock::time_point t0 = steady_clock::now();
+    return static_cast<Uint32>(duration_cast<milliseconds>(steady_clock::now() - t0).count());
+}
+static inline void SDL_Delay(Uint32 ms) { (void)ms; }
 static inline int SDL_Init(Uint32) { return 0; }
 static inline void SDL_Quit(void) {}
 
