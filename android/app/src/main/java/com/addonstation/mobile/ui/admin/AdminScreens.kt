@@ -111,7 +111,6 @@ import com.addonstation.mobile.ui.components.RowItem
 import com.addonstation.mobile.ui.components.SectionHeader
 import com.addonstation.mobile.ui.components.specDashedBorder
 import com.addonstation.mobile.ui.common.metaOf
-import com.addonstation.mobile.ui.plans.StatusPill
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
