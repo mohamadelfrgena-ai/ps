@@ -69,7 +69,7 @@ fun PixelTopBar(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                painter = painterResource(R.mipmap.ic_launcher),
+                painter = painterResource(R.drawable.app_icon),
                 contentDescription = stringResourceAppName(),
                 tint = androidx.compose.ui.graphics.Color.Unspecified,
                 modifier = Modifier.size(24.dp),

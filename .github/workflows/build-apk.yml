@@ -328,6 +328,7 @@ jobs:
       - name: Verify redesigned splash resources and behavior
         run: |
           python3 tools/check_resources.py
+          python3 tools/check_app_icon.py
           python3 tools/check_kotlin_health.py
           python3 tools/check_kotlin_refs.py
           python3 tools/check_splash_progress.py
@@ -417,6 +418,10 @@ jobs:
         run: |
           python3 tools/check_resources.py || {
             echo "::error::مشاكل في مجلد res/ — أصلحها أولاً (التفاصيل في السجل أعلاه)"
+            exit 1
+          }
+          python3 tools/check_app_icon.py || {
+            echo "::error::أيقونة الهاتف الجديدة ناقصة أو عادت أيقونة قديمة"
             exit 1
           }
 
