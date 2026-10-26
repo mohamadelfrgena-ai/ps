@@ -4,8 +4,9 @@
 # دفع هذا الملف (أو تغييره) يشغّل سير العمل تلقائياً.
 mode: upload
 zip: https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/banner.zip
-run: 4
+run: 5
 
+# تطبيق migration 48 بعد نجاح رفع الأصول والتحقق منها.
 # إعادة التنفيذ لتنظيف النسخ العامة بعد اكتمال نسخ الملفات إلى admin-assets.
 # إعادة التنفيذ بعد دعم استجابة Storage للملف الخاص المفقود وعدم تعطيل النشر عند امتلاء Artifact quota.
 # طلب 2026-10-26: حذف Nature والنسخ العامة القديمة، ثم رفع 56 أصلاً إلى
