@@ -39,7 +39,7 @@ using namespace pkgtest;
 // ---------------------------------------------------------------- config ----
 static const char* kStageDir = "/data/AddonStation/installed";
 static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
-static const char* kAppVersion = "0.29";
+static const char* kAppVersion = "0.30";
 static const char* kBrandSuffix = " by sliver fox";
 
 static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
@@ -600,6 +600,10 @@ static void queueBtn(Btn b) {
     std::lock_guard<std::mutex> lk(gBtnMx);
     if (gBtnQ.size() < 32) gBtnQ.push_back(b);
 }
+// v0.30: animation frame-snapshot (restored between state changes; animated overlays replayed)
+static std::vector<std::uint32_t> gFrameBase;
+static Uint32 gLastAnimMs = 0;
+
 static void pushBtn(Btn b) {
     queueBtn(swapRtl(b));
 }
@@ -1156,6 +1160,11 @@ int main(int, char**) {
         }
     }).detach();
 
+    // ---- HUD sounds: start audio FIRST so the welcome chime plays with the splash (v0.30) ----
+    if (!ui_audio_init("/app0/assets/sfx")) ui_audio_init("assets/sfx");
+    ui_sfx_volume(100);
+    ui_sfx(Sfx::AppStart);
+
     // ---- boot image (pic1): put our first frame on screen, THEN dismiss it ----
     drawLegalSplashFade(engine, A.lang, 0);
     engine.present(SDL_GetWindowSurface(window));
@@ -1164,13 +1173,20 @@ int main(int, char**) {
     sceSystemServiceHideSplashScreen();   // boot screen -> our splash (fade starts from black)
 #endif
 
-    // ---- v5.5 legal splash: fade in -> hold -> fade out -> guest Home ----
+    // ---- v5.5 legal splash: fade in -> hold -> smooth cross-fade into guest Home (v0.30) ----
     {
         const auto t0 = std::chrono::steady_clock::now();
+        const int fadeOutAt = kSplashFadeInMs + kSplashHoldMs;
         for (;;) {
             const int ms = (int)std::chrono::duration_cast<std::chrono::milliseconds>(
                                 std::chrono::steady_clock::now() - t0).count();
-            const bool running = drawLegalSplashFade(engine, A.lang, ms);
+            bool running;
+            if (ms < fadeOutAt) {
+                running = drawLegalSplashFade(engine, A.lang, ms);
+            } else {
+                drawFrame(engine);                       // Home live beneath the splash
+                running = drawLegalSplashOver(engine, A.lang, ms);
+            }
             engine.present(SDL_GetWindowSurface(window));
             SDL_UpdateWindowSurface(window);
             SDL_Delay(16);
@@ -1179,11 +1195,6 @@ int main(int, char**) {
         releaseLegalSplash(engine);
         A.dirty = true;
     }
-    // ---- HUD sounds (v7.2) — AFTER the splash so the app always boots first ----
-    if (!ui_audio_init("/app0/assets/sfx")) ui_audio_init("assets/sfx");
-    ui_sfx_volume(80);
-    ui_sfx(Sfx::AppStart);
-
     setAppVersion(kAppVersion);
     if (!gSession.valid) setAccount(Account{});
     setCoverRequestHandler([](const AddonItem& it) { requestCoverAsync(it); });
@@ -1298,8 +1309,22 @@ int main(int, char**) {
             A.dirty = true;
         }
 
+        const Uint32 nowMs = SDL_GetTicks();
         if (A.dirty.exchange(false)) {
+            animReset();
             drawFrame(engine);
+            gFrameBase = engine.framebuffer();
+            engine.present(SDL_GetWindowSurface(window));
+            SDL_UpdateWindowSurface(window);
+            gLastAnimMs = nowMs;
+        } else if (animHas() && nowMs - gLastAnimMs >= 33) {
+            // v0.30: ~30 fps motion (glow comet, gem, mascot, settings tiles) without a full redraw
+            gLastAnimMs = nowMs;
+            std::vector<int> rects;
+            animRects(rects);
+            if (!rects.empty())
+                engine.restoreFrom(gFrameBase, rects.data(), static_cast<int>(rects.size()) / 4);
+            animReplay(engine);
             engine.present(SDL_GetWindowSurface(window));
             SDL_UpdateWindowSurface(window);
         }

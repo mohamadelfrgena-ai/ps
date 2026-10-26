@@ -259,6 +259,7 @@ void ui_sfx(Sfx id) {
 }
 
 void ui_sfx_volume(int v01) {
-    if (v01 < 0) v01 = 0; if (v01 > 100) v01 = 100;
+    if (v01 < 0) v01 = 0;
+    if (v01 > 100) v01 = 100;
     gVol = v01;
 }

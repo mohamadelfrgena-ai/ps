@@ -59,6 +59,8 @@ public:
     bool loadImageMemory(const std::string& name, const void* data, std::size_t size, int maxW = 0, int maxH = 0);
     bool addImageRGBA(const std::string& name, int w, int h, const std::uint8_t* rgba);
     void unloadImage(const std::string& name);
+    // v0.30: restore dirty rectangles from a frame snapshot (animation ticks)
+    void restoreFrom(const std::vector<std::uint32_t>& base, const int* rects, int nRects);
     bool hasImage(const std::string& name) const { return images_.count(name) != 0 || packed_.count(name) != 0; }
     std::size_t imageBytes() const { return imageBytes_; }      // decoded RGBA held by images_
     std::size_t scaledCacheBytes() const { return scaledBytes_; }

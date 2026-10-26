@@ -371,6 +371,10 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable2() 
                     {"es", "Introduce este código"}, {"ru", "Введи этот код"}, {"pt", "Digite este código"}, {"zh", "输入此代码"}}},
         {"code_expires", {{"en", "Expires in"}, {"ar", "ينتهي خلال"}, {"fr", "Expire dans"}, {"tr", "Süre"}, {"es", "Caduca en"},
                           {"ru", "Истекает через"}, {"pt", "Expira em"}, {"zh", "剩余"}}},
+        {"loading", {{"en", "Loading\xE2\x80\xA6"}, {"ar", "جار\xD9\x90 \xD8\xA7\xD9\x84\xD8\xAA\xD8\xAD\xD9\x85\xD9\x8A\xD9\x84\xE2\x80\xA6"},
+                    {"fr", "Chargement\xE2\x80\xA6"}, {"tr", "Y\xC3\xBCkleniyor\xE2\x80\xA6"},
+                    {"es", "Cargando\xE2\x80\xA6"}, {"ru", "\xD0\x97\xD0\xB0\xD0\xB3\xD1\x80\xD1\x83\xD0\xB7\xD0\xBA\xD0\xB0\xE2\x80\xA6"},
+                    {"pt", "Carregando\xE2\x80\xA6"}, {"zh", "\xE5\x8A\xA0\xE8\xBD\xBD\xE4\xB8\xAD\xE2\x80\xA6"}}},
         {"code_regen", {{"en", "Regenerate the code"}, {"ar", "عاود إنشاء الرمز"},
                        {"fr", "Régénérer le code"}, {"tr", "Kodu yeniden oluştur"},
                        {"es", "Regenerar el código"}, {"ru", "Создайте код заново"},
@@ -691,18 +695,42 @@ int drawBtn(UiEngine& e, const std::string& key, int cx, int cy, int h) {
     return iw;
 }
 
+// v0.30: ANIMATED overlay recording. The UI redraws fully only when state changes; between
+// states the main loop restores the animated rectangles from a frame snapshot and replays just
+// these calls (focus glow/comet, gem, mascot, settings icon tiles) ~30 times a second.
+struct AnimCall {
+    enum Kind : std::uint8_t { Ring, Mark, Mascot, Tile } kind;
+    int a0 = 0, a1 = 0, a2 = 0, a3 = 0, a4 = 0;
+    SDL_Color c{0, 0, 0, 255};
+};
+std::vector<AnimCall> gAnimCalls;
+std::vector<int> gAnimRects;      // x, y, w, h quads (draw space, already clipped later)
+bool gAnimRec = true;
+void animPush(const AnimCall& call, int x, int y, int w, int h) {
+    if (!gAnimRec) return;
+    gAnimCalls.push_back(call);
+    gAnimRects.push_back(x); gAnimRects.push_back(y);
+    gAnimRects.push_back(w); gAnimRects.push_back(h);
+}
+
 // v7.4 — LIVING focus glow: a crisp core ring (white on dark / black on light) + a soft multi-layer aura that
 // breathes (fades in and out) + two ripples that expand from the item and vanish. Time based (SDL_GetTicks),
 // so the speed is identical at any frame-rate. Cost: ~10 thin rounded borders for the ONE focused item only.
 void focusRing(UiEngine& e, int x, int y, int w, int h, int r) {
+    animPush({AnimCall::Ring, x, y, w, h, r}, x - 40, y - 40, w + 80, h + 80);
     const float t = static_cast<float>(SDL_GetTicks() % 600000u) / 1000.0f;           // seconds
     const float breath = std::sin(t * 3.1416f * 2.0f / 1.8f) * 0.5f + 0.5f;           // 0..1 every 1.8 s
     const float fast   = std::sin(t * 3.1416f * 2.0f / 0.9f + 1.2f) * 0.5f + 0.5f;    // quick shimmer on the core
-    // glow colour: brand green (brighter on dark, deeper on light). Set kGlowAccent=false for a neutral glow.
+    // glow colours: gold + orange only. Set kGlowAccent=false for a neutral white/black glow.
     const bool kGlowAccent = true;
     const bool kShine = true;    // light sweep across the focused BUTTON (h <= 110)
     const bool kLift  = true;    // focused item "grows" 0..3 px with the breathing (ring + aura expand together)
-    const SDL_Color g = !kGlowAccent ? kFOCUS : (gLight ? SDL_Color{16, 170, 96, 255} : SDL_Color{74, 240, 160, 255});
+    const bool kComet = true;    // white light-comet that circles the frame (like a gentle meteor)
+    // TWO-COLOUR glow: gold (inner rings) -> orange (outer rings + ripples). Change c1/c2 to re-tint the whole effect.
+    const SDL_Color c1 = !kGlowAccent ? kFOCUS : (gLight ? SDL_Color{184, 128, 8, 255} : SDL_Color{255, 214, 90, 255});
+    const SDL_Color c2 = !kGlowAccent ? kFOCUS : (gLight ? SDL_Color{220, 90, 20, 255} : SDL_Color{255, 130, 60, 255});
+    auto mixc = [&](float m) { return SDL_Color{static_cast<Uint8>(c1.r + (c2.r - c1.r) * m), static_cast<Uint8>(c1.g + (c2.g - c1.g) * m), static_cast<Uint8>(c1.b + (c2.b - c1.b) * m), 255}; };
+    const SDL_Color g = c1;
     // 0) light sweep (clipped to the rounded button): slanted soft band every 2.4 s, crossing in 0.9 s
     if (kShine && h <= 110 && w > 2 * r + 8) {
         const float ph = std::fmod(t, 2.4f) / 0.9f;
@@ -733,7 +761,8 @@ void focusRing(UiEngine& e, int x, int y, int w, int h, int r) {
         const int o = 6 + i * 3;
         const int a = static_cast<int>((gLight ? 120.0f : 150.0f) * f * f * k);
         if (a < 2) continue;
-        e.drawRoundBorder(x - o, y - o, w + 2 * o, h + 2 * o, r + o, 3, SDL_Color{g.r, g.g, g.b, static_cast<Uint8>(a)});
+        const SDL_Color gc = mixc(static_cast<float>(i) / 6.0f);
+        e.drawRoundBorder(x - o, y - o, w + 2 * o, h + 2 * o, r + o, 3, SDL_Color{gc.r, gc.g, gc.b, static_cast<Uint8>(a)});
     }
     // 2) two ripples: expand outward while fading (half a cycle apart)
     for (int n = 0; n < 2; ++n) {
@@ -742,12 +771,51 @@ void focusRing(UiEngine& e, int x, int y, int w, int h, int r) {
         const float q = 1.0f - p;
         const int a = static_cast<int>((gLight ? 90.0f : 120.0f) * q * q);
         if (a < 3) continue;
-        e.drawRoundBorder(x - o, y - o, w + 2 * o, h + 2 * o, r + o, 3, SDL_Color{g.r, g.g, g.b, static_cast<Uint8>(a)});
+        e.drawRoundBorder(x - o, y - o, w + 2 * o, h + 2 * o, r + o, 3, SDL_Color{c2.r, c2.g, c2.b, static_cast<Uint8>(a)});
     }
     // 3) tinted inner line + crisp core ring (core brightness shimmers slightly)
     e.drawRoundBorder(x - 3, y - 3, w + 6, h + 6, r + 3, 6, SDL_Color{g.r, g.g, g.b, static_cast<Uint8>(110 + 60 * breath)});
     const Uint8 ca = static_cast<Uint8>(226 + 29 * fast);
     e.drawRoundBorder(x - 3, y - 3, w + 6, h + 6, r + 3, 4, SDL_Color{kFOCUS.r, kFOCUS.g, kFOCUS.b, ca});
+    // 4) white light-comet circling the frame: one lap every 2.4 s, tail fades out behind the head
+    if (kComet) {
+        const int cx0 = x - 1, cy0 = y - 1, cw = w + 2, ch = h + 2;
+        const int cr = std::max(2, std::min(r + 1, std::min(cw, ch) / 2));
+        const float arc = 1.5707963f * static_cast<float>(cr);
+        const float sx = static_cast<float>(cw - 2 * cr), sy = static_cast<float>(ch - 2 * cr);
+        const float P = 2.0f * sx + 2.0f * sy + 4.0f * arc;
+        auto at = [&](float d, int& px, int& py) {
+            d = std::fmod(d, P); if (d < 0) d += P;
+            const float R = static_cast<float>(cr);
+            float q = d;
+            if (q < sx) { px = cx0 + cr + static_cast<int>(q); py = cy0; return; }
+            q -= sx;
+            if (q < arc) { const float a = q / R; px = cx0 + cw - cr + static_cast<int>(std::sin(a) * R); py = cy0 + cr - static_cast<int>(std::cos(a) * R); return; }
+            q -= arc;
+            if (q < sy) { px = cx0 + cw; py = cy0 + cr + static_cast<int>(q); return; }
+            q -= sy;
+            if (q < arc) { const float a = q / R; px = cx0 + cw - cr + static_cast<int>(std::cos(a) * R); py = cy0 + ch - cr + static_cast<int>(std::sin(a) * R); return; }
+            q -= arc;
+            if (q < sx) { px = cx0 + cw - cr - static_cast<int>(q); py = cy0 + ch; return; }
+            q -= sx;
+            if (q < arc) { const float a = q / R; px = cx0 + cr - static_cast<int>(std::sin(a) * R); py = cy0 + ch - cr + static_cast<int>(std::cos(a) * R); return; }
+            q -= arc;
+            if (q < sy) { px = cx0; py = cy0 + ch - cr - static_cast<int>(q); return; }
+            q -= sy;
+            const float a = q / R; px = cx0 + cr - static_cast<int>(std::cos(a) * R); py = cy0 + cr - static_cast<int>(std::sin(a) * R);
+        };
+        const float head = std::fmod(t / 2.4f, 1.0f) * P;
+        const float tail = P * 0.24f;
+        const int N = std::max(14, std::min(56, static_cast<int>(tail / 7.0f)));
+        for (int i = N; i >= 0; --i) {                      // tail first, head last (head on top)
+            const float f = 1.0f - static_cast<float>(i) / static_cast<float>(N);
+            int px = 0, py = 0;
+            at(head - tail * static_cast<float>(i) / static_cast<float>(N), px, py);
+            const int rad = 2 + static_cast<int>(3.0f * f);
+            e.drawCircle(px, py, rad + 4, SDL_Color{c2.r, c2.g, c2.b, static_cast<Uint8>(46.0f * f * f)});    // warm halo
+            e.drawCircle(px, py, rad, SDL_Color{255, 255, 255, static_cast<Uint8>(255.0f * f * f)});
+        }
+    }
 }
 
 [[maybe_unused]] void iconPhone(UiEngine& e, int x, int y, int s, SDL_Color c) {
@@ -1528,6 +1596,7 @@ void surface(UiEngine& e, int x, int y, int w, int h, int r, int tone = 0, bool 
 // v7.4 — section marker: a small glowing gem (rounded diamond) with a soft breathing halo. Replaces the old
 // square pixel block in section titles and kicker labels. Same box (x, y, s x s) as pixelBlock, so nothing shifts.
 void sectionMark(UiEngine& e, int x, int y, int s, SDL_Color c) {
+    animPush({AnimCall::Mark, x, y, s, 0, 0, c}, x - 12, y - 12, s + 24, s + 24);
     const float t = static_cast<float>(SDL_GetTicks() % 600000u) / 1000.0f;
     const float br = std::sin(t * 3.1416f * 2.0f / 1.8f) * 0.5f + 0.5f;
     const int cx = x + s / 2, cy = y + s / 2;
@@ -1544,6 +1613,7 @@ void sectionMark(UiEngine& e, int x, int y, int s, SDL_Color c) {
 //   icon_allay (with white glow, for the dark theme) and icon_allay_light (no glow, for the light theme).
 // Returns false when the image is not in the pak, so callers fall back to the old drawing (nothing breaks).
 bool drawMascot(UiEngine& e, int cx, int cy, int s) {
+    animPush({AnimCall::Mascot, cx, cy, s}, cx - s / 2 - 16, cy - s / 2 - 28, s + 32, s + 44);
     const char* nm = gLight ? "icon_allay_light" : "icon_allay";
     int iw = 0, ih = 0;
     if (!e.imageSize(nm, iw, ih) || iw <= 0) return false;
@@ -1653,23 +1723,37 @@ void qrTile(UiEngine& e, int x, int y, int s) {
         e.drawImage("qr_app", x + pad, y + pad, s - 2 * pad, s - 2 * pad);
         return;
     }
-    // placeholder: three finder patterns + dotted modules
-    const SDL_Color ink{20, 26, 40, 255};
-    const int u = (s - 2 * pad) / 21;
-    const int ox = x + (s - u * 21) / 2, oy = y + (s - u * 21) / 2;
-    auto finder = [&](int fx, int fy) {
-        e.fillRect(ox + fx * u, oy + fy * u, 7 * u, 7 * u, ink);
-        e.fillRect(ox + (fx + 1) * u, oy + (fy + 1) * u, 5 * u, 5 * u, kWHT);
-        e.fillRect(ox + (fx + 2) * u, oy + (fy + 2) * u, 3 * u, 3 * u, ink);
-    };
-    finder(0, 0); finder(14, 0); finder(0, 14);
-    unsigned h = 2166136261u;
-    for (int r = 0; r < 21; ++r) for (int c = 0; c < 21; ++c) {
-        const bool inFinder = (r < 8 && c < 8) || (r < 8 && c > 12) || (r > 12 && c < 8);
-        if (inFinder) continue;
-        h = h * 16777619u ^ static_cast<unsigned>(r * 31 + c);
-        if ((h >> 7) & 1u) e.fillRect(ox + c * u, oy + r * u, u, u, ink);
+    // placeholder: three finder patterns + dotted modules — rasterized ONCE into a
+    // cached image (v0.30: this used to draw ~300 rects every single frame on Plans)
+    const int q = s - 2 * pad;
+    const std::string nm = "__qr_ph_" + std::to_string(q);
+    if (!e.hasImage(nm)) {
+        const std::uint8_t kr = 20, kg = 26, kb = 40;
+        std::vector<std::uint8_t> px(static_cast<std::size_t>(q) * q * 4, 255);
+        const int u = std::max(1, q / 21);
+        auto dot = [&](int cx, int cy, int n, std::uint8_t r, std::uint8_t g2, std::uint8_t b2) {
+            for (int py = cy * u; py < cy * u + n * u && py < q; ++py)
+                for (int pxl = cx * u; pxl < cx * u + n * u && pxl < q; ++pxl) {
+                    std::uint8_t* t = &px[(static_cast<std::size_t>(py) * q + pxl) * 4];
+                    t[0] = r; t[1] = g2; t[2] = b2; t[3] = 255;
+                }
+        };
+        auto finder = [&](int fx, int fy) {
+            dot(fx, fy, 7, kr, kg, kb);
+            dot(fx + 1, fy + 1, 5, 255, 255, 255);
+            dot(fx + 2, fy + 2, 3, kr, kg, kb);
+        };
+        finder(0, 0); finder(14, 0); finder(0, 14);
+        unsigned h2 = 2166136261u;
+        for (int r = 0; r < 21; ++r) for (int c = 0; c < 21; ++c) {
+            const bool inFinder = (r < 8 && c < 8) || (r < 8 && c > 12) || (r > 12 && c < 8);
+            if (inFinder) continue;
+            h2 = h2 * 16777619u ^ static_cast<unsigned>(r * 31 + c);
+            if ((h2 >> 7) & 1u) dot(c, r, 1, kr, kg, kb);
+        }
+        e.addImageRGBA(nm, q, q, px.data());
     }
+    e.drawImage(nm, x + pad, y + pad, q, q);
 }
 
 
@@ -2363,6 +2447,7 @@ void lineIcon(UiEngine& e, int kind, int x, int y, int s, SDL_Color c, float ang
 // When `focused` the tile glows/pulses and the icon moves: globe + contrast spin, user floats, gamepad and info sway,
 // log-out slides. Everything is cached images + a few rounded rects, so it stays cheap on the PS4.
 void lineIconTile(UiEngine& e, int kind, int x, int y, int s, SDL_Color acc, bool focused = false) {
+    animPush({AnimCall::Tile, kind, x, y, s, focused ? 1 : 0, acc}, x - 12, y - 12, s + 24, s + 24);
     const float t = static_cast<float>(SDL_GetTicks() % 600000u) / 1000.0f;
     const float br = std::sin(t * 3.1416f * 2.0f / 1.8f) * 0.5f + 0.5f;
     const int r = s * 28 / 100;
@@ -2435,7 +2520,7 @@ void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const Addo
         icCheck(e, ix + 7, y + 19, 16, kWHT);
     }
     const int ty = y + imgH + 14;
-    boxText(e, L, it.title, xl + 16, w - 32, ty, 21, kTX);
+    boxText(e, L, it.title, xl + 16, w - 32, ty, 21, kTX, FontRole::Pixel);   // v0.30: names always in Minecraft F77
     if (creator && !it.creator.empty()) boxText(e, L, tr("by", lang) + " " + it.creator, xl + 16, w - 32, ty + 28, 16, kMU);
     const int py = y + h - 16 - 30;
     if (!creator || it.tier == Tier::Free) tierChip(e, L, xl + 16, py, it.tier, lang, 28);
@@ -2489,6 +2574,11 @@ void kickerText(UiEngine& e, const Lay& L, int xl, int y, const std::string& tex
     sectionMark(e, L.X(xl, 16), y + 2, 16, c);
     boxText(e, L, text, xl + 26, 1100, y, 18, c);
 }
+// v0.30: the sign-in kicker uses the golden gem (not the blue mascot)
+void kickerGem(UiEngine& e, const Lay& L, int xl, int y, const std::string& text, SDL_Color c) {
+    sectionMark(e, L.X(xl, 30), y - 2, 30, SDL_Color{255, 214, 90, 255});
+    boxText(e, L, text, xl + 44, 1100, y, 18, c);
+}
 void pageTitle(UiEngine& e, const Lay& L, const std::string& t, int xl, int y) {
     if (L.rtl) { boxText(e, L, t, xl, 900, y + 4, 54, kTX); return; }
     std::string u = t;
@@ -2511,9 +2601,11 @@ void tabRow(UiEngine& e, const Lay& L, int xl, int y, const std::vector<std::str
         const int tw = textW(e, L, labels[i], px);
         const int rx = L.X(x, tw);
         const bool on = static_cast<int>(i) == active;
+        const bool foc = focusBase >= 0 && focus == focusBase + static_cast<int>(i);
         boxText(e, L, labels[i], x, tw + 6, y, px, on ? kTX : kMU);
-        if (on) e.drawRoundRect(rx, y + px + 14, tw, 4, 2, kBLl);
-        if (focusBase >= 0 && focus == focusBase + static_cast<int>(i)) focusRing(e, rx - 10, y - 8, tw + 20, px + 30, 12);
+        // v0.30: tags are marked with an underline bar only (no selection frame)
+        if (foc) e.drawRoundRect(rx, y + px + 12, tw, 7, 4, SDL_Color{255, 214, 90, 255});
+        else if (on) e.drawRoundRect(rx, y + px + 14, tw, 5, 3, kBLl);
         x += tw + 44;
     }
 }
@@ -2759,7 +2851,7 @@ void drawSignIn(UiEngine& e, int focus, const std::string& code, int secondsLeft
         y += 86;
     }
     y += 24;
-    kickerMascot(e, L, x0, y, tr("same_account", lang), kGD);
+    kickerGem(e, L, x0, y, tr("same_account", lang), kGD);
     y += 44;
     {
         int x = x0;
@@ -3137,6 +3229,7 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
     } else {
         pageTitle(e, L, tr("nav_deals_t", lang), cx, 44);
     }
+    drawMascot(e, kCR - 84, 112, 150);   // v0.30: the allay belongs to the Store / Deals area
     if (!sale && any.empty()) {
         emptyState(e, L, cx, 200, cw, 600, 11, tr("deals_empty_t", lang), tr("deals_empty_s", lang));
         drawLegendBar(e, {{"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}}, langCode);
@@ -3162,6 +3255,7 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
     const bool sale = saleActive();
     const int cx = kCL + 20, cw = kCR - cx;
     pageTitle(e, L, tr("nav_store", lang), cx, 44);
+    drawMascot(e, kCR - 84, 112, 150);   // v0.30: the allay belongs to the Store / Deals area
     {   // ---- sort pill (focus 16): Popular / Newest / Top rated — ✕ cycles it (setStoreSort) ----
         static const char* kSortKeys[3] = {"sort_popular", "sort_newest", "sort_rating"};
         const std::string lab = tr("sort_by", lang) + ":  " + tr(kSortKeys[storeSort()], lang);
@@ -3222,13 +3316,14 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
                                  tr("chip_epic", lang), tr("chip_legendary", lang), tr("chip_new", lang)};
     for (int i = 0; i < 7; ++i) {
         const int y = catY + i * 68;
-        const int rx = L.X(catX, catW);
         const bool on = i == filterIndex;
-        if (on) e.drawRoundRect(rx, y, catW, 58, 16, kTX);
-        boxText(e, L, cats[i], catX + 22, catW - 90, y + 16, 22, on ? kBG : kCHIPTX);
+        const bool foc = focus == 9 + i;
+        boxText(e, L, cats[i], catX + 22, catW - 90, y + 16, 22, on || foc ? kTX : kCHIPTX);
         const int n = static_cast<int>(viewItems(View::Store, i).size());
-        endText(e, L, num(n), catX, catW - 20, y + 18, 19, on ? kBG : kMU);
-        if (focus == 9 + i) focusRing(e, rx, y, catW, 58, 16);
+        endText(e, L, num(n), catX, catW - 20, y + 18, 19, on || foc ? kTX : kMU);
+        // v0.30: category tags are marked with an underline bar only (no selection frame)
+        if (foc) e.drawRoundRect(L.X(catX + 18, catW - 36), y + 50, catW - 36, 6, 3, SDL_Color{255, 214, 90, 255});
+        else if (on) e.drawRoundRect(L.X(catX + 18, catW - 36), y + 51, catW - 36, 4, 2, kBLl);
     }
 
     // ---- grid 2 x 4 (focus 0-7) ----
@@ -3949,6 +4044,25 @@ float legalSplashOpacity(int ms) {
     if (ms < kSplashFadeOutMs) return 1.f - static_cast<float>(ms) / kSplashFadeOutMs;
     return 0.f;
 }
+// v0.30: the splash "loading" box at the bottom-left (restored) + animated progress.
+void splashLoadingBox(UiEngine& e, const std::string& langCode, int elapsedMs, int a) {
+    if (a <= 0) return;
+    Lay L; L.rtl = (langCode == "ar");
+    auto A = [&](int v) { return static_cast<Uint8>(std::min(255, v * a / 255)); };
+    const int x = 118, y = 928, w = 430, h = 78;
+    e.drawRoundRect(x, y, w, h, 22, SDL_Color{A(16), A(20), A(28), A(215)});
+    e.drawRoundBorder(x, y, w, h, 22, 2, SDL_Color{A(255), A(214), A(90), A(170)});
+    const float p = std::min(1.0f, static_cast<float>(elapsedMs) / static_cast<float>(std::max(1, legalSplashTotalMs())));
+    e.drawText(tr("loading", langCode), L.X(x + 26, w - 120), y + 18, 24,
+               SDL_Color{A(236), A(236), A(236), A(255)}, FontRole::Body, false, false);
+    char pct[16];
+    std::snprintf(pct, sizeof pct, "%d%%", static_cast<int>(p * 100.0f + 0.5f));
+    e.drawText(pct, L.X(x + w - 26 - 64, 64), y + 20, 22, SDL_Color{A(255), A(214), A(90), A(255)}, FontRole::Pixel, false, false);
+    e.drawRoundRect(x + 26, y + 54, w - 52, 8, 4, SDL_Color{A(255), A(214), A(90), A(50)});
+    const int fw = static_cast<int>((w - 52) * p);
+    if (fw > 0) e.drawRoundRect(x + 26, y + 54, fw, 8, 4, SDL_Color{A(255), A(214), A(90), A(230)});
+}
+
 bool drawLegalSplashFade(UiEngine& e, const std::string& langCode, int elapsedMs) {
     // PERFORMANCE: the splash (4 logos + text) is composed ONCE into "__splash"; every fade frame is a
     // single image copy with alpha over black. Call releaseLegalSplash(e) afterwards to free it (8 MB).
@@ -3969,8 +4083,20 @@ bool drawLegalSplashFade(UiEngine& e, const std::string& langCode, int elapsedMs
     const int a = static_cast<int>(op * 255.f + 0.5f);
     if (a <= 0) { e.clear(SDL_Color{0, 0, 0, 255}); return elapsedMs < legalSplashTotalMs(); }
     e.drawImage("__splash", 0, 0, 1920, 1080);              // opaque straight copy
+    splashLoadingBox(e, langCode, elapsedMs, 255);
     if (a < 255) e.fadeToBlack(static_cast<Uint8>(a));     // one fast pass towards black (splash bg is black)
     return elapsedMs < legalSplashTotalMs();
+}
+// v0.30: smooth disappearance — the splash drawn OVER the live Home frame, fading out
+bool drawLegalSplashOver(UiEngine& e, const std::string& langCode, int elapsedMs) {
+    if (!e.hasImage("__splash")) return false;
+    float op = legalSplashOpacity(elapsedMs);
+    op = op * op * (3.f - 2.f * op);
+    const int a = static_cast<int>(op * 255.f + 0.5f);
+    if (a <= 0) return false;
+    e.drawImage("__splash", 0, 0, 1920, 1080, static_cast<Uint8>(a));
+    splashLoadingBox(e, langCode, elapsedMs, a);
+    return true;
 }
 void releaseLegalSplash(UiEngine& e) { e.unloadImage("__splash"); }
 
@@ -4099,6 +4225,23 @@ void drawLegalSplash(UiEngine& e, const std::string& /*langCode*/) {
         int y = 836 - static_cast<int>(lines.size() > 1 ? 14 : 0);
         for (const auto& ln : lines) { e.drawText(ln, left + 112, y, 22, SDL_Color{236, 236, 236, 255}, FontRole::Body, false, false); y += 28; }
     }
+}
+
+// v0.30: public animation API (pkgtest scope) — used by the main loop
+void animReset() { gAnimCalls.clear(); gAnimRects.clear(); }
+bool animHas() { return !gAnimCalls.empty(); }
+void animRects(std::vector<int>& out) { out = gAnimRects; }
+void animReplay(UiEngine& e) {
+    gAnimRec = false;
+    for (const AnimCall& a : gAnimCalls) {
+        switch (a.kind) {
+            case AnimCall::Ring:   focusRing(e, a.a0, a.a1, a.a2, a.a3, a.a4); break;
+            case AnimCall::Mark:   sectionMark(e, a.a0, a.a1, a.a2, a.c); break;
+            case AnimCall::Mascot: drawMascot(e, a.a0, a.a1, a.a2); break;
+            case AnimCall::Tile:   lineIconTile(e, a.a0, a.a1, a.a2, a.a3, a.c, a.a4 != 0); break;
+        }
+    }
+    gAnimRec = true;
 }
 
 } // namespace pkgtest

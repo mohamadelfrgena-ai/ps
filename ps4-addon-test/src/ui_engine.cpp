@@ -366,6 +366,21 @@ bool UiEngine::init(const std::string& pakPath) {
     return fontsLoaded_;
 }
 
+void UiEngine::restoreFrom(const std::vector<std::uint32_t>& base, const int* rects, int nRects) {
+    if (base.size() != fb_.size() || !rects || nRects <= 0) return;
+    for (int i = 0; i < nRects; ++i) {
+        const int x = rects[4 * i], y = rects[4 * i + 1], w = rects[4 * i + 2], h = rects[4 * i + 3];
+        const int ya = std::max(0, y), yb = std::min(kHeight, y + h);
+        const int xa = std::max(0, x), xb = std::min(kWidth, x + w);
+        if (xb <= xa || yb <= ya) continue;
+        for (int yy = ya; yy < yb; ++yy) {
+            std::memcpy(&fb_[static_cast<std::size_t>(yy) * kWidth + xa],
+                        &base[static_cast<std::size_t>(yy) * kWidth + xa],
+                        static_cast<std::size_t>(xb - xa) * sizeof(std::uint32_t));
+        }
+    }
+}
+
 void UiEngine::blendPx(int x, int y, Uint8 r, Uint8 g, Uint8 b, Uint8 a) {
     if (x < 0 || y < 0 || x >= kWidth || y >= kHeight) return;
     std::uint32_t& cell = fb_[static_cast<std::size_t>(y) * kWidth + x];
@@ -1180,9 +1195,11 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
     if (hasArabic) cps = shapeAndOrderArabic(cps);
 
     stbtt_fontinfo* primaryFont = &fonts_->bodyInfo;
-    if (hasArabic || (role == FontRole::Pixel && isArabicLang) || role == FontRole::Arabic) {
+    if (hasArabic || role == FontRole::Arabic) {
         primaryFont = &fonts_->arInfo;
     } else if (role == FontRole::Pixel) {
+        // v0.30: Minecraft F77 is honoured in EVERY language (addon / world names). Arabic
+        // codepoints that F77 lacks fall back per-character to the Arabic font below.
         primaryFont = &fonts_->f77Info;
     }
 

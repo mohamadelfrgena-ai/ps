@@ -172,7 +172,13 @@ void drawLegalSplash(UiEngine& e, const std::string& langCode);   // static fram
 constexpr int kSplashFadeInMs = 800, kSplashHoldMs = 3800, kSplashFadeOutMs = 1000;   // v0.29: longer hold so the user can read the splash
 bool drawLegalSplashFade(UiEngine& e, const std::string& langCode, int elapsedMs);
 float legalSplashOpacity(int elapsedMs);                // 0..1 (linear) for your own effects / sounds
+// v0.30: animated overlay record/replay (smooth 30 fps motion without full redraws)
+void animReset();
+void animReplay(UiEngine& e);
+bool animHas();
+void animRects(std::vector<int>& out);
 int legalSplashTotalMs();
+bool drawLegalSplashOver(UiEngine& e, const std::string& langCode, int elapsedMs);
 void releaseLegalSplash(UiEngine& e);
 void drawToast(UiEngine& e, const std::string& text, const std::string& langCode);
 void drawLegendBar(UiEngine& e, const std::vector<std::pair<std::string, std::string>>& items, const std::string& langCode);
