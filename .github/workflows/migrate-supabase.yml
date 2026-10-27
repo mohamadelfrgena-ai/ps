@@ -122,7 +122,7 @@ jobs:
           fi
           FOUND=$(python3 tools/find_pg_host.py "$REF" "$PGPW" 2>>/tmp/find2.err | tail -1)
           cat /tmp/find2.err
-          if [ "$FOUND" != "${FOUND#OK }" ]; then
+          if [ "$FOUND" = "${FOUND#OK }" ]; then
             echo "::error title=الاستعادة::فشل اكتشاف اتصال المشروع الجديد (التفاصيل أعلاه)"
             exit 1
           fi

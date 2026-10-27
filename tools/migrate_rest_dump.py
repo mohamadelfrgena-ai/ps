@@ -77,10 +77,17 @@ def main():
     counts = []
     empty_tables = []
     for t in TABLES:
-        try:
-            rows = fetch_all(base, key, t)
-        except urllib.error.HTTPError as e:
-            print(f"::warning title=REST::الجدول {t} غير متاح ({e.code}) — تخطّي", file=sys.stderr)
+        rows = None
+        for attempt in (1, 2):
+            try:
+                rows = fetch_all(base, key, t)
+                break
+            except urllib.error.HTTPError as e:
+                if attempt == 2:
+                    print(f"::warning title=REST::الجدول {t} غير متاح ({e.code}) — تخطّي", file=sys.stderr)
+                else:
+                    import time; time.sleep(2)
+        if rows is None:
             continue
         counts.append(f"{t}={len(rows)}")
         if not rows:
