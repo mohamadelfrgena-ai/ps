@@ -237,7 +237,7 @@ jobs:
               import base64
               md = ",".join(
                   f"{k} {base64.b64encode(v.encode()).decode()}"
-                  for k, v in (("bucketName", bucket), ("objectName", path), ("contentType", ctype)).items() if v
+                  for k, v in (("bucketName", bucket), ("objectName", path), ("contentType", ctype)) if v
               )
               r = urllib.request.Request(f"{url_base}/storage/v1/upload/resumable", method="POST", headers={
                   "Authorization": f"Bearer {key}", "apikey": key,
@@ -322,6 +322,19 @@ jobs:
           if [ "$FOUND" = "${FOUND#OK }" ]; then echo "::warning::تعذّر التحقق"; exit 0; fi
           CH=$(echo "$FOUND" | cut -d" " -f2); CP=$(echo "$FOUND" | cut -d" " -f3); CU=$(echo "$FOUND" | cut -d" " -f4)
           SQL() { docker run --rm -e PGPASSWORD="$PGPW" postgres:17 psql -h "$CH" -p "$CP" -U "$CU" -d postgres -Atc "$1"; }
-          SQL "select string_agg(table_name || '=' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text, ' ') from information_schema.tables where table_schema='public' and table_type='BASE TABLE'" > /tmp/c.txt
-          echo "::notice title=الجداول في الجديد::$(head -c 700 /tmp/c.txt)"
-          echo "::notice title=المستخدمون::$(SQL "select string_agg(email, ', ') from auth.users")"
+          SQL "select table_name || '=' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by 1" > /tmp/c.txt 2>/tmp/c.err
+          SQL "select 'users: ' || string_agg(email, ', ') from auth.users" >> /tmp/c.txt 2>>/tmp/c.err
+          cat /tmp/c.err | head -3
+          {
+            echo "=== new project verification $(date -u +%FT%TZ) ==="
+            cat /tmp/c.txt
+          } > supabase-migration/verify-report.txt
+          echo "::notice title=التحقق::$(head -c 600 /tmp/c.txt | tr '\n' ' ')"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add supabase-migration/verify-report.txt supabase-migration/storage-report.txt 2>/dev/null
+          if ! git diff --cached --quiet; then
+            git commit -m "Migration verify + storage report [skip ci]"
+            git pull --rebase origin "$GITHUB_REF_NAME" || true
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
