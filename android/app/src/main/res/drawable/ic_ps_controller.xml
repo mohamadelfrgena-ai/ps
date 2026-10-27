@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- أيقونة بلايستيشن: يد تحكم بوجه أزرار △ ○ ✕ □ -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- جسم اليد -->
+    <path
+        android:fillColor="#FF1B2838"
+        android:pathData="M10,16 h28 a7,7 0 0 1 7,7 v6 a7,7 0 0 1 -7,7 h-5 l-2,4 h-14 l-2,-4 h-5 a7,7 0 0 1 -7,-7 v-6 a7,7 0 0 1 7,-7 z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#3E5A78"
+        android:strokeWidth="1.5"
+        android:pathData="M10,16 h28 a7,7 0 0 1 7,7 v6 a7,7 0 0 1 -7,7 h-5 l-2,4 h-14 l-2,-4 h-5 a7,7 0 0 1 -7,-7 v-6 a7,7 0 0 1 7,-7 z" />
+
+    <!-- المصباح المركزي -->
+    <path android:fillColor="#4FC3F7" android:pathData="M23,18.5 h2 v1.5 h-2 z" />
+
+    <!-- عصا اليسار -->
+    <path android:fillColor="#3E5A78" android:pathData="M15,26 m-3.2,0 a3.2,3.2 0 1 0 6.4,0 a3.2,3.2 0 1 0 -6.4,0" />
+    <!-- عصا اليمين -->
+    <path android:fillColor="#3E5A78" android:pathData="M33,26 m-3.2,0 a3.2,3.2 0 1 0 6.4,0 a3.2,3.2 0 1 0 -6.4,0" />
+
+    <!-- D-pad -->
+    <path android:fillColor="#2C4258" android:pathData="M10.5,21.2 h3 v-3 h2 v3 h3 v2 h-3 v3 h-2 v-3 h-3 z" />
+
+    <!-- △ -->
+    <path android:strokeColor="#4FC3F7" android:strokeWidth="1.4" android:fillColor="#00000000"
+        android:pathData="M37.2,20.6 l2.1,3.4 h-4.2 z" />
+    <!-- ○ -->
+    <path android:strokeColor="#FF70A9" android:strokeWidth="1.4" android:fillColor="#00000000"
+        android:pathData="M39.3,26.2 m-1.9,0 a1.9,1.9 0 1 0 3.8,0 a1.9,1.9 0 1 0 -3.8,0" />
+    <!-- ✕ -->
+    <path android:strokeColor="#7ED957" android:strokeWidth="1.4" android:fillColor="#00000000"
+        android:pathData="M34.4,27.2 l2.6,2.6 M37,27.2 l-2.6,2.6" />
+    <!-- □ -->
+    <path android:strokeColor="#FF5C7A" android:strokeWidth="1.4" android:fillColor="#00000000"
+        android:pathData="M33.8,23.2 h2.6 v2.6 h-2.6 z" />
+</vector>

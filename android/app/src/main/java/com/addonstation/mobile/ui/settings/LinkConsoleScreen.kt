@@ -16,8 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Tv
+import androidx.compose.foundation.Image
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -30,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -103,11 +103,10 @@ fun LinkConsoleScreen(
                             .background(AppColors.AuthSurfaceHigh),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            Icons.Outlined.Tv,
+                        Image(
+                            painter = painterResource(R.drawable.ic_ps_controller),
                             contentDescription = null,
-                            tint = AppColors.AuthAccentBlue,
-                            modifier = Modifier.size(28.dp),
+                            modifier = Modifier.size(36.dp),
                         )
                     }
                     Text(

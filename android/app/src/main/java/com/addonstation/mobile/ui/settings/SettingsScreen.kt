@@ -338,7 +338,7 @@ fun SettingsScreen(
                     clickable = true,
                     onClick = onLinkConsole,
                     chevron = true,
-                    tile = { AuthSettingsIconTile(Icons.Outlined.Tv, AppColors.AuthAccentBlue) },
+                    tile = { AuthSettingsImageTile(R.drawable.ic_ps_controller) },
                 )
                 if ((profileLoadStatus == ProfileLoadStatus.FAILED || profileLoadStatus == ProfileLoadStatus.MISSING) && signedIn && profile == null) {
                     ErrorState(onRetry = { profileRetryTick += 1 })

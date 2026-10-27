@@ -37,7 +37,7 @@
 # بناء APK بطلب المالك بعد إصلاح انهيار Android 12 في طلب إذن الإشعارات.
 # اكتمل تسجيل APK إصلاح Android 12؛ أوقف طلب البناء.
 task: apk
-run: 122
+run: 123
 # إعادة البناء بعد إصلاح استيراد ConsoleLinkRepository + تحرير حصة المخرجات القديمة
 # بناء APK بعد إضافة ميزة «ربط جهاز» (Settings → Link a console) — claim_console_link_code
 #              + شاشة إدخال الكود و16 نصاً بـ8 لغات + حارس الجلسة على السوني (refresh_token).
