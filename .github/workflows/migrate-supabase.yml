@@ -226,18 +226,60 @@ jobs:
                   offset += 100
               return out
 
+          MIME = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                  "gif": "image/gif", "webp": "image/webp", "mp4": "video/mp4",
+                  "mp3": "audio/mpeg", "wav": "audio/wav", "json": "application/json",
+                  "pdf": "application/pdf", "mcaddon": "application/octet-stream"}
+
+          def tus_upload(url_base, key, bucket, path, data, ctype):
+              import base64
+              md = ",".join(
+                  f"{k} {base64.b64encode(v.encode()).decode()}"
+                  for k, v in (("bucketName", bucket), ("objectName", path), ("contentType", ctype)).items() if v
+              )
+              r = urllib.request.Request(f"{url_base}/storage/v1/upload/resumable", method="POST", headers={
+                  "Authorization": f"Bearer {key}", "apikey": key,
+                  "Tus-Resumable": "1.0.0", "Upload-Length": str(len(data)),
+                  "Upload-Metadata": md, "x-upsert": "true",
+              })
+              with urllib.request.urlopen(r, timeout=120) as resp:
+                  loc = resp.headers.get("Location", "")
+              if loc.startswith("/"):
+                  loc = url_base + loc
+              offset = 0
+              while offset < len(data):
+                  chunk = data[offset:offset + 6 * 1024 * 1024]
+                  r2 = urllib.request.Request(loc, method="PATCH", data=chunk, headers={
+                      "Authorization": f"Bearer {key}", "apikey": key,
+                      "Tus-Resumable": "1.0.0", "Upload-Offset": str(offset),
+                      "Content-Type": "application/offset+octet-stream",
+                  })
+                  with urllib.request.urlopen(r2, timeout=300) as resp2:
+                      if resp2.status not in (200, 204):
+                          return resp2.status
+                  offset += len(chunk)
+              return 200
+
           total = copied = 0
           for b in buckets:
               files = list_all(OK, OLD, b["name"])
               note(f"ملفات {b['name']}", f"{len(files)} ملفاً")
               for path in files:
                   total += 1
-                  q = urllib.request.quote(path)
+                  q = urllib.request.quote(path, safe="/")
                   st4, data = req("GET", f"{OLD}/storage/v1/object/{b['name']}/{q}", OK)
                   if st4 != 200:
                       note("فشل تنزيل", f"{path}: {st4}"); continue
-                  st5, body5 = req("POST", f"{NEW}/storage/v1/object/{b['name']}/{q}", NK, data,
-                                   {"Content-Type": "application/octet-stream", "x-upsert": "true"})
+                  ctype = MIME.get(path.rsplit(".", 1)[-1].lower(), "application/octet-stream")
+                  if len(data) > 4 * 1024 * 1024:
+                      try:
+                          st5 = tus_upload(NEW, NK, b["name"], path, data, ctype)
+                          body5 = b""
+                      except Exception as ex:  # noqa: BLE001
+                          st5, body5 = 0, str(ex).encode()
+                  else:
+                      st5, body5 = req("POST", f"{NEW}/storage/v1/object/{b['name']}/{q}", NK, data,
+                                       {"Content-Type": ctype, "x-upsert": "true"})
                   if st5 in (200, 201):
                       copied += 1
                   else:
@@ -246,3 +288,20 @@ jobs:
           if copied < total:
               print(f"::warning title=التخزين::لم تُنسخ {total - copied} ملفات")
           PY
+
+      # ------------------------------------------------------- Final verify
+      - name: "التحقق النهائي من القاعدة"
+        if: steps.cfg.outputs.task == 'all' || steps.cfg.outputs.task == 'restore'
+        env:
+          PGPW: ${{ steps.cfg.outputs.new_pw }}
+          REF: ${{ steps.cfg.outputs.new_ref }}
+        run: |
+          set +e
+          echo "::add-mask::$PGPW"
+          FOUND=$(python3 tools/find_pg_host.py "$REF" "$PGPW" eu-west-1 2>/dev/null | tail -1)
+          if [ "$FOUND" = "${FOUND#OK }" ]; then echo "::warning::تعذّر التحقق"; exit 0; fi
+          CH=$(echo "$FOUND" | cut -d" " -f2); CP=$(echo "$FOUND" | cut -d" " -f3); CU=$(echo "$FOUND" | cut -d" " -f4)
+          SQL() { docker run --rm -e PGPASSWORD="$PGPW" postgres:17 psql -h "$CH" -p "$CP" -U "$CU" -d postgres -Atc "$1"; }
+          SQL "select string_agg(table_name || '=' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text, ' ') from information_schema.tables where table_schema='public' and table_type='BASE TABLE'" > /tmp/c.txt
+          echo "::notice title=الجداول في الجديد::$(head -c 700 /tmp/c.txt)"
+          echo "::notice title=المستخدمون::$(SQL "select string_agg(email, ', ') from auth.users")"
