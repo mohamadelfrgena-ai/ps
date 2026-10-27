@@ -78,11 +78,11 @@ jobs:
             TASK=$(sed -n 's/^[[:space:]]*task:[[:space:]]*//p' .migrate-request | tr -d '"' | tr -d '[:space:]' | head -1)
             [ -z "$TASK" ] && TASK="all"
           fi
-          # الأولوية: مُدخلات التشغيل اليدوي ← الأسرار
+          # الأولوية: مُدخلات التشغيل اليدوي ← الأسرار (والمرجع الجديد معروف مسبقاً)
           {
             echo "task=$TASK"
             echo "old_pw=${IN_OLD_PW:-$SEC_OLD_PW}"
-            echo "new_ref=${IN_NEW_REF:-$SEC_NEW_REF}"
+            echo "new_ref=${IN_NEW_REF:-${SEC_NEW_REF:-stbmescmexzcszyyambq}}"
             echo "new_pw=${IN_NEW_PW:-$SEC_NEW_PW}"
             echo "new_sk=${IN_NEW_SK:-$SEC_NEW_SK}"
           } >> "$GITHUB_OUTPUT"
