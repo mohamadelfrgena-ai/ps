@@ -69,21 +69,13 @@ jobs:
           echo "::add-mask::$PGPW"
           if [ -z "$PGPW" ]; then echo "::error title=الاستخراج::كلمة السر القديمة مفقودة (سر OLD_DB_PASSWORD)"; exit 1; fi
           REF="jqjmkssgjdsfdojkuqzq"
-          CONN_U=""; CONN_H=""; CONN_P=""
-          for TRY in "postgres db.$REF.supabase.co 5432" "postgres.$REF aws-0-eu-central-1.pooler.supabase.com 6543" "postgres.$REF aws-0-eu-central-1.pooler.supabase.com 5432"; do
-            set -- $TRY
-            OUT=$(docker run --rm -e PGPASSWORD="$PGPW" postgres:17 \
-              psql -h "$2" -p "$3" -U "$1" -d postgres -c "select 1" 2>&1)
-            if echo "$OUT" | grep -q "1 row"; then
-              CONN_U="$1"; CONN_H="$2"; CONN_P="$3"
-              echo "::notice title=اتصال القديم::✓ ناجح عبر $2:$3"
-              break
-            fi
-            ERR=$(echo "$OUT" | grep -v "^$" | tail -1)
-            echo "::notice title=محاولة فاشلة::$1@$2:$3 — $ERR"
-          done
-          if [ -z "$CONN_H" ]; then
-            echo "::error title=الاستخراج::فشل الاتصال بالمشروع القديم بكل المحاولات — كلمة السر خاطئة؟ (المحاولات أعلاه تُظهر السبب)"
+          FOUND=$(python3 tools/find_pg_host.py "$REF" "$PGPW" eu-central-1 | tee /tmp/find1.log | tail -1)
+          if [ "$FOUND" != "${FOUND#OK }" ]; then
+            CONN_H=$(echo "$FOUND" | cut -d" " -f2)
+            CONN_P=$(echo "$FOUND" | cut -d" " -f3)
+            CONN_U=$(echo "$FOUND" | cut -d" " -f4)
+          else
+            echo "::error title=الاستخراج::فشل اكتشاف اتصال المشروع القديم (التفاصيل أعلاه)"
             exit 1
           fi
           mkdir -p supabase-migration
@@ -129,21 +121,13 @@ jobs:
             echo "::error title=الاستعادة::لا توجد نسخة — المرحلة 1 لم تنجح"
             exit 1
           fi
-          CONN_U=""; CONN_H=""; CONN_P=""
-          for TRY in "postgres $REF.supabase.co 5432" "postgres.$REF aws-0-eu-central-1.pooler.supabase.com 6543" "postgres.$REF aws-0-eu-central-1.pooler.supabase.com 5432"; do
-            set -- $TRY
-            OUT=$(docker run --rm -e PGPASSWORD="$PGPW" postgres:17 \
-              psql -h "$2" -p "$3" -U "$1" -d postgres -c "select 1" 2>&1)
-            if echo "$OUT" | grep -q "1 row"; then
-              CONN_U="$1"; CONN_H="$2"; CONN_P="$3"
-              echo "::notice title=اتصال الجديد::✓ ناجح عبر $2:$3"
-              break
-            fi
-            ERR=$(echo "$OUT" | grep -v "^$" | tail -1)
-            echo "::notice title=محاولة فاشلة::$1@$2:$3 — $ERR"
-          done
-          if [ -z "$CONN_H" ]; then
-            echo "::error title=الاستعادة::فشل الاتصال بالمشروع الجديد — تحقق من NEW_DB_PASSWORD"
+          FOUND=$(python3 tools/find_pg_host.py "$REF" "$PGPW" | tee /tmp/find2.log | tail -1)
+          if [ "$FOUND" != "${FOUND#OK }" ]; then
+            CONN_H=$(echo "$FOUND" | cut -d" " -f2)
+            CONN_P=$(echo "$FOUND" | cut -d" " -f3)
+            CONN_U=$(echo "$FOUND" | cut -d" " -f4)
+          else
+            echo "::error title=الاستعادة::فشل اكتشاف اتصال المشروع الجديد (التفاصيل أعلاه)"
             exit 1
           fi
           echo "::notice title=الاستعادة 1/2::حسابات المستخدمين…"
