@@ -10,5 +10,5 @@
 #   OLD_DB_PASSWORD  ·  NEW_PROJECT_REF  ·  NEW_DB_PASSWORD  ·  NEW_SERVICE_KEY
 #
 # طلب المالك: نقل كامل إلى مشروع جديد (فقد الوصول للحساب القديم مع بقاء كلمة السر).
-task: all
-run: 13
+task: dump
+run: 14
