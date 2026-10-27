@@ -29,8 +29,8 @@ constexpr const char* kDownloadUrl = "";
 //  يمكن تعديلهما على جهاز السوني مباشرة عبر ملف (يتفوق على القيم هنا):
 //    /data/AddonStation/supabase.cfg  (سطر 1: الرابط — سطر 2: المفتاح)
 // ----------------------------------------------------------------------------
-constexpr const char* kSupabaseUrl = "https://jqjmkssgjdsfdojkuqzq.supabase.co";
-constexpr const char* kSupabaseAnonKey = "sb_publishable_HjkmzYpP7SPjfKH4usnWjg_N760ZeCs";
+constexpr const char* kSupabaseUrl = "https://stbmescmexzcszyyambq.supabase.co";
+constexpr const char* kSupabaseAnonKey = "sb_publishable_dixIJL7ToJJVzzGY4rz3DQ_7VFapcp-";
 
 } // namespace content
 } // namespace pkgtest
