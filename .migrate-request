@@ -1,0 +1,14 @@
+# ملف «طلب نقل Supabase» — يُحكَم عبره سير العمل migrate-supabase.yml
+#
+#   task: none      ← لا شيء (الوضع الافتراضي)
+#   task: all       ← كل المراحل (استخراج + استعادة + ملفات التخزين)
+#   task: dump      ← الاستخراج فقط من المشروع القديم
+#   task: restore   ← الاستعادة فقط في المشروع الجديد
+#   task: storage   ← نسخ ملفات التخزين فقط
+#
+# الأسرار المطلوبة قبل task: all (Settings ← Secrets ← Actions):
+#   OLD_DB_PASSWORD  ·  NEW_PROJECT_REF  ·  NEW_DB_PASSWORD  ·  NEW_SERVICE_KEY
+#
+# طلب المالك: نقل كامل إلى مشروع جديد (فقد الوصول للحساب القديم مع بقاء كلمة السر).
+task: none
+run: 1

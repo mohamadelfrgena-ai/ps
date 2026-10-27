@@ -1,0 +1,250 @@
+# ============================================================================
+# نقل Supabase الكامل: القديم ← الجديد (بناءً على طلب المالك 2026-10-27)
+#
+# يعمل بملف الطلب .migrate-request (task: all/dump/restore/storage) أو يدوياً
+# من زر Run workflow بعد أول تشغيل.
+#
+# الأسرار المطلوبة (Settings ← Secrets ← Actions) — أو مُدخلات التشغيل اليدوي:
+#   OLD_DB_PASSWORD   كلمة سر قاعدة البيانات القديمة (المحفوظة عند المالك)
+#   NEW_PROJECT_REF   مرجع المشروع الجديد (Settings ← General)
+#   NEW_DB_PASSWORD   كلمة سر قاعدة البيانات الجديدة
+#   NEW_SERVICE_KEY   مفتاح service_role للمشروع الجديد (Settings ← API Keys)
+# الأسرار الجاهزة مسبقاً: ADDONSTATION_SUPABASE_URL / ADDONSTATION_SUPABASE_SECRET_KEY
+#   (تُستعمل لقراءة ملفات Storage القديمة في المرحلة 3)
+#
+# المراحل:
+#   1) dump     — pg_dump كامل (public + حسابات auth بكلمات مرورها) ← يُسجَّل في
+#                 supabase-migration/ داخل المستودع كنسخة دائمة
+#   2) restore  — استعادة كل شيء في المشروع الجديد
+#   3) storage  — نسخ كل ملفات Storage (الأغلفة والأفاتار والأصول)
+# ============================================================================
+name: "Migrate: Supabase old → new"
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "all (كل المراحل) · dump · restore · storage"
+        required: true
+        default: all
+        type: choice
+        options: [all, dump, restore, storage]
+      old_db_password:
+        description: "كلمة السر القديمة (أو استعمل السر OLD_DB_PASSWORD)"
+        required: false
+        type: string
+      new_project_ref:
+        description: "مرجع المشروع الجديد (أو السر NEW_PROJECT_REF)"
+        required: false
+        type: string
+      new_db_password:
+        description: "كلمة السر الجديدة (أو السر NEW_DB_PASSWORD)"
+        required: false
+        type: string
+      new_service_key:
+        description: "مفتاح service_role الجديد (أو السر NEW_SERVICE_KEY)"
+        required: false
+        type: string
+  push:
+    branches: [ main, arena/5622bbf6-ps ]
+    paths:
+      - '.migrate-request'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: قراءة المهمة والمدخلات
+        id: cfg
+        env:
+          IN_TASK: ${{ inputs.task }}
+          IN_OLD_PW: ${{ inputs.old_db_password }}
+          IN_NEW_REF: ${{ inputs.new_project_ref }}
+          IN_NEW_PW: ${{ inputs.new_db_password }}
+          IN_NEW_SK: ${{ inputs.new_service_key }}
+          SEC_OLD_PW: ${{ secrets.OLD_DB_PASSWORD }}
+          SEC_NEW_REF: ${{ secrets.NEW_PROJECT_REF }}
+          SEC_NEW_PW: ${{ secrets.NEW_DB_PASSWORD }}
+          SEC_NEW_SK: ${{ secrets.NEW_SERVICE_KEY }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TASK="${IN_TASK:-all}"
+          else
+            TASK=$(sed -n 's/^[[:space:]]*task:[[:space:]]*//p' .migrate-request | tr -d '"' | tr -d '[:space:]' | head -1)
+            [ -z "$TASK" ] && TASK="all"
+          fi
+          # الأولوية: مُدخلات التشغيل اليدوي ← الأسرار
+          {
+            echo "task=$TASK"
+            echo "old_pw=${IN_OLD_PW:-$SEC_OLD_PW}"
+            echo "new_ref=${IN_NEW_REF:-$SEC_NEW_REF}"
+            echo "new_pw=${IN_NEW_PW:-$SEC_NEW_PW}"
+            echo "new_sk=${IN_NEW_SK:-$SEC_NEW_SK}"
+          } >> "$GITHUB_OUTPUT"
+          echo "### المهمة: **$TASK**" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "المرحلة 1: الاستخراج من القديم (pg_dump)"
+        if: steps.cfg.outputs.task == 'all' || steps.cfg.outputs.task == 'dump'
+        env:
+          PGPW: ${{ steps.cfg.outputs.old_pw }}
+        run: |
+          set -e
+          echo "::add-mask::$PGPW"
+          [ -n "$PGPW" ] || { echo "::error::كلمة السر القديمة مفقودة (OLD_DB_PASSWORD)"; exit 1; }
+          REF="jqjmkssgjdsfdojkuqzq"
+          PGURL=""
+          for TRY in "postgres@db.$REF.supabase.co:5432" "postgres.$REF@aws-0-eu-central-1.pooler.supabase.co:6543"; do
+            U="${TRY%%@*}"; H="${TRY#*@}"; HOST="${H%%:*}"; PORT="${H##*:}"
+            if docker run --rm postgres:17 psql "postgresql://$U:$PGPW@$HOST:$PORT/postgres" -c "select 1" >/dev/null 2>&1; then
+              PGURL="postgresql://$U:$PGPW@$HOST:$PORT/postgres"
+              echo "✓ اتصال ناجح عبر $HOST"
+              break
+            fi
+            echo "✗ $HOST"
+          done
+          [ -n "$PGURL" ] || { echo "::error::فشل الاتصال بالمشروع القديم — تحقق من كلمة السر"; exit 1; }
+          mkdir -p supabase-migration
+          docker run --rm postgres:17 pg_dump "$PGURL" --schema=public --no-owner --no-acl \
+            | gzip > supabase-migration/old-public.sql.gz
+          docker run --rm postgres:17 pg_dump "$PGURL" --data-only --no-owner --no-acl \
+            --table=auth.users --table=auth.identities \
+            | gzip > supabase-migration/old-auth.sql.gz
+          docker run --rm postgres:17 psql "$PGURL" -Atc \
+            "select table_name || ': ' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by 1" \
+            | tee supabase-migration/table-counts.txt
+          ls -la supabase-migration/
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add supabase-migration/
+          if git diff --cached --quiet; then
+            echo "لا تغيير في النسخة"
+          else
+            git commit -m "Supabase migration dump: public + auth [skip ci]"
+            git pull --rebase origin "$GITHUB_REF_NAME" || true
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
+
+      - name: "المرحلة 2: الاستعادة في الجديد"
+        if: steps.cfg.outputs.task == 'all' || steps.cfg.outputs.task == 'restore'
+        env:
+          PGPW: ${{ steps.cfg.outputs.new_pw }}
+          REF: ${{ steps.cfg.outputs.new_ref }}
+        run: |
+          set -e
+          echo "::add-mask::$PGPW"
+          [ -n "$PGPW" ] || { echo "::error::كلمة السر الجديدة مفقودة (NEW_DB_PASSWORD)"; exit 1; }
+          [ -n "$REF" ] || { echo "::error::مرجع المشروع الجديد مفقود (NEW_PROJECT_REF)"; exit 1; }
+          ls supabase-migration/old-public.sql.gz >/dev/null 2>&1 || { echo "::error::لا توجد نسخة — شغّل المرحلة 1 أولاً"; exit 1; }
+          NEWURL=""
+          for TRY in "postgres@$REF.supabase.co:5432" "postgres.$REF@aws-0-eu-central-1.pooler.supabase.co:6543"; do
+            U="${TRY%%@*}"; H="${TRY#*@}"; HOST="${H%%:*}"; PORT="${H##*:}"
+            if docker run --rm postgres:17 psql "postgresql://$U:$PGPW@$HOST:$PORT/postgres" -c "select 1" >/dev/null 2>&1; then
+              NEWURL="postgresql://$U:$PGPW@$HOST:$PORT/postgres"
+              echo "✓ اتصال ناجح عبر $HOST"
+              break
+            fi
+            echo "✗ $HOST"
+          done
+          [ -n "$NEWURL" ] || { echo "::error::فشل الاتصال بالمشروع الجديد"; exit 1; }
+          echo "## 1) حسابات المستخدمين (كلمات المرور كما هي)…"
+          gunzip -c supabase-migration/old-auth.sql.gz | \
+            docker run --rm -i postgres:17 psql "$NEWURL" -v ON_ERROR_STOP=0 --echo-errors 2>&1 | tail -15
+          echo "## 2) schema public كامل…"
+          gunzip -c supabase-migration/old-public.sql.gz | \
+            docker run --rm -i postgres:17 psql "$NEWURL" -v ON_ERROR_STOP=0 --echo-errors 2>&1 | tail -25
+          echo "## 3) التحقق:"
+          docker run --rm postgres:17 psql "$NEWURL" -Atc \
+            "select table_name || ': ' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by 1"
+          docker run --rm postgres:17 psql "$NEWURL" -Atc "select 'المستخدمون: ' || count(*) from auth.users"
+
+      - name: "المرحلة 3: نسخ ملفات Storage"
+        if: steps.cfg.outputs.task == 'all' || steps.cfg.outputs.task == 'storage'
+        env:
+          OLD_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || 'https://jqjmkssgjdsfdojkuqzq.supabase.co' }}
+          OLD_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY }}
+          NEW_REF: ${{ steps.cfg.outputs.new_ref }}
+          NEW_KEY: ${{ steps.cfg.outputs.new_sk }}
+        run: |
+          echo "::add-mask::$OLD_KEY"
+          echo "::add-mask::$NEW_KEY"
+          [ -n "$OLD_KEY" ] || { echo "::error::سر ADDONSTATION_SUPABASE_SECRET_KEY مفقود"; exit 1; }
+          [ -n "$NEW_KEY" ] || { echo "::error::مفتاح service_role الجديد مفقود (NEW_SERVICE_KEY)"; exit 1; }
+          [ -n "$NEW_REF" ] || { echo "::error::مرجع المشروع الجديد مفقود (NEW_PROJECT_REF)"; exit 1; }
+          python3 - <<'PY'
+          import json, os, sys, urllib.request, urllib.error
+
+          OLD = os.environ["OLD_URL"].rstrip("/")
+          NEW = f"https://{os.environ['NEW_REF']}.supabase.co"
+          OK = os.environ["OLD_KEY"]; NK = os.environ["NEW_KEY"]
+
+          def req(method, url, key, data=None, headers=None):
+              h = {"Authorization": f"Bearer {key}", "apikey": key}
+              if headers: h.update(headers)
+              body = data if isinstance(data, (bytes, type(None))) else json.dumps(data).encode()
+              if body is not None and "Content-Type" not in h:
+                  h["Content-Type"] = "application/json"
+              r = urllib.request.Request(url, data=body, headers=h, method=method)
+              try:
+                  with urllib.request.urlopen(r, timeout=180) as resp:
+                      return resp.status, resp.read()
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read()
+
+          st, body = req("GET", f"{OLD}/storage/v1/bucket", OK)
+          buckets = json.loads(body or b"[]")
+          if st >= 400 or not isinstance(buckets, list):
+              print(f"::error::فشل جلب البُرَك: {st} {body[:300]}"); sys.exit(1)
+          print("البُرَك:", [b["name"] for b in buckets])
+
+          for b in buckets:
+              st, body = req("POST", f"{NEW}/storage/v1/bucket", NK, {
+                  "name": b["name"], "id": b["name"],
+                  "public": bool(b.get("public")),
+                  "file_size_limit": b.get("file_size_limit"),
+                  "allowed_mime_types": b.get("allowed_mime_types"),
+              })
+              print(("✓" if st in (200, 201) else "=" if st == 409 else "!"), b["name"], st if st not in (200, 201, 409) else "")
+
+          def list_all(key, base, bucket, prefix=""):
+              out, offset = [], 0
+              while True:
+                  st, body = req("POST", f"{base}/storage/v1/object/list/{bucket}", key,
+                                 {"prefix": prefix, "limit": 100, "offset": offset,
+                                  "sortBy": {"column": "name", "order": "asc"}})
+                  if st >= 400:
+                      print(f"! جلب {bucket}/{prefix}: {st}"); break
+                  batch = json.loads(body or b"[]")
+                  for it in batch:
+                      name = it.get("name", "")
+                      if it.get("id") is None and it.get("metadata") is None:
+                          out += list_all(key, base, bucket, f"{prefix}{name}/")
+                      else:
+                          out.append(f"{prefix}{name}")
+                  if len(batch) < 100: break
+                  offset += 100
+              return out
+
+          total = copied = 0
+          for b in buckets:
+              files = list_all(OK, OLD, b["name"])
+              print(f"## {b['name']}: {len(files)} ملفاً")
+              for path in files:
+                  total += 1
+                  st, data = req("GET", f"{OLD}/storage/v1/object/{b['name']}/{urllib.request.quote(path)}", OK)
+                  if st != 200:
+                      print(f"  ✗ تنزيل {path}: {st}"); continue
+                  st, body = req("POST", f"{NEW}/storage/v1/object/{b['name']}/{urllib.request.quote(path)}", NK, data,
+                                 {"Content-Type": "application/octet-stream", "x-upsert": "true"})
+                  if st in (200, 201):
+                      copied += 1
+                  else:
+                      print(f"  ✗ رفع {path}: {st} {body[:120]}")
+          print(f"## النتيجة: نُسخ {copied} من {total} ملفاً")
+          if copied < total:
+              print("::warning::بعض الملفات لم تُنسخ — راجع السجل")
+          PY
