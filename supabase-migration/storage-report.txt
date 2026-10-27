@@ -5,16 +5,16 @@ bucket chat-media: 400 {"statusCode":"413","error":"Payload too large","message"
 bucket creator-media: 400 {"statusCode":"413","error":"Payload too large","message":"The object exceeded t
 bucket admin-assets: 400 ok
 bucket site-assets: 400 ok
-FAIL upload content-files/content-001/sulfur-cars_ffe0c865.mcaddon: 0 b'HTTP Error 404: Not Found'
 bucket content-files: copied-in-bucket
 bucket payment-receipts: copied-in-bucket
 bucket chat-images: copied-in-bucket
-FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1791241172915-video-1791241172894: 0 b'HTTP Error 404: Not Found'
-FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1791386030584-audio-1791386030565: 0 b'HTTP Error 404: Not Found'
-FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1792527516000-audio-1792527515993: 0 b'HTTP Error 404: Not Found'
-FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1792527564033-video-1792527563808: 0 b'HTTP Error 404: Not Found'
+FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1791241172915-video-1791241172894: 0 b'simple=400 b\'{"statusCode":"415","error":"invalid_mime_type","message":"m\' tus=HTTP Error 415: Unsupported Media Type'
+FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1791386030584-audio-1791386030565: 0 b'simple=400 b\'{"statusCode":"415","error":"invalid_mime_type","message":"m\' tus=HTTP Error 415: Unsupported Media Type'
+FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1792527516000-audio-1792527515993: 0 b'simple=400 b\'{"statusCode":"415","error":"invalid_mime_type","message":"m\' tus=HTTP Error 415: Unsupported Media Type'
+FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1792527564033-video-1792527563808: 0 b"simple=0 b'' tus=HTTP Error 415: Unsupported Media Type"
 bucket chat-media: copied-in-bucket
 bucket creator-media: copied-in-bucket
 bucket admin-assets: copied-in-bucket
+FAIL upload site-assets/profiles/animated/giphy-3.gif: 0 b"simple=0 b'' tus=HTTP Error 413: Payload Too Large"
 bucket site-assets: copied-in-bucket
 TOTAL copied=592 of 597
