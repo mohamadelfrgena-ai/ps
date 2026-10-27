@@ -97,24 +97,40 @@ jobs:
           echo "::add-mask::$PGPW"
           [ -n "$PGPW" ] || { echo "::error::كلمة السر القديمة مفقودة (OLD_DB_PASSWORD)"; exit 1; }
           REF="jqjmkssgjdsfdojkuqzq"
-          PGURL=""
-          for TRY in "postgres@db.$REF.supabase.co:5432" "postgres.$REF@aws-0-eu-central-1.pooler.supabase.co:6543"; do
-            U="${TRY%%@*}"; H="${TRY#*@}"; HOST="${H%%:*}"; PORT="${H##*:}"
-            if docker run --rm postgres:17 psql "postgresql://$U:$PGPW@$HOST:$PORT/postgres" -c "select 1" >/dev/null 2>&1; then
-              PGURL="postgresql://$U:$PGPW@$HOST:$PORT/postgres"
-              echo "✓ اتصال ناجح عبر $HOST"
+          echo "طول كلمة السر المدخلة: ${#PGPW} (المحتوى مخفي)"
+          # ملاحظة: PGPASSWORD متغير بيئة يتجنب مشاكل المحارف الخاصة في الرابط
+          try_conn() {
+            local U="$1" H="$2"
+            docker run --rm -e PGPASSWORD="$PGPW" postgres:17 \
+              psql -h "$H" -p "$3" -U "$U" -d postgres -c "select 1" 2>&1
+          }
+          CONN_U=""; CONN_H=""; CONN_P=""
+          for TRY in "postgres db.$REF.supabase.co 5432" "postgres.$REF aws-0-eu-central-1.pooler.supabase.com 6543" "postgres.$REF aws-0-eu-central-1.pooler.supabase.com 5432"; do
+            set -- $TRY
+            echo "… محاولة $1@$2:$3"
+            OUT=$(try_conn "$1" "$2" "$3")
+            if echo "$OUT" | grep -q "1 row"; then
+              CONN_U="$1"; CONN_H="$2"; CONN_P="$3"
+              echo "✓ اتصال ناجح عبر $2:$3"
               break
             fi
-            echo "✗ $HOST"
+            echo "✗ $(echo "$OUT" | tail -2 | head -1)"
           done
-          [ -n "$PGURL" ] || { echo "::error::فشل الاتصال بالمشروع القديم — تحقق من كلمة السر"; exit 1; }
+          [ -n "$CONN_H" ] || { echo "::error::فشل الاتصال بالمشروع القديم — تحقق من كلمة السر (المحاولة تُظهر الخطأ أعلاه)"; exit 1; }
+          PGRUN() {
+            docker run --rm -e PGPASSWORD="$PGPW" postgres:17 \
+              psql -h "$CONN_H" -p "$CONN_P" -U "$CONN_U" -d postgres "$@"
+          }
           mkdir -p supabase-migration
-          docker run --rm postgres:17 pg_dump "$PGURL" --schema=public --no-owner --no-acl \
+          PGRUN --no-owner --no-acl -c '\\dt' >/dev/null 2>&1 || true
+          docker run --rm -e PGPASSWORD="$PGPW" postgres:17 \
+            pg_dump -h "$CONN_H" -p "$CONN_P" -U "$CONN_U" -d postgres --schema=public --no-owner --no-acl \
             | gzip > supabase-migration/old-public.sql.gz
-          docker run --rm postgres:17 pg_dump "$PGURL" --data-only --no-owner --no-acl \
+          docker run --rm -e PGPASSWORD="$PGPW" postgres:17 \
+            pg_dump -h "$CONN_H" -p "$CONN_P" -U "$CONN_U" -d postgres --data-only --no-owner --no-acl \
             --table=auth.users --table=auth.identities \
             | gzip > supabase-migration/old-auth.sql.gz
-          docker run --rm postgres:17 psql "$PGURL" -Atc \
+          PGRUN -Atc \
             "select table_name || ': ' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by 1" \
             | tee supabase-migration/table-counts.txt
           ls -la supabase-migration/
@@ -140,27 +156,38 @@ jobs:
           [ -n "$PGPW" ] || { echo "::error::كلمة السر الجديدة مفقودة (NEW_DB_PASSWORD)"; exit 1; }
           [ -n "$REF" ] || { echo "::error::مرجع المشروع الجديد مفقود (NEW_PROJECT_REF)"; exit 1; }
           ls supabase-migration/old-public.sql.gz >/dev/null 2>&1 || { echo "::error::لا توجد نسخة — شغّل المرحلة 1 أولاً"; exit 1; }
-          NEWURL=""
-          for TRY in "postgres@$REF.supabase.co:5432" "postgres.$REF@aws-0-eu-central-1.pooler.supabase.co:6543"; do
-            U="${TRY%%@*}"; H="${TRY#*@}"; HOST="${H%%:*}"; PORT="${H##*:}"
-            if docker run --rm postgres:17 psql "postgresql://$U:$PGPW@$HOST:$PORT/postgres" -c "select 1" >/dev/null 2>&1; then
-              NEWURL="postgresql://$U:$PGPW@$HOST:$PORT/postgres"
-              echo "✓ اتصال ناجح عبر $HOST"
+          echo "طول كلمة السر المدخلة: ${#PGPW} (المحتوى مخفي)"
+          try_conn() {
+            docker run --rm -e PGPASSWORD="$PGPW" postgres:17 \
+              psql -h "$2" -p "$3" -U "$1" -d postgres -c "select 1" 2>&1
+          }
+          CONN_U=""; CONN_H=""; CONN_P=""
+          for TRY in "postgres $REF.supabase.co 5432" "postgres.$REF aws-0-eu-central-1.pooler.supabase.com 6543" "postgres.$REF aws-0-eu-central-1.pooler.supabase.com 5432"; do
+            set -- $TRY
+            echo "… محاولة $1@$2:$3"
+            OUT=$(try_conn "$1" "$2" "$3")
+            if echo "$OUT" | grep -q "1 row"; then
+              CONN_U="$1"; CONN_H="$2"; CONN_P="$3"
+              echo "✓ اتصال ناجح عبر $2:$3"
               break
             fi
-            echo "✗ $HOST"
+            echo "✗ $(echo "$OUT" | tail -2 | head -1)"
           done
-          [ -n "$NEWURL" ] || { echo "::error::فشل الاتصال بالمشروع الجديد"; exit 1; }
+          [ -n "$CONN_H" ] || { echo "::error::فشل الاتصال بالمشروع الجديد — تحقق من كلمة السر والمرجع"; exit 1; }
+          NEWRUN() {
+            docker run --rm $4 -e PGPASSWORD="$PGPW" postgres:17 \
+              psql -h "$CONN_H" -p "$CONN_P" -U "$CONN_U" -d postgres "$@"
+          }
           echo "## 1) حسابات المستخدمين (كلمات المرور كما هي)…"
           gunzip -c supabase-migration/old-auth.sql.gz | \
-            docker run --rm -i postgres:17 psql "$NEWURL" -v ON_ERROR_STOP=0 --echo-errors 2>&1 | tail -15
+            NEWRUN -i -v ON_ERROR_STOP=0 --echo-errors 2>&1 | tail -15
           echo "## 2) schema public كامل…"
           gunzip -c supabase-migration/old-public.sql.gz | \
-            docker run --rm -i postgres:17 psql "$NEWURL" -v ON_ERROR_STOP=0 --echo-errors 2>&1 | tail -25
+            NEWRUN -i -v ON_ERROR_STOP=0 --echo-errors 2>&1 | tail -25
           echo "## 3) التحقق:"
-          docker run --rm postgres:17 psql "$NEWURL" -Atc \
+          NEWRUN -Atc \
             "select table_name || ': ' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.%I', table_name), false, true, '')))[1]::text from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by 1"
-          docker run --rm postgres:17 psql "$NEWURL" -Atc "select 'المستخدمون: ' || count(*) from auth.users"
+          NEWRUN -Atc "select 'المستخدمون: ' || count(*) from auth.users"
 
       - name: "المرحلة 3: نسخ ملفات Storage"
         if: steps.cfg.outputs.task == 'all' || steps.cfg.outputs.task == 'storage'
