@@ -128,24 +128,27 @@ jobs:
           fi
           CH=$(echo "$FOUND" | cut -d" " -f2); CP=$(echo "$FOUND" | cut -d" " -f3); CU=$(echo "$FOUND" | cut -d" " -f4)
           SQL() {
+            docker run --rm -e PGPASSWORD="$PGPW" postgres:17 \
+              psql -h "$CH" -p "$CP" -U "$CU" -d postgres "$@"
+          }
+          SQL_IN() {
             docker run --rm -i -e PGPASSWORD="$PGPW" postgres:17 \
-              psql -h "$CH" -p "$CP" -U "$CU" -d postgres -v ON_ERROR_STOP=0 "$@"
+              psql -h "$CH" -p "$CP" -U "$CU" -d postgres -v ON_ERROR_STOP=0
           }
           echo "::notice title=1/5::بناء البنية من ملفات supabase/*.sql…"
           for f in supabase/*.sql; do
-            [ "$f" = "supabase-migration/old-auth.sql" ] && continue
-            gunzip -c "$f" 2>/dev/null > /tmp/one.sql || cp "$f" /tmp/one.sql
-            SQL -q -f /tmp/one.sql >/dev/null 2>>/tmp/schema.err
+            cat "$f" | SQL_IN >/dev/null 2>>/tmp/schema.err
           done
-          ERRS=$(grep -c "^ERROR" /tmp/schema.err 2>/dev/null || echo 0)
-          echo "::notice title=البنية::انتهت بـ $ERRS تحذيراً (متوقع في التكرار)"
+          ERRS=$(grep -ci "error" /tmp/schema.err 2>/dev/null || echo 0)
+          echo "::notice title=البنية::انتهت بـ $ERRS سطراً فيه error — أمثلة:"
+          grep -i "error" /tmp/schema.err 2>/dev/null | head -5 | sed 's/^/::warning title=schema::/'
           echo "::notice title=2/5::حسابات المستخدمين (بكلمات مرورها)…"
-          SQL -f supabase-migration/old-auth.sql 2>&1 | grep -E "^(ERROR|INSERT|BEGIN|COMMIT)" | sed 's/^/::notice title=auth::/' | head -8
+          cat supabase-migration/old-auth.sql | SQL_IN 2>&1 | grep -E "^(ERROR|INSERT|BEGIN|COMMIT)" | sed 's/^/::notice title=auth::/' | head -8
           echo "::notice title=3/5::تفريغ بيانات الـ seed…"
-          SQL -f supabase-migration/truncate.sql >/dev/null 2>&1
+          cat supabase-migration/truncate.sql | SQL_IN >/dev/null 2>&1
           echo "::notice title=4/5::إدراج البيانات الحقيقية…"
-          SQL -f supabase-migration/rest-data.sql >/dev/null 2>>/tmp/data.err
-          DERRS=$(grep -c "^ERROR" /tmp/data.err 2>/dev/null || echo 0)
+          cat supabase-migration/rest-data.sql | SQL_IN >/dev/null 2>>/tmp/data.err
+          DERRS=$(grep -ci "error" /tmp/data.err 2>/dev/null || echo 0)
           if [ "$DERRS" != "0" ]; then
             grep "^ERROR" /tmp/data.err | head -8 | sed 's/^/::warning title=بيانات::/'
           fi
@@ -239,11 +242,25 @@ jobs:
                   f"{k} {base64.b64encode(v.encode()).decode()}"
                   for k, v in (("bucketName", bucket), ("objectName", path), ("contentType", ctype)) if v
               )
-              r = urllib.request.Request(f"{url_base}/storage/v1/upload/resumable", method="POST", headers={
-                  "Authorization": f"Bearer {key}", "apikey": key,
-                  "Tus-Resumable": "1.0.0", "Upload-Length": str(len(data)),
-                  "Upload-Metadata": md, "x-upsert": "true",
-              })
+              direct = url_base.replace("://", "://", 1).replace(".supabase.co", ".storage.supabase.co")
+              try:
+                  r = urllib.request.Request(f"{direct}/storage/v1/upload/resumable", method="POST", headers={
+                      "Authorization": f"Bearer {key}", "apikey": key,
+                      "Tus-Resumable": "1.0.0", "Upload-Length": str(len(data)),
+                      "Upload-Metadata": md, "x-upsert": "true",
+                  })
+                  with urllib.request.urlopen(r, timeout=120) as resp:
+                      loc = resp.headers.get("Location", "")
+              except Exception:
+                  r = urllib.request.Request(f"{url_base}/storage/v1/upload/resumable", method="POST", headers={
+                      "Authorization": f"Bearer {key}", "apikey": key,
+                      "Tus-Resumable": "1.0.0", "Upload-Length": str(len(data)),
+                      "Upload-Metadata": md, "x-upsert": "true",
+                  })
+                  with urllib.request.urlopen(r, timeout=120) as resp:
+                      loc = resp.headers.get("Location", "")
+              if not loc:
+                  raise RuntimeError("no Location header from TUS creation")
               with urllib.request.urlopen(r, timeout=120) as resp:
                   loc = resp.headers.get("Location", "")
               if loc.startswith("/"):
@@ -254,7 +271,7 @@ jobs:
                   r2 = urllib.request.Request(loc, method="PATCH", data=chunk, headers={
                       "Authorization": f"Bearer {key}", "apikey": key,
                       "Tus-Resumable": "1.0.0", "Upload-Offset": str(offset),
-                      "Content-Type": "application/offset+octet-stream",
+                      "Content-Type": "application/offset+octet-stream", "x-upsert": "true",
                   })
                   with urllib.request.urlopen(r2, timeout=300) as resp2:
                       if resp2.status not in (200, 204):
@@ -282,11 +299,12 @@ jobs:
                       st5, body5 = req("POST", f"{NEW}/storage/v1/object/{b['name']}/{q}", NK, data,
                                        {"Content-Type": ctype, "x-upsert": "true"})
                   if st5 not in (200, 201):
+                      simple_err = f"simple={st5} {body5[:60]!r}"
                       try:
                           st5 = tus_upload(NEW, NK, b["name"], path, data, ctype)
                           body5 = b""
                       except Exception as ex:  # noqa: BLE001
-                          st5, body5 = 0, str(ex).encode()
+                          st5, body5 = 0, (simple_err + f" tus={ex}").encode()
                   if st5 in (200, 201):
                       copied += 1
                   else:
