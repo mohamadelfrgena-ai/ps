@@ -291,7 +291,7 @@ jobs:
 
       # ------------------------------------------------------- Final verify
       - name: "التحقق النهائي من القاعدة"
-        if: steps.cfg.outputs.task == 'all' || steps.cfg.outputs.task == 'restore'
+        if: always() && steps.cfg.outputs.task != 'none'
         env:
           PGPW: ${{ steps.cfg.outputs.new_pw }}
           REF: ${{ steps.cfg.outputs.new_ref }}
