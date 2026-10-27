@@ -71,8 +71,7 @@ def main():
 
     data_sql = [
         "-- بيانات المشروع القديم (استخراج REST بلا كلمة سر) — أُنشئت تلقائياً",
-        "begin;",
-        "set local session_replication_role = replica;",
+        "-- كل جدول في معاملة مستقلة: فشل جدول واحد لا يُسقط الباقي",
     ]
     counts = []
     empty_tables = []
@@ -95,11 +94,14 @@ def main():
             continue
         blob = json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
         blob = blob.replace("'", "''")
+        data_sql.append(f"-- TABLE {t} rows={len(rows)}")
+        data_sql.append("begin;")
+        data_sql.append("set local session_replication_role = replica;")
         data_sql.append(
-            f"insert into public.{t} OVERRIDING SYSTEM VALUE "
+            f"insert into public.{t} "
             f"select * from json_populate_recordset(null::public.{t}, '{blob}'::json);"
         )
-    data_sql.append("commit;")
+        data_sql.append("commit;")
 
     with open(f"{outdir}/rest-data.sql", "w", encoding="utf-8") as f:
         f.write("\n".join(data_sql) + "\n")

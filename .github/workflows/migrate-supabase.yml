@@ -145,12 +145,15 @@ jobs:
           echo "::notice title=2/5::حسابات المستخدمين (بكلمات مرورها)…"
           cat supabase-migration/old-auth.sql | SQL_IN 2>&1 | grep -E "^(ERROR|INSERT|BEGIN|COMMIT)" | sed 's/^/::notice title=auth::/' | head -8
           echo "::notice title=3/5::تفريغ بيانات الـ seed…"
-          cat supabase-migration/truncate.sql | SQL_IN >/dev/null 2>&1
+          cat supabase-migration/truncate.sql | SQL_IN >/tmp/trunc.out 2>&1
+          grep -i "error" /tmp/trunc.out | head -3 | sed 's/^/::warning title=truncate::/'
           echo "::notice title=4/5::إدراج البيانات الحقيقية…"
-          cat supabase-migration/rest-data.sql | SQL_IN >/dev/null 2>>/tmp/data.err
+          cat supabase-migration/rest-data.sql | SQL_IN >/tmp/data.out 2>>/tmp/data.err
           DERRS=$(grep -ci "error" /tmp/data.err 2>/dev/null || echo 0)
+          echo "::notice title=أخطاء الإدراج::$DERRS"
           if [ "$DERRS" != "0" ]; then
-            grep "^ERROR" /tmp/data.err | head -8 | sed 's/^/::warning title=بيانات::/'
+            grep -i "error" /tmp/data.err | sort | uniq -c | sort -rn | head -8 | sed 's/^/::warning title=بيانات::/'
+            grep -B1 -i "error" /tmp/data.err | grep "TABLE" | head -8 | sed 's/^/::warning title=جدول فاشل::/'
           fi
           echo "::notice title=5/5::تسلسل الأرقام + التحقق…"
           SQL -c "do \$\$ declare r record; begin for r in select table_name, column_name from information_schema.columns where table_schema='public' and column_default like 'nextval%' loop execute format('select setval(pg_get_serial_sequence(%L,%L), coalesce((select max(%I) from public.%I), 1))', r.table_name, r.column_name, r.column_name, r.table_name); end loop; end \$\$;" >/dev/null 2>&1
@@ -226,7 +229,8 @@ jobs:
                       if it.get("id") is None and it.get("metadata") is None:
                           out += list_all(key, base, bucket, f"{prefix}{name}/")
                       else:
-                          out.append(f"{prefix}{name}")
+                          meta = it.get("metadata") or {}
+                          out.append((f"{prefix}{name}", meta.get("mimetype") or "", meta.get("size") or 0))
                   if len(batch) < 100: break
                   offset += 100
               return out
@@ -267,7 +271,7 @@ jobs:
                   loc = url_base + loc
               offset = 0
               while offset < len(data):
-                  chunk = data[offset:offset + 6 * 1024 * 1024]
+                  chunk = data[offset:offset + 2 * 1024 * 1024]
                   r2 = urllib.request.Request(loc, method="PATCH", data=chunk, headers={
                       "Authorization": f"Bearer {key}", "apikey": key,
                       "Tus-Resumable": "1.0.0", "Upload-Offset": str(offset),
@@ -283,7 +287,7 @@ jobs:
           for b in buckets:
               files = list_all(OK, OLD, b["name"])
               note(f"ملفات {b['name']}", f"{len(files)} ملفاً")
-              for path in files:
+              for path, listed_mime, listed_size in files:
                   total += 1
                   q = urllib.request.quote(path, safe="/")
                   st4, data = req("GET", f"{OLD}/storage/v1/object/{b['name']}/{q}", OK)
@@ -293,7 +297,7 @@ jobs:
                       note("فشل تنزيل", f"{path}: {st4}")
                       report.append(f"FAIL download {b['name']}/{path}: {st4} {data[:80]!r}")
                       continue
-                  ctype = MIME.get(path.rsplit(".", 1)[-1].lower(), "application/octet-stream")
+                  ctype = listed_mime or MIME.get(path.rsplit(".", 1)[-1].lower(), "application/octet-stream")
                   st5, body5 = 0, b""
                   if len(data) <= 4 * 1024 * 1024:
                       st5, body5 = req("POST", f"{NEW}/storage/v1/object/{b['name']}/{q}", NK, data,
