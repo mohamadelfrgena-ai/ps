@@ -196,6 +196,7 @@ jobs:
           if st >= 400 or not isinstance(buckets, list):
               print(f"::error title=التخزين::فشل جلب البُرَك: {st} {body[:200]}"); sys.exit(1)
           note("البُرَك", ", ".join(b["name"] for b in buckets))
+          report = []
 
           for b in buckets:
               st2, body2 = req("POST", f"{NEW}/storage/v1/bucket", NK, {
@@ -204,8 +205,9 @@ jobs:
                   "file_size_limit": b.get("file_size_limit"),
                   "allowed_mime_types": b.get("allowed_mime_types"),
               })
-              state = "أنشئت" if st2 in (200, 201) else "موجودة" if st2 == 409 else f"خطأ {st2} {body2[:120]}"
-              note(f"بُركة {b['name']}", state)
+              bb = (body2 or b"").decode("utf-8", "replace")
+              ok2 = st2 in (200, 201) or "already exists" in bb.lower() or "409" in bb
+              report.append(f"bucket {b['name']}: {st2} {'ok' if ok2 else bb[:80]}")
 
           def list_all(key, base, bucket, prefix=""):
               out, offset = [], 0
@@ -269,25 +271,43 @@ jobs:
                   q = urllib.request.quote(path, safe="/")
                   st4, data = req("GET", f"{OLD}/storage/v1/object/{b['name']}/{q}", OK)
                   if st4 != 200:
-                      note("فشل تنزيل", f"{path}: {st4}"); continue
+                      st4, data = req("GET", f"{OLD}/storage/v1/object/{b['name']}/{q}", OK)
+                  if st4 != 200:
+                      note("فشل تنزيل", f"{path}: {st4}")
+                      report.append(f"FAIL download {b['name']}/{path}: {st4} {data[:80]!r}")
+                      continue
                   ctype = MIME.get(path.rsplit(".", 1)[-1].lower(), "application/octet-stream")
-                  if len(data) > 4 * 1024 * 1024:
+                  st5, body5 = 0, b""
+                  if len(data) <= 4 * 1024 * 1024:
+                      st5, body5 = req("POST", f"{NEW}/storage/v1/object/{b['name']}/{q}", NK, data,
+                                       {"Content-Type": ctype, "x-upsert": "true"})
+                  if st5 not in (200, 201):
                       try:
                           st5 = tus_upload(NEW, NK, b["name"], path, data, ctype)
                           body5 = b""
                       except Exception as ex:  # noqa: BLE001
                           st5, body5 = 0, str(ex).encode()
-                  else:
-                      st5, body5 = req("POST", f"{NEW}/storage/v1/object/{b['name']}/{q}", NK, data,
-                                       {"Content-Type": ctype, "x-upsert": "true"})
                   if st5 in (200, 201):
                       copied += 1
                   else:
                       note("فشل رفع", f"{path}: {st5} {body5[:100]}")
+                      report.append(f"FAIL upload {b['name']}/{path}: {st5} {body5[:120]!r}")
+              report.append(f"bucket {b['name']}: copied-in-bucket")
           note("النتيجة", f"نُسخ {copied} من {total} ملفاً")
+          report.append(f"TOTAL copied={copied} of {total}")
+          with open("supabase-migration/storage-report.txt", "w", encoding="utf-8") as f:
+              f.write("\n".join(report) + "\n")
           if copied < total:
               print(f"::warning title=التخزين::لم تُنسخ {total - copied} ملفات")
           PY
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add supabase-migration/storage-report.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Storage migration report [skip ci]"
+            git pull --rebase origin "$GITHUB_REF_NAME" || true
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
 
       # ------------------------------------------------------- Final verify
       - name: "التحقق النهائي من القاعدة"
