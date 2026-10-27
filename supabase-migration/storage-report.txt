@@ -1,0 +1,22 @@
+bucket content-files: 400 {"statusCode":"413","error":"Payload too large","message":"The object exceeded t
+bucket payment-receipts: 400 ok
+bucket chat-images: 400 ok
+bucket chat-media: 400 {"statusCode":"413","error":"Payload too large","message":"The object exceeded t
+bucket creator-media: 400 {"statusCode":"413","error":"Payload too large","message":"The object exceeded t
+bucket admin-assets: 400 ok
+bucket site-assets: 400 ok
+FAIL upload content-files/content-001/sulfur-cars_ffe0c865.mcaddon: 0 b"'tuple' object has no attribute 'items'"
+bucket content-files: copied-in-bucket
+bucket payment-receipts: copied-in-bucket
+bucket chat-images: copied-in-bucket
+FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1791241172915-video-1791241172894: 0 b"'tuple' object has no attribute 'items'"
+FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1791386030584-audio-1791386030565: 0 b"'tuple' object has no attribute 'items'"
+FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1792527516000-audio-1792527515993: 0 b"'tuple' object has no attribute 'items'"
+FAIL upload chat-media/8694dace-72e9-447b-bba1-77b1fca37742/1792527564033-video-1792527563808: 0 b"'tuple' object has no attribute 'items'"
+bucket chat-media: copied-in-bucket
+bucket creator-media: copied-in-bucket
+FAIL upload admin-assets/admin-private/items/minecraft-item/enchanted-bedrock.gif: 0 b"'tuple' object has no attribute 'items'"
+bucket admin-assets: copied-in-bucket
+FAIL upload site-assets/profiles/animated/giphy-3.gif: 0 b"'tuple' object has no attribute 'items'"
+bucket site-assets: copied-in-bucket
+TOTAL copied=590 of 597
