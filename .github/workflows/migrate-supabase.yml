@@ -147,9 +147,10 @@ jobs:
           echo "::notice title=3/5::تفريغ كل الجداول (الـ seed)…"
           echo "set session_replication_role = replica; do \$\$ declare r record; begin for r in select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE' loop execute format('truncate public.%I cascade', r.table_name); end loop; end \$\$;" | SQL_IN >/tmp/trunc.out 2>&1
           grep -i "error" /tmp/trunc.out | head -3 | sed 's/^/::warning title=truncate::/'
+          echo "set session_replication_role = replica;" | SQL_IN >/dev/null 2>&1
+          cat supabase-migration/manual-fixes.sql 2>/dev/null | SQL_IN >/dev/null 2>&1
           echo "::notice title=4/5::إدراج البيانات الحقيقية…"
           cat supabase-migration/rest-data.sql | SQL_IN >/tmp/data.out 2>>/tmp/data.err
-          echo "set session_replication_role = replica;" | SQL_IN >/dev/null 2>&1
           for f in supabase-migration/manual-*.sql; do
             [ -f "$f" ] || continue
             cat "$f" | SQL_IN >/dev/null 2>>/tmp/manual.err
