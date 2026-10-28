@@ -39,7 +39,7 @@ using namespace pkgtest;
 // ---------------------------------------------------------------- config ----
 static const char* kStageDir = "/data/AddonStation/installed";
 static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
-static const char* kAppVersion = "0.34";
+static const char* kAppVersion = "0.35";
 static const char* kBrandSuffix = " by sliver fox";
 
 static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
@@ -430,7 +430,11 @@ static bool parseCodeCreate(const RpcResult& r, std::string& code, std::string& 
     secret = jsonGetString(r.body, "poll_secret");
     if (secret.empty()) secret = jsonGetString(r.body, "p_poll_secret");
     if (secret.empty()) secret = jsonGetString(r.body, "poll_token");
-    secs = (int)jsonGetInt(r.body, "expires_in", 600);
+    // v0.35: expiry — server key first (expires_in_seconds), legacy alias, hard default 600.
+    // The timer can never show a wrong value; poll re-syncs it every 2 s anyway.
+    secs = (int)jsonGetInt(r.body, "expires_in_seconds", 0);
+    if (secs <= 0) secs = (int)jsonGetInt(r.body, "expires_in", 0);
+    if (secs <= 0) secs = 600;
     return !code.empty();
 }
 
@@ -444,7 +448,13 @@ static void newCode() {
         int secs = 600;
         // legacy RPC first — 40_ps4_and_deals.sql defines create_console_link_code on the live DB
         RpcResult r = callCreateLinkCode(gCfg, "ps4", "PlayStation 4");
-        if (!parseCodeCreate(r, code, secret, secs)) {
+        parseCodeCreate(r, code, secret, secs);
+        for (int i = 0; code.empty() && i < 2; ++i) {   // v0.35: transient network retries
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            r = callCreateLinkCode(gCfg, "ps4", "PlayStation 4");
+            parseCodeCreate(r, code, secret, secs);
+        }
+        if (code.empty()) {
             r = callConsoleCodeCreate(gCfg, "PlayStation 4", kAppVersion, "ps4-console");
             parseCodeCreate(r, code, secret, secs);
         }
@@ -461,11 +471,17 @@ static void newCode() {
     }).detach();
 }
 
-// returns 0 pending, 1 approved, 2 expired, 3 error
+// v0.35: one network hiccup must NOT kill the code screen — 8 consecutive failures
+// (~16 s) are needed before showing "connection error", and polling keeps running
+// afterwards so the screen recovers on its own. Waiting responses re-sync the
+// countdown from the server clock (authoritative 10-minute lifetime).
+// returns 0 pending, 1 approved, 2 expired, 3 error, 4 transient (keep waiting)
+static int gPollFailStreak = 0;
 static int pollCodeOnce() {
     // legacy poll first — poll_console_link_code (40_ps4_and_deals.sql)
     RpcResult old = callPollLinkCode(gCfg, A.code, A.pollSecret);
     if (old.ok) {
+        gPollFailStreak = 0;
         const std::string st = jsonGetString(old.body, "status");
         if (st == "linked" || st == "approved") {
             // one-shot response: carry the session + profile back to the app
@@ -476,12 +492,17 @@ static int pollCodeOnce() {
             return 1;
         }
         if (st == "expired") return 2;
-        if (st == "waiting" || st == "pending") return 0;   // "ok":true while waiting — NOT linked
+        if (st == "waiting" || st == "pending") {   // "ok":true while waiting — NOT linked
+            const long s = jsonGetInt(old.body, "expires_in_seconds", -1);
+            if (s > 0 && s < 3600) A.codeSecs = (int)s; // v0.35: re-sync from server
+            return 0;
+        }
         return 3;
     }
     // fallback: console_code_* RPCs (newer schema)
     RpcResult r = callConsoleCodeConsume(gCfg, A.code, A.pollSecret);
     if (r.ok) {
+        gPollFailStreak = 0;
         const std::string st = jsonGetString(r.body, "status");
         A.exchangeId = jsonGetString(r.body, "exchange_id");
         A.linkedConsoleId = jsonGetString(r.body, "linked_console_id");
@@ -493,7 +514,8 @@ static int pollCodeOnce() {
         if (st == "pending" || st == "waiting" || r.rpcOk) return 0;
         return 3;
     }
-    return 3;
+    if (++gPollFailStreak >= 8) return 3;
+    return 4; // transient network failure — keep waiting
 }
 
 static void finishSignIn() {
@@ -1307,10 +1329,11 @@ int main(int, char**) {
             if (now / 60 != lastSec / 60) A.dirty = true;   // clock + sale countdown
             lastSec = now;
         }
-        if (A.scr == Scr::SignIn && A.codeStatus == 0) {
+        if (A.scr == Scr::SignIn && (A.codeStatus == 0 || A.codeStatus == 3)) {
             static std::time_t lastPoll = 0;
             static std::atomic<bool> pollBusy{false};
-            if (now - lastPoll >= 2 && !pollBusy.exchange(true)) {
+            const long long cadence = A.codeStatus == 3 ? 5 : 2;   // v0.35: slower while recovering
+            if (now - lastPoll >= cadence && !pollBusy.exchange(true)) {
                 lastPoll = now;
                 std::thread([]() {
                     const int r = pollCodeOnce();
@@ -1321,6 +1344,8 @@ int main(int, char**) {
                         A.focus = 0;
                     } else if (r == 2 || r == 3) {
                         A.codeStatus = r;
+                    } else if (r == 0 && A.codeStatus == 3) {
+                        A.codeStatus = 0; // v0.35: connection recovered — countdown resumes
                     }
                     pollBusy = false;
                     A.dirty = true;
