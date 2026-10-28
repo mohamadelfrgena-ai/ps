@@ -20,10 +20,11 @@ create or replace function public.create_console_link_code(
 ) returns jsonb
 language plpgsql security definer set search_path = public as $q$
 declare
-  v_code text;
+  v_alphabet constant text := '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  v_code text := '';
   v_secret uuid := gen_random_uuid();
   v_expires timestamptz := now() + interval '10 minutes';
-  v_exists boolean := true;
+  v_i int;
 begin
   if auth.uid() is not null then
     return jsonb_build_object('ok', false, 'message', 'already_signed_in');
@@ -33,10 +34,11 @@ begin
   end if;
   delete from public.console_link_codes where expires_at < now() - interval '1 hour';
   loop
-    select upper(substr(encode(gen_random_bytes(8), 'base64'), 1, 6))
-      into v_code;
-    select not exists(select 1 from public.console_link_codes where code = v_code) into v_exists;
-    exit when v_exists;
+    v_code := '';
+    for v_i in 1..6 loop
+      v_code := v_code || substr(v_alphabet, 1 + floor(random() * length(v_alphabet))::int, 1);
+    end loop;
+    exit when not exists (select 1 from public.console_link_codes where code = v_code);
   end loop;
   insert into public.console_link_codes(code, poll_token, platform, device_name, expires_at)
   values (v_code, v_secret, p_platform, coalesce(nullif(p_device_name, ''), 'PlayStation Console'), v_expires);
