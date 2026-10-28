@@ -697,7 +697,7 @@ int drawBtn(UiEngine& e, const std::string& key, int cx, int cy, int h) {
 
 // v0.30: ANIMATED overlay recording. The UI redraws fully only when state changes; between
 // states the main loop restores the animated rectangles from a frame snapshot and replays just
-// these calls (focus glow/comet, gem, mascot, settings icon tiles) ~30 times a second.
+// these calls (focus ring/gleam, gem, mascot, settings icon tiles) ~30 times a second.
 struct AnimCall {
     enum Kind : std::uint8_t { Ring, Mark, Mascot, Tile } kind;
     int a0 = 0, a1 = 0, a2 = 0, a3 = 0, a4 = 0;
@@ -713,108 +713,41 @@ void animPush(const AnimCall& call, int x, int y, int w, int h) {
     gAnimRects.push_back(w); gAnimRects.push_back(h);
 }
 
-// v7.4 — LIVING focus glow: a crisp core ring (white on dark / black on light) + a soft multi-layer aura that
-// breathes (fades in and out) + two ripples that expand from the item and vanish. Time based (SDL_GetTicks),
-// so the speed is identical at any frame-rate. Cost: ~10 thin rounded borders for the ONE focused item only.
+// v0.34 — POLISHED GOLD RIM + one quiet gleam (لمعة).
+// User request (2026-10-28): remove the circling comet (الشهاب), the light sweep (الضوء)
+// and every glow / aura / ripple (التوهج). What remains is ONE clean, beautiful frame
+// with a single soft shine that catches the light when focus lands, then rests.
+// Cost: 3 thin rounded AA borders for the ONE focused item only (cheaper than v7.4).
 void focusRing(UiEngine& e, int x, int y, int w, int h, int r) {
-    animPush({AnimCall::Ring, x, y, w, h, r}, x - 40, y - 40, w + 80, h + 80);
-    const float t = static_cast<float>(SDL_GetTicks() % 600000u) / 1000.0f;           // seconds
-    const float breath = std::sin(t * 3.1416f * 2.0f / 1.8f) * 0.5f + 0.5f;           // 0..1 every 1.8 s
-    const float fast   = std::sin(t * 3.1416f * 2.0f / 0.9f + 1.2f) * 0.5f + 0.5f;    // quick shimmer on the core
-    // glow colours: gold + orange only. Set kGlowAccent=false for a neutral white/black glow.
-    const bool kGlowAccent = true;
-    const bool kShine = true;    // light sweep across the focused BUTTON (h <= 110)
-    const bool kLift  = true;    // focused item "grows" 0..3 px with the breathing (ring + aura expand together)
-    const bool kComet = true;    // white light-comet that circles the frame (like a gentle meteor)
-    // TWO-COLOUR glow: gold (inner rings) -> orange (outer rings + ripples). Change c1/c2 to re-tint the whole effect.
-    const SDL_Color c1 = !kGlowAccent ? kFOCUS : (gLight ? SDL_Color{184, 128, 8, 255} : SDL_Color{255, 214, 90, 255});
-    const SDL_Color c2 = !kGlowAccent ? kFOCUS : (gLight ? SDL_Color{220, 90, 20, 255} : SDL_Color{255, 130, 60, 255});
-    auto mixc = [&](float m) { return SDL_Color{static_cast<Uint8>(c1.r + (c2.r - c1.r) * m), static_cast<Uint8>(c1.g + (c2.g - c1.g) * m), static_cast<Uint8>(c1.b + (c2.b - c1.b) * m), 255}; };
-    const SDL_Color g = c1;
-    // 0) light sweep (clipped to the rounded button): slanted soft band every 2.4 s, crossing in 0.9 s
-    if (kShine && h <= 110 && w > 2 * r + 8) {
-        const float ph = std::fmod(t, 2.4f) / 0.9f;
-        if (ph < 1.0f) {
-            const int rr_ = std::min(r, h / 2), band = std::max(48, h), sk = h / 2;
-            const int sx = static_cast<int>(-band + ph * (w + band * 2 + sk));
-            static const float kSeg[5] = {0.15f, 0.5f, 1.0f, 0.5f, 0.15f};
-            const float amax = gLight ? 130.0f : 96.0f;
-            for (int dy = 0; dy < h; ++dy) {
-                int inset = 0;
-                if (dy < rr_) { const float yf = static_cast<float>(rr_ - dy) - 0.5f; inset = rr_ - static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(rr_ * rr_) - yf * yf))); }
-                else if (dy >= h - rr_) { const float yf = static_cast<float>(dy - (h - rr_)) + 0.5f; inset = rr_ - static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(rr_ * rr_) - yf * yf))); }
-                const int lo = x + inset, hi = x + w - inset;
-                const int left = x + sx + (h - dy) * sk / h;
-                for (int sgi = 0; sgi < 5; ++sgi) {
-                    const int s0 = std::max(lo, left + band * sgi / 5), s1 = std::min(hi, left + band * (sgi + 1) / 5);
-                    if (s1 > s0) e.fillRect(s0, y + dy, s1 - s0, 1, SDL_Color{255, 255, 255, static_cast<Uint8>(amax * kSeg[sgi])});
-                }
-            }
-        }
+    animPush({AnimCall::Ring, x, y, w, h, r}, x - 10, y - 10, w + 20, h + 20);
+
+    // ---- the gleam (لمعة): fires ONCE when focus lands on a NEW item, then rests.
+    // Smoothstep ease-out over 420 ms — smooth "frames" at any refresh rate (time based).
+    static bool sInit = false;
+    static int sLX = 0, sLY = 0, sLW = 0, sLH = 0;
+    static Uint32 sGleamAt = 0;
+    if (!sInit || x != sLX || y != sLY || w != sLW || h != sLH) {
+        sInit = true; sLX = x; sLY = y; sLW = w; sLH = h;
+        sGleamAt = SDL_GetTicks();
     }
-    // 0b) gentle "lift": everything below is drawn up to 3 px larger at the peak of the breath
-    if (kLift) { const int lf = static_cast<int>(3.0f * breath + 0.5f); x -= lf; y -= lf; w += 2 * lf; h += 2 * lf; r += lf; }
-    // 1) soft aura: 7 contiguous thin rings, alpha falls off quadratically; whole aura pulses
-    const float k = 0.45f + 0.55f * breath;
-    for (int i = 0; i < 7; ++i) {
-        const float f = 1.0f - static_cast<float>(i) / 7.0f;
-        const int o = 6 + i * 3;
-        const int a = static_cast<int>((gLight ? 120.0f : 150.0f) * f * f * k);
-        if (a < 2) continue;
-        const SDL_Color gc = mixc(static_cast<float>(i) / 6.0f);
-        e.drawRoundBorder(x - o, y - o, w + 2 * o, h + 2 * o, r + o, 3, SDL_Color{gc.r, gc.g, gc.b, static_cast<Uint8>(a)});
-    }
-    // 2) two ripples: expand outward while fading (half a cycle apart)
-    for (int n = 0; n < 2; ++n) {
-        float p = std::fmod(t / 2.2f + n * 0.5f, 1.0f);
-        const int o = 10 + static_cast<int>(p * 26.0f);
-        const float q = 1.0f - p;
-        const int a = static_cast<int>((gLight ? 90.0f : 120.0f) * q * q);
-        if (a < 3) continue;
-        e.drawRoundBorder(x - o, y - o, w + 2 * o, h + 2 * o, r + o, 3, SDL_Color{c2.r, c2.g, c2.b, static_cast<Uint8>(a)});
-    }
-    // 3) tinted inner line + crisp core ring (core brightness shimmers slightly)
-    e.drawRoundBorder(x - 3, y - 3, w + 6, h + 6, r + 3, 6, SDL_Color{g.r, g.g, g.b, static_cast<Uint8>(110 + 60 * breath)});
-    const Uint8 ca = static_cast<Uint8>(226 + 29 * fast);
-    e.drawRoundBorder(x - 3, y - 3, w + 6, h + 6, r + 3, 4, SDL_Color{kFOCUS.r, kFOCUS.g, kFOCUS.b, ca});
-    // 4) white light-comet circling the frame: one lap every 2.4 s, tail fades out behind the head
-    if (kComet) {
-        const int cx0 = x - 1, cy0 = y - 1, cw = w + 2, ch = h + 2;
-        const int cr = std::max(2, std::min(r + 1, std::min(cw, ch) / 2));
-        const float arc = 1.5707963f * static_cast<float>(cr);
-        const float sx = static_cast<float>(cw - 2 * cr), sy = static_cast<float>(ch - 2 * cr);
-        const float P = 2.0f * sx + 2.0f * sy + 4.0f * arc;
-        auto at = [&](float d, int& px, int& py) {
-            d = std::fmod(d, P); if (d < 0) d += P;
-            const float R = static_cast<float>(cr);
-            float q = d;
-            if (q < sx) { px = cx0 + cr + static_cast<int>(q); py = cy0; return; }
-            q -= sx;
-            if (q < arc) { const float a = q / R; px = cx0 + cw - cr + static_cast<int>(std::sin(a) * R); py = cy0 + cr - static_cast<int>(std::cos(a) * R); return; }
-            q -= arc;
-            if (q < sy) { px = cx0 + cw; py = cy0 + cr + static_cast<int>(q); return; }
-            q -= sy;
-            if (q < arc) { const float a = q / R; px = cx0 + cw - cr + static_cast<int>(std::cos(a) * R); py = cy0 + ch - cr + static_cast<int>(std::sin(a) * R); return; }
-            q -= arc;
-            if (q < sx) { px = cx0 + cw - cr - static_cast<int>(q); py = cy0 + ch; return; }
-            q -= sx;
-            if (q < arc) { const float a = q / R; px = cx0 + cr - static_cast<int>(std::sin(a) * R); py = cy0 + ch - cr + static_cast<int>(std::cos(a) * R); return; }
-            q -= arc;
-            if (q < sy) { px = cx0; py = cy0 + ch - cr - static_cast<int>(q); return; }
-            q -= sy;
-            const float a = q / R; px = cx0 + cr - static_cast<int>(std::cos(a) * R); py = cy0 + cr - static_cast<int>(std::sin(a) * R);
-        };
-        const float head = std::fmod(t / 2.4f, 1.0f) * P;
-        const float tail = P * 0.24f;
-        const int N = std::max(14, std::min(56, static_cast<int>(tail / 7.0f)));
-        for (int i = N; i >= 0; --i) {                      // tail first, head last (head on top)
-            const float f = 1.0f - static_cast<float>(i) / static_cast<float>(N);
-            int px = 0, py = 0;
-            at(head - tail * static_cast<float>(i) / static_cast<float>(N), px, py);
-            const int rad = 2 + static_cast<int>(3.0f * f);
-            e.drawCircle(px, py, rad + 4, SDL_Color{c2.r, c2.g, c2.b, static_cast<Uint8>(46.0f * f * f)});    // warm halo
-            e.drawCircle(px, py, rad, SDL_Color{255, 255, 255, static_cast<Uint8>(255.0f * f * f)});
-        }
+    float gleam = static_cast<float>(SDL_GetTicks() - sGleamAt) / 420.0f;
+    gleam = gleam < 0.0f ? 0.0f : (gleam > 1.0f ? 1.0f : gleam);
+    gleam = 1.0f - gleam;
+    gleam = gleam * gleam * (3.0f - 2.0f * gleam);          // 1 on arrival -> 0 at rest
+
+    // ---- polished gold (theme-aware): bright rim + deeper-gold inner line = metal bevel
+    const SDL_Color goldHi = gLight ? SDL_Color{184, 128, 8, 255} : SDL_Color{255, 214, 90, 255};
+    const SDL_Color goldLo = gLight ? SDL_Color{122, 84, 6, 255} : SDL_Color{184, 128, 8, 255};
+
+    // 1) the frame itself: one clean 3 px AA border + a 1 px deeper line inside (bevel edge)
+    const int rr = std::max(2, std::min(r, std::min(w, h) / 2));
+    e.drawRoundBorder(x, y, w, h, rr, 3, goldHi);
+    e.drawRoundBorder(x + 3, y + 3, w - 6, h - 6, std::max(1, rr - 3), 1, goldLo);
+
+    // 2) THE gleam: a soft white-gold light that catches the rim once and fades out (nothing else)
+    if (gleam > 0.01f) {
+        const Uint8 a = static_cast<Uint8>(80.0f * gleam);
+        e.drawRoundBorder(x - 1, y - 1, w + 2, h + 2, rr + 1, 4, SDL_Color{255, 246, 214, a});
     }
 }
 
