@@ -21,6 +21,13 @@ import kotlinx.serialization.json.put
  * الخطط والاشتراكات والدفع اليدوي بالإيصال.
  * السعر يأتي دائماً من الخادم، والمبلغ يُحدده الخادم عند إنشاء الطلب (إصلاح ثغرة §3.3-2).
  */
+/** نتيجة بدء دفع إلكتروني عبر البوابة: الطلب + الرابط الجاهز للدفع. */
+data class GatewayPayment(
+    val orderId: String,
+    val referenceCode: String,
+    val payUrl: String,
+)
+
 class PlansRepository(
     private val supabase: SupabaseClient,
     private val state: AppState,
@@ -84,6 +91,30 @@ class PlansRepository(
                         paymentMethod = methodCode,
                         referenceCode = outcome.data["reference_code"]?.asString().orEmpty(),
                     )
+            }
+        }
+
+    /**
+     * بدء دفع إلكتروني عبر بوابة الدفع: ينشئ الطلب (بمبلغ يحدده الخادم) ويرجع
+     * رابط الدفع الجاهز. بيانات البوابة (Key + ID) لا تغادر الخادم إطلاقاً.
+     */
+    suspend fun startGatewayPayment(planId: String, methodCode: String): Result<GatewayPayment> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val outcome = supabase.rpc(
+                    "start_gateway_payment",
+                    mapOf(
+                        "p_plan_id" to JsonPrimitive(planId),
+                        "p_method" to JsonPrimitive(methodCode),
+                    ),
+                ).asOutcome().requireOk()
+                GatewayPayment(
+                    orderId = outcome.data["order_id"]?.asString()
+                        ?: throw ApiError(ApiErrorKind.GENERIC, "order_id_missing"),
+                    referenceCode = outcome.data["reference_code"]?.asString().orEmpty(),
+                    payUrl = outcome.data["pay_url"]?.asString()
+                        ?: throw ApiError(ApiErrorKind.GENERIC, "pay_url_missing"),
+                )
             }
         }
 

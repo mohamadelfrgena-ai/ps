@@ -860,4 +860,13 @@ CREATE IT.</string>
     <string name="link_error_expired">This code expired — request a new one on the console.</string>
     <string name="link_error_signin">Sign in first to link a console.</string>
     <string name="link_error_network">Something went wrong — try again.</string>
+    <string name="plan_pay_online">Pay online</string>
+    <string name="plan_gateway_waiting">Waiting for payment confirmation…</string>
+    <string name="plan_gateway_approved">Payment confirmed — your plan is active</string>
+    <string name="plan_gateway_rejected">Payment was not completed</string>
+    <string name="admin_gateway_title">Payment gateway (Key + ID)</string>
+    <string name="admin_gateway_key">API key (secret)</string>
+    <string name="admin_gateway_id">Merchant / client ID</string>
+    <string name="admin_gateway_url">Checkout URL ({amount} {reference})</string>
+    <string name="admin_gateway_saved">Gateway credentials saved</string>
 </resources>

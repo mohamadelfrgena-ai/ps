@@ -54,6 +54,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -81,6 +83,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -2913,6 +2916,104 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
                             methods = container.plans.loadAllPaymentMethods()
                         }
                     },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            // ---- بوابة الدفع: Key + ID + رابط الدفع (تُحفظ في جدول إداري محجوب) ----
+            var gwCode by remember { mutableStateOf("") }
+            var gwKey by remember { mutableStateOf("") }
+            var gwId by remember { mutableStateOf("") }
+            var gwUrl by remember { mutableStateOf("") }
+            var gwMenu by remember { mutableStateOf(false) }
+            val gatewaySavedMsg = stringResource(R.string.admin_gateway_saved)
+            val methodPickLabel = stringResource(R.string.plan_payment_method)
+            LaunchedEffect(methods) {
+                if (gwCode.isEmpty()) gwCode = methods.firstOrNull()?.code ?: ""
+            }
+            LaunchedEffect(gwCode) {
+                if (gwCode.isEmpty()) return@LaunchedEffect
+                val c = container.admin.getGatewayCredentials(gwCode)
+                gwKey = c?.apiKey.orEmpty()
+                gwId = c?.merchantId.orEmpty()
+                gwUrl = c?.checkoutUrl.orEmpty()
+            }
+            Spacer(Modifier.height(10.dp))
+            GlassCard(padding = 10.dp) {
+                Text(stringResource(R.string.admin_gateway_title), style = AppText.sectionTitle, color = AppColors.Text)
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(AppColors.Elevated)
+                            .clickable { gwMenu = true }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            gwCode.ifBlank { methodPickLabel },
+                            style = AppText.bodySmall,
+                            color = AppColors.Text,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text("▾", style = AppText.bodySmall, color = AppColors.Muted)
+                    }
+                    DropdownMenu(
+                        expanded = gwMenu,
+                        onDismissRequest = { gwMenu = false },
+                        containerColor = AppColors.Elevated,
+                    ) {
+                        methods.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.name, style = AppText.bodySmall, color = AppColors.Text) },
+                                onClick = {
+                                    gwCode = option.code
+                                    gwMenu = false
+                                },
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    gwKey,
+                    { gwKey = it },
+                    label = { Text(stringResource(R.string.admin_gateway_key)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    gwId,
+                    { gwId = it },
+                    label = { Text(stringResource(R.string.admin_gateway_id)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    gwUrl,
+                    { gwUrl = it },
+                    label = { Text(stringResource(R.string.admin_gateway_url)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                GradientButton(
+                    text = stringResource(R.string.admin_save),
+                    onClick = {
+                        scope.launch {
+                            container.admin.setGatewayCredentials(
+                                code = gwCode,
+                                apiKey = gwKey.trim(),
+                                merchantId = gwId.trim(),
+                                checkoutUrl = gwUrl.trim(),
+                            ).onSuccess { message = gatewaySavedMsg }
+                                .onFailure { message = it.message }
+                        }
+                    },
+                    enabled = gwCode.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

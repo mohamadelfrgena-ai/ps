@@ -846,4 +846,13 @@ CRÉALO.</string>
     <string name="link_error_expired">Este código caducó — pide uno nuevo en la consola.</string>
     <string name="link_error_signin">Inicia sesión primero para vincular una consola.</string>
     <string name="link_error_network">Algo salió mal — inténtalo de nuevo.</string>
+    <string name="plan_pay_online">Pagar en línea</string>
+    <string name="plan_gateway_waiting">Esperando la confirmación del pago…</string>
+    <string name="plan_gateway_approved">Pago confirmado — tu plan ya está activo</string>
+    <string name="plan_gateway_rejected">El pago no se completó</string>
+    <string name="admin_gateway_title">Pasarela de pago (Key + ID)</string>
+    <string name="admin_gateway_key">Clave API (secreta)</string>
+    <string name="admin_gateway_id">ID de comerciante / cliente</string>
+    <string name="admin_gateway_url">URL de pago ({amount} {reference})</string>
+    <string name="admin_gateway_saved">Credenciales de la pasarela guardadas</string>
 </resources>

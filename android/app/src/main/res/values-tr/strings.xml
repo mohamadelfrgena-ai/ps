@@ -846,4 +846,13 @@ YARAT.</string>
     <string name="link_error_expired">Bu kodun süresi doldu — konsoldan yeni kod isteyin.</string>
     <string name="link_error_signin">Konsol eşleştirmek iönce giriş yapın.</string>
     <string name="link_error_network">Bir şeyler ters gitti — tekrar deneyin.</string>
+    <string name="plan_pay_online">Çevrimiçi öde</string>
+    <string name="plan_gateway_waiting">Ödeme onayı bekleniyor…</string>
+    <string name="plan_gateway_approved">Ödeme onaylandı — planınız artık aktif</string>
+    <string name="plan_gateway_rejected">Ödeme tamamlanamadı</string>
+    <string name="admin_gateway_title">Ödeme ağ geçidi (Key + ID)</string>
+    <string name="admin_gateway_key">API anahtarı (gizli)</string>
+    <string name="admin_gateway_id">Tücar / istemci kimliği</string>
+    <string name="admin_gateway_url">Ödeme URL\'si ({amount} {reference})</string>
+    <string name="admin_gateway_saved">Ağ geçidi bilgileri kaydedildi</string>
 </resources>

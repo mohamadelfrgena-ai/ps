@@ -19,11 +19,11 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "all (كل المراحل) · dump · restore · storage"
+        description: "all (كل المراحل) · dump · restore · storage · sql (تعديلات حية)"
         required: true
         default: all
         type: choice
-        options: [all, dump, restore, storage]
+        options: [all, dump, restore, storage, sql]
   push:
     branches: [ main, arena/5622bbf6-ps ]
     paths:
@@ -60,6 +60,43 @@ jobs:
             echo "new_ref=stbmescmexzcszyyambq"
           } >> "$GITHUB_OUTPUT"
           echo "::notice title=المهمة::task=$TASK"
+
+      # ---------------------------------------------------------------- Stage SQL
+      - name: "المرحلة SQL: تطبيق تعديلات حية (supabase-live/*.sql — بدون تفريغ)"
+        if: steps.cfg.outputs.task == 'sql'
+        env:
+          PGPW: ${{ steps.cfg.outputs.new_pw }}
+          REF: ${{ steps.cfg.outputs.new_ref }}
+        run: |
+          set +e
+          echo "::add-mask::$PGPW"
+          if [ -z "$PGPW" ]; then echo "::error title=SQL::سر NEW_DB_PASSWORD مفقود"; exit 1; fi
+          FOUND=$(python3 tools/find_pg_host.py "$REF" "$PGPW" 2>>/tmp/find3.err | tail -1)
+          cat /tmp/find3.err
+          if [ "$FOUND" = "${FOUND#OK }" ]; then
+            echo "::error title=SQL::فشل اكتشاف اتصال المشروع الجديد (التفاصيل أعلاه)"
+            exit 1
+          fi
+          CH=$(echo "$FOUND" | cut -d" " -f2); CP=$(echo "$FOUND" | cut -d" " -f3); CU=$(echo "$FOUND" | cut -d" " -f4)
+          SQL_IN() {
+            docker run --rm -i -e PGPASSWORD="$PGPW" postgres:17 \
+              psql -h "$CH" -p "$CP" -U "$CU" -d postgres -v ON_ERROR_STOP=0
+          }
+          SQL() {
+            docker run --rm -e PGPASSWORD="$PGPW" postgres:17 \
+              psql -h "$CH" -p "$CP" -U "$CU" -d postgres -Atc "$1"
+          }
+          APPLIED=0
+          for f in supabase-live/*.sql; do
+            [ -f "$f" ] || continue
+            cat "$f" | SQL_IN >/dev/null 2>>/tmp/live.err
+            echo "::notice title=live::$(basename "$f") طُبِّق"
+            APPLIED=$((APPLIED + 1))
+          done
+          ERRS=$(grep -ci "error" /tmp/live.err 2>/dev/null || echo 0)
+          echo "::notice title=live SQL::طُبِّق $APPLIED ملفاً · أخطاء: $ERRS"
+          grep -i "error" /tmp/live.err 2>/dev/null | head -8 | sed 's/^/::warning title=live::/'
+          echo "::notice title=بوابات الدفع::$(SQL -Atc "select coalesce(string_agg(method_code || ' key=' || (api_key is not null)::text || ' id=' || (merchant_id is not null)::text || ' url=' || (checkout_url is not null)::text, ' · '), 'لا شيء') from public.payment_gateway_credentials" | head -c 400)"
 
       # ---------------------------------------------------------------- Stage 1
       - name: "المرحلة 1: الاستخراج (REST بلا كلمة سر)"

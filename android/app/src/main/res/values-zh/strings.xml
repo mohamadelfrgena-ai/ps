@@ -846,4 +846,13 @@
     <string name="link_error_expired">代码已过期—请在主机上获取新代码。</string>
     <string name="link_error_signin">请先登录再绑定主机。</string>
     <string name="link_error_network">出错了—请重试。</string>
+    <string name="plan_pay_online">在线支付</string>
+    <string name="plan_gateway_waiting">等待付款确认…</string>
+    <string name="plan_gateway_approved">付款已确认 — 您的计划已生效</string>
+    <string name="plan_gateway_rejected">付款未完成</string>
+    <string name="admin_gateway_title">支付网关 (Key + ID)</string>
+    <string name="admin_gateway_key">API 密钥（保密）</string>
+    <string name="admin_gateway_id">商户/客户 ID</string>
+    <string name="admin_gateway_url">支付链接 ({amount} {reference})</string>
+    <string name="admin_gateway_saved">网关凭据已保存</string>
 </resources>

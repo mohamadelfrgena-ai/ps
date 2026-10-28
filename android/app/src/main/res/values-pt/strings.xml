@@ -846,4 +846,13 @@ CRIE.</string>
     <string name="link_error_expired">Este código expirou — peÃ§a um novo na consola.</string>
     <string name="link_error_signin">Inicie sessão primeiro para ligar uma consola.</string>
     <string name="link_error_network">Algo correu mal — tente novamente.</string>
+    <string name="plan_pay_online">Pagar online</string>
+    <string name="plan_gateway_waiting">A aguardar a confirmação do pagamento…</string>
+    <string name="plan_gateway_approved">Pagamento confirmado — o seu plano está ativo</string>
+    <string name="plan_gateway_rejected">O pagamento não foi concluído</string>
+    <string name="admin_gateway_title">Gateway de pagamento (Key + ID)</string>
+    <string name="admin_gateway_key">Chave API (secreta)</string>
+    <string name="admin_gateway_id">ID de comerciante / cliente</string>
+    <string name="admin_gateway_url">URL de pagamento ({amount} {reference})</string>
+    <string name="admin_gateway_saved">Credenciais do gateway guardadas</string>
 </resources>

@@ -844,4 +844,13 @@
     <string name="link_error_expired">انتهت صلاحية الكود — اطلب كوداً جديداً من السوني.</string>
     <string name="link_error_signin">سجّل الدخول أولاً لربط جهاز.</string>
     <string name="link_error_network">حدث خطأ — حاول مرة أخرى.</string>
+    <string name="plan_pay_online">ادفع إلكترونياً</string>
+    <string name="plan_gateway_waiting">بانتظار تأكيد الدفع…</string>
+    <string name="plan_gateway_approved">تم تأكيد الدفع — خطتك فعالة الآن</string>
+    <string name="plan_gateway_rejected">لم يكتمل الدفع</string>
+    <string name="admin_gateway_title">بوابة الدفع (Key + ID)</string>
+    <string name="admin_gateway_key">المفتاح السري (Key)</string>
+    <string name="admin_gateway_id">المعرّف (ID)</string>
+    <string name="admin_gateway_url">رابط الدفع ({amount} {reference})</string>
+    <string name="admin_gateway_saved">تم حفظ بيانات البوابة</string>
 </resources>

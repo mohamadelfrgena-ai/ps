@@ -46,7 +46,8 @@ def main() -> int:
         if "PasswordVisualTransformation()" in text:
             occurrences.append(path)
     admin_gate = SRC / "com/addonstation/mobile/ui/admin/AdminGate.kt"
-    allowed = {FIELDS, admin_gate}
+    admin_settings = SRC / "com/addonstation/mobile/ui/admin/AdminScreens.kt"
+    allowed = {FIELDS, admin_gate, admin_settings}
     if set(occurrences) != allowed:
         problems.append("تحويل كلمة مرور في ملف غير معتمد: " + " · ".join(str(p.relative_to(ROOT)) for p in occurrences))
     if admin_gate.exists():

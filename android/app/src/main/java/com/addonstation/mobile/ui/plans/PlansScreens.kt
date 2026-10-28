@@ -1,5 +1,6 @@
 package com.addonstation.mobile.ui.plans
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,6 +71,7 @@ import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.util.TimeFormat
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -232,6 +234,7 @@ fun CheckoutScreen(
     var method by remember { mutableStateOf<PaymentMethodSetting?>(null) }
     var methodMenu by remember { mutableStateOf(false) }
     var order by remember { mutableStateOf<PaymentOrder?>(null) }
+    var payUrl by remember { mutableStateOf<String?>(null) }
     var receiptBytes by remember { mutableStateOf<ByteArray?>(null) }
     var receiptName by remember { mutableStateOf<String?>(null) }
     var receiptMime by remember { mutableStateOf("image/png") }
@@ -243,6 +246,10 @@ fun CheckoutScreen(
     val sentMsg = stringResource(R.string.plan_order_sent_plain)
     val chooseReceipt = stringResource(R.string.plan_choose_receipt)
     val unavailable = stringResource(R.string.plan_unavailable)
+    val payOnlineLabel = stringResource(R.string.plan_pay_online)
+    val gatewayWaiting = stringResource(R.string.plan_gateway_waiting)
+    val gatewayApproved = stringResource(R.string.plan_gateway_approved)
+    val gatewayRejected = stringResource(R.string.plan_gateway_rejected)
 
     LaunchedEffect(planId) {
         if (plans.isEmpty()) container.plans.loadPlans()
@@ -251,6 +258,25 @@ fun CheckoutScreen(
     LaunchedEffect(plans, planId) {
         plan = plans.firstOrNull { it.id == planId }
         method = methods.firstOrNull()
+    }
+
+    // بوابة الدفع: مراقبة الطلب كل 5 ثوانٍ حتى يأكدّه المزوّد (gateway_confirm_order)
+    LaunchedEffect(order?.id, payUrl) {
+        val id = order?.id ?: return@LaunchedEffect
+        if (payUrl == null) return@LaunchedEffect
+        while (true) {
+            delay(5000)
+            val fresh = container.plans.orderById(id) ?: continue
+            order = fresh
+            if (fresh.status == "approved") {
+                status = gatewayApproved
+                break
+            }
+            if (fresh.status == "rejected" || fresh.status == "cancelled") {
+                error = gatewayRejected
+                break
+            }
+        }
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -345,7 +371,8 @@ fun CheckoutScreen(
             Spacer(Modifier.height(14.dp))
             if (order == null) {
                 GradientButton(
-                    text = stringResource(R.string.plan_create_order),
+                    text = if (method?.provider != "manual") payOnlineLabel
+                    else stringResource(R.string.plan_create_order),
                     onClick = {
                         val selectedMethod = method
                         if (selectedMethod == null) {
@@ -355,12 +382,34 @@ fun CheckoutScreen(
                         scope.launch {
                             busy = true
                             error = null
-                            container.plans.createOrder(currentPlan.id, selectedMethod.code)
-                                .onSuccess { created ->
-                                    order = created
-                                    status = null
-                                }
-                                .onFailure { error = it.message }
+                            if (selectedMethod.provider != "manual") {
+                                // بوابة الدفع: طلب + رابط دفع جاهز (Key + ID تبقى على الخادم)
+                                container.plans.startGatewayPayment(currentPlan.id, selectedMethod.code)
+                                    .onSuccess { gp ->
+                                        payUrl = gp.payUrl
+                                        order = PaymentOrder(
+                                            id = gp.orderId,
+                                            userId = "",
+                                            planId = currentPlan.id,
+                                            amountLyd = currentPlan.priceLyd,
+                                            paymentMethod = selectedMethod.code,
+                                            referenceCode = gp.referenceCode,
+                                            status = "pending",
+                                        )
+                                        status = gatewayWaiting
+                                        runCatching {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(gp.payUrl)))
+                                        }
+                                    }
+                                    .onFailure { error = it.message }
+                            } else {
+                                container.plans.createOrder(currentPlan.id, selectedMethod.code)
+                                    .onSuccess { created ->
+                                        order = created
+                                        status = null
+                                    }
+                                    .onFailure { error = it.message }
+                            }
                             busy = false
                         }
                     },
@@ -385,6 +434,7 @@ fun CheckoutScreen(
                     }
                     Text(stringResource(R.string.plan_order_instructions), style = AppText.bodySmall, color = AppColors.Muted)
 
+                    if (payUrl == null) {
                     // [جديد] بيانات المستفيد ورقم الحساب وتعليمات الأدمن — مع زر نسخ
                     method?.let { selected ->
                         selected.accountName?.let {
@@ -439,6 +489,24 @@ fun CheckoutScreen(
                         enabled = !busy,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    } else {
+                        // بوابة الدفع: رابط الدفع + حالة الطلب (الإيصال غير مطلوب)
+                        Text(
+                            if (current.status == "approved") gatewayApproved else gatewayWaiting,
+                            style = AppText.bodySmall,
+                            color = AppColors.Muted,
+                        )
+                        GhostButton(
+                            text = payOnlineLabel,
+                            onClick = {
+                                val url = payUrl
+                                if (url != null) runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             }
 

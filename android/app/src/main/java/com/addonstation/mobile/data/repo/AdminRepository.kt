@@ -18,6 +18,13 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
+/** بيانات بوابة الدفع (Key + ID) — تُحفظ في جدول إداري محجوب عن المستخدمين. */
+data class GatewayCredentials(
+    val apiKey: String = "",
+    val merchantId: String = "",
+    val checkoutUrl: String = "",
+)
+
 /**
  * لوحة الأدمن — كل الدوال هنا يُتحقق منها على الخادم (is_admin) وليس في الواجهة فقط.
  * أي محاولة من غير الأدمن تُرفض من قاعدة البيانات.
@@ -276,6 +283,44 @@ class AdminRepository(private val supabase: SupabaseClient) {
             Unit
         }
     }
+
+    /**
+     * حفظ بيانات بوابة الدفع (Key + ID + رابط الدفع) لطريقة دفع واحدة.
+     * القيم تُمرَّر إلى admin_set_gateway_credentials (security definer) وتبقى
+     * في جدول إداري محجوب — لا تصل للمستخدمين إطلاقاً.
+     */
+    suspend fun setGatewayCredentials(
+        code: String,
+        apiKey: String?,
+        merchantId: String?,
+        checkoutUrl: String?,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc(
+                "admin_set_gateway_credentials",
+                mapOf(
+                    "p_code" to JsonPrimitive(code),
+                    "p_api_key" to apiKey?.let { JsonPrimitive(it) },
+                    "p_merchant_id" to merchantId?.let { JsonPrimitive(it) },
+                    "p_checkout_url" to checkoutUrl?.let { JsonPrimitive(it) },
+                ),
+            ).asOutcome().requireOk()
+            Unit
+        }
+    }
+
+    /** قراءة بيانات البوابة المحفوظة (للأدمن فقط) لتعبئة المحرر. */
+    suspend fun getGatewayCredentials(code: String): GatewayCredentials? = runCatching {
+        val outcome = supabase.rpc(
+            "admin_get_gateway_credentials",
+            mapOf("p_code" to JsonPrimitive(code)),
+        ).asOutcome().requireOk()
+        GatewayCredentials(
+            apiKey = outcome.data["api_key"]?.asString().orEmpty(),
+            merchantId = outcome.data["merchant_id"]?.asString().orEmpty(),
+            checkoutUrl = outcome.data["checkout_url"]?.asString().orEmpty(),
+        )
+    }.getOrNull()
 
     // -------------------------------------------------------------- الإشراف
 

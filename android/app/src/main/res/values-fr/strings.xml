@@ -846,4 +846,13 @@ CRÉE-LE.</string>
     <string name="link_error_expired">Ce code a expiré — demandez-en un nouveau sur la console.</string>
     <string name="link_error_signin">Connectez-vous d\'abord pour associer une console.</string>
     <string name="link_error_network">Une erreur est survenue — réessayez.</string>
+    <string name="plan_pay_online">Payer en ligne</string>
+    <string name="plan_gateway_waiting">En attente de confirmation du paiement…</string>
+    <string name="plan_gateway_approved">Paiement confirmé — votre forfait est actif</string>
+    <string name="plan_gateway_rejected">Le paiement n\'a pas abouti</string>
+    <string name="admin_gateway_title">Passerelle de paiement (Key + ID)</string>
+    <string name="admin_gateway_key">Clé API (secrète)</string>
+    <string name="admin_gateway_id">Identifiant marchand / client</string>
+    <string name="admin_gateway_url">URL de paiement ({amount} {reference})</string>
+    <string name="admin_gateway_saved">Identifiants de la passerelle enregistrés</string>
 </resources>

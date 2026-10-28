@@ -846,4 +846,13 @@
     <string name="link_error_expired">Срок кода истёк — запросите новый на консоли.</string>
     <string name="link_error_signin">Сначала войдите, чтобы привязать консоль.</string>
     <string name="link_error_network">Что-то пошло не так — попробуйте снова.</string>
+    <string name="plan_pay_online">Оплатить онлайн</string>
+    <string name="plan_gateway_waiting">Ожидание подтверждения платежа…</string>
+    <string name="plan_gateway_approved">Платёж подтверждён — ваш план активен</string>
+    <string name="plan_gateway_rejected">Платёж не завершён</string>
+    <string name="admin_gateway_title">Платёжный шлюз (Key + ID)</string>
+    <string name="admin_gateway_key">API-ключ (секретный)</string>
+    <string name="admin_gateway_id">ID продавца / клиента</string>
+    <string name="admin_gateway_url">URL оплаты ({amount} {reference})</string>
+    <string name="admin_gateway_saved">Данные шлюза сохранены</string>
 </resources>
