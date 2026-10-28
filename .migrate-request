@@ -1,11 +1,6 @@
-# ملف «طلب نقل Supabase» — يُحكَم عبره سير العمل migrate-supabase.yml
+# One-shot Supabase request-file — the migrate-supabase.yml workflow reads this
+# and runs the requested task against the live project. Rewrite the WHOLE file
+# (a single `task:` line is picked via sed|head -1 — never append a second one).
 #
-#   task: sql       ← تطبيق تعديلات حية من supabase-live/*.sql (بدون تفريغ) ✅ الآن
-#   task: all       ← كل المراحل (استخراج + استعادة + ملفات التخزين)
-#   task: dump      ← الاستخراج فقط من المشروع القديم
-#   task: restore   ← الاستعادة فقط في المشروع الجديد (يفرّغ الجداول!)
-#   task: storage   ← نسخ ملفات التخزين فقط
-#
-# الأسرار المطلوبة (Settings ← Secrets ← Actions):
-#   OLD_DB_PASSWORD  ·  NEW_PROJECT_REF  ·  NEW_DB_PASSWORD  ·  NEW_SERVICE_KEY
+# task: one of (status | migrate | sql | up | down | verify | reset | restore | counts | auth | users | backfill | chat | health | reports)
 task: sql
