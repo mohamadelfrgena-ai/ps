@@ -2,5 +2,6 @@
 # and runs the requested task against the live project. Rewrite the WHOLE file
 # (a single `task:` line is picked via sed|head -1 — never append a second one).
 #
+# run 2 (previous push had [skip ci] by mistake)
 # task: one of (status | migrate | sql | up | down | verify | reset | restore | counts | auth | users | backfill | chat | health | reports)
 task: sql
