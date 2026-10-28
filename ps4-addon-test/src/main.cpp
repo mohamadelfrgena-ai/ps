@@ -39,7 +39,7 @@ using namespace pkgtest;
 // ---------------------------------------------------------------- config ----
 static const char* kStageDir = "/data/AddonStation/installed";
 static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
-static const char* kAppVersion = "0.32";
+static const char* kAppVersion = "0.33";
 static const char* kBrandSuffix = " by sliver fox";
 
 static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
@@ -1184,10 +1184,9 @@ int main(int, char**) {
         }
     }).detach();
 
-    // ---- HUD sounds: start audio FIRST so the welcome chime plays with the splash (v0.30) ----
+    // ---- HUD sounds: audio ready at boot; the startup music plays AFTER the splash (v0.33) ----
     if (!ui_audio_init("/app0/assets/sfx")) ui_audio_init("assets/sfx");
     ui_sfx_volume(100);
-    ui_sfx(Sfx::AppStart);
 
     // ---- boot image (pic1): put our first frame on screen, THEN dismiss it ----
     drawLegalSplashFade(engine, A.lang, 0);
@@ -1219,6 +1218,10 @@ int main(int, char**) {
         releaseLegalSplash(engine);
         A.dirty = true;
     }
+    // v0.33: startup music AFTER the splash — it plays when the main store page appears
+    // (user request 2026-10-28: never with the boot/legal splash). Same intent as the
+    // Sfx::AppStart comment ("عند ظهور المنزل بعد الإسبلاش").
+    ui_sfx(Sfx::AppStart);
     setAppVersion(kAppVersion);
     if (!gSession.valid) setAccount(Account{});
     setCoverRequestHandler([](const AddonItem& it) { requestCoverAsync(it); });
