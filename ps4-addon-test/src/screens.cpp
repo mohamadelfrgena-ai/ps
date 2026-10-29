@@ -3528,7 +3528,9 @@ void drawSearch(UiEngine& e, int focus, const std::string& query, int filterInde
     {
         const int frx = L.X(cx, fw);
         e.drawRoundRect(frx, fy, fw, fh, 26, gLight ? SDL_Color{255, 255, 255, 255} : SDL_Color{8, 10, 13, 230});
-        e.drawRoundBorder(frx, fy, fw, fh, 26, 2, focus == 0 ? SDL_Color{43, 214, 123, 200} : ink(30));
+        // v0.35: NO selection frame and NO gleam on the search field — the gleam belongs to
+        // buttons only. The blinking-caret bar marks the focus instead.
+        e.drawRoundBorder(frx, fy, fw, fh, 26, 2, ink(30));
         // v6.9: icon + text + caret as ONE group, flush to the start edge (left in LTR, right in RTL), centred vertically
         const bool empty = query.empty();
         const std::string& t   = empty ? tr("search_type", lang) : query;
@@ -3540,13 +3542,13 @@ void drawSearch(UiEngine& e, int focus, const std::string& query, int filterInde
             g.push_back(gText(e, t, tpx, tc, L.rtl));
         } else {
             g.push_back(gText(e, t, tpx, tc, L.rtl, 6));
-            g.push_back(gIcon(3, 40, [&](int gx, int gy) { e.fillRect(gx, gy, 3, 40, kBLl); }));   // caret
         }
+        if (!empty || focus == 0)
+            g.push_back(gIcon(3, 40, [&](int gx, int gy) { e.fillRect(gx, gy, 3, 40, kBLl); }));   // caret
         const int gw = groupW(g);
         int sx = L.rtl ? frx + fw - 24 - gw : frx + 24;                 // start edge (pay tight to it)
         if (gw > fw - 48) sx = L.rtl ? frx + 24 : frx + fw - 24 - gw;   // long text: keep the end visible
         drawGroupAt(e, L, g, sx, fy + fh / 2);
-        if (focus == 0) focusRing(e, frx, fy, fw, fh, 26);
     }
     tabRow(e, L, cx, 160, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang)}, filterIndex, 1, focus);
     const std::vector<int> res = searchCatalog(query, filterIndex);
