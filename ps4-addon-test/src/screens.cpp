@@ -700,7 +700,7 @@ int drawBtn(UiEngine& e, const std::string& key, int cx, int cy, int h) {
 // these calls (focus ring/gleam, gem, mascot, settings icon tiles) ~30 times a second.
 struct AnimCall {
     enum Kind : std::uint8_t { Ring, Mark, Mascot, Tile } kind;
-    int a0 = 0, a1 = 0, a2 = 0, a3 = 0, a4 = 0;
+    int a0 = 0, a1 = 0, a2 = 0, a3 = 0, a4 = 0, a5 = 0;
     SDL_Color c{0, 0, 0, 255};
 };
 std::vector<AnimCall> gAnimCalls;
@@ -717,23 +717,10 @@ void animPush(const AnimCall& call, int x, int y, int w, int h) {
 // User request (2026-10-28): remove the circling comet (الشهاب), the light sweep (الضوء)
 // and every glow / aura / ripple (التوهج). What remains is ONE clean, beautiful frame
 // with a single soft shine that catches the light when focus lands, then rests.
-// Cost: 3 thin rounded AA borders for the ONE focused item only (cheaper than v7.4).
-void focusRing(UiEngine& e, int x, int y, int w, int h, int r) {
-    animPush({AnimCall::Ring, x, y, w, h, r}, x - 10, y - 10, w + 20, h + 20);
-
-    // ---- the gleam (لمعة): fires ONCE when focus lands on a NEW item, then rests.
-    // Smoothstep ease-out over 420 ms — smooth "frames" at any refresh rate (time based).
-    static bool sInit = false;
-    static int sLX = 0, sLY = 0, sLW = 0, sLH = 0;
-    static Uint32 sGleamAt = 0;
-    if (!sInit || x != sLX || y != sLY || w != sLW || h != sLH) {
-        sInit = true; sLX = x; sLY = y; sLW = w; sLH = h;
-        sGleamAt = SDL_GetTicks();
-    }
-    float gleam = static_cast<float>(SDL_GetTicks() - sGleamAt) / 420.0f;
-    gleam = gleam < 0.0f ? 0.0f : (gleam > 1.0f ? 1.0f : gleam);
-    gleam = 1.0f - gleam;
-    gleam = gleam * gleam * (3.0f - 2.0f * gleam);          // 1 on arrival -> 0 at rest
+// v0.35 (2026-10-29): the gleam lives on ACTION BUTTONS only (download CTAs, the sign-in
+// dialog, …). Rows / lists / catalog cards / settings tiles get the gold frame ONLY.
+void focusRing(UiEngine& e, int x, int y, int w, int h, int r, bool gleam = true) {
+    animPush({AnimCall::Ring, x, y, w, h, r, gleam ? 1 : 0}, x - 10, y - 10, w + 20, h + 20);
 
     // ---- polished gold (theme-aware): bright rim + deeper-gold inner line = metal bevel
     const SDL_Color goldHi = gLight ? SDL_Color{184, 128, 8, 255} : SDL_Color{255, 214, 90, 255};
@@ -744,10 +731,23 @@ void focusRing(UiEngine& e, int x, int y, int w, int h, int r) {
     e.drawRoundBorder(x, y, w, h, rr, 3, goldHi);
     e.drawRoundBorder(x + 3, y + 3, w - 6, h - 6, std::max(1, rr - 3), 1, goldLo);
 
-    // 2) THE gleam: a soft white-gold light that catches the rim once and fades out (nothing else)
-    if (gleam > 0.01f) {
-        const Uint8 a = static_cast<Uint8>(80.0f * gleam);
-        e.drawRoundBorder(x - 1, y - 1, w + 2, h + 2, rr + 1, 4, SDL_Color{255, 246, 214, a});
+    // 2) THE gleam (buttons only): a soft white-gold light that catches the rim on arrival
+    if (gleam) {
+        static bool sInit = false;
+        static int sLX = 0, sLY = 0, sLW = 0, sLH = 0;
+        static Uint32 sGleamAt = 0;
+        if (!sInit || x != sLX || y != sLY || w != sLW || h != sLH) {
+            sInit = true; sLX = x; sLY = y; sLW = w; sLH = h;
+            sGleamAt = SDL_GetTicks();
+        }
+        float g = static_cast<float>(SDL_GetTicks() - sGleamAt) / 420.0f;
+        g = g < 0.0f ? 0.0f : (g > 1.0f ? 1.0f : g);
+        g = 1.0f - g;
+        g = g * g * (3.0f - 2.0f * g);          // 1 on arrival -> 0 at rest
+        if (g > 0.01f) {
+            const Uint8 a = static_cast<Uint8>(80.0f * g);
+            e.drawRoundBorder(x - 1, y - 1, w + 2, h + 2, rr + 1, 4, SDL_Color{255, 246, 214, a});
+        }
     }
 }
 
@@ -1529,7 +1529,7 @@ void surface(UiEngine& e, int x, int y, int w, int h, int r, int tone = 0, bool 
 // v7.4 — section marker: a small glowing gem (rounded diamond) with a soft breathing halo. Replaces the old
 // square pixel block in section titles and kicker labels. Same box (x, y, s x s) as pixelBlock, so nothing shifts.
 void sectionMark(UiEngine& e, int x, int y, int s, SDL_Color c) {
-    animPush({AnimCall::Mark, x, y, s, 0, 0, c}, x - 12, y - 12, s + 24, s + 24);
+    animPush({AnimCall::Mark, x, y, s, 0, 0, 0, c}, x - 12, y - 12, s + 24, s + 24);
     const float t = static_cast<float>(SDL_GetTicks() % 600000u) / 1000.0f;
     const float br = std::sin(t * 3.1416f * 2.0f / 1.8f) * 0.5f + 0.5f;
     const int cx = x + s / 2, cy = y + s / 2;
@@ -2380,15 +2380,15 @@ void lineIcon(UiEngine& e, int kind, int x, int y, int s, SDL_Color c, float ang
 // When `focused` the tile glows/pulses and the icon moves: globe + contrast spin, user floats, gamepad and info sway,
 // log-out slides. Everything is cached images + a few rounded rects, so it stays cheap on the PS4.
 void lineIconTile(UiEngine& e, int kind, int x, int y, int s, SDL_Color acc, bool focused = false) {
-    animPush({AnimCall::Tile, kind, x, y, s, focused ? 1 : 0, acc}, x - 12, y - 12, s + 24, s + 24);
-    const float t = static_cast<float>(SDL_GetTicks() % 600000u) / 1000.0f;
-    const float br = std::sin(t * 3.1416f * 2.0f / 1.8f) * 0.5f + 0.5f;
+    animPush({AnimCall::Tile, kind, x, y, s, focused ? 1 : 0, 0, acc}, x - 12, y - 12, s + 24, s + 24);
+    // v0.35: the settings icons are STATIC — no spin / float / sway and no pulsing glow
+    // (user: «ايقونات الاعدات لا اريدها متحركة»). Focused tile = steady soft halo only.
     const int r = s * 28 / 100;
     auto dark = [&](int k) { return SDL_Color{static_cast<Uint8>(acc.r * k / 100), static_cast<Uint8>(acc.g * k / 100), static_cast<Uint8>(acc.b * k / 100), 255}; };
     // soft glow under / around the tile
     if (focused) {
-        e.drawRoundRect(x - 8, y - 4, s + 16, s + 14, r + 8, SDL_Color{acc.r, acc.g, acc.b, static_cast<Uint8>(10 + 16 * br)});
-        e.drawRoundRect(x - 4, y - 2, s + 8, s + 8, r + 4, SDL_Color{acc.r, acc.g, acc.b, static_cast<Uint8>(22 + 34 * br)});
+        e.drawRoundRect(x - 8, y - 4, s + 16, s + 14, r + 8, SDL_Color{acc.r, acc.g, acc.b, 18});
+        e.drawRoundRect(x - 4, y - 2, s + 8, s + 8, r + 4, SDL_Color{acc.r, acc.g, acc.b, 40});
     } else {
         e.drawRoundRect(x - 2, y + 3, s + 4, s + 4, r + 2, SDL_Color{acc.r, acc.g, acc.b, static_cast<Uint8>(gLight ? 20 : 18)});
     }
@@ -2398,17 +2398,7 @@ void lineIconTile(UiEngine& e, int kind, int x, int y, int s, SDL_Color acc, boo
     if (s > 24) e.drawRoundGradV(x + 2, y + 2, s - 4, s / 2 - 2, std::max(2, r - 2), SDL_Color{255, 255, 255, 70}, SDL_Color{255, 255, 255, 0});
     const int is = s * 54 / 100;
     const int ix = x + (s - is) / 2, iy = y + (s - is) / 2;
-    float ang = 0.0f; int dx = 0, dy = 0;
-    if (focused) {
-        switch (kind) {
-            case 0: ang = std::fmod(t * 60.0f, 360.0f); break;                                   // globe spins
-            case 1: ang = std::fmod(t * 90.0f, 360.0f); break;                                   // contrast spins
-            case 2: dy = static_cast<int>(std::lround(-1.6f * (std::sin(t * 3.1416f) * 0.5f + 0.5f) * s / 64.0f)); break;   // user floats
-            case 3: ang = 6.0f * std::sin(t * 3.1416f * 2.0f / 1.6f); break;                     // gamepad sways
-            case 4: ang = 8.0f * std::sin(t * 3.1416f * 2.0f / 1.2f); break;                     // info sways
-            default: dx = static_cast<int>(std::lround(2.5f * (std::sin(t * 3.1416f * 2.0f / 1.4f) * 0.5f + 0.5f) * s / 64.0f)); break;   // log-out slides
-        }
-    }
+    const float ang = 0.0f; const int dx = 0, dy = 0;   // static icons (v0.35)
     const SDL_Color sh{dark(30).r, dark(30).g, dark(30).b, 255};
     lineIcon(e, kind, ix, iy + 1, is, sh, ang, dx, dy);                         // drop shadow of the icon
     lineIcon(e, kind, ix, iy, is, SDL_Color{255, 255, 255, 255}, ang, dx, dy);  // white icon
@@ -2477,7 +2467,7 @@ void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const Addo
             icDownloadArrow(e, L.X(xl + w - 16 - rw - 26, 20), py + 4, 20, kMU);
         }
     }
-    if (focused) focusRing(e, rx, y, w, h, r);
+    if (focused) focusRing(e, rx, y, w, h, r, false);   // v0.35: card = list item, frame only
 }
 
 // Empty state panel (no fake templates): icon + title + one line.
@@ -3245,7 +3235,7 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
         button(e, L, cx + cw - 30 - vw, bnY + (bnH - 60) / 2, vw, 60, vt, 0, 22, 18);
         e.drawRoundBorder(brx, bnY, cw, bnH, 22, 2, ink(26));
     }
-    if (bnH > 0 && focus == 8) focusRing(e, L.X(cx, cw), bnY, cw, bnH, 22);
+    if (bnH > 0 && focus == 8) focusRing(e, L.X(cx, cw), bnY, cw, bnH, 22, false);   // v0.35: frame only
 
     // ---- categories (focus 9-15) with real counts: All Addons Worlds Free Epic Legendary New ----
     const int catX = cx, catW = 270, catY = bnH > 0 ? bnY + bnH + 34 : 150;
@@ -3667,7 +3657,7 @@ void drawProfile(UiEngine& e, int focus, const std::string& langCode) {
             boxText(e, L, fmtDate(t.at), wx + 100, 300, ry + 36, 16, kMU);
             const std::string amt = (plus ? "+" : "") + formatAC(t.amount) + " AC";
             endText(e, L, amt, wx + 30, ww - 80, ry + 18, 24, plus ? (gLight ? SDL_Color{12, 120, 66, 255} : kGRN2) : kERT);
-            if (focus == i) focusRing(e, rrx, ry, ww - 60, rh, 16);
+            if (focus == i) focusRing(e, rrx, ry, ww - 60, rh, 16, false);   // v0.35: row, frame only
         }
     }
     drawLegendBar(e, {{"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}}, langCode);
@@ -3826,7 +3816,7 @@ void drawSettings(UiEngine& e, int focus, int subFocus, bool autoLaunchOn, const
             if (!values[i].empty()) endText(e, L, values[i], listX, listW - 62, y + (rowH - 28) / 2, 24, kMU);
             if (i != 4) chevron(e, L.X(listX + listW - 34, 12), y + rowH / 2 - 9, 9, !L.rtl, 3, danger ? kERT : kMU);
         }
-        if (foc && subFocus < 0) focusRing(e, rx, y, listW, rowH, 22);
+        if (foc && subFocus < 0) focusRing(e, rx, y, listW, rowH, 22, false);   // v0.35: row, frame only
     }
 
     // ---- detail panel ----
@@ -3853,7 +3843,7 @@ void drawSettings(UiEngine& e, int focus, int subFocus, bool autoLaunchOn, const
                 e.drawRoundBorder(rcx - 13, yy + chh / 2 - 13, 26, 26, 13, 2, sel ? kBLl : kMU);
                 if (sel) e.drawCircle(rcx, yy + chh / 2, 7, kBLl);
                 boxText(e, L, kLangNative[i], xl + 22 + 26 + 18, cw - 90, yy + (chh - 26) / 2, 22, sel ? kTX : kCHIPTX);
-                if (subFocus == i) focusRing(e, rx, yy, cw, chh, 18);
+                if (subFocus == i) focusRing(e, rx, yy, cw, chh, 18, false);   // v0.35: tile, frame only
             }
             break;
         }
@@ -3868,7 +3858,7 @@ void drawSettings(UiEngine& e, int focus, int subFocus, bool autoLaunchOn, const
                 e.drawRoundBorder(rcx - 13, ry, 26, 26, 13, 2, sel ? kBLl : kMU);
                 if (sel) e.drawCircle(rcx, ry + 13, 7, kBLl);
                 boxText(e, L, tr(light ? "theme_light" : "theme_dark", lang), xl + 66, cw - 90, ry - 2, 26, kTX);
-                if (subFocus == i) focusRing(e, rx, cy, cw, chh, 22);
+                if (subFocus == i) focusRing(e, rx, cy, cw, chh, 22, false);   // v0.35: tile, frame only
             }
             break;
         }
@@ -4233,7 +4223,7 @@ void animReplay(UiEngine& e) {
     gAnimRec = false;
     for (const AnimCall& a : gAnimCalls) {
         switch (a.kind) {
-            case AnimCall::Ring:   focusRing(e, a.a0, a.a1, a.a2, a.a3, a.a4); break;
+            case AnimCall::Ring:   focusRing(e, a.a0, a.a1, a.a2, a.a3, a.a4, a.a5 != 0); break;
             case AnimCall::Mark:   sectionMark(e, a.a0, a.a1, a.a2, a.c); break;
             case AnimCall::Mascot: drawMascot(e, a.a0, a.a1, a.a2); break;
             case AnimCall::Tile:   lineIconTile(e, a.a0, a.a1, a.a2, a.a3, a.c, a.a4 != 0); break;
