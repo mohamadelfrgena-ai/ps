@@ -298,7 +298,7 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
         {"linked_ok", {{"en", "LINKED!"}, {"ar", "تم الربط!"}}},
         {"email", {{"en", "Email"}, {"ar", "البريد الإلكتروني"}}},
         {"password", {{"en", "Password"}, {"ar", "كلمة المرور"}}},
-        {"press_x_type", {{"en", "Press ✕ to type"}, {"ar", "اضغط ✕ للكتابة"}}},
+        {"press_x_type", {{"en", "Press × to type"}, {"ar", "اضغط × للكتابة"}}},
         {"wrong_login", {{"en", "Wrong email or password. Try again."}, {"ar", "البريد أو كلمة المرور غير صحيحة. حاول مرة ثانية."}}},
         {"forgot_pw", {{"en", "Forgot your password? Reset it on your phone."}, {"ar", "نسيت كلمة المرور؟ أعد تعيينها من جوالك."}}},
         {"sale_winter", {{"en", "WINTER SALE"}, {"ar", "عروض الشتاء"}}},
@@ -3878,18 +3878,48 @@ void drawSettings(UiEngine& e, int focus, int subFocus, bool autoLaunchOn, const
                 boxText(e, L, tr("guest_s", lang), tX, tW, cy + 76, 19, kMU);
                 const char* steps[3] = {"step_1", "step_2", "step_3"};
                 for (int i = 0; i < 3; ++i) {
-                    const int yy = cy + 170 + i * 92;
+                    const int yy = cy + 158 + i * 86;
                     const int rx = L.X(innerX, innerW);
-                    surface(e, rx, yy, innerW, 78, 20, 0);
+                    surface(e, rx, yy, innerW, 72, 20, 0);
                     const int nx = L.X(innerX + 20, 46);
-                    e.drawRoundGradH(nx, yy + 16, 46, 46, 14, kBL, kBL2);
-                    e.drawTextCentered(num(i + 1), nx + 23, yy + 39, 26, SDL_Color{6, 24, 14, 255}, FontRole::Pixel, false);
-                    boxText(e, L, tr(steps[i], lang), innerX + 20 + 46 + 20, innerW - 110, yy + 24, 24, kCHIPTX);
+                    e.drawRoundGradH(nx, yy + 13, 46, 46, 14, kBL, kBL2);
+                    e.drawTextCentered(num(i + 1), nx + 23, yy + 36, 26, SDL_Color{6, 24, 14, 255}, FontRole::Pixel, false);
+                    boxText(e, L, tr(steps[i], lang), innerX + 20 + 46 + 20, innerW - 110, yy + 22, 24, kCHIPTX);
                 }
-                e.drawRoundRect(L.X(innerX, innerW), cy + 436, innerW, 96, 24, SDL_Color{43, 214, 123, 44});
-                e.drawRoundBorder(L.X(innerX, innerW), cy + 436, innerW, 96, 24, 3, SDL_Color{43, 214, 123, 190});
-                e.drawTextCentered(tr("press_x_code", lang), L.X(innerX, innerW) + innerW / 2, cy + 486, 28,
-                                   gLight ? SDL_Color{12, 120, 66, 255} : kBLl, FontRole::Body, L.rtl);
+                // v0.35: the green CTA sits fully INSIDE the card (it used to reach the card's
+                // bottom edge so its rounded corners poked outside). Its ✕ is the pixel button
+                // icon — IBM Plex has no U+2715 and rendered a tofu box instead.
+                const int bY = cy + 418, bH = 88, bMid = bY + bH / 2;
+                const int brx = L.X(innerX, innerW);
+                e.drawRoundRect(brx, bY, innerW, bH, 24, SDL_Color{43, 214, 123, 44});
+                e.drawRoundBorder(brx, bY, innerW, bH, 24, 3, SDL_Color{43, 214, 123, 190});
+                {
+                    std::string s = tr("press_x_code", lang), a, b;
+                    const std::size_t p = s.find("\xE2\x9C\x95");           // U+2715
+                    if (p != std::string::npos) {
+                        a = s.substr(0, p);
+                        b = s.substr(p + 3);
+                        while (!a.empty() && a.back() == ' ') a.pop_back();
+                        while (!b.empty() && b.front() == ' ') b.erase(b.begin());
+                    } else {
+                        a = s;
+                    }
+                    const int fsz = 28, iw = 32, gap = 12;
+                    const int wA = a.empty() ? 0 : e.inkWidth(a, fsz, FontRole::Body, L.rtl);
+                    const int wB = b.empty() ? 0 : e.inkWidth(b, fsz, FontRole::Body, L.rtl);
+                    const int total = wA + (b.empty() ? 0 : gap + iw + gap) + wB;
+                    const int gx = brx + (innerW - total) / 2;
+                    const SDL_Color cta = gLight ? SDL_Color{12, 120, 66, 255} : kBLl;
+                    if (L.rtl) {
+                        if (!a.empty()) e.drawTextCentered(a, gx + total - wA / 2, bMid, fsz, cta, FontRole::Body, true);
+                        if (!b.empty()) e.drawTextCentered(b, gx + wB / 2, bMid, fsz, cta, FontRole::Body, true);
+                        if (!b.empty()) drawBtn(e, "\xE2\x9C\x95", gx + total - wA - gap - iw / 2, bMid, iw);
+                    } else {
+                        if (!a.empty()) e.drawTextCentered(a, gx + wA / 2, bMid, fsz, cta, FontRole::Body, false);
+                        if (!b.empty()) e.drawTextCentered(b, gx + wA + gap + iw + gap + wB / 2, bMid, fsz, cta, FontRole::Body, false);
+                        if (!b.empty()) drawBtn(e, "\xE2\x9C\x95", gx + wA + gap + iw / 2, bMid, iw);
+                    }
+                }
             } else {
                 int x = tX;
                 x += tierChip(e, L, x, cy + 76, gAcc.plan, lang, 36) + 14;
