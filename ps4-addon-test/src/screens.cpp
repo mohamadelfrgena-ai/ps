@@ -3162,7 +3162,9 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
     } else {
         pageTitle(e, L, tr("nav_deals_t", lang), cx, 44);
     }
-    drawMascot(e, kCR - 84, 112, 150);   // v0.30: the allay belongs to the Store / Deals area
+    // v0.30: the allay belongs to the Store / Deals area
+    // v0.35: keep the mascot inside the content area — never crossing the sidebar rail (Arabic)
+    drawMascot(e, L.rtl ? (kCR - kRailW - 75) : (kCR - 84), 112, 150);
     if (!sale && any.empty()) {
         emptyState(e, L, cx, 200, cw, 600, 11, tr("deals_empty_t", lang), tr("deals_empty_s", lang));
         drawLegendBar(e, {{"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}}, langCode);
@@ -3188,7 +3190,9 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
     const bool sale = saleActive();
     const int cx = kCL + 20, cw = kCR - cx;
     pageTitle(e, L, tr("nav_store", lang), cx, 44);
-    drawMascot(e, kCR - 84, 112, 150);   // v0.30: the allay belongs to the Store / Deals area
+    // v0.30: the allay belongs to the Store / Deals area
+    // v0.35: keep the mascot inside the content area — never crossing the sidebar rail (Arabic)
+    drawMascot(e, L.rtl ? (kCR - kRailW - 75) : (kCR - 84), 112, 150);
     {   // ---- sort pill (focus 16): Popular / Newest / Top rated — ✕ cycles it (setStoreSort) ----
         static const char* kSortKeys[3] = {"sort_popular", "sort_newest", "sort_rating"};
         const std::string lab = tr("sort_by", lang) + ":  " + tr(kSortKeys[storeSort()], lang);
