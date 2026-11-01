@@ -108,14 +108,21 @@ jobs:
           SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_PUBLIC_KEY: ${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
         run: |
-          set -euo pipefail
-          python3 tools/check_console_contract_live.py | tee /tmp/console-contract-check.txt
+          set +e
+          set -o pipefail
+          python3 tools/check_console_contract_live.py 2>&1 | tee /tmp/console-contract-check.txt
+          code=${PIPESTATUS[0]}
           {
             echo "### Shared PS4/phone console-link contract"
             echo '```text'
             cat /tmp/console-contract-check.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" -ne 0 ]; then
+            detail=$(tail -8 /tmp/console-contract-check.txt | tr '\n' '|' | cut -c1-900)
+            echo "::error title=Console contract check failed::$detail"
+          fi
+          exit "$code"
 
   # ==========================================================================
   # 0b) تشخيص قراءة ملفات المستخدمين — قراءة فقط، بلا SQL أو نشر أو كتابة بيانات
