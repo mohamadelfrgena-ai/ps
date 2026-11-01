@@ -386,6 +386,7 @@ std::vector<ItemData> fetchContentItems(const SupabaseConfig& cfg, int limit) {
         it.version = jsonGetString(obj, "version");
         it.fileSize = (long long)jsonGetInt(obj, "file_size", 0);
         it.downloads = jsonGetInt(obj, "downloads_count", 0);
+        it.views = jsonGetInt(obj, "views_count", 0);
         it.rating = (double)jsonGetInt(obj, "rating", 0);
         {
             const std::string r = jsonGetString(obj, "rating");
@@ -692,6 +693,7 @@ std::vector<ItemData> fetchContentItemsByIds(const SupabaseConfig& cfg, const st
         it.version = jsonGetString(obj, "version");
         it.fileSize = (long long)jsonGetInt(obj, "file_size", 0);
         it.downloads = jsonGetInt(obj, "downloads_count", 0);
+        it.views = jsonGetInt(obj, "views_count", 0);
         {
             const std::string r = jsonGetString(obj, "rating");
             if (!r.empty() && r != "null") it.rating = std::strtod(r.c_str(), nullptr);

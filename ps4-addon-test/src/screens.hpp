@@ -64,6 +64,7 @@ struct AddonItem {
     std::string version;         // content_items.version
     long long fileSize = 0;      // bytes (content_items.file_size)
     int downloads = 0;           // content_items.downloads_count
+    int views = 0;               // content_items.views_count (REAL — record_content_view)
     float rating = 0.f;          // content_items.rating
     int ratingCount = 0;         // content_items.rating_count (0 = rating hidden)
     bool exclusive = false;      // is_exclusive

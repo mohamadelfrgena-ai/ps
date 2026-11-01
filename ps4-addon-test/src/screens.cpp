@@ -989,6 +989,20 @@ void shapeIcon(UiEngine& e, int kind, int x, int y, int s, SDL_Color c) {
         } else if (kind == 1) {
             polys.push_back({10.2f, 2.6f, 13.8f, 2.6f, 13.8f, 10.f, 18.8f, 10.f, 12.f, 17.2f, 5.2f, 10.f, 10.2f, 10.f});
             polys.push_back({4.f, 19.4f, 20.f, 19.4f, 20.f, 22.4f, 4.f, 22.4f});
+        } else if (kind == 3) {   // v0.36: eye lens (views)
+            std::vector<float> ey;
+            const int N = 14;
+            for (int i = 0; i <= N; ++i) {
+                const float t2 = (float)i / N;
+                ey.push_back(2.5f + 19.f * t2);
+                ey.push_back(12.f - 8.5f * std::sin(3.14159265f * t2));
+            }
+            for (int i = N; i >= 0; --i) {
+                const float t2 = (float)i / N;
+                ey.push_back(2.5f + 19.f * t2);
+                ey.push_back(12.f + 8.5f * std::sin(3.14159265f * t2));
+            }
+            polys.push_back(ey);
         } else {   // v7.0: kind 2 = clean Material-style check (short arm, long arm, thin balanced stroke)
             polys.push_back({6.7f, 11.2f, 11.3f, 15.7f, 9.1f, 17.9f, 4.5f, 13.4f});
             polys.push_back({8.7f, 16.2f, 17.4f, 6.0f, 19.8f, 8.0f, 11.0f, 18.2f});
@@ -1027,6 +1041,11 @@ void icStar(UiEngine& e, int x, int y, int s, SDL_Color c) { shapeIcon(e, 0, x, 
     fillTriDown(e, x + s * 10 / 100, y + s * 40 / 100, s * 80 / 100, s * 48 / 100, c);
 }
 void icDownloadArrow(UiEngine& e, int x, int y, int s, SDL_Color c) { shapeIcon(e, 1, x, y, s, c); }   // v6.7
+void icEye(UiEngine& e, int x, int y, int s, SDL_Color c, SDL_Color bg) {   // v0.36: views icon
+    shapeIcon(e, 3, x, y, s, c);
+    e.drawCircle(x + s / 2, y + s / 2, (s * 4) / 24, bg);
+    e.drawCircle(x + s / 2, y + s / 2, (s * 2) / 24, c);
+}
 [[maybe_unused]] void icMenu(UiEngine& e, int x, int y, int s, SDL_Color c) {
     for (int i = 0; i < 3; ++i) e.drawRoundRect(x + s * 14 / 100, y + s * (24 + i * 24) / 100, s * 72 / 100, std::max(4, s / 9), 3, c);
 }
@@ -2390,9 +2409,10 @@ void lineIconTile(UiEngine& e, int kind, int x, int y, int s, SDL_Color acc, boo
 }
 
 // v5 card: cover (16:9), title, optional creator, tier chip (+ rating / downloads). No AC price on cards.
-int vcardHeight(int imgH, bool creator) { return imgH + 14 + 26 + (creator ? 24 : 0) + 10 + 30 + 16; }
+int vcardHeight(int imgH, bool creator) { (void)creator; return imgH + 12 + 26 + 30 + 26 + 12; }   // v0.36: title + rating row + stats row
 void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const AddonItem& it, bool focused,
            const std::string& lang, bool creator, bool stats, bool dealBadge) {
+    (void)creator; (void)stats;
     const int h = vcardHeight(imgH, creator);
     const int rx = L.X(xl, w), r = 18;
     e.dropShadow(rx, y + 6, w, h, r, 14, focused ? 150 : (gLight ? 40 : 90));
@@ -2401,56 +2421,59 @@ void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const Addo
     itemCover(e, it, rx, y, w, imgH + r, r);
     e.fillRect(rx, y + imgH, w, r, bg);
     e.drawRoundBorder(rx, y, w, h, r, 2, focused ? ink(40) : kBD);
-    // creator == true -> Store/Search card: tier (or New) badge sits on the cover, bottom row = FREE / downloads + rating.
-    // creator == false -> Home/Deals shelf card: badges top-left, bottom row = tier chip (+ stats when asked).
-    int bx = xl + 12;
+    // ---- cover badges (v0.36 marketplace look): sale % top-left, NEW top-right, type tag bottom-left ----
     if (dealBadge && onSale(it)) {
         const std::string b = fmtPct(discountOf(it));
         const int bw = textW(e, L, b, 16) + 20;
-        e.drawRoundRect(L.X(bx, bw), y + 12, bw, 30, 8, kRED);
-        e.drawTextCentered(b, L.X(bx, bw) + bw / 2, y + 27, 16, kWHT, FontRole::Body, false);
-        bx += bw + 8;
+        e.drawRoundRect(L.X(xl + 12, bw), y + 12, bw, 30, 8, kRED);
+        e.drawTextCentered(b, L.X(xl + 12, bw) + bw / 2, y + 27, 16, kWHT, FontRole::Body, false);
     }
-    const bool coverTier = creator && it.tier != Tier::Free;
-    if (isNewItem(it) && !coverTier) {
+    if (isNewItem(it)) {
         const std::string b = tr("badge_new", lang);
         const int bw = textW(e, L, b, 15) + 20;
-        const int by = creator ? y + imgH - 12 - 30 : y + 12;
-        const int bxx = creator ? xl + 12 : bx;
-        if (creator) e.drawRoundRect(L.X(bxx, bw), by, bw, 30, 8, SDL_Color{245, 247, 250, 245});
-        else e.drawRoundRect(L.X(bxx, bw), by, bw, 30, 8, SDL_Color{16, 185, 129, 255});
-        e.drawTextCentered(b, L.X(bxx, bw) + bw / 2, by + 15, 15, creator ? SDL_Color{17, 20, 24, 255} : kWHT, FontRole::Body, L.rtl);
+        e.drawRoundRect(L.X(xl + w - 12 - bw, bw), y + 12, bw, 30, 8, SDL_Color{16, 185, 129, 255});
+        e.drawTextCentered(b, L.X(xl + w - 12 - bw, bw) + bw / 2, y + 27, 15, kWHT, FontRole::Body, L.rtl);
     }
-    if (coverTier) tierChip(e, L, xl + 12, y + imgH - 12 - 28, it.tier, lang, 28);
+    {   // yellow type tag on the cover (Add-On / World)
+        const std::string tg = tr(it.isWorld ? "type_world" : "type_addon", lang);
+        const int tw = textW(e, L, tg, 15) + 22;
+        const int tyy = y + imgH - 12 - 30;
+        e.drawRoundRect(L.X(xl + 12, tw), tyy, tw, 30, 8, kGD);
+        e.drawTextCentered(tg, L.X(xl + 12, tw) + tw / 2, tyy + 15, 15, SDL_Color{30, 22, 4, 255}, FontRole::Body, L.rtl);
+    }
     if (it.installed) {
-        const int s = 30, ix = L.X(xl + w - 12 - s, s);
-        e.drawCircle(ix + s / 2, y + 12 + s / 2, s / 2, kGRN);
-        icCheck(e, ix + 7, y + 19, 16, kWHT);
+        const int s2 = 30, ix = L.X(xl + w - 12 - s2, s2), iy = y + imgH - 12 - 30;
+        e.drawCircle(ix + s2 / 2, iy + s2 / 2, s2 / 2, kGRN);
+        icCheck(e, ix + 7, iy + 7, 16, kWHT);
     }
-    const int ty = y + imgH + 14;
-    boxText(e, L, it.title, xl + 16, w - 32, ty, 21, kTX, FontRole::Pixel);   // v0.30: names always in Minecraft F77
-    if (creator && !it.creator.empty()) boxText(e, L, tr("by", lang) + " " + it.creator, xl + 16, w - 32, ty + 28, 16, kMU);
-    const int py = y + h - 16 - 30;
-    if (!creator || it.tier == Tier::Free) tierChip(e, L, xl + 16, py, it.tier, lang, 28);
-    else if (it.downloads > 0) {
-        const std::string d = fmtCompact(it.downloads);
-        icDownloadArrow(e, L.X(xl + 16, 20), py + 4, 20, kMU);
-        boxText(e, L, d, xl + 16 + 28, w / 2, py + 5, 18, kCHIPTX);
+    // ---- title (pixel — v0.30: names always in Minecraft F77) ----
+    const int ty = y + imgH + 12;
+    boxText(e, L, it.title, xl + 16, w - 32, ty, 21, kTX, FontRole::Pixel);
+    // ---- rating row: stars + score (approved display rating) + tier chip ----
+    const int ry = y + imgH + 42;
+    const float rate = it.ratingCount > 0 ? it.rating : 0.f;
+    for (int i = 0; i < 5; ++i) {
+        const bool full = rate >= (float)(i + 1) - 0.25f;
+        icStar(e, L.X(xl + 16 + i * 20, 17), ry + 2, 17, full ? kGD : ink(gLight ? 40 : 70));
     }
-    if (stats || creator) {
-        if (it.ratingCount > 0) {
-            char b[16];
-            std::snprintf(b, sizeof b, "%.1f", it.rating);
-            const std::string st = b;
-            const int rw = textW(e, L, st, 17);
-            endText(e, L, st, xl, w - 16, py + 5, 17, kGD);
-            icStar(e, L.X(xl + w - 16 - rw - 24, 18), py + 6, 18, kGD);
-        } else if (it.downloads > 0 && !creator) {
-            const std::string st = fmtCompact(it.downloads);
-            const int rw = textW(e, L, st, 17);
-            endText(e, L, st, xl, w - 16, py + 5, 17, kMU);
-            icDownloadArrow(e, L.X(xl + w - 16 - rw - 26, 20), py + 4, 20, kMU);
-        }
+    if (rate > 0.f) {
+        char b[16]; std::snprintf(b, sizeof b, "%.1f", rate);
+        boxText(e, L, b, xl + 16 + 5 * 20 + 2, 70, ry + 1, 18, kGD);
+    }
+    {
+        const int tw = tierChip(e, L, 0, -1000, it.tier, lang, 26, false);
+        tierChip(e, L, xl + w - 16 - tw, ry - 1, it.tier, lang, 26);
+    }
+    // ---- stats row: REAL views + downloads (never fake) ----
+    const int sy = y + imgH + 68;
+    {
+        int sx = xl + 16;
+        icEye(e, L.X(sx, 18), sy + 1, 18, kMU, bg);
+        const std::string v = fmtCompact((long long)it.views);
+        boxText(e, L, v, sx + 24, 90, sy, 17, kCHIPTX);
+        sx += 24 + textW(e, L, v, 17) + 18;
+        icDownloadArrow(e, L.X(sx, 18), sy + 1, 18, kMU);
+        boxText(e, L, fmtCompact((long long)it.downloads), sx + 24, 90, sy, 17, kCHIPTX);
     }
     if (focused) focusRing(e, rx, y, w, h, r, false);   // v0.35: card = list item, frame only
 }

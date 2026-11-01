@@ -113,6 +113,7 @@ struct ItemData {
     std::string creatorName;  // profiles.display_name of created_by
     long long fileSize = 0;
     long downloads = 0;
+    long views = 0;
     double rating = 0;
     long ratingCount = 0;
     long exclusiveSlot = 0;

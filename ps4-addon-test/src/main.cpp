@@ -255,6 +255,7 @@ static AddonItem toItem(const ItemData& d) {
     it.version = d.version;
     it.fileSize = d.fileSize;
     it.downloads = (int)d.downloads;
+    it.views = (int)d.views;
     it.rating = (float)d.rating;
     it.ratingCount = (int)d.ratingCount;
     it.exclusive = d.isExclusive;
@@ -715,6 +716,10 @@ static void openItem(int catIdx) {
     gDetailId = catalog()[(std::size_t)catIdx].id;
     A.dl = catalog()[(std::size_t)catIdx].installed ? (int)DemoState::Installed : (int)DemoState::Idle;
     pushScr(Scr::Detail);
+    {   // v0.36: REAL view counter (record_content_view RPC) — fire and forget
+        const std::string body = std::string("{\"p_item_id\":\"") + gDetailId + "\"}";
+        std::thread([body]() { supabaseRpc(gCfg, "record_content_view", body); }).detach();
+    }
 }
 
 static void startSignIn() {

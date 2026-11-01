@@ -314,6 +314,10 @@ with checks(n, file_, item, ok, detail) as (
          public.diag_text($q$select ((select count(*) from storage.buckets where name = 'site-assets' and allowed_mime_types is null and file_size_limit is null) = 1)::text$q$) = 'true',
          coalesce(public.diag_text($q$select 'قيود MIME على site-assets: ' || coalesce((select allowed_mime_types::text from storage.buckets where name = 'site-assets'), 'مفتوحة (null)')$q$), 'مفقود')
 
+  select 64, '47_content_views_ratings', 'عدادات المشاهدات والتحميلات حقيقية والتقييمات نجوم مقررة',
+         public.diag_text($q$select ((select count(*) from public.content_items where rating_count > 0 and rating >= 4.0 and rating < 5.0) >= (select count(*) from public.content_items))::text$q$) = 'true',
+         coalesce(public.diag_text($q$select 'بتقييمات: ' || (select count(*) from public.content_items where rating_count > 0)::text || ' · مشاهدات: ' || coalesce((select sum(views_count) from public.content_items), 0)::text || ' · تحميلات: ' || coalesce((select sum(downloads_count) from public.content_items), 0)::text$q$), 'مفقود')
+
 )
 select n                                  as "#",
        file_                              as "الملف / الخطوة",
