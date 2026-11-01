@@ -123,5 +123,11 @@ jobs:
           git add -f ps4/downloads/pkg-addon-test.pkg
           if ! git diff --cached --quiet; then
             git commit -m "Publish pkg-addon-test.pkg to ps4/downloads [skip ci]"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            # v0.36: retry with rebase — a parallel workflow (migrate report) may land first
+            for i in 1 2 3 4 5; do
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then echo "published"; break; fi
+              echo "push raced (attempt $i) — rebasing onto the branch tip"
+              git fetch origin "${GITHUB_REF_NAME}"
+              git rebase "origin/${GITHUB_REF_NAME}"
+            done
           fi
