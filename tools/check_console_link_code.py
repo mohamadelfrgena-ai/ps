@@ -58,6 +58,7 @@ forbidden_schema_statements = (
 checks = [
     ("production project URL is pinned", "ADDONSTATION_SUPABASE_URL=https://stbmescmexzcszyyambq.supabase.co" in gradle),
     ("CI always targets the transferred production project", "jqjmkssgjdsfdojkuqzq" not in workflow_text and workflow_text.count("https://stbmescmexzcszyyambq.supabase.co") >= 10),
+    ("stale Actions secrets cannot override the reviewed Android public key", 'echo "ADDONSTATION_SUPABASE_ANON_KEY=' not in workflow_text),
     ("Android configuration contains only a publishable key", "ADDONSTATION_SUPABASE_ANON_KEY=sb_publishable_" in gradle and "service_role" not in gradle.lower() and "sb_secret_" not in gradle.lower()),
     ("six-character unambiguous alphabet is present", code_length == 6 and alphabet == "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"),
     ("Kotlin normalization is locale-independent uppercase", ".uppercase(Locale.ROOT)" in repo),

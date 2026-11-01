@@ -355,7 +355,8 @@ jobs:
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
           echo "ADDONSTATION_SUPABASE_URL=https://stbmescmexzcszyyambq.supabase.co" >> local.properties
-          echo "ADDONSTATION_SUPABASE_ANON_KEY=${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}" >> local.properties
+          # The publishable key is sourced from the reviewed android/gradle.properties.
+          # Do not let a stale account-level Actions secret override it.
 
       - name: Verify redesigned splash resources and behavior
         run: |
@@ -422,12 +423,13 @@ jobs:
           chmod +x gradlew
           grep distributionUrl gradle/wrapper/gradle-wrapper.properties
 
-      - name: Write local.properties (مفاتيح Supabase من Secrets إن وُجدت)
+      - name: Write reviewed public Android configuration
         working-directory: android
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
           echo "ADDONSTATION_SUPABASE_URL=https://stbmescmexzcszyyambq.supabase.co" >> local.properties
-          echo "ADDONSTATION_SUPABASE_ANON_KEY=${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}" >> local.properties
+          # The publishable key is sourced from the reviewed android/gradle.properties.
+          # Do not let a stale account-level Actions secret override it.
 
       # إشعارات حقيقية: ملف Firebase يُدمج في التطبيق وقت البناء. لا يوجد في
       # المودع (وهو ليس سرّاً)، فإن وُضع نصّه في الأسرار كُتب هنا تلقائياً ⇒ يكفي
