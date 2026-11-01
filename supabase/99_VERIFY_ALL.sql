@@ -310,6 +310,10 @@ with checks(n, file_, item, ok, detail) as (
          public.diag_text($q$select ((select count(*) from public.content_items where cover_url like 'https://github.com/mohamadelfrgena-ai/ps/releases/download/%' or ps4_raw_url like 'https://github.com/mohamadelfrgena-ai/ps/releases/download/%' or pack_targets::text like '%https://github.com/mohamadelfrgena-ai/ps/releases/download/%') = 0)::text$q$) = 'true',
          coalesce(public.diag_text($q$select 'روابط Releases المتبقية: ' || (select count(*) from public.content_items where cover_url like 'https://github.com/%' or ps4_raw_url like 'https://github.com/%')::text || ' · روابط Storage: ' || (select count(*) from public.content_items where ps4_raw_url like 'https://stbmescmexzcszyyambq.supabase.co/storage/%')::text$q$), 'مفقود')
 
+  select 63, '46_storage_bucket_mime', 'مخزن site-assets يقبل ملفات الحزم (raw/zip/json) بعد توسيع MIME',
+         public.diag_text($q$select ((select count(*) from storage.buckets where name = 'site-assets' and allowed_mime_types is null) = 1)::text$q$) = 'true',
+         coalesce(public.diag_text($q$select 'قيود MIME على site-assets: ' || coalesce((select allowed_mime_types::text from storage.buckets where name = 'site-assets'), 'مفتوحة (null)')$q$), 'مفقود')
+
 )
 select n                                  as "#",
        file_                              as "الملف / الخطوة",

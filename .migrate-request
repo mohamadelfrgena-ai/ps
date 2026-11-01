@@ -1,5 +1,5 @@
 # One-shot Supabase request-file — migrate-supabase.yml reads this file.
 # Rewrite the WHOLE file; the FIRST `task:` line wins (sed | head -1).
 #
-# run: apply 45_content_storage_urls.sql (content URLs -> public storage)
+# run: apply 46_storage_bucket_mime.sql (site-assets accepts pack files)
 task: sql
