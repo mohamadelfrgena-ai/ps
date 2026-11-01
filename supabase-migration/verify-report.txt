@@ -1,4 +1,4 @@
-=== new project verification 2026-11-01T20:30:15Z ===
+=== new project verification 2026-11-01T22:11:43Z ===
 ac_events=0
 ac_redeem_codes=190
 ac_redeem_uses=0
@@ -20,7 +20,7 @@ chat_reports=0
 chat_rule_acceptances=0
 chat_rules=8
 chat_typing=0
-console_link_codes=5
+console_link_codes=1
 content_downloads=0
 content_favorites=0
 content_items=11
