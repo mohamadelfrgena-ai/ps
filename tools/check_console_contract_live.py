@@ -22,10 +22,16 @@ from typing import Any
 from uuid import UUID
 
 EXPECTED_URL = "https://stbmescmexzcszyyambq.supabase.co"
-EXPECTED_RPC_PARAMETERS = {
-    "create_console_link_code": {"p_platform", "p_device_name"},
-    "claim_console_link": {"p_code", "p_access_token", "p_refresh_token"},
-    "poll_console_link": {"p_code", "p_poll_token"},
+FORBIDDEN_RPC_PROBES: dict[str, dict[str, Any]] = {
+    "console_code_create": {},
+    "console_code_lookup": {"p_code": "222222"},
+    "console_code_approve": {"p_code": "222222"},
+    "console_code_consume": {"p_code": "222222", "p_poll_secret": "invalid"},
+    "console_code_complete": {
+        "p_exchange_id": "00000000-0000-0000-0000-000000000000",
+        "p_linked_console_id": "00000000-0000-0000-0000-000000000000",
+        "p_session_ref": "contract-check-invalid-session",
+    },
 }
 CODE_RE = re.compile(r"^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$")
 ROOT = Path(__file__).resolve().parents[1]
@@ -123,32 +129,22 @@ def response_status(value: dict[str, Any]) -> str | None:
     return None
 
 
-def verify_openapi(key: str) -> None:
-    document = request_json(
-        "GET",
-        "/rest/v1/",
-        key,
-        accept="application/openapi+json",
-    )
-    if not isinstance(document, dict) or not isinstance(document.get("paths"), dict):
-        raise ContractError("PostgREST did not return an OpenAPI paths object")
-    paths: dict[str, Any] = document["paths"]
-
-    for rpc, parameters in EXPECTED_RPC_PARAMETERS.items():
-        route = f"/rpc/{rpc}"
-        if route not in paths:
-            raise ContractError(f"production is missing {route}")
-        serialized = json.dumps(paths[route], sort_keys=True)
-        missing = sorted(parameter for parameter in parameters if parameter not in serialized)
-        if missing:
-            raise ContractError(f"{route} is missing parameters: {', '.join(missing)}")
-
-    forbidden = sorted(path for path in paths if path.startswith("/rpc/console_code_"))
-    if forbidden:
-        raise ContractError(f"obsolete console_code_* RPCs are exposed: {', '.join(forbidden)}")
-    if "consumed_at" in json.dumps(document):
-        raise ContractError("obsolete consumed_at is exposed by the production REST schema")
-    print("PASS: OpenAPI exposes only the exact shared create/claim/poll RPC contract")
+def verify_forbidden_rpcs(key: str) -> None:
+    """Probe every obsolete signature without requiring secret OpenAPI access."""
+    for rpc, payload in FORBIDDEN_RPC_PROBES.items():
+        try:
+            request_json("POST", f"/rest/v1/rpc/{rpc}", key, payload)
+        except ContractError as exc:
+            detail = str(exc)
+            if "HTTP 404" in detail and (
+                "PGRST202" in detail
+                or "Could not find the function" in detail
+                or "Could not find function" in detail
+            ):
+                continue
+            raise ContractError(f"could not prove obsolete RPC {rpc} is absent: {detail}") from exc
+        raise ContractError(f"obsolete RPC is still callable: {rpc}")
+    print("PASS: obsolete console_code_* RPC signatures are absent")
 
 
 def verify_live_flow(key: str) -> None:
@@ -218,6 +214,8 @@ def verify_live_flow(key: str) -> None:
     )
     if response_status(still_waiting) != "waiting":
         raise ContractError("a rejected claim consumed or changed the one-time code")
+    if any("consumed_at" in response for response in (created, waiting, rejected, still_waiting)):
+        raise ContractError("obsolete consumed_at appeared in a shared RPC response")
     print("PASS: anonymous claim is rejected and does not consume the code")
 
 
@@ -226,8 +224,8 @@ def main() -> int:
     if configured_url != EXPECTED_URL:
         raise ContractError(f"refusing unexpected Supabase project URL: {configured_url}")
     key = public_key()
-    verify_openapi(key)
     verify_live_flow(key)
+    verify_forbidden_rpcs(key)
     print("PASS: production PS4/phone link contract is live and compatible")
     return 0
 
