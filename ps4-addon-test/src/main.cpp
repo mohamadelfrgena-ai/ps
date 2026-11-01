@@ -1244,7 +1244,7 @@ int main(int, char**) {
     // (user request 2026-10-28: never with the boot/legal splash). Same intent as the
     // Sfx::AppStart comment ("عند ظهور المنزل بعد الإسبلاش").
     ui_sfx(Sfx::AppStart);
-    setAppVersion(kAppVersion);
+    setAppVersion(std::string(kAppVersion) + " (2026-11-01)");  // ختم البناء في الإعدادات ← تمييز هذه النسخة
     if (!gSession.valid) setAccount(Account{});
     setCoverRequestHandler([](const AddonItem& it) { requestCoverAsync(it); });
 
