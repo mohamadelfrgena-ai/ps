@@ -93,6 +93,11 @@ python3 tools/migrate_admin_assets_private.py --apply
 > لا يدخل ملف 41 في `00_ALL_IN_ONE.sql` ولا يغيّر أي جدول أو دالة. شغّله فقط
 > للتحقق من تطابق العقد على مشروع الإنتاج المشترك. لا تنشر Edge Function بديلة
 > لهذا التدفق، ولا تضع مفتاح service role داخل تطبيق الهاتف أو PS4.
+>
+> إذا كان مشروع الإنتاج القديم يعرض الاسمين `claim_console_link_code` و
+> `poll_console_link_code` بدلاً من الاسمين المشتركين، نفّذ مرة واحدة ملف
+> `APPLY_SHARED_CONSOLE_LINK_CONTRACT.sql` على المشروع `stbmescmexzcszyyambq`.
+> الملف يضيف غلافين متوافقين فقط ولا يحذف الدوال التي يستخدمها PS4.
 
 > ⚠️ **ترتيب مهم:** `15_assets_v2` يبدأ بـ`delete from public.site_assets` ثم
 > يزرع 492 أصلاً، و`21_banners` يضيف 40 بانراً ⇒ **نفّذ 15 قبل 21 دائماً**،
