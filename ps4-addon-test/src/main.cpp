@@ -738,19 +738,40 @@ static int focusedCard() {
 }
 
 static void clampScroll() {
-    // keep the focused card visible; windows: Home 5, Deals 5, Store 8, Search 5
-    int win = 5, idx = -1;
+    // keep the focused card visible; windows: Home 10, Deals 10, Store 10, Search 5 (v0.36 grids)
+    int win = 10, idx = -1;
     View view = View::Home;
     if (A.scr == Scr::Home) { idx = A.focus - 12; view = View::Home; }
     else if (A.scr == Scr::Deals) { idx = A.focus - 5; view = View::Deals; }
-    else if (A.scr == Scr::Store) { idx = A.focus; view = View::Store; win = 8; }
-    else if (A.scr == Scr::Search) { idx = A.focus - 4; view = View::Search; }
+    else if (A.scr == Scr::Store) { idx = A.focus; view = View::Store; }
+    else if (A.scr == Scr::Search) { idx = A.focus - 4; view = View::Search; win = 5; }
     if (idx < 0) return;
     int first = scrollOf(view);
     if (idx < first) first = idx;
     if (idx > first + win - 1) first = idx - win + 1;
     if (first < 0) first = 0;
     if (first != scrollOf(view)) setScroll(view, first);
+}
+
+// v0.36 grid navigation: the focused card walks the WHOLE list with wrap-around («التقليب عبر
+// البطاقات» — never bounces back mid-list), and the visible window follows it (row-aligned).
+static void moveGridCard(View view, int fb, int cols, int win, int dx, int dy) {
+    const std::vector<int> v = viewItems(view, A.filter);
+    const int n = (int)v.size();
+    if (n == 0) return;
+    int first = scrollOf(view);
+    int abs = first + (A.focus - fb);
+    if (abs < 0) abs = 0;
+    if (abs >= n) abs = n - 1;
+    if (dx != 0) abs += dx;
+    if (dy != 0) abs += dy * cols;
+    if (abs < 0) abs += n;
+    if (abs >= n) abs -= n;
+    if (abs < first) first = (abs / cols) * cols;
+    if (abs >= first + win) first = ((abs / cols) - (win / cols) + 1) * cols;
+    if (first < 0) first = 0;
+    if (first != scrollOf(view)) setScroll(view, first);
+    A.focus = fb + (abs - first);
 }
 
 // focus zones per screen (linear stepping inside a zone; Up/Down crosses zones)
@@ -763,14 +784,14 @@ static void moveFocus(int dx, int dy) {
             A.focus = clampInto(A.focus + dx + dy, 0, 1);
             break;
         case Scr::Home: {
-            // zones: hero 0-1 | tabs 5-11 | shelf 12-16
+            // zones: hero 0-1 | tabs 5-11 | card grid 12-21 (5-wide, v0.36)
             const std::vector<int> v = viewItems(View::Home, A.filter);
-            const int shelfN = (int)std::min<std::size_t>(5, v.size());
+            const int gridN = (int)std::min<std::size_t>(10, v.size());
             if (A.focus <= 1) {
                 if (dy > 0) A.focus = 5 + std::min(A.filter, 6);
                 else A.focus = clampInto(A.focus + dx, 0, 1);
             } else if (A.focus <= 11) {
-                if (dy > 0 && shelfN > 0) A.focus = 12;
+                if (dy > 0 && gridN > 0) A.focus = 12;
                 else if (dy < 0) A.focus = clampInto(A.hero, 0, 1);
                 else {
                     int f = A.focus - 5 + dx;
@@ -779,22 +800,17 @@ static void moveFocus(int dx, int dy) {
                     A.focus = 5 + f;
                 }
             } else {
-                if (dy < 0) A.focus = 5 + std::min(A.filter, 6);
-                else {
-                    int k = A.focus - 12 + dx;
-                    if (shelfN > 0) { if (k < 0) k = shelfN - 1;
-                    if (k > shelfN - 1) k = 0; }
-                    else k = 0;
-                    A.focus = 12 + k;
-                }
+                if (v.empty()) A.focus = 5 + std::min(A.filter, 6);
+                else if (dy < 0 && A.focus < 17 && scrollOf(View::Home) == 0) A.focus = 5 + std::min(A.filter, 6);
+                else moveGridCard(View::Home, 12, 5, 10, dx, dy);
             }
             break;
         }
         case Scr::Deals: {
             const std::vector<int> v = viewItems(View::Deals, A.filter);
-            const int cardN = (int)std::min<std::size_t>(5, v.size());
+            const int gridN = (int)std::min<std::size_t>(10, v.size());
             if (A.focus <= 4) {
-                if (dy > 0 && cardN > 0) A.focus = 5;
+                if (dy > 0 && gridN > 0) A.focus = 5;
                 else {
                     int f = A.focus + dx;
                     if (f < 0) f = 4;
@@ -802,47 +818,35 @@ static void moveFocus(int dx, int dy) {
                     A.focus = f;
                 }
             } else {
-                if (dy < 0) A.focus = std::min(A.filter, 4);
-                else {
-                    int k = A.focus - 5 + dx;
-                    if (cardN > 0) { if (k < 0) k = cardN - 1;
-                    if (k > cardN - 1) k = 0; }
-                    else k = 0;
-                    A.focus = 5 + k;
-                }
+                if (v.empty()) A.focus = std::min(A.filter, 4);
+                else if (dy < 0 && A.focus < 10 && scrollOf(View::Deals) == 0) A.focus = std::min(A.filter, 4);
+                else moveGridCard(View::Deals, 5, 5, 10, dx, dy);
             }
             break;
         }
         case Scr::Store: {
+            // v0.36: grid 0-9 (5-wide x2 rows) | banner 10 | categories 11-17 | sort pill 18
             const std::vector<int> v = viewItems(View::Store, A.filter);
-            const int cardN = (int)std::min<std::size_t>(8, v.size());
-            if (A.focus <= 7) {
-                if (dy < 0) { if (cardN == 0) A.focus = 8; }
-                else if (dy > 0) {
-                    if (cardN == 0) A.focus = 9 + std::min(A.filter, 6);
-                    else if (A.focus + 4 < cardN) A.focus += 4;
-                    else A.focus = 8;
-                } else {
-                    int k = A.focus + dx;
-                    if (cardN > 0) { if (k < 0) k = cardN - 1;
-                    if (k > cardN - 1) k = 0; }
-                    else k = 0;
-                    A.focus = k;
-                }
-            } else if (A.focus == 8) {
-                if (dy > 0) A.focus = 9 + std::min(A.filter, 6);
-                else if (dy < 0) A.focus = cardN > 0 ? cardN - 1 : 9;
-            } else if (A.focus <= 15) {
-                if (dy < 0) A.focus = 8;
-                else if (dy > 0) A.focus = 16;
+            const int gridN = (int)std::min<std::size_t>(10, v.size());
+            if (A.focus <= 9) {
+                if (v.empty()) A.focus = 10;
+                else if (dy < 0 && A.focus < 5 && scrollOf(View::Store) == 0) A.focus = 10;
+                else if (dy > 0 && A.focus >= 5 && scrollOf(View::Store) + 10 >= (int)v.size()) A.focus = 10;
+                else moveGridCard(View::Store, 0, 5, 10, dx, dy);
+            } else if (A.focus == 10) {
+                if (dy > 0) A.focus = 11 + std::min(A.filter, 6);
+                else if (dy < 0) A.focus = gridN > 0 ? 9 : 11 + std::min(A.filter, 6);
+            } else if (A.focus <= 17) {
+                if (dy < 0) A.focus = 10;
+                else if (dy > 0) A.focus = 18;
                 else {
-                    int f = A.focus - 9 + dx;
+                    int f = A.focus - 11 + dx;
                     if (f < 0) f = 6;
                     if (f > 6) f = 0;
-                    A.focus = 9 + f;
+                    A.focus = 11 + f;
                 }
             } else {
-                if (dy < 0) A.focus = 9 + std::min(A.filter, 6);
+                if (dy < 0) A.focus = 11 + std::min(A.filter, 6);
                 else if (dx != 0) setStoreSort((storeSort() + (dx > 0 ? 1 : 2)) % 3);
             }
             break;
@@ -1080,18 +1084,18 @@ static void handle(Btn b) {
                     setScroll(View::Deals, 0);
                     break;
                 }
-                if (A.scr == Scr::Store && A.focus == 16) {
+                if (A.scr == Scr::Store && A.focus == 18) {
                     setStoreSort((storeSort() + 1) % 3);
                     setScroll(View::Store, 0);
                     ui_sfx(Sfx::Toggle);
                     break;
                 }
-                if (A.scr == Scr::Store && A.focus >= 9 && A.focus <= 15) {
+                if (A.scr == Scr::Store && A.focus >= 11 && A.focus <= 17) {
                     A.filter = A.focus - 9;
                     setScroll(View::Store, 0);
                     break;
                 }
-                if (A.scr == Scr::Store && A.focus == 8) {
+                if (A.scr == Scr::Store && A.focus == 10) {
                     if (saleLive()) go(Scr::Deals);
                     else if (!catalog().empty()) openItem(0);
                     break;

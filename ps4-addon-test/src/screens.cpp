@@ -481,6 +481,8 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable2() 
         {"view_plans", {{"en", "View plans"}, {"ar", "عرض الخطط"}, {"fr", "Voir les offres"}, {"tr", "Planları gör"}, {"es", "Ver planes"},
                         {"ru", "Планы"}, {"pt", "Ver planos"}, {"zh", "查看套餐"}}},
         {"badge_new", {{"en", "NEW"}, {"ar", "جديد"}, {"fr", "NOUVEAU"}, {"tr", "YENİ"}, {"es", "NUEVO"}, {"ru", "НОВОЕ"}, {"pt", "NOVO"}, {"zh", "新"}}},
+        {"card_dl", {{"en", "Download"}, {"ar", "نزّل"}, {"fr", "Télécharger"}, {"tr", "İndir"}, {"es", "Descargar"}, {"ru", "Скачать"}, {"pt", "Baixar"}, {"zh", "下载"}}},
+        {"card_soon", {{"en", "Soon"}, {"ar", "قريباً"}, {"fr", "Bientôt"}, {"tr", "Yakında"}, {"es", "Próximamente"}, {"ru", "Скоро"}, {"pt", "Em breve"}, {"zh", "即将"}}},
         {"newest_k", {{"en", "Just released"}, {"ar", "نزلت للتو"}, {"fr", "Tout juste sorti"}, {"tr", "Yeni çıktı"}, {"es", "Recién salido"},
                       {"ru", "Только что вышло"}, {"pt", "Acabou de sair"}, {"zh", "刚刚发布"}}},
         {"open_cta", {{"en", "Open"}, {"ar", "فتح"}, {"fr", "Ouvrir"}, {"tr", "Aç"}, {"es", "Abrir"}, {"ru", "Открыть"}, {"pt", "Abrir"}, {"zh", "打开"}}},
@@ -2915,22 +2917,30 @@ void drawSignInRequired(UiEngine& e, int focus, const std::string& langCode) {
 // ============================================================================
 namespace {
 // Shelf of up to 5 cards from `items` starting at scroll; focus base fb. Empty -> empty state.
-void shelf(UiEngine& e, const Lay& L, const std::vector<int>& items, int scroll, int fb, int focus, int xl, int bottom,
-           const std::string& lang, bool dealBadge) {
+void cardGrid(UiEngine& e, const Lay& L, const std::vector<int>& items, int scroll, int fb, int focus,
+              int xl, int yTop, int w, int yMax, const std::string& lang, bool dealBadge) {
     if (items.empty()) {
-        emptyState(e, L, xl, bottom - 290, kCR - xl, 290, 12, tr(gCat.empty() ? "home_empty_t" : "empty_t", lang),
+        emptyState(e, L, xl, yTop, w, yMax - yTop, 12, tr(gCat.empty() ? "home_empty_t" : "empty_t", lang),
                    tr(gCat.empty() ? "home_empty_s" : "empty_s", lang));
         return;
     }
-    int x = xl;
+    // v0.36 «شبكة البطاقات»: 5 whole cards per row (never cropped), rows continue below the fold
+    // and the window scrolls (clampScroll). Each card carries its action word under it:
+    // «نزّل» when the file is available now, «قريباً» when it is not released yet.
+    const int cols = 5, gap = 26;
+    const int cw = (w - gap * (cols - 1)) / cols;
+    const int ih = cw * 9 / 16;
+    const int ch = vcardHeight(ih, false);
     const int first = std::max(0, std::min(scroll, static_cast<int>(items.size()) - 1));
-    // 5 focusable cards + a 6th one peeking at the screen edge when the list continues (concept look)
-    for (int i = 0; i < 6 && first + i < static_cast<int>(items.size()) && x < 1920; ++i) {
-        const bool f = focus == fb + i && i < 5;
-        const int w = f ? 340 : 300, ih = f ? 191 : 169;
-        const int h = vcardHeight(ih, false);
-        vcard(e, L, x, bottom - h, w, ih, gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])], f, lang, false, false, dealBadge);
-        x += w + 22;
+    for (int i = 0; i < cols * 4 && first + i < static_cast<int>(items.size()); ++i) {
+        const int ry = yTop + (i / cols) * (ch + gap);
+        if (ry >= yMax) break;
+        const int x = xl + (i % cols) * (cw + gap);
+        const AddonItem& it = gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])];
+        vcard(e, L, x, ry, cw, ih, it, focus == fb + i, lang, false, false, dealBadge);
+        const bool soon = it.fileSize <= 0;
+        e.drawTextCentered(tr(soon ? "card_soon" : "card_dl", lang), L.X(x, cw) + cw / 2, ry + ch + 4, 16,
+                           soon ? kMU : kBLl, FontRole::Body, L.rtl);
     }
 }
 } // namespace
@@ -3075,7 +3085,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     // ---- tabs (focus 5-11) + shelf (focus 12-16): newest first ----
     tabRow(e, L, cx, 636, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang), tr("chip_free", lang),
                            tr("chip_epic", lang), tr("chip_legendary", lang), tr("chip_new", lang)}, filterIndex, 5, focus);
-    shelf(e, L, viewItems(View::Home, filterIndex), scrollOf(View::Home), 12, focus, cx, 984, lang, sale);
+    cardGrid(e, L, viewItems(View::Home, filterIndex), scrollOf(View::Home), 12, focus, cx, 684, kCR - cx, 1010, lang, sale);
 
     std::vector<std::pair<std::string, std::string>> leg = {{"\xE2\x9C\x95", "select"}, {"\xE2\x96\xB3", "search"}};
     if (nS > 1) { leg.push_back({"L2", "prev_offer"}); leg.push_back({"R2", "next_offer"}); }
@@ -3137,7 +3147,7 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
     const std::vector<int> items = viewItems(View::Deals, filterIndex);
     if (items.empty()) emptyState(e, L, cx, 694, cw, 290, 11, tr(any.empty() ? "deals_soon" : "empty_t", lang),
                                   tr(any.empty() ? "deals_soon_sub" : "empty_s", lang));
-    else shelf(e, L, items, scrollOf(View::Deals), 5, focus, cx, 984, lang, true);
+    else cardGrid(e, L, items, scrollOf(View::Deals), 5, focus, cx, 684, cw, 1010, lang, true);
     drawLegendBar(e, {{"\xE2\x9C\x95", "open"}, {"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}}, langCode);
 }
 
@@ -3166,7 +3176,7 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
         e.drawRoundRect(srx, sy, sw, sh, sh / 2, ink(gLight ? 8 : 12));
         e.drawRoundBorder(srx, sy, sw, sh, sh / 2, 2, ink(gLight ? 30 : 34));
         drawGroupCentered(e, L, g, srx + sw / 2, sy + sh / 2);
-        if (focus == 16) focusRing(e, srx, sy, sw, sh, sh / 2);
+        if (focus == 18) focusRing(e, srx, sy, sw, sh, sh / 2);
     }
 
     // ---- banner (focus 8): sale strip (art as backdrop of the strip) or the newest item ----
@@ -3204,7 +3214,7 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
         button(e, L, cx + cw - 30 - vw, bnY + (bnH - 60) / 2, vw, 60, vt, 0, 22, 18);
         e.drawRoundBorder(brx, bnY, cw, bnH, 22, 2, ink(26));
     }
-    if (bnH > 0 && focus == 8) focusRing(e, L.X(cx, cw), bnY, cw, bnH, 22, false);   // v0.35: frame only
+    if (bnH > 0 && focus == 10) focusRing(e, L.X(cx, cw), bnY, cw, bnH, 22, false);   // v0.35: frame only
 
     // ---- categories (focus 9-15) with real counts: All Addons Worlds Free Epic Legendary New ----
     const int catX = cx, catW = 270, catY = bnH > 0 ? bnY + bnH + 34 : 150;
@@ -3213,7 +3223,7 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
     for (int i = 0; i < 7; ++i) {
         const int y = catY + i * 68;
         const bool on = i == filterIndex;
-        const bool foc = focus == 9 + i;
+        const bool foc = focus == 11 + i;
         boxText(e, L, cats[i], catX + 22, catW - 90, y + 16, 22, on || foc ? kTX : kCHIPTX);
         const int n = static_cast<int>(viewItems(View::Store, i).size());
         endText(e, L, num(n), catX, catW - 20, y + 18, 19, on || foc ? kTX : kMU);
@@ -3222,21 +3232,25 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
         else if (on) e.drawRoundRect(L.X(catX + 18, catW - 36), y + 51, catW - 36, 4, 2, kBLl);
     }
 
-    // ---- grid 2 x 4 (focus 0-7) ----
-    const int gx = cx + catW + 32, gw = kCR - gx, gap = 26, cols = 4;
+    // ---- grid 2 x 5 (focus 0-9) — v0.36 five whole cards per row ----
+    const int gx = cx + catW + 32, gw = kCR - gx, gap = 26, cols = 5;
     const int gcw = (gw - gap * (cols - 1)) / cols, ih = gcw * 9 / 16;
     const int ch = vcardHeight(ih, true);
     const std::vector<int> items = viewItems(View::Store, filterIndex);
     const int first = std::max(0, std::min(scrollOf(View::Store), std::max(0, static_cast<int>(items.size()) - 1)));
-    const int shown = std::min(8, static_cast<int>(items.size()) - first);
+    const int shown = std::min(10, static_cast<int>(items.size()) - first);
     if (items.empty()) {
         emptyState(e, L, gx, catY, gw, std::min(560, 960 - catY), 12, tr(gCat.empty() ? "home_empty_t" : "empty_t", lang),
                    tr(gCat.empty() ? "home_empty_s" : "empty_s", lang));
     } else {
         for (int i = 0; i < shown; ++i) {
             const int col = i % cols, row = i / cols;
-            vcard(e, L, gx + col * (gcw + gap), catY + row * (ch + gap), gcw, ih,
-                  gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])], focus == i, lang, true, true, sale);
+            const int ry = catY + row * (ch + gap);
+            const AddonItem& it = gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])];
+            vcard(e, L, gx + col * (gcw + gap), ry, gcw, ih, it, focus == i, lang, true, true, sale);
+            const bool soon = it.fileSize <= 0;
+            e.drawTextCentered(tr(soon ? "card_soon" : "card_dl", lang), L.X(gx + col * (gcw + gap), gcw) + gcw / 2, ry + ch + 4, 15,
+                               soon ? kMU : kBLl, FontRole::Body, L.rtl);
         }
     }
     drawLegendBar(e, {{"\xE2\x9C\x95", "open"}, {"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}}, langCode);
