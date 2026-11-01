@@ -11,3 +11,10 @@ update storage.buckets
 set allowed_mime_types = null
 where name = 'site-assets'
   and allowed_mime_types is not null;
+
+-- Content packs can reach ~5 MB; the bucket's file_size_limit would reject
+-- them with 413 Payload too large. Lift it (NULL = no limit).
+update storage.buckets
+set file_size_limit = null
+where name = 'site-assets'
+  and file_size_limit is not null;
