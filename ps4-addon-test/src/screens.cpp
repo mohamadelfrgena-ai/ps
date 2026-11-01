@@ -697,9 +697,9 @@ int drawBtn(UiEngine& e, const std::string& key, int cx, int cy, int h) {
 
 // v0.30: ANIMATED overlay recording. The UI redraws fully only when state changes; between
 // states the main loop restores the animated rectangles from a frame snapshot and replays just
-// these calls (focus ring/gleam, gem, mascot, settings icon tiles) ~30 times a second.
+// these calls (focus ring/gleam, gem, settings icon tiles) ~30 times a second.
 struct AnimCall {
-    enum Kind : std::uint8_t { Ring, Mark, Mascot, Tile } kind;
+    enum Kind : std::uint8_t { Ring, Mark, Tile } kind;
     int a0 = 0, a1 = 0, a2 = 0, a3 = 0, a4 = 0, a5 = 0;
     SDL_Color c{0, 0, 0, 255};
 };
@@ -1540,21 +1540,6 @@ void sectionMark(UiEngine& e, int x, int y, int s, SDL_Color c) {
     e.drawRoundRectRotated(cx, cy, d, d, std::max(2, d / 5), 45.0f, SDL_Color{static_cast<Uint8>(c.r * 70 / 100), static_cast<Uint8>(c.g * 70 / 100), static_cast<Uint8>(c.b * 70 / 100), 255});
     e.drawRoundRectRotated(cx, cy, d * 82 / 100, d * 82 / 100, std::max(2, d / 6), 45.0f, c);
     e.drawRoundRectRotated(cx - d / 14, cy - d / 5, d * 34 / 100, d * 34 / 100, std::max(1, d / 10), 45.0f, mix(62));
-}
-
-// v7.4 — AC mascot (the Allay holding the AC coin). Floats and tilts gently. Images in ui.pak:
-//   icon_allay (with white glow, for the dark theme) and icon_allay_light (no glow, for the light theme).
-// Returns false when the image is not in the pak, so callers fall back to the old drawing (nothing breaks).
-bool drawMascot(UiEngine& e, int cx, int cy, int s) {
-    animPush({AnimCall::Mascot, cx, cy, s}, cx - s / 2 - 16, cy - s / 2 - 28, s + 32, s + 44);
-    const char* nm = gLight ? "icon_allay_light" : "icon_allay";
-    int iw = 0, ih = 0;
-    if (!e.imageSize(nm, iw, ih) || iw <= 0) return false;
-    const float t = static_cast<float>(SDL_GetTicks() % 600000u) / 1000.0f;
-    const float ph = t * 3.1416f * 2.0f / 2.4f;
-    const int dy = static_cast<int>(std::lround(-std::max(2.0f, s * 0.07f) * (std::sin(ph) * 0.5f + 0.5f)));
-    e.drawImageRotated(nm, cx, cy + dy, s, s, 3.0f * std::sin(ph), 255);
-    return true;
 }
 
 // Page background. PERFORMANCE: the old version blended 18 huge translucent circles every frame
@@ -2478,21 +2463,13 @@ void emptyState(UiEngine& e, const Lay& L, int xl, int y, int w, int h, int kind
     const int s = std::min(84, h / 3);
     const int ty = y + (h - s - 20 - 34 - 12 - 26) / 2;
     e.drawCircle(rx + w / 2, ty + s / 2, s / 2 + 14, ink(gLight ? 10 : 14));
-    if (!drawMascot(e, rx + w / 2, ty + s / 2, s + 36)) glyph(e, kind, rx + w / 2 - s / 2, ty, s, kMU, kMU, false);   // v7.4 mascot
+    glyph(e, kind, rx + w / 2 - s / 2, ty, s, kMU, kMU, false);
     e.drawTextCentered(title, rx + w / 2, ty + s + 20 + 17, 30, kTX, FontRole::Body, L.rtl);
     const auto lines = wrapLines(e, sub, 22, w - 80, L.rtl);
     int yy = ty + s + 20 + 34 + 12 + 13;
     for (std::size_t i = 0; i < lines.size() && i < 2; ++i) { e.drawTextCentered(lines[i], rx + w / 2, yy, 22, kMU, FontRole::Body, L.rtl); yy += 32; }
 }
 
-// v7.4: kicker whose marker is the AC mascot (wallet title, "moves with your account"). Falls back to kickerText().
-void kickerMascot(UiEngine& e, const Lay& L, int xl, int y, const std::string& text, SDL_Color c) {
-    const int ms = 44;
-    int iw = 0, ih = 0;
-    if (!e.imageSize(gLight ? "icon_allay_light" : "icon_allay", iw, ih)) { sectionMark(e, L.X(xl, 16), y + 2, 16, c); boxText(e, L, text, xl + 26, 1100, y, 18, c); return; }
-    drawMascot(e, L.X(xl, ms) + ms / 2, y + 11, ms);
-    boxText(e, L, text, xl + ms + 8, 1100, y, 18, c);
-}
 void kickerText(UiEngine& e, const Lay& L, int xl, int y, const std::string& text, SDL_Color c) {
     sectionMark(e, L.X(xl, 16), y + 2, 16, c);
     boxText(e, L, text, xl + 26, 1100, y, 18, c);
@@ -3152,9 +3129,6 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
     } else {
         pageTitle(e, L, tr("nav_deals_t", lang), cx, 44);
     }
-    // v0.30: the allay belongs to the Store / Deals area
-    // v0.35: keep the mascot inside the content area — never crossing the sidebar rail (Arabic)
-    drawMascot(e, L.rtl ? (kCR - kRailW - 75) : (kCR - 84), 112, 150);
     if (!sale && any.empty()) {
         emptyState(e, L, cx, 200, cw, 600, 11, tr("deals_empty_t", lang), tr("deals_empty_s", lang));
         drawLegendBar(e, {{"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}}, langCode);
@@ -3180,9 +3154,6 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
     const bool sale = saleActive();
     const int cx = kCL + 20, cw = kCR - cx;
     pageTitle(e, L, tr("nav_store", lang), cx, 44);
-    // v0.30: the allay belongs to the Store / Deals area
-    // v0.35: keep the mascot inside the content area — never crossing the sidebar rail (Arabic)
-    drawMascot(e, L.rtl ? (kCR - kRailW - 75) : (kCR - 84), 112, 150);
     {   // ---- sort pill (focus 16): Popular / Newest / Top rated — ✕ cycles it (setStoreSort) ----
         static const char* kSortKeys[3] = {"sort_popular", "sort_newest", "sort_rating"};
         const std::string lab = tr("sort_by", lang) + ":  " + tr(kSortKeys[storeSort()], lang);
@@ -3629,7 +3600,7 @@ void drawProfile(UiEngine& e, int focus, const std::string& langCode) {
     const int wrx = L.X(wx, ww);
     e.dropShadow(wrx, ly + 10, ww, lh, 30, 20, gLight ? 50 : 130);
     surface(e, wrx, ly, ww, lh, 30, 1);
-    kickerMascot(e, L, wx + 40, ly + 40, tr("ac_wallet", lang), kGD);
+    kickerText(e, L, wx + 40, ly + 40, tr("ac_wallet", lang), kGD);
     {
         const std::string bal = formatAC(gAcc.acBalance);
         e.drawImage("icon_coin", L.X(wx + 40, 72), ly + 86, 72, 72);
@@ -4225,7 +4196,6 @@ void animReplay(UiEngine& e) {
         switch (a.kind) {
             case AnimCall::Ring:   focusRing(e, a.a0, a.a1, a.a2, a.a3, a.a4, a.a5 != 0); break;
             case AnimCall::Mark:   sectionMark(e, a.a0, a.a1, a.a2, a.c); break;
-            case AnimCall::Mascot: drawMascot(e, a.a0, a.a1, a.a2); break;
             case AnimCall::Tile:   lineIconTile(e, a.a0, a.a1, a.a2, a.a3, a.c, a.a4 != 0); break;
         }
     }
