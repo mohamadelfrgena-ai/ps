@@ -106,7 +106,6 @@ jobs:
       - name: Verify the shared production console-link contract
         env:
           SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
-          SUPABASE_PUBLIC_KEY: ${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
         run: |
           set +e
           set -o pipefail
