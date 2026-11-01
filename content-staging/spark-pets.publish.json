@@ -1,0 +1,11 @@
+{
+  "tag": "content-spark-pets-1.0.0",
+  "title": "AddonStation content: Spark Pets 1.0.0",
+  "source": "content-staging/src/spark-pets.mcaddon",
+  "name": "Spark Pets",
+  "version": "1.0.0",
+  "content_type": "addon",
+  "cover": "content-staging/src/spark-pets-cover.jpg",
+  "slug": "spark-pets",
+  "notes": "Spark Pets 1.0.0 — by silverfoxstudio / by sliver fox."
+}

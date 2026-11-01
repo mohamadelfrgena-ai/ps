@@ -1,0 +1,11 @@
+{
+  "tag": "content-weapons-armors-1.0.0",
+  "title": "AddonStation content: Weapons Armors 1.0.0",
+  "source": "content-staging/src/weapons-armors.mcaddon",
+  "name": "Weapons Armors",
+  "version": "1.0.0",
+  "content_type": "addon",
+  "cover": "content-staging/src/weapons-armors-cover.jpg",
+  "slug": "weapons-armors",
+  "notes": "Weapons Armors 1.0.0 — by silverfoxstudio / by sliver fox."
+}

@@ -1,0 +1,11 @@
+{
+  "tag": "content-a-minecraft-movie-1.0.0",
+  "title": "AddonStation content: A Minecraft Movie 1.0.0",
+  "source": "content-staging/src/a-minecraft-movie.mcaddon",
+  "name": "A Minecraft Movie",
+  "version": "1.0.0",
+  "content_type": "addon",
+  "cover": "content-staging/src/a-minecraft-movie-cover.jpg",
+  "slug": "a-minecraft-movie",
+  "notes": "A Minecraft Movie 1.0.0 — by silverfoxstudio / by sliver fox."
+}

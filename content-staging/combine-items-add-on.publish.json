@@ -1,0 +1,11 @@
+{
+  "tag": "content-combine-items-add-on-1.0.0",
+  "title": "AddonStation content: COMBINE ITEMS! Add-On 1.0.0",
+  "source": "content-staging/src/combine-items-add-on.mcaddon",
+  "name": "COMBINE ITEMS! Add-On",
+  "version": "1.0.0",
+  "content_type": "addon",
+  "cover": "content-staging/src/combine-items-add-on-cover.jpg",
+  "slug": "combine-items-add-on",
+  "notes": "COMBINE ITEMS! Add-On 1.0.0 — by silverfoxstudio / by sliver fox."
+}

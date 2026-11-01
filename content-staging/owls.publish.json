@@ -1,0 +1,11 @@
+{
+  "tag": "content-owls-1.0.0",
+  "title": "AddonStation content: Owls 1.0.0",
+  "source": "content-staging/src/owls.mcaddon",
+  "name": "Owls",
+  "version": "1.0.0",
+  "content_type": "addon",
+  "cover": "content-staging/src/owls-cover.jpg",
+  "slug": "owls",
+  "notes": "Owls 1.0.0 — by silverfoxstudio / by sliver fox."
+}

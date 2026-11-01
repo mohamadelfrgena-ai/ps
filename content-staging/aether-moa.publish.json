@@ -1,0 +1,11 @@
+{
+  "tag": "content-aether-moa-1.0.0",
+  "title": "AddonStation content: Aether Moa 1.0.0",
+  "source": "content-staging/src/aether-moa.mcaddon",
+  "name": "Aether Moa",
+  "version": "1.0.0",
+  "content_type": "addon",
+  "cover": "content-staging/src/aether-moa-cover.jpg",
+  "slug": "aether-moa",
+  "notes": "Aether Moa 1.0.0 — by silverfoxstudio / by sliver fox."
+}

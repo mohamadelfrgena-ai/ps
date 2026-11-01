@@ -1,0 +1,11 @@
+{
+  "tag": "content-tiny-takeover-mini-mania-1.0.0",
+  "title": "AddonStation content: Tiny Takeover Mini Mania 1.0.0",
+  "source": "content-staging/src/tiny-takeover-mini-mania.mcaddon",
+  "name": "Tiny Takeover Mini Mania",
+  "version": "1.0.0",
+  "content_type": "addon",
+  "cover": "content-staging/src/tiny-takeover-mini-mania-cover.jpg",
+  "slug": "tiny-takeover-mini-mania",
+  "notes": "Tiny Takeover Mini Mania 1.0.0 — by silverfoxstudio / by sliver fox."
+}
