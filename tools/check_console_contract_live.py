@@ -165,6 +165,33 @@ def request_contract_rpc(
         return as_object(response, legacy_rpc), False
 
 
+def probe_claim_contract(
+    key: str,
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any] | None, bool]:
+    """Prove the claim endpoint exists while respecting its authenticated-only grant."""
+    required_rpc = "claim_console_link"
+    legacy_rpc = "claim_console_link_code"
+    try:
+        response = request_json("POST", f"/rest/v1/rpc/{required_rpc}", key, payload)
+        return as_object(response, required_rpc), True
+    except ContractError as exc:
+        detail = str(exc)
+        if "HTTP 401" in detail and "permission denied for function claim_console_link" in detail:
+            return None, True
+        if "HTTP 404" not in detail or "PGRST202" not in detail or legacy_rpc not in detail:
+            raise
+
+    try:
+        response = request_json("POST", f"/rest/v1/rpc/{legacy_rpc}", key, payload)
+        return as_object(response, legacy_rpc), False
+    except ContractError as exc:
+        detail = str(exc)
+        if "HTTP 401" in detail and "permission denied for function claim_console_link_code" in detail:
+            return None, False
+        raise
+
+
 def verify_live_flow(key: str) -> list[str]:
     issues: list[str] = []
     created = as_object(
@@ -206,19 +233,16 @@ def verify_live_flow(key: str) -> list[str]:
         "p_access_token": "contract-check-invalid-access-token",
         "p_refresh_token": "contract-check-invalid-refresh-token",
     }
-    rejected, exact_claim = request_contract_rpc(
-        key,
-        "claim_console_link",
-        "claim_console_link_code",
-        claim_payload,
-    )
-    if rejected.get("ok") is not False or response_status(rejected) != "sign_in_required":
-        raise ContractError("anonymous claim must return {ok:false, message:'sign_in_required'}")
+    rejected, exact_claim = probe_claim_contract(key, claim_payload)
+    if rejected is not None and (
+        rejected.get("ok") is not False or response_status(rejected) != "sign_in_required"
+    ):
+        raise ContractError("anonymous claim must return sign_in_required when it is callable")
     if exact_claim:
-        print("PASS: claim_console_link exposes the exact phone parameter contract")
+        print("PASS: claim_console_link exists and is protected for authenticated phone users")
     else:
         issues.append("claim_console_link is missing; only claim_console_link_code is available")
-        print("DIAG: claim_console_link_code works, but the required claim_console_link name is missing")
+        print("DIAG: claim_console_link_code exists, but the required claim_console_link name is missing")
 
     poll_payload = {"p_code": code.lower(), "p_poll_token": str(poll_token)}
     waiting, exact_poll = request_contract_rpc(
@@ -245,9 +269,12 @@ def verify_live_flow(key: str) -> list[str]:
     )
     if response_status(still_waiting) != "waiting":
         raise ContractError("a rejected claim consumed or changed the one-time code")
-    if any("consumed_at" in response for response in (created, waiting, rejected, still_waiting)):
+    responses = [created, waiting, still_waiting]
+    if rejected is not None:
+        responses.append(rejected)
+    if any("consumed_at" in response for response in responses):
         raise ContractError("obsolete consumed_at appeared in a shared RPC response")
-    print("PASS: anonymous claim is rejected and does not consume the code")
+    print("PASS: an unauthorized claim probe does not consume the code")
     return issues
 
 
