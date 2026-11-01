@@ -7,9 +7,11 @@
 الترتيب ملزم: 01 → 02 → 03 → 04 → 05 → 06 → 07 → 10
 (08 إعداد الأدمن يُنفَّذ يدوياً بعد إنشاء الحساب، و09 بوابات الدفع اختياري.)
 12_avatars.sql يضيف 25 أفاتاراً إلى site_assets (قديمة — يستبدلها 15_assets_v2.sql).
-15_assets_v2.sql في النهاية: يحذف كل الأصول القديمة (أفاتارات/ملصقات/أدوات) ويزرع الدفعة
-الجديدة (492 أصلاً في 21 قسماً حسب مجلدات المصدر) — لذا ينتهي التجهيز بالأصول الصحيحة.
-11_grants.sql في النهاية وهو إلزامي لمشاريع Supabase الجديدة (منح صلاحيات anon/authenticated).
+15_assets_v2.sql يزرع دفعة الأصول الأساسية، ثم تنظف الترحيلات اللاحقة الأفاتارات
+المجانية القديمة. 46_profile_avatar_packs.sql يستبدل Profiles بـ24 Epic ويضيف
+Profile 2 بـ11 Legendary مع إبقاء onefree وحدها مجانية. ويضيف 47 مستورد ZIP
+الجماعي الآمن والذري للوحة الإدارة.
+11_grants.sql إلزامي لمشاريع Supabase الجديدة (منح صلاحيات anon/authenticated).
 
 الاستخدام: python3 tools/build_all_in_one_sql.py
 """
@@ -52,6 +54,22 @@ ORDER = [
     "32_onefree_canonical_path.sql",
     "33_user_block.sql",
     "34_push_notifications.sql",
+    "35_push_live.sql",
+    "36_profile_stats.sql",
+    "37_profile_reports.sql",
+    "38_user_mute.sql",
+    "39_notif_revert.sql",
+    "40_admin_asset_privacy.sql",
+    # 41 is a read-only verifier for the externally shared PS4/phone contract;
+    # never include it in a schema installer or mutate that contract here.
+    "42_visible_profiles_access.sql",
+    # 43 is a production-data repair that requires an already-uploaded object;
+    # it must never run as part of a fresh all-in-one installation.
+    "44_fix_profile_asset_guard.sql",
+    "45_single_attached_free_avatar.sql",
+    "46_profile_avatar_packs.sql",
+    "47_bulk_content_import.sql",
+    "48_creator_verification_and_featured_banners.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -76,6 +94,16 @@ HEADER = """-- =================================================================
 --      → 26_fix_site_assets_sequence (صلاحية تسلسل site_assets للتسجيل عبر REST)
 --      → 27_admin_only_assets (Enchanted Bedrock · PFP 4 · أغلفة الأدمن = admin فقط)
 --      → 28_chat_cleanup (تنظيف غرف الشات: حذف/إخفاء الرسائل — أقسام اختيارية)
+--      → 40_admin_asset_privacy (أصول الأدمن لا تظهر لغيره + مخزن خاص)
+--      → 42_visible_profiles_access → 44_fix_profile_asset_guard
+--      → 45_single_attached_free_avatar → 46_profile_avatar_packs
+--      → 47_bulk_content_import (استيراد ZIP جماعي ذري وآمن للأدمن)
+--      → 48_creator_verification_and_featured_banners (بانرات جديدة + عناصر المبدعين/الأدمن)
+--  ملاحظة: 41_console_link_codes فاحص قراءة فقط لعقد PS4/الهاتف المشترك؛
+--     لا يدخل ملف التثبيت ولا يغيّر بنية الخادم.
+--  ⚠️ ارفع ملفات supabase/profile-pack-files إلى مخزن site-assets قبل تشغيل 46؛
+--     يتحقق الترحيل من الأحجام والبصمات ويرفض إنشاء أي صف ذي صورة ناقصة.
+--  (43_content_download_integrity إصلاح بيانات إنتاجية مستقل، وليس للتنصيب الجديد.)
 --  ثم بعد إنشاء حسابك من التطبيق: 08_admin_bootstrap.sql
 --  و(اختيارياً) 09_gateway_functions.sql لبوابات الدفع الإلكتروني.
 --

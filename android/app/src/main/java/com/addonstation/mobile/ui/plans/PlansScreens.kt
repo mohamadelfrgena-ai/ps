@@ -194,7 +194,7 @@ private fun PlanCard(plan: SubscriptionPlan, isCurrent: Boolean, onSelect: () ->
         )
         if (!plan.isFree) {
             GradientButton(
-                text = if (plan.id == "legendary") stringResource(R.string.plan_join_legendary)
+                text = if (plan.id == "legendary") stringResource(R.string.plan_join_legendary_plain)
                 else stringResource(R.string.plan_choose),
                 onClick = onSelect,
                 colors = listOf(accent, accent.copy(alpha = 0.7f)),
@@ -240,7 +240,7 @@ fun CheckoutScreen(
     var status by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val sentMsg = stringResource(R.string.plan_order_sent)
+    val sentMsg = stringResource(R.string.plan_order_sent_plain)
     val chooseReceipt = stringResource(R.string.plan_choose_receipt)
     val unavailable = stringResource(R.string.plan_unavailable)
 
@@ -471,115 +471,4 @@ private fun DetailLine(label: String, value: String, clipboard: androidx.compose
             )
         }
     }
-}
-
-/** «طلباتي»: المرجع، الخطة، المبلغ، الطريقة، وحالة الطلب مع سبب الرفض. */
-@Composable
-fun MyOrdersScreen(onBack: () -> Unit) {
-    val container = rememberContainer()
-    val scope = rememberCoroutineScope()
-    var orders by remember { mutableStateOf<List<PaymentOrder>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var failed by remember { mutableStateOf(false) }
-    var reloadTick by remember { mutableStateOf(0) }
-    var filter by remember { mutableStateOf("all") }
-
-    LaunchedEffect(filter, reloadTick) {
-        loading = true
-        failed = false
-        try {
-            orders = container.plans.myOrders().filter { filter == "all" || it.status == filter }
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (_: Throwable) {
-            failed = true
-        } finally {
-            loading = false
-        }
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.plan_my_orders), onBack = onBack)
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            listOf(
-                "all" to stringResource(R.string.common_all),
-                "pending" to stringResource(R.string.plan_status_pending),
-                "submitted" to stringResource(R.string.plan_status_submitted),
-                "approved" to stringResource(R.string.plan_status_approved),
-                "rejected" to stringResource(R.string.plan_status_rejected),
-            ).forEach { (key, label) ->
-                FilterChip(label = label, selected = filter == key, onClick = { filter = key })
-            }
-        }
-        if (loading) {
-            LoadingBox(text = stringResource(R.string.common_loading))
-        } else if (failed) {
-            com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
-        } else if (orders.isEmpty()) {
-            EmptyState(stringResource(R.string.common_none))
-        } else {
-            LazyColumn(
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(orders, key = { it.id }) { order ->
-                    GlassCard(padding = 12.dp) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(order.referenceCode, style = AppText.sectionTitle, color = AppColors.Text)
-                            Spacer(Modifier.weight(1f))
-                            StatusPill(order.status)
-                        }
-                        Text(
-                            "${order.planId} · ${order.amountLyd} LYD · ${order.paymentMethod}",
-                            style = AppText.bodySmall,
-                            color = AppColors.Muted,
-                        )
-                        Text(
-                            TimeFormat.dateTime(order.createdAt, Locale.getDefault()),
-                            style = AppText.tiny,
-                            color = AppColors.Dim,
-                        )
-                        order.rejectReason?.let {
-                            Text(it, style = AppText.tiny, color = AppColors.Red)
-                        }
-                        if (order.status == "pending" && order.receiptUrl == null) {
-                            Text(
-                                stringResource(R.string.plan_receipt),
-                                style = AppText.tiny,
-                                color = AppColors.Blue,
-                                modifier = Modifier.clickable { },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun StatusPill(status: String) {
-    val (label, color) = when (status) {
-        "approved" -> stringResource(R.string.plan_status_approved) to AppColors.Green
-        "rejected" -> stringResource(R.string.plan_status_rejected) to AppColors.Red
-        "submitted" -> stringResource(R.string.plan_status_submitted) to AppColors.Blue
-        else -> stringResource(R.string.plan_status_pending) to AppColors.Gold
-    }
-    Text(
-        text = label,
-        style = AppText.tiny,
-        color = color,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(color.copy(alpha = 0.14f))
-            .padding(horizontal = 9.dp, vertical = 3.dp),
-    )
 }

@@ -692,7 +692,11 @@ begin
    order by created_at desc limit 1;
 
   select exists(select 1 from public.chat_bans where user_id = v_uid and active) into v_banned;
-  select exists(select 1 from public.chat_rule_acceptances where user_id = v_uid) into v_accepted;
+  -- Keep v1 aligned with ChatRepository.COMMUNITY_RULES_VERSION; mismatches must re-accept.
+  select exists(
+    select 1 from public.chat_rule_acceptances acceptance
+     where acceptance.user_id = v_uid and acceptance.version = 'v1'
+  ) into v_accepted;
 
   return jsonb_build_object(
     'signed_in', true,

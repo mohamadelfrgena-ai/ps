@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_rule_1_plain">احترام جميع الأعضاء</string>
+    <string name="chat_rule_2_plain">لا إهانات أو مضايقات</string>
+    <string name="chat_rule_3_plain">لا عنصرية أو تمييز</string>
+    <string name="chat_rule_4_plain">لا روابط أو إعلانات مشبوهة</string>
+    <string name="chat_rule_5_plain">لا تشارك معلوماتك الشخصية</string>
+    <string name="chat_rule_6_plain">لا محتوى غير لائق</string>
+    <string name="chat_rule_7_plain">لا سياسة</string>
+    <string name="chat_rule_8_plain">قد تؤدي الانتهاكات إلى كتم الصوت أو الحظر</string>
+    <string name="chat_rules_title_plain">قواعد المجتمع</string>
+    <string name="chat_rules_list_description">٧ قواعد</string>
+</resources>

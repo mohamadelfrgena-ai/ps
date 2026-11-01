@@ -13,19 +13,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AlternateEmail
+import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Diamond
+import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.RemoveCircleOutline
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,473 +45,247 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.R
-import com.addonstation.mobile.data.model.AcTask
-import com.addonstation.mobile.data.model.AcTransaction
 import com.addonstation.mobile.data.model.ChatNotification
 import com.addonstation.mobile.data.model.CreatorTip
 import com.addonstation.mobile.data.model.FriendEntry
 import com.addonstation.mobile.ui.assetUrl
-import com.addonstation.mobile.ui.components.appLocaleCode
 import com.addonstation.mobile.ui.components.AvatarImage
-import com.addonstation.mobile.ui.components.CoinIcon
 import com.addonstation.mobile.ui.components.EmptyState
+import com.addonstation.mobile.ui.components.ErrorState
 import com.addonstation.mobile.ui.components.GhostButton
 import com.addonstation.mobile.ui.components.GlassCard
 import com.addonstation.mobile.ui.components.GradientButton
 import com.addonstation.mobile.ui.components.LoadingBox
+import com.addonstation.mobile.ui.components.LoadingPattern
+import com.addonstation.mobile.ui.components.LoadingState
+import com.addonstation.mobile.ui.components.PhoneChipRow
+import com.addonstation.mobile.ui.components.PhoneEmptyState
+import com.addonstation.mobile.ui.components.PhoneGroupLabel
+import com.addonstation.mobile.ui.components.PhoneHeaderAction
+import com.addonstation.mobile.ui.components.PhoneIconTile
+import com.addonstation.mobile.ui.components.PhoneListChip
+import com.addonstation.mobile.ui.components.PhoneListHeader
 import com.addonstation.mobile.ui.components.PixelTopBar
 import com.addonstation.mobile.ui.components.ProfileRow
 import com.addonstation.mobile.ui.components.SectionHeader
 import com.addonstation.mobile.ui.components.SubScreenHeader
+import com.addonstation.mobile.ui.components.toErrorKind
 import com.addonstation.mobile.ui.rememberContainer
 import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.AppText
+import com.addonstation.mobile.ui.theme.LocalHomePalette
 import com.addonstation.mobile.util.TimeFormat
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import java.util.Locale
 
-/** محفظة AC: الرصيد، الشرح، مهام الكسب مع زر المطالبة، وسجل المعاملات. */
-@Composable
-fun AcWalletScreen(
-    onBack: () -> Unit,
-    onOpenItem: (String) -> Unit,
-) {
-    val container = rememberContainer()
-    val scope = rememberCoroutineScope()
-    val wallet by container.state.wallet.collectAsState()
+// AC wallet screens are implemented in WalletScreens.kt.
 
-    var tasks by remember { mutableStateOf<List<AcTask>>(emptyList()) }
-    var transactions by remember { mutableStateOf<List<AcTransaction>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var message by remember { mutableStateOf<String?>(null) }
-    var messageOk by remember { mutableStateOf(true) }
-    var codeInput by remember { mutableStateOf("") }
-    var redeeming by remember { mutableStateOf(false) }
-    var detectedTier by remember { mutableStateOf<Int?>(null) }
+/** Notifications with localized, typed rows, filters, grouping, and swipe actions. */
+private enum class NotificationFilter(val key: String) { ALL("all"), ACCOUNT("account"), CHAT("chat"), CONTENT("content"), SOCIAL("social") }
 
-    val localeCode = appLocaleCode()
-    val arabic = localeCode.equals("ar", ignoreCase = true)
-    // نصوص رسائل الكود (تُقرأ خارج التزامن لأن stringResource للـComposable فقط)
-    val msgInvalid = stringResource(R.string.ac_redeem_invalid)
-    val msgUsed = stringResource(R.string.ac_redeem_used)
-    val msgExpired = stringResource(R.string.ac_redeem_expired)
-    val msgOff = stringResource(R.string.ac_redeem_off)
-    val msgExhausted = stringResource(R.string.ac_redeem_exhausted)
-    val msgSignIn = stringResource(R.string.ac_redeem_sign_in)
-    val msgSuccess = stringResource(R.string.ac_redeem_success, "%s")
-    val msgGeneric = stringResource(R.string.msg_generic_error)
-
-    val msgClaimed = stringResource(R.string.ac_claimed)
-    val msgSignInNeeded = stringResource(R.string.msg_sign_in_needed)
-
-    fun claimMessage(raw: String?): String {
-        val m = raw.orEmpty().lowercase()
-        return when {
-            m.contains("already_claimed") || m.contains("max_claims") -> msgClaimed
-            m.contains("sign_in_required") -> msgSignInNeeded
-            raw.isNullOrBlank() -> msgGeneric
-            else -> raw
-        }
-    }
-
-    fun redeemMessage(raw: String?): String {
-        val m = raw.orEmpty().lowercase()
-        return when {
-            m.contains("code_used") -> msgUsed
-            m.contains("code_expired") -> msgExpired
-            m.contains("code_inactive") -> msgOff
-            m.contains("code_exhausted") -> msgExhausted
-            m.contains("code_invalid") -> msgInvalid
-            m.contains("sign_in_required") -> msgSignIn
-            raw.isNullOrBlank() -> msgGeneric
-            else -> raw
-        }
-    }
-
-    var failed by remember { mutableStateOf(false) }
-    var reloadTick by remember { mutableStateOf(0) }
-
-    LaunchedEffect(reloadTick) {
-        loading = true
-        failed = false
-        try {
-            container.profile.refreshWallet()
-            tasks = container.ac.tasks()
-            transactions = container.ac.transactions()
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (_: Throwable) {
-            failed = true
-        } finally {
-            loading = false
-        }
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.ac_title), onBack = onBack)
-        Column(
-            Modifier
-                .fillMaxSize()
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp),
-        ) {
-            GlassCard(color = AppColors.Gold.copy(alpha = 0.08f), borderColor = AppColors.Gold.copy(alpha = 0.35f)) {
-                Text(stringResource(R.string.ac_balance), style = AppText.tiny, color = AppColors.Muted)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "${wallet?.balance ?: 0}",
-                        style = AppText.pageTitle,
-                        color = AppColors.Gold,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        CoinIcon(size = 22.dp)
-                        Text("AC", style = AppText.sectionTitle, color = AppColors.Gold)
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text("+${wallet?.totalEarned ?: 0}", style = AppText.tiny, color = AppColors.Green)
-                    Text("-${wallet?.totalSpent ?: 0}", style = AppText.tiny, color = AppColors.Red)
-                }
-                Text(stringResource(R.string.ac_desc), style = AppText.tiny, color = AppColors.Muted)
-            }
-
-            message?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    it,
-                    style = AppText.bodySmall,
-                    color = if (messageOk) AppColors.Green else AppColors.Red,
-                )
-            }
-
-            // ------------------------------------------------ كود هدية AC
-            SectionHeader(title = stringResource(R.string.ac_redeem_title))
-            GlassCard(padding = 12.dp) {
-                Text(
-                    stringResource(R.string.ac_redeem_hint),
-                    style = AppText.tiny,
-                    color = AppColors.Muted,
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = codeInput,
-                    onValueChange = { codeInput = it.filter { ch -> !ch.isWhitespace() }.take(12) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
-                    label = { Text(stringResource(R.string.ac_redeem_title)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(8.dp))
-                GradientButton(
-                    text = stringResource(R.string.ac_redeem_action),
-                    onClick = {
-                        scope.launch {
-                            redeeming = true
-                            container.ac.redeemCode(codeInput)
-                                .onSuccess { amount ->
-                                    messageOk = true
-                                    detectedTier = amount
-                                    message = msgSuccess.format("%,d".format(java.util.Locale.US, amount))
-                                    codeInput = ""
-                                    transactions = container.ac.transactions()
-                                    tasks = container.ac.tasks()
-                                }
-                                .onFailure {
-                                    messageOk = false
-                                    message = redeemMessage((it as? com.addonstation.mobile.data.ApiError)?.raw ?: it.message)
-                                }
-                            redeeming = false
-                        }
-                    },
-                    enabled = !redeeming && codeInput.length >= 4,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                // التطبيق يتعرّف على فئة الكود تلقائياً ويعرضها — لا يختار المستخدم شيئاً
-                detectedTier?.let { tier ->
-                    Spacer(Modifier.height(6.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        CoinIcon(size = 16.dp)
-                        Text(
-                            stringResource(R.string.ac_redeem_detected, "%,d".format(java.util.Locale.US, tier)),
-                            style = AppText.tiny,
-                            color = AppColors.Gold,
-                        )
-                    }
-                }
-            }
-
-            SectionHeader(title = stringResource(R.string.ac_tasks))
-            if (loading) {
-                LoadingBox()
-            } else if (failed) {
-                com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
-            } else {
-                tasks.forEach { task ->
-                    GlassCard(padding = 12.dp) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    if (arabic) task.titleAr else (task.titleEn ?: task.titleAr),
-                                    style = AppText.bodySmall,
-                                    color = AppColors.Text,
-                                )
-                                // الوصف في قاعدة البيانات عربي فقط — لا نعرضه في الواجهات غير العربية
-                                if (arabic) {
-                                    task.description?.let {
-                                        Text(it, style = AppText.tiny, color = AppColors.Muted, maxLines = 2)
-                                    }
-                                }
-                                Text(
-                                    "+${task.reward} AC · ${acFrequencyLabel(task.frequency)}",
-                                    style = AppText.tiny,
-                                    color = AppColors.Gold,
-                                )
-                            }
-                            GhostButton(
-                                text = stringResource(R.string.ac_claim),
-                                onClick = {
-                                    scope.launch {
-                                        container.ac.claimTask(task.id)
-                                            .onSuccess { reward ->
-                                                messageOk = true
-                                                message = "+$reward AC"
-                                                transactions = container.ac.transactions()
-                                            }
-                                            .onFailure {
-                                                messageOk = false
-                                                message = claimMessage(it.message)
-                                            }
-                                    }
-                                },
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-            }
-
-            SectionHeader(title = stringResource(R.string.ac_history))
-            if (transactions.isEmpty()) {
-                EmptyState(stringResource(R.string.ac_no_transactions))
-            } else {
-                transactions.forEach { tx ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(AppColors.Elevated)
-                            .padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                tx.taskId
-                                    ?.let { id -> tasks.firstOrNull { it.id == id } }
-                                    ?.let { if (arabic) it.titleAr else (it.titleEn ?: it.titleAr) }
-                                    ?: acKindLabel(tx.kind),
-                                style = AppText.bodySmall,
-                                color = AppColors.Text,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                TimeFormat.dateTime(tx.createdAt, Locale.getDefault()),
-                                style = AppText.tiny,
-                                color = AppColors.Muted,
-                            )
-                        }
-                        Text(
-                            (if (tx.amount > 0) "+" else "") + tx.amount,
-                            style = AppText.sectionTitle,
-                            color = if (tx.amount > 0) AppColors.Green else AppColors.Red,
-                        )
-                        Spacer(Modifier.padding(horizontal = 4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                            CoinIcon(size = 11.dp)
-                            Text("${tx.balanceAfter}", style = AppText.tiny, color = AppColors.Muted)
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(96.dp))
-        }
-    }
+private fun notificationFilterOf(type: String, amount: Int?): NotificationFilter = when {
+    amount != null || type in setOf("system", "plan", "payment", "subscription") -> NotificationFilter.ACCOUNT
+    type in setOf("mention", "reply", "thread", "message") -> NotificationFilter.CHAT
+    type in setOf("content", "new_content", "content_published") -> NotificationFilter.CONTENT
+    type in setOf("friend_request", "friend", "follow", "social") -> NotificationFilter.SOCIAL
+    else -> NotificationFilter.ACCOUNT
 }
 
-/** الإشعارات: طلب صداقة (مع قبول)، منشن، رد، نشاط موضوع — مع وسم «جديد». */
 @Composable
 fun NotificationsScreen(
     onBack: () -> Unit,
     onOpenChannel: (String, Long?) -> Unit,
     onOpenProfile: (String) -> Unit,
-    /** فتح إعدادات الإشعارات (الأقسام وساعات الهدوء) — زر الترس في الرأس. */
     onOpenSettings: () -> Unit = {},
 ) {
     val container = rememberContainer()
     val scope = rememberCoroutineScope()
-
-    var items by remember { mutableStateOf<List<ChatNotification>>(emptyList()) }
+    var notifications by remember { mutableStateOf<List<ChatNotification>>(emptyList()) }
     var requests by remember { mutableStateOf<List<FriendEntry>>(emptyList()) }
     var profiles by remember { mutableStateOf<Map<String, com.addonstation.mobile.data.model.Profile>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
-
     var failed by remember { mutableStateOf(false) }
+    var errorKind by remember { mutableStateOf(com.addonstation.mobile.ui.components.ErrorKind.Network) }
     var reloadTick by remember { mutableStateOf(0) }
+    var selectedFilter by remember { mutableStateOf(NotificationFilter.ALL.key) }
 
     LaunchedEffect(reloadTick) {
         loading = true
         failed = false
         try {
-            items = container.notifications.list()
+            notifications = container.notifications.list()
             requests = container.notifications.incomingFriendRequests()
-            val ids = (items.mapNotNull { it.actorId } + requests.map { it.requesterId }).toSet()
+            val ids = (notifications.mapNotNull { it.actorId } + requests.map { it.requesterId }).toSet()
             profiles = container.profile.loadProfiles(ids)
-            container.notifications.markRead()
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (_: Throwable) {
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            errorKind = error.toErrorKind()
+            android.util.Log.w("NotificationsScreen", "Notification load failed", error)
             failed = true
         } finally {
             loading = false
         }
     }
 
-    // نرفع النصوص خارج اللامبدا (قاعدة الفاحص: stringResource في لامبدا تُرفع إلى val)
-    val notifTitle = stringResource(R.string.notif_title)
+    val unread = notifications.count { !it.isRead }
+    val amountOf: (ChatNotification) -> Int? = { notification ->
+        notification.meta["amount"]?.jsonPrimitive?.intOrNull
+    }
+    val counts = remember(notifications, requests) {
+        NotificationFilter.entries.associateWith { filter ->
+            when (filter) {
+                NotificationFilter.ALL -> notifications.size + requests.size
+                NotificationFilter.SOCIAL -> notifications.count {
+                    notificationFilterOf(it.type, amountOf(it)) == filter
+                } + requests.size
+                else -> notifications.count { notificationFilterOf(it.type, amountOf(it)) == filter }
+            }
+        }
+    }
+    val visible = remember(notifications, selectedFilter) {
+        val selected = NotificationFilter.entries.firstOrNull { it.key == selectedFilter } ?: NotificationFilter.ALL
+        if (selected == NotificationFilter.ALL) notifications
+        else notifications.filter { notificationFilterOf(it.type, amountOf(it)) == selected }
+    }
+    val visibleRequests = selectedFilter == NotificationFilter.ALL.key || selectedFilter == NotificationFilter.SOCIAL.key
+    val today = stringResource(R.string.list_today)
+    val yesterday = stringResource(R.string.list_yesterday)
+    val earlier = stringResource(R.string.list_earlier)
+    val grouped = remember(visible, today, yesterday, earlier) {
+        visible.groupBy { notificationDayGroup(it.createdAt, today, yesterday, earlier) }
+    }
+    val title = stringResource(R.string.notif_title)
     val settingsLabel = stringResource(R.string.notif_settings)
+    val markAllLabel = stringResource(R.string.notif_mark_all_read)
+    val chips = listOf(
+        PhoneListChip(NotificationFilter.ALL.key, stringResource(R.string.notif_category_all), counts[NotificationFilter.ALL]),
+        PhoneListChip(NotificationFilter.ACCOUNT.key, stringResource(R.string.notif_category_account), counts[NotificationFilter.ACCOUNT]),
+        PhoneListChip(NotificationFilter.CHAT.key, stringResource(R.string.notif_category_chat), counts[NotificationFilter.CHAT]),
+        PhoneListChip(NotificationFilter.CONTENT.key, stringResource(R.string.notif_category_content), counts[NotificationFilter.CONTENT]),
+        PhoneListChip(NotificationFilter.SOCIAL.key, stringResource(R.string.notif_category_social), counts[NotificationFilter.SOCIAL]),
+    )
 
-    Column(Modifier.fillMaxSize()) {
-        PixelTopBar(
-            title = notifTitle,
-            onLogoClick = onBack,
-            showWallet = false,
-            icon = Icons.Filled.Notifications,
+    Column(Modifier.fillMaxSize().background(LocalHomePalette.current.bg)) {
+        PhoneListHeader(
+            title = title,
+            count = unread,
+            countLabel = stringResource(R.string.list_new_count, unread),
+            onBack = onBack,
             actions = {
-                // ترس التخصيص: مكانه الطبيعي داخل شاشة الإشعارات نفسها
-                Icon(
-                    Icons.Filled.Settings,
-                    contentDescription = settingsLabel,
-                    tint = AppColors.Muted,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable { onOpenSettings() },
+                PhoneHeaderAction(
+                    icon = Icons.Filled.DoneAll,
+                    contentDescription = markAllLabel,
+                    onClick = {
+                        if (unread > 0) scope.launch {
+                            container.notifications.markRead()
+                            notifications = notifications.map { it.copy(isRead = true) }
+                        }
+                    },
+                    tint = LocalHomePalette.current.blueLink,
                 )
+                PhoneHeaderAction(Icons.Filled.Settings, settingsLabel, onOpenSettings)
             },
         )
-        if (loading) {
-            LoadingBox(text = stringResource(R.string.common_loading))
-        } else if (failed) {
-            com.addonstation.mobile.ui.components.ErrorState(onRetry = { reloadTick += 1 })
-        } else if (items.isEmpty() && requests.isEmpty()) {
-            EmptyState(stringResource(R.string.notif_empty))
-        } else {
-            LazyColumn(
+        PhoneChipRow(chips, selectedFilter, { selectedFilter = it })
+        when {
+            loading -> LoadingState(
+                pattern = LoadingPattern.Skeleton,
+                onRetry = { reloadTick += 1 },
+                skeletonRows = 5,
+            )
+            failed -> ErrorState(
+                onRetry = { reloadTick += 1 },
+                kind = errorKind,
+                modifier = Modifier.weight(1f),
+            )
+            visible.isEmpty() && (!visibleRequests || requests.isEmpty()) -> PhoneEmptyState(
+                icon = Icons.Outlined.NotificationsOff,
+                color = AppColors.Blue,
+                title = stringResource(R.string.notif_empty_title),
+                body = stringResource(R.string.notif_empty_body),
+                actionText = settingsLabel,
+                onAction = onOpenSettings,
+                modifier = Modifier.weight(1f),
+            )
+            else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = 14.dp,
-                    end = 14.dp,
-                    top = 10.dp,
-                    bottom = 96.dp,
+                    start = 14.dp, end = 14.dp, top = 4.dp, bottom = 96.dp,
                 ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (requests.isNotEmpty()) {
-                    item { SectionHeader(title = stringResource(R.string.notif_friend_request), leadingEmoji = "🤝") }
-                    items(requests, key = { it.id }) { request ->
+                item(key = "swipe-hint") {
+                    Text(
+                        stringResource(R.string.list_swipe_hint),
+                        style = AppText.tiny,
+                        color = LocalHomePalette.current.textMuted,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
+                if (visibleRequests && requests.isNotEmpty()) {
+                    item(key = "request-group") { PhoneGroupLabel(today) }
+                    items(requests, key = { "request-${it.id}" }) { request ->
                         val profile = profiles[request.requesterId]
-                        GlassCard(padding = 10.dp) {
-                            com.addonstation.mobile.ui.components.ProfileRow(
-                                profile = profile,
-                                fallbackName = request.requesterId.take(6),
-                                avatarUrl = assetUrl(container, profile?.avatarUrl),
-                                onClick = { onOpenProfile(request.requesterId) },
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                GradientButton(
-                                    text = stringResource(R.string.notif_accept),
-                                    onClick = {
-                                        scope.launch {
-                                            container.notifications.respond(request.id, true)
-                                            requests = container.notifications.incomingFriendRequests()
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                )
-                                GhostButton(
-                                    text = stringResource(R.string.notif_decline),
-                                    onClick = {
-                                        scope.launch {
-                                            container.notifications.respond(request.id, false)
-                                            requests = container.notifications.incomingFriendRequests()
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(8.dp))
+                        FriendRequestNotificationRow(
+                            name = profile?.displayName?.takeIf(String::isNotBlank)
+                                ?: profile?.username ?: request.requesterId.take(8),
+                            onOpen = { onOpenProfile(request.requesterId) },
+                            onAccept = {
+                                scope.launch {
+                                    container.notifications.respond(request.id, true)
+                                    requests = requests.filterNot { it.id == request.id }
+                                }
+                            },
+                            onDecline = {
+                                scope.launch {
+                                    container.notifications.respond(request.id, false)
+                                    requests = requests.filterNot { it.id == request.id }
+                                }
+                            },
+                        )
                     }
                 }
-                items(items, key = { it.id }) { notification ->
-                    val actor = notification.actorId?.let { profiles[it] }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (notification.isRead) AppColors.Surface else AppColors.Elevated)
-                            .border(
-                                1.dp,
-                                if (notification.isRead) AppColors.Border else AppColors.Green.copy(alpha = 0.35f),
-                                RoundedCornerShape(14.dp),
-                            )
-                            .clickable {
-                                if (notification.channelId != null) {
-                                    onOpenChannel(notification.channelId!!, notification.messageId)
-                                } else if (actor != null) {
-                                    onOpenProfile(actor.id)
-                                }
-                            }
-                            .padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        AvatarImage(url = assetUrl(container, actor?.avatarUrl), size = 38.dp)
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                text = notificationBody(notification, actor?.username),
-                                style = AppText.bodySmall,
-                                color = AppColors.Text,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                TimeFormat.dateTime(notification.createdAt, Locale.getDefault()),
-                                style = AppText.tiny,
-                                color = AppColors.Muted,
+                listOf(today, yesterday, earlier).forEach { group ->
+                    val rows = grouped[group].orEmpty()
+                    if (rows.isNotEmpty()) {
+                        item(key = "group-$group") { PhoneGroupLabel(group) }
+                        items(rows, key = { "notification-${it.id}" }) { notification ->
+                            val actor = notification.actorId?.let(profiles::get)
+                            SwipeNotificationRow(
+                                notification = notification,
+                                actorName = actor?.displayName?.takeIf(String::isNotBlank)
+                                    ?: actor?.username,
+                                amount = amountOf(notification),
+                                onOpen = {
+                                    when {
+                                        notification.channelId != null -> onOpenChannel(notification.channelId, notification.messageId)
+                                        actor != null -> onOpenProfile(actor.id)
+                                    }
+                                },
+                                onRead = {
+                                    scope.launch {
+                                        container.notifications.markRead(listOf(notification.id))
+                                        notifications = notifications.map {
+                                            if (it.id == notification.id) it.copy(isRead = true) else it
+                                        }
+                                    }
+                                },
+                                onDelete = {
+                                    scope.launch {
+                                        container.notifications.delete(notification.id)
+                                        notifications = notifications.filterNot { it.id == notification.id }
+                                    }
+                                },
                             )
                         }
-                        if (!notification.isRead) {
-                            Text(
-                                stringResource(R.string.notif_new),
-                                style = AppText.tiny,
-                                color = AppColors.OnGreen,
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(AppColors.Green)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                            )
-                        }
-                        Text("←", style = AppText.bodySmall, color = AppColors.Blue)
                     }
                 }
             }
@@ -514,16 +293,204 @@ fun NotificationsScreen(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun notificationBody(notification: ChatNotification, actorName: String?): String {
-    val name = actorName ?: "—"
-    return when (notification.type) {
-        "friend_request" -> "$name · " + stringResource(R.string.notif_friend_request)
-        "mention" -> "$name · " + stringResource(R.string.notif_mention)
-        "reply" -> "$name · " + stringResource(R.string.notif_reply)
-        "thread" -> "$name · " + stringResource(R.string.notif_thread)
-        "plan", "payment" -> notification.body ?: stringResource(R.string.plan_title)
-        else -> notification.body ?: stringResource(R.string.notif_title)
+private fun SwipeNotificationRow(
+    notification: ChatNotification,
+    actorName: String?,
+    amount: Int?,
+    onOpen: () -> Unit,
+    onRead: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val dismissState = androidx.compose.material3.rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd -> scope.launch { onRead() }
+                androidx.compose.material3.SwipeToDismissBoxValue.EndToStart -> scope.launch { onDelete() }
+                else -> Unit
+            }
+            false
+        },
+    )
+    androidx.compose.material3.SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(AppColors.Elevated)
+                    .padding(horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.list_read), style = AppText.button, color = AppColors.Blue)
+                Spacer(Modifier.weight(1f))
+                Text(stringResource(R.string.common_delete), style = AppText.button, color = AppColors.Red)
+            }
+        },
+    ) {
+        NotificationCard(notification, actorName, amount, onOpen)
+    }
+}
+
+@Composable
+private fun NotificationCard(
+    notification: ChatNotification,
+    actorName: String?,
+    amount: Int?,
+    onOpen: () -> Unit,
+) {
+    val palette = LocalHomePalette.current
+    val visual = notificationVisual(notification, actorName, amount)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (notification.isRead) palette.surface else palette.blue.copy(alpha = 0.10f))
+            .border(1.dp, if (notification.isRead) palette.border else palette.blue.copy(alpha = 0.48f), RoundedCornerShape(18.dp))
+            .clickable(onClick = onOpen)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        if (!notification.isRead) {
+            Box(Modifier.width(3.dp).height(48.dp).clip(CircleShape).background(palette.blue))
+        }
+        PhoneIconTile(visual.icon, visual.color)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(visual.title, style = AppText.bodySmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold), color = palette.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(visual.subtitle, style = AppText.tiny, color = palette.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (notification.type == "mention" && notification.channelId != null) {
+                Text("@${notification.channelId}", style = AppText.tiny, color = AppColors.Purple, maxLines = 1)
+            }
+        }
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                if (!notification.isRead) Box(Modifier.size(7.dp).clip(CircleShape).background(palette.blue))
+                Text(notificationRelativeTime(notification.createdAt), style = AppText.tiny, color = palette.textMuted)
+            }
+            if (amount != null) {
+                val credit = amount >= 0
+                val color = if (credit) AppColors.Green else AppColors.Red
+                Text(
+                    (if (credit) "+" else "−") + kotlin.math.abs(amount) + " AC",
+                    style = AppText.tiny.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold),
+                    color = color,
+                    modifier = Modifier.clip(CircleShape).background(color.copy(alpha = 0.14f)).padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+private data class NotificationVisual(val title: String, val subtitle: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val color: androidx.compose.ui.graphics.Color)
+
+@Composable
+private fun notificationVisual(notification: ChatNotification, actorName: String?, amount: Int?): NotificationVisual {
+    val name = actorName ?: stringResource(R.string.role_user)
+    val type = notification.type.lowercase(Locale.ROOT)
+    return when {
+        amount != null && amount >= 0 -> NotificationVisual(
+            stringResource(R.string.notif_ac_received, amount),
+            stringResource(R.string.notif_gift_team),
+            Icons.Filled.MonetizationOn,
+            AppColors.Green,
+        )
+        amount != null -> NotificationVisual(
+            stringResource(R.string.notif_ac_deducted, kotlin.math.abs(amount)),
+            stringResource(R.string.notif_adjusted_team),
+            Icons.Filled.RemoveCircleOutline,
+            AppColors.Red,
+        )
+        type == "friend_request" -> NotificationVisual(
+            stringResource(R.string.notif_friend_request_from, name),
+            stringResource(R.string.notif_friend_help),
+            Icons.Filled.PersonAdd,
+            AppColors.Blue,
+        )
+        type == "mention" -> NotificationVisual(
+            stringResource(R.string.notif_mentioned_in, name, notification.channelId ?: "—"),
+            stringResource(R.string.notif_mention),
+            Icons.Filled.AlternateEmail,
+            AppColors.Purple,
+        )
+        type in setOf("reply", "thread", "message") -> NotificationVisual(
+            name,
+            stringResource(if (type == "reply") R.string.notif_reply else R.string.notif_thread),
+            Icons.Filled.ChatBubbleOutline,
+            AppColors.Purple,
+        )
+        type in setOf("content", "new_content", "content_published") -> NotificationVisual(
+            stringResource(R.string.notif_content_published, notification.meta["title"]?.jsonPrimitive?.contentOrNull ?: stringResource(R.string.admin_content)),
+            stringResource(R.string.notif_category_content),
+            Icons.Filled.Extension,
+            AppColors.Blue,
+        )
+        type in setOf("plan", "payment", "subscription") -> NotificationVisual(
+            stringResource(R.string.notif_plan_active, notification.meta["plan"]?.jsonPrimitive?.contentOrNull ?: stringResource(R.string.plan_epic_name)),
+            stringResource(R.string.notif_category_account),
+            Icons.Filled.Diamond,
+            AppColors.Gold,
+        )
+        else -> NotificationVisual(
+            stringResource(R.string.notif_title),
+            stringResource(R.string.notif_category_account),
+            Icons.Filled.Notifications,
+            AppColors.Blue,
+        )
+    }
+}
+
+@Composable
+private fun FriendRequestNotificationRow(
+    name: String,
+    onOpen: () -> Unit,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    val palette = LocalHomePalette.current
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.surface)
+            .border(1.dp, palette.border, RoundedCornerShape(18.dp)).clickable(onClick = onOpen).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        PhoneIconTile(Icons.Filled.PersonAdd, AppColors.Blue)
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.notif_friend_request_from, name), style = AppText.bodySmall, color = palette.text, maxLines = 2)
+            Text(stringResource(R.string.notif_friend_help), style = AppText.tiny, color = palette.textMuted, maxLines = 1)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 7.dp)) {
+                GradientButton(stringResource(R.string.notif_accept), onAccept, modifier = Modifier.weight(1f))
+                GhostButton(stringResource(R.string.notif_decline), onDecline, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+private fun notificationDayGroup(iso: String?, today: String, yesterday: String, earlier: String): String {
+    val millis = TimeFormat.parseMillis(iso) ?: return earlier
+    val now = java.util.Calendar.getInstance()
+    val then = java.util.Calendar.getInstance().apply { timeInMillis = millis }
+    val sameYear = now.get(java.util.Calendar.YEAR) == then.get(java.util.Calendar.YEAR)
+    val difference = now.get(java.util.Calendar.DAY_OF_YEAR) - then.get(java.util.Calendar.DAY_OF_YEAR)
+    return when {
+        sameYear && difference == 0 -> today
+        sameYear && difference == 1 -> yesterday
+        else -> earlier
+    }
+}
+
+private fun notificationRelativeTime(iso: String?): String {
+    val millis = TimeFormat.parseMillis(iso) ?: return "—"
+    val diff = (System.currentTimeMillis() - millis).coerceAtLeast(0L)
+    val minutes = java.util.concurrent.TimeUnit.MILLISECONDS.toMinutes(diff)
+    return when {
+        minutes < 1 -> "<1m"
+        minutes < 60 -> "${minutes}m"
+        minutes < 1_440 -> "${minutes / 60}h"
+        else -> TimeFormat.dateOnly(iso, Locale.getDefault())
     }
 }
 
@@ -540,7 +507,10 @@ fun FriendsScreen(onBack: () -> Unit, onOpenProfile: (String) -> Unit) {
     var failed by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableStateOf(0) }
 
-    LaunchedEffect(reloadTick) {
+    // حالة الدخول جزء من المفاتيح: بعد تسجيل الدخول تُعاد القوائم فوراً
+    // (كانت تبقى فارغة حتى يبدّل المستخدم شيئاً آخر).
+    val signedIn by container.state.signedIn.collectAsState()
+    LaunchedEffect(reloadTick, signedIn) {
         loading = true
         failed = false
         try {
@@ -560,7 +530,7 @@ fun FriendsScreen(onBack: () -> Unit, onOpenProfile: (String) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        SubScreenHeader(title = stringResource(R.string.profile_friends), onBack = onBack)
+        SubScreenHeader(title = stringResource(R.string.profile_friends_plain), onBack = onBack)
         if (loading) {
             LoadingBox(text = stringResource(R.string.common_loading))
         } else if (failed) {
@@ -594,7 +564,7 @@ fun FriendsScreen(onBack: () -> Unit, onOpenProfile: (String) -> Unit) {
                         }
                     }
                 }
-                item { SectionHeader(title = stringResource(R.string.profile_friends), leadingEmoji = "👥") }
+                item { SectionHeader(title = stringResource(R.string.profile_friends_plain), leadingEmoji = "👥") }
                 items(friends, key = { it.id }) { entry ->
                     val me = container.supabase.session()?.userId
                     val otherId = if (entry.requesterId == me) entry.receiverId else entry.requesterId
@@ -644,27 +614,4 @@ fun TipsList(tips: List<CreatorTip>, modifier: Modifier = Modifier) {
             }
         }
     }
-}
-
-/** وسم تكرار المهمة مترجماً (مرة واحدة · يومياً · سلسلة · من الإدارة). */
-@Composable
-private fun acFrequencyLabel(frequency: String): String = when (frequency) {
-    "daily" -> stringResource(R.string.ac_freq_daily)
-    "streak" -> stringResource(R.string.ac_freq_streak)
-    "manual" -> stringResource(R.string.ac_freq_manual)
-    else -> stringResource(R.string.ac_freq_once)
-}
-
-/** وسم نوع العملية في سجل AC بلغة التطبيق الحالية. */
-@Composable
-private fun acKindLabel(kind: String): String = when (kind) {
-    "task" -> stringResource(R.string.ac_kind_task)
-    "daily" -> stringResource(R.string.ac_kind_daily)
-    "streak" -> stringResource(R.string.ac_kind_streak)
-    "admin_reward", "admin_adjustment" -> stringResource(R.string.ac_kind_admin)
-    "unlock" -> stringResource(R.string.ac_kind_unlock)
-    "event" -> stringResource(R.string.ac_kind_event)
-    "welcome" -> stringResource(R.string.ac_kind_welcome)
-    "code" -> stringResource(R.string.ac_kind_code)
-    else -> kind
 }

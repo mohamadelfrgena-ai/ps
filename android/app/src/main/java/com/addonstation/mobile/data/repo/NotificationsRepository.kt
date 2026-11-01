@@ -13,14 +13,12 @@ class NotificationsRepository(private val supabase: SupabaseClient) {
 
     suspend fun list(limit: Int = 60): List<ChatNotification> = withContext(Dispatchers.IO) {
         val uid = supabase.session()?.userId ?: return@withContext emptyList()
-        runCatching {
-            supabase.decodeList<ChatNotification>(
-                supabase.select(
-                    "chat_notifications",
-                    "select=*&recipient_id=eq.$uid&order=created_at.desc&limit=$limit",
-                )
+        supabase.decodeList<ChatNotification>(
+            supabase.select(
+                "chat_notifications",
+                "select=*&recipient_id=eq.$uid&order=created_at.desc&limit=$limit",
             )
-        }.getOrElse { emptyList() }
+        )
     }
 
     suspend fun unreadCount(): Int = withContext(Dispatchers.IO) {
@@ -41,6 +39,14 @@ class NotificationsRepository(private val supabase: SupabaseClient) {
                 "mark_notifications_read",
                 mapOf("p_ids" to array),
             ).asOutcome().requireOk()
+            Unit
+        }
+    }
+
+    /** Delete one owned notification; RLS rejects every other recipient. */
+    suspend fun delete(id: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.delete("chat_notifications", "id=eq.$id")
             Unit
         }
     }

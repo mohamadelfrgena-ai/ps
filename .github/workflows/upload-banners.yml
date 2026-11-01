@@ -1,13 +1,13 @@
-# رفع **أغلفة الملف الشخصي (البانرات)** من ملف المالك Banner.zip
+# نشر حزمة البانرات الجديدة وحزمة التحقق المطلوبة بأمان.
 #
 # ما يفعله بالترتيب:
-#   1) ينزّل Banner.zip من المستودع العام mohamadelfrgena-ai/vae
-#   2) يرفع الصور إلى مخزن site-assets تحت banners/nature وbanners/random
-#   3) يسجّلها في site_assets عبر REST (بلا لصق SQL):
-#        40 غلافاً · required_plan = epic ⇒ مقفولة 🔒 إلا باشتراك
-#        قسمان (فقرتان): Nature 🌿 و Random 🎲
-#        animated = true لكل ملف gif ⇒ يتحرّك في المعاينة والاستخدام
-#   4) يتحقق بقراءة الصفوف من قاعدة البيانات ويطبع الأعداد
+#   1) ينزّل banner.zip وحزمة verification من مستودع المالك.
+#   2) يستخرج الأرشيفين مع منع path traversal والروابط الرمزية.
+#   3) يتحقق من قائمة الملفات والأحجام وSHA-256 ثم يرفع 56 أصلاً.
+#   4) ينقل أصول الأدمن القديمة إلى المخزن الخاص ويحذف النسخ العامة.
+#   5) يحذف ملفات Nature القديمة ويتحقق من الملفات البعيدة ويُخرج سجلاً.
+#
+# تسجيل كتالوج الأصول وصلاحيات creator/admin يتم عبر migration 48.
 #
 # الإعداد المطلوب مرة واحدة (نفس سرّي رفع الأصول):
 #   Settings → Secrets and variables → Actions:
@@ -17,12 +17,12 @@
 # التشغيل: Actions → Upload profile banners → Run workflow
 #   (mode = dry-run للتجربة · upload للرفع والتسجيل الفعلي)
 
-name: Upload profile banners
+name: Upload requested profile assets
 
 on:
   # دفعُ ملف `.upload-request` يشغّل السير تلقائياً (نفس أسلوب `.build-request`)
   push:
-    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps ]
+    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps, arena/75fb0e28-ps ]
     paths:
       - '.upload-request'
   workflow_dispatch:
@@ -73,7 +73,7 @@ jobs:
 
       - name: التحقق من وجود السرّين
         env:
-          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          S_URL: https://stbmescmexzcszyyambq.supabase.co
           S_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           if [ -z "$S_URL" ] || [ -z "$S_KEY" ]; then
@@ -82,21 +82,53 @@ jobs:
           fi
           echo "✓ السرّان موجودان (الرابط: ${S_URL%%/} · طول المفتاح: ${#S_KEY} حرفاً)"
 
-      - name: تنزيل Banner.zip
+      - name: تنزيل Banner.zip والتحقق من نوع الحزمة
+        id: package
         run: |
           set -e
           curl -fsSL -o Banner.zip "${{ steps.req.outputs.zip }}"
           ls -lh Banner.zip
           python3 - <<'PY'
-          import zipfile
+          import os, zipfile
           z = zipfile.ZipFile("Banner.zip")
           names = [n for n in z.namelist() if not n.endswith("/")]
           folders = sorted({n.split("/")[-2] for n in names if "/" in n})
           gifs = [n for n in names if n.lower().endswith(".gif")]
+          requested = any(n.endswith("06aa4e3ff6eab5eecad52378a694114a.jpg") for n in names)
           print("المجلدات (الفقرات):", folders)
-          print("عدد الصور:", len(names), "· متحرّكة gif:", len(gifs))
+          print("عدد الصور:", len(names), "· متحرّكة gif:", len(gifs), "· الحزمة الجديدة:", requested)
           assert names, "الأرشيف فارغ"
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"requested={'true' if requested else 'false'}\n")
           PY
+
+      - name: تنزيل حزمة verification واستخراج الحزمتين بأمان
+        if: ${{ steps.package.outputs.requested == 'true' }}
+        run: |
+          set -e
+          curl -fsSL -o verification.zip \
+            "https://raw.githubusercontent.com/mohamadelfrgena-ai/vae/main/45945-verification-emojigg-pack.zip"
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+
+          def safe_extract(archive, destination):
+              root = Path(destination).resolve()
+              root.mkdir(parents=True, exist_ok=True)
+              with zipfile.ZipFile(archive) as zf:
+                  for info in zf.infolist():
+                      target = (root / info.filename).resolve()
+                      if root not in target.parents and target != root:
+                          raise SystemExit(f"unsafe archive member: {info.filename}")
+                      unix_mode = info.external_attr >> 16
+                      if (unix_mode & 0o170000) == 0o120000:
+                          raise SystemExit(f"symbolic links are not allowed: {info.filename}")
+                  zf.extractall(root)
+
+          safe_extract("Banner.zip", "/tmp/requested/banner")
+          safe_extract("verification.zip", "/tmp/requested/verification")
+          PY
+          find /tmp/requested -type f -printf '%P\n' | sort
 
       - name: تنزيل أغلفة الأدمن من مستودع المالك
         if: ${{ steps.req.outputs.mode == 'admin-gifs' }}
@@ -113,7 +145,7 @@ jobs:
       - name: رفع أغلفة الأدمن + تسجيلها (admin فقط)
         if: ${{ steps.req.outputs.mode == 'admin-gifs' }}
         env:
-          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           set -o pipefail
@@ -124,7 +156,7 @@ jobs:
       - name: التسجيل فقط (الصور مرفوعة سابقاً)
         if: ${{ steps.req.outputs.mode == 'seed-only' }}
         env:
-          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           set -o pipefail
@@ -134,7 +166,7 @@ jobs:
       - name: تجربة بلا رفع (dry-run)
         if: ${{ steps.req.outputs.mode == 'dry-run' }}
         env:
-          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           python3 tools/upload_banners.py --zip Banner.zip --dry-run
@@ -142,32 +174,59 @@ jobs:
       - name: الرفع + التسجيل في القاعدة
         if: ${{ steps.req.outputs.mode == 'upload' }}
         env:
-          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
-          set -o pipefail
+          set -euo pipefail
           exec > >(tee "$GITHUB_WORKSPACE/upload-log.txt") 2>&1
-          python3 -m pip install --quiet pillow
-          python3 tools/upload_banners.py --zip Banner.zip --seed
+          if [ "${{ steps.package.outputs.requested }}" = "true" ]; then
+            BANNER_DIR="$(find /tmp/requested/banner -type f -name '06aa4e3ff6eab5eecad52378a694114a.jpg' -printf '%h\n' | head -1)"
+            test -n "$BANNER_DIR"
+            python3 tools/deploy_requested_profile_assets.py \
+              --banner-dir "$BANNER_DIR" \
+              --verification-dir /tmp/requested/verification \
+              --apply
+            # Migration 40 changed existing admin catalog paths before their
+            # bytes had been copied. Finish that pending migration and remove
+            # every legacy public admin copy. The two new admin files were
+            # uploaded directly to admin-assets by the command above.
+            set +e
+            python3 tools/migrate_admin_assets_private.py --apply
+            MIGRATE_STATUS=$?
+            set -e
+            if [ "$MIGRATE_STATUS" -ne 0 ]; then
+              SUMMARY=$(grep -E '✗|  - .*HTTP' "$GITHUB_WORKSPACE/upload-log.txt" | tail -8 | tr '\n' ';' | sed 's/%/%25/g')
+              echo "::error title=Admin asset migration::${SUMMARY:-See upload step output}"
+              exit "$MIGRATE_STATUS"
+            fi
+          else
+            python3 -m pip install --quiet pillow
+            python3 tools/upload_banners.py --zip Banner.zip --seed
+          fi
 
       - name: "تحقق: رابط عام لأول غلاف"
         if: ${{ steps.req.outputs.mode == 'upload' || steps.req.outputs.mode == 'seed-only' || steps.req.outputs.mode == 'admin-gifs' }}
         env:
-          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          S_URL: https://stbmescmexzcszyyambq.supabase.co
         run: |
           set -e
-          python3 - <<'PY' > /tmp/first_banner.txt
+          if [ "${{ steps.package.outputs.requested }}" = "true" ]; then
+            REL="banners/featured/06aa4e3ff6eab5eecad52378a694114a.jpg"
+          else
+            python3 - <<'PY' > /tmp/first_banner.txt
           import re, io
           sql = io.open("supabase/21_banners.sql", encoding="utf-8").read()
           print(re.search(r"'banners/[a-z0-9._/-]+'", sql).group(0).strip("'"))
           PY
-          REL=$(cat /tmp/first_banner.txt)
+            REL=$(cat /tmp/first_banner.txt)
+          fi
           CODE=$(curl -s -o /dev/null -w "%{http_code}" "${S_URL%/}/storage/v1/object/public/site-assets/$REL")
           echo "$REL → HTTP $CODE"
           if [ "$CODE" != "200" ]; then
-            echo "::warning::الغلاف لا يُقرأ عامّاً — تأكد أن مخزن site-assets عام وأن 05_storage.sql نُفِّذ"
+            echo "::error::الغلاف لا يُقرأ عامّاً — تأكد أن مخزن site-assets عام وأن 05_storage.sql نُفِّذ"
+            exit 1
           else
-            echo "✅ الأغلفة تعمل — افتح التطبيق: الملف الشخصي ← تعديل ← تبويب «الأغلفة 🔒»"
+            echo "✅ الأغلفة تعمل — افتح التطبيق: الملف الشخصي ← تعديل ← تبويب الأغلفة"
           fi
 
       # ── شعار AddonStation لقوالب البريد ────────────────────────────────
@@ -176,7 +235,7 @@ jobs:
       - name: رفع شعار AddonStation (mode = brand)
         if: ${{ steps.req.outputs.mode == 'brand' }}
         env:
-          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           set -o pipefail
@@ -185,15 +244,12 @@ jobs:
           echo ""
           echo "استخدم هذا الرابط في حقل الصورة داخل قوالب البريد (docs/07-EMAIL-BRANDING-AR.md)"
 
-      - name: نشر السجل في الفرع (لقراءته من أي مكان)
+      - name: حفظ سجل الرفع كمخرج للتشغيل
         if: always()
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          ls -la upload-log.txt 2>/dev/null || { echo "لا سجلّ"; exit 0; }
-          git config user.name "AddonStation CI"
-          git config user.email "ci@users.noreply.github.com"
-          git add -f upload-log.txt
-          git -c core.quotepath=false commit -m "سجل رفع الأغلفة (تشغيل ${{ github.run_id }})" || exit 0
-          git pull --rebase -X ours origin "${{ github.ref_name }}" || true
-          git push origin "HEAD:${{ github.ref_name }}" || echo "تعذّر الدفع"
-          echo "✓ السجل في upload-log.txt"
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: profile-assets-upload-log-${{ github.run_id }}
+          path: upload-log.txt
+          if-no-files-found: ignore
+          retention-days: 7

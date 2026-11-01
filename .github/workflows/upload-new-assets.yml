@@ -60,7 +60,7 @@ jobs:
 
       - name: التحقق من وجود السرّين
         env:
-          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          S_URL: https://stbmescmexzcszyyambq.supabase.co
           S_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           if [ -z "$S_URL" ] || [ -z "$S_KEY" ]; then
@@ -109,7 +109,7 @@ jobs:
       - name: تجربة بلا رفع (dry-run)
         if: ${{ inputs.mode == 'dry-run' }}
         env:
-          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           python3 tools/upload_seed_assets.py --source new-assets --dry-run
@@ -118,7 +118,7 @@ jobs:
       - name: الرفع الفعلي
         if: ${{ inputs.mode == 'upload' }}
         env:
-          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           python3 tools/upload_seed_assets.py --source new-assets
@@ -126,7 +126,7 @@ jobs:
       - name: تسجيل الأصول الجديدة في قاعدة البيانات (بلا لصق SQL)
         if: ${{ inputs.mode == 'upload' }}
         env:
-          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           set -o pipefail
@@ -135,7 +135,7 @@ jobs:
       - name: حذف الأصول القديمة من المخزن
         if: ${{ inputs.mode == 'upload' && inputs.prune == 'true' }}
         env:
-          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           python3 tools/prune_old_assets.py || echo "::warning::تعذّر حذف بعض الأصول القديمة — أكمل يدوياً من Storage"
@@ -143,7 +143,7 @@ jobs:
       - name: "تحقق بعد الرفع (ثلاثة ملفات: بروفايل + ستيكر + آيتم)"
         if: ${{ inputs.mode == 'upload' }}
         env:
-          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          S_URL: https://stbmescmexzcszyyambq.supabase.co
         run: |
           set -e
           python3 - <<'PY' > /tmp/sample_paths.txt

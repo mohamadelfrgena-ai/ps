@@ -44,10 +44,18 @@ def strip_noise(src: str) -> str:
                 i += 1
             i += 1
         elif c == "'":
+            # Kotlin char literals can contain escaped characters (for example
+            # '\\\\'); consume escapes as pairs so the escaped quote is not
+            # mistaken for the end of the literal.
             i += 1
-            while i < n and not (src[i] == "'" and src[i - 1] != "\\"):
-                i += 1
-            i += 1
+            while i < n:
+                if src[i] == "\\":
+                    i += 2
+                elif src[i] == "'":
+                    i += 1
+                    break
+                else:
+                    i += 1
         else:
             out.append(c)
             i += 1
@@ -114,6 +122,17 @@ def main() -> int:
         dupes = {i for i in imports if imports.count(i) > 1}
         for d in sorted(dupes):
             problems.append(f"استيراد مكرّر · {rel} → {d}")
+
+        # أعضاء النطاقات (RowScope/BoxScope/ColumnScope) لا تُستورد كدوال عليا:
+        # `weight` و`align` و`matchParentSize` تُنادى داخل النطاق مباشرةً.
+        # استيرادها يمنع البناء بخطأ «unresolved reference» — حدث فعلاً مرةً.
+        for imp in imports:
+            if imp in (
+                "import androidx.compose.foundation.layout.weight",
+                "import androidx.compose.foundation.layout.align",
+                "import androidx.compose.foundation.layout.matchParentSize",
+            ):
+                problems.append(f"استيراد غير صالح (عضو نطاق) · {rel} → {imp}")
 
         for n, line in enumerate(text.split("\n"), 1):
             if "TODO" in line or "FIXME" in line:

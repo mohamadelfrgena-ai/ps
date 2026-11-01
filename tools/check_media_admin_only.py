@@ -5,7 +5,7 @@
 يفشل إذا:
   • لم يكن الفحص موجوداً في send_chat_message (القاعدة الحاسمة).
   • لم يوجد المشغّل الحامي في 18_media_admin_only.sql أو لم يُدرج في الجامع.
-  • ظهر خيار الوسائط في نافذة الإرفاق بلا شرط `isAdmin`.
+  • لم تكن بطاقة الصوت/الفيديو مقفلة ومعطّلة لغير الأدمن.
   • لم يُمنع مسار اختيار الوسائط ومنتقي الملفات في الشات.
   • نقص نص `chat_media_admin_only` في أي لغة (٨ لغات) أو في ErrorText/ApiError.
 """
@@ -71,9 +71,14 @@ if not re.search(pat, guard_sql):
     problems.append("18_media_admin_only.sql: لا يعيد تعريف سياسة رفع المخزن للأدمن")
 
 # 3) التطبيق: الخيار للأدمن فقط + منع المسارين
-if not re.search(r"if \(isAdmin\) \{\s*\n\s*SheetRow\(\"🎬\", stringResource\(R\.string\.chat_attach_media\)",
-                 sheets):
-    problems.append("AttachSheet: خيار «ملف صوتي / مرئي» غير مشروط بـisAdmin")
+media_card_guarded = (
+    "title = stringResource(R.string.chat_attach_media)" in sheets
+    and "locked = !isAdmin" in sheets
+    and "lockedLabel = stringResource(R.string.chat_admin_only_short)" in sheets
+    and ".clickable(enabled = !locked, onClick = onClick)" in sheets
+)
+if not media_card_guarded:
+    problems.append("AttachSheet: بطاقة الصوت/الفيديو لا تُقفل وتُعطّل لغير الأدمن")
 if "val isAdmin = profile?.role == \"admin\"" not in screen:
     problems.append("ChatScreen: لا يحسب isAdmin من الدور (admin فقط)")
 if screen.count("if (isAdmin)") + screen.count("if (!isAdmin)") < 3:
@@ -109,7 +114,7 @@ checks = [
     ("مشغّل الحماية على الجدول", "trg_chat_media_admin_only" in guard_sql),
     ("الملف 18 داخل الجامع", "18_media_admin_only.sql" in all_in_one),
     ("رفع الوسائط للأدمن فقط في المخزن", bool(re.search(pat, storage))),
-    ("خيار الوسائط للأدمن فقط في التطبيق", "isAdmin: Boolean = false" in sheets),
+    ("بطاقة الصوت/الفيديو مقفلة لغير الأدمن", media_card_guarded),
     ("isAdmin = admin فقط (لا مشرف)", 'profile?.role == "admin"' in screen),
     ("نص المنع في 8 لغات", not missing),
 ]

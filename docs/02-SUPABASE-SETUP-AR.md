@@ -284,7 +284,7 @@ site-assets/
 ### 6.3 تحقق
 ```sql
 select asset_type, count(*) from public.site_assets group by 1 order by 1;
--- المتوقّع (بعد 15_assets_v2.sql): sticker = 193 ، item = 176 ، avatar = 123
+-- المتوقّع بعد تنظيف المجاني القديم: sticker = 193 ، item = 176 ، avatar = 66
 
 -- الأقسام كما ستراها في التطبيق:
 select collection, count(*) from public.site_assets group by 1 order by 1;

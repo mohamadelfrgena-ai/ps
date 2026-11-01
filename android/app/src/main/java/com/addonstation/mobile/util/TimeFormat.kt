@@ -63,6 +63,22 @@ object TimeFormat {
         }
     }
 
+    /**
+     * مفتاح اليوم **بالتوقيت المحلي** (مثال: ‎2026-10-07‎) — للتحقّق السريع:
+     * هل الرسالتان في يومين مختلفين؟
+     *
+     * **لماذا؟** شاشة الشات كانت تحسب [dayLabel] **مرتين لكل رسالة** في كل
+     * إعادة تركيب (سطران لكل عنصر أثناء التمرير) ⇒ آلاف العمليات في الثانية
+     * = تقطيع. الآن: حساب واحد لكل رسالة يُخزَّن في [ChatMessageUi.dayKey]،
+     * ثم مقارنة نصّية رخيصة، ولا يُبنى نصّ التاريخ إلا للفواصل نفسها (يوم واحد
+     * لكل عدة رسائل).
+     */
+    fun localDayKey(iso: String?): String {
+        val millis = parseMillis(iso) ?: return ""
+        val cal = Calendar.getInstance().apply { timeInMillis = millis }
+        return "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.MONTH) + 1}-${cal.get(Calendar.DAY_OF_MONTH)}"
+    }
+
     fun parseMillis(iso: String?): Long? {
         if (iso.isNullOrBlank()) return null
         return try {

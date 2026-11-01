@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shared loading and error states -->
+    <string name="state_refreshing">Refreshing…</string>
+    <string name="state_loading_more">Loading more…</string>
+    <string name="state_loading_slow_title">Taking longer than usual…</string>
+    <string name="state_loading_slow_body">Your connection may be slow.</string>
+    <string name="state_network_body">Check your Wi-Fi or mobile data, then try again.</string>
+    <string name="state_server_body">Our server is not responding. It is not your connection. Please try again in a moment.</string>
+    <string name="state_timeout_title">Request timed out</string>
+    <string name="state_timeout_body">The connection is too slow. Move to a better signal and try again.</string>
+    <string name="state_session_title">Your session ended</string>
+    <string name="state_session_body">For your safety you were signed out. Sign in again to continue.</string>
+    <string name="state_unexpected_body">An unexpected problem happened. Try again, and if it continues contact support.</string>
+    <string name="state_auto_retry">Retrying automatically in %1$d s</string>
+    <string name="state_trying_reconnect">Trying to reconnect…</string>
+    <string name="state_back_home">Back to Home</string>
+    <string name="state_continue_guest">Continue as guest</string>
+    <string name="state_contact_support">Contact support</string>
+    <string name="state_code">Code %1$d</string>
+    <string name="state_offline_title">You are offline</string>
+    <string name="state_saved_content">Showing saved content.</string>
+    <string name="state_back_online_title">Back online</string>
+    <string name="state_content_updated">Content updated.</string>
+    <string name="state_refresh_failed_saved">Could not refresh. Showing saved content.</string>
+    <string name="state_refresh_failed">Could not refresh</string>
+
+    <!-- Shared list labels -->
+    <string name="list_new_count">%1$d new</string>
+    <string name="list_read">Read</string>
+    <string name="list_swipe_hint">Swipe a notification to mark it as read or delete it.</string>
+    <string name="list_today">Today</string>
+    <string name="list_yesterday">Yesterday</string>
+    <string name="list_earlier">Earlier</string>
+    <string name="list_this_week">This week</string>
+    <string name="list_published">Published</string>
+    <string name="list_in_review">In review</string>
+    <string name="list_active">Active</string>
+    <string name="list_new">New</string>
+    <string name="list_reason">Reason: %1$s</string>
+
+    <!-- Notifications -->
+    <string name="notif_mark_all_read">Mark all as read</string>
+    <string name="notif_category_all">All</string>
+    <string name="notif_category_account">Account</string>
+    <string name="notif_category_chat">Chat</string>
+    <string name="notif_category_content">Content</string>
+    <string name="notif_category_social">Social</string>
+    <string name="notif_ac_received">You received %1$d AC</string>
+    <string name="notif_ac_deducted">%1$d AC were deducted</string>
+    <string name="notif_gift_team">A gift from the AddonStation team</string>
+    <string name="notif_adjusted_team">Adjusted by the team</string>
+    <string name="notif_friend_request_from">%1$s sent you a friend request</string>
+    <string name="notif_friend_help">Accept to chat and share content</string>
+    <string name="notif_mentioned_in">%1$s mentioned you in %2$s</string>
+    <string name="notif_content_published">%1$s was just published</string>
+    <string name="notif_plan_active">Your %1$s plan is active</string>
+    <string name="notif_empty_title">No notifications yet</string>
+    <string name="notif_empty_body">We will tell you about AC, friend requests, mentions and new addons and worlds.</string>
+
+    <!-- My content -->
+    <string name="my_content_empty_title">No content yet</string>
+    <string name="my_content_empty_body">Publish your first addon or world from the Creator Dashboard.</string>
+    <string name="my_content_open_dashboard">Open dashboard</string>
+    <string name="my_content_creator_only_title">My content is for creators</string>
+    <string name="my_content_creator_only_body">Apply to become a creator, then publish your own addons and worlds.</string>
+    <string name="my_content_become_creator">Become a creator</string>
+    <string name="my_content_downloads_stat">Downloads</string>
+    <string name="my_content_views_stat">Views</string>
+    <string name="my_content_rating_stat">Rating</string>
+    <string name="my_content_edit">Edit</string>
+
+    <!-- Favorites -->
+    <string name="favorites_removed">Removed from favorites</string>
+    <string name="common_undo">Undo</string>
+    <string name="favorites_empty_title">No favorites yet</string>
+    <string name="favorites_empty_body">Tap the heart on any addon or world to keep it here.</string>
+    <string name="browse_store">Browse the store</string>
+
+    <!-- Downloads -->
+    <string name="downloads_month_title">Downloads this month</string>
+    <string name="downloads_usage">%1$d / %2$d</string>
+    <string name="downloads_upgrade">Upgrade</string>
+    <string name="downloads_limit_reached">You reached your download limit for this plan</string>
+    <string name="downloads_limit_resets">The limit resets in %1$d days.</string>
+    <string name="downloads_empty_title">No downloads yet</string>
+    <string name="downloads_empty_body">Addons and worlds you download will show up here.</string>
+    <string name="downloads_again">Download again</string>
+    <string name="downloads_meta">Downloaded %1$s · %2$s</string>
+
+    <!-- Orders -->
+    <string name="orders_transfer_upload">Transfer the amount, then upload the receipt.</string>
+    <string name="orders_upload_receipt">Upload receipt</string>
+    <string name="orders_checking_receipt">We are checking your receipt.</string>
+    <string name="orders_active_until">Active until %1$s</string>
+    <string name="orders_view_plan">View plan</string>
+    <string name="orders_try_again">Try again</string>
+    <string name="orders_progress">Progress</string>
+    <string name="orders_created_step">Order created</string>
+    <string name="orders_receipt_uploaded_step">Receipt uploaded</string>
+    <string name="orders_review_step">Under review</string>
+    <string name="orders_activated_step">Plan activated</string>
+    <string name="orders_usually_hours">Usually within a few hours</string>
+    <string name="orders_amount">Amount</string>
+    <string name="orders_method">Method</string>
+    <string name="orders_transaction_reference">Transaction reference</string>
+    <string name="orders_created">Created</string>
+    <string name="orders_receipt">Receipt</string>
+    <string name="orders_view">View</string>
+    <string name="orders_empty_title">No orders yet</string>
+    <string name="orders_empty_body">When you subscribe to a plan, your orders and their status appear here.</string>
+    <string name="orders_see_plans">See plans</string>
+    <string name="orders_number">Order #%1$s</string>
+    <string name="orders_duration_days">%1$d days</string>
+</resources>
