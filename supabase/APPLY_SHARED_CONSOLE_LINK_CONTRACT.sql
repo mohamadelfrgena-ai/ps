@@ -40,9 +40,9 @@ security invoker
 set search_path = public
 as $function$
   select public.claim_console_link_code(
-    p_code,
-    p_access_token,
-    p_refresh_token
+    p_code => p_code,
+    p_access_token => p_access_token,
+    p_refresh_token => p_refresh_token
   )::jsonb;
 $function$;
 
@@ -56,13 +56,15 @@ security invoker
 set search_path = public
 as $function$
   select public.poll_console_link_code(
-    p_code,
-    p_poll_token
+    p_code => p_code,
+    p_poll_token => p_poll_token
   )::jsonb;
 $function$;
 
-revoke all on function public.claim_console_link(text, text, text) from public;
-revoke all on function public.poll_console_link(text, uuid) from public;
+revoke all on function public.claim_console_link(text, text, text)
+  from public, anon, authenticated;
+revoke all on function public.poll_console_link(text, uuid)
+  from public, anon, authenticated;
 
 grant execute on function public.claim_console_link(text, text, text) to authenticated;
 grant execute on function public.poll_console_link(text, uuid) to anon, authenticated;
@@ -76,8 +78,18 @@ notify pgrst, 'reload schema';
 
 commit;
 
--- Read-only verification. Expected result: true / true / true.
+-- Read-only verification. Every result must be true.
 select
   to_regprocedure('public.create_console_link_code(text,text)') is not null as has_create,
   to_regprocedure('public.claim_console_link(text,text,text)') is not null as has_claim,
-  to_regprocedure('public.poll_console_link(text,uuid)') is not null as has_poll;
+  to_regprocedure('public.poll_console_link(text,uuid)') is not null as has_poll,
+  has_function_privilege(
+    'authenticated',
+    'public.claim_console_link(text,text,text)',
+    'execute'
+  ) as authenticated_can_claim,
+  has_function_privilege(
+    'anon',
+    'public.poll_console_link(text,uuid)',
+    'execute'
+  ) as anon_can_poll;
