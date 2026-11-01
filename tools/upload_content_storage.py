@@ -29,9 +29,8 @@ BUCKET = "site-assets"
 
 
 def headers(key: str, content_type=None) -> dict:
-    h = {"apikey": key, "x-upsert": "true", "cache-control": "3600"}
-    if key.startswith("eyJ"):
-        h["Authorization"] = f"Bearer {key}"
+    # Both headers for every key style (new sb_… keys still want Bearer here).
+    h = {"apikey": key, "Authorization": "Bearer " + key, "x-upsert": "true", "cache-control": "3600"}
     if content_type:
         h["Content-Type"] = content_type
     return h

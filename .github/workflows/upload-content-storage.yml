@@ -69,27 +69,34 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dl
-          tags=$(python3 - <<'PY'
-          import glob, json
+          python3 - <<'PY' > /tmp/tags.txt
+          import glob, json, os
           for p in sorted(glob.glob("content-staging/*.publish.json")):
-              print(json.load(open(p))["tag"])
+              slug = os.path.basename(p)[:-len(".publish.json")]
+              tag = json.load(open(p))["tag"]
+              print(slug, tag)
           PY
-          )
-          echo "الإصدارات: $tags"
-          for tag in $tags; do
-            slug=${tag#content-}; slug=${slug%-*}
+          cat /tmp/tags.txt
+          while read -r slug tag; do
             mkdir -p "dl/$slug"
             gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir "dl/$slug" --clobber
-            echo "— $tag: $(ls "dl/$slug" | wc -l) ملف"
-          done
-          find dl -type f | sort | head -40
+            echo "— $slug ($tag): $(ls "dl/$slug" | wc -l) ملف"
+          done < /tmp/tags.txt
+          find dl -type f | sort | head -20
 
       - name: رفع إلى site-assets (content/<slug>/)
         if: ${{ steps.req.outputs.mode == 'upload' }}
         env:
           SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
-        run: python3 tools/upload_content_storage.py --src dl --verify
+        run: |
+          set -o pipefail
+          python3 tools/upload_content_storage.py --src dl --verify 2>&1 | tee /tmp/up.log || {
+            echo "::error::رفع المحتوى فشل — آخر السطور:"
+            tail -25 /tmp/up.log | sed 's/^/::error::/'
+            exit 1
+          }
+          tail -8 /tmp/up.log | sed 's/^/::notice::/'
 
       - name: جرد فقط (dry-run)
         if: ${{ steps.req.outputs.mode != 'upload' }}
