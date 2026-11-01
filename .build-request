@@ -7,6 +7,7 @@
 #   task: assets-seed     ← سجّل الأصول في القاعدة فقط (يعمل بعد تنفيذ 15_assets_v2.sql)
 #   task: assets-dry-run  ← تجربة رفع بلا كتابة
 #   task: kotlin-check    ← تصريف Kotlin للتحقق فقط، بلا APK
+#   task: console-contract-check ← فحص عقد ربط PS4/الهاتف الحي بمفتاح عام فقط
 #   task: content-diagnostic ← فحص حزمة Sulfur Cars فقط، بلا رفع أو APK
 #   task: content-repair  ← إعادة حزمة Sulfur Cars الموثوقة ورفعها، بلا APK
 #   task: profile-packs-upload ← رفع صور Profiles وProfile 2 والتحقق منها، بلا APK
@@ -44,8 +45,9 @@
 # نجح البناء في run 40406033582 وسُجّل APK عند cc8c623؛ أوقف طلب البناء.
 # طلب تصريف APK تجريبي بعد توحيد مشروع Supabase وعقد ربط PS4/الهاتف (2026-11-01).
 # نجح APK في run 41311446890 وسُجّل عند f5b630e؛ أوقف طلب البناء.
-task: none
-run: 182
+# طلب فحص حي آمن لعقد ربط PS4/الهاتف على مشروع الإنتاج (2026-11-01).
+task: console-contract-check
+run: 183
 # نجح APK الأيقونة الجديدة في run 40328311697 وسُجّل عند 657d7d6.
 # نجح تصريف إصلاح أصول الأدمن وتنقّل المصادقة في run 39490411389؛ لا طلب بناء.
 # إعادة التصريف بعد تمرير خريطة الروابط الموقّعة إلى بطاقة الإعدادات (2026-10-20).

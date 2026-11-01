@@ -7,6 +7,7 @@
 #         task: assets-upload  ← ارفع الأصول الـ311
 #         task: assets-dry-run ← تجربة رفع بلا كتابة
 #         task: profile-diagnostic ← فحص قراءة البروفايل فقط، بلا كتابة أو نشر
+#         task: console-contract-check ← فحص عقد ربط PS4/الهاتف بمفتاح عام فقط
 #         task: profile-access-fix ← تطبيق إصلاح visible_profiles المحدد والتحقق منه
 #         task: content-diagnostic ← يفحص حزمة Sulfur Cars المصدرية فقط، بلا رفع أو APK
 #         task: content-repair ← يعيد حزمة Sulfur Cars الموثوقة ويرفعها، بلا APK
@@ -49,6 +50,7 @@ on:
           - apk
           - apk-commit
           - profile-diagnostic
+          - console-contract-check
           - profile-access-fix
           - content-diagnostic
           - content-repair
@@ -90,6 +92,30 @@ jobs:
           echo "task=$TASK" >> "$GITHUB_OUTPUT"
           echo "### المهمّة المطلوبة: **$TASK** (المصدر: $SOURCE)" >> "$GITHUB_STEP_SUMMARY"
           echo "المهمّة: $TASK"
+
+  # ==========================================================================
+  # 0a) فحص عقد PS4/الهاتف الحي — مفتاح عام فقط ورمز مؤقت ينتهي تلقائياً
+  # ==========================================================================
+  console-contract-check:
+    needs: request
+    if: needs.request.outputs.task == 'console-contract-check'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify the shared production console-link contract
+        env:
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
+          SUPABASE_PUBLIC_KEY: ${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          python3 tools/check_console_contract_live.py | tee /tmp/console-contract-check.txt
+          {
+            echo "### Shared PS4/phone console-link contract"
+            echo '```text'
+            cat /tmp/console-contract-check.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ==========================================================================
   # 0b) تشخيص قراءة ملفات المستخدمين — قراءة فقط، بلا SQL أو نشر أو كتابة بيانات
