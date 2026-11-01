@@ -1,0 +1,3 @@
+# طلب رفع ملفات المحتوى إلى Supabase Storage (site-assets/content/<slug>/)
+# يقرأ السير upload-content-storage.yml هذا السطر:
+mode: upload

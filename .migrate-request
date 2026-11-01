@@ -1,6 +1,5 @@
-# One-shot Supabase request-file — the migrate-supabase.yml workflow reads this
-# and runs the requested task against the live project. Rewrite the WHOLE file
-# (a single `task:` line is picked via sed|head-1 — never append a second one).
+# One-shot Supabase request-file — migrate-supabase.yml reads this file.
+# Rewrite the WHOLE file; the FIRST `task:` line wins (sed | head -1).
 #
-# run: apply free-tier content seed (44_free_content_seed.sql) — 10 addons
+# run: apply 45_content_storage_urls.sql (content URLs -> public storage)
 task: sql

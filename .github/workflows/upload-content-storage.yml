@@ -1,0 +1,98 @@
+# نشر ملفات المحتوى (الأغلفة + حزم الإضافات) إلى Supabase Storage العام
+#
+# لماذا؟ المستودع خاص ⇒ روابط releases/download لا تعمل من PS4/الهاتف.
+# هذا السير ينزّل أصول كل إصدار content-<slug>-<version> من Releases
+# ويرفعها إلى مخزن site-assets تحت content/<slug>/<نفس-اسم-الملف>،
+# فتصبح عامة عبر:
+#   https://<ref>.supabase.co/storage/v1/object/public/site-assets/content/<slug>/<file>
+#
+# التشغيل: ادفع ملف `.content-upload-request` (يُقرأ `mode:` منه) أو Actions يدوياً.
+# السرّان المطلوبان (نفس سرّي رفع الأصول):
+#   ADDONSTATION_SUPABASE_URL · ADDONSTATION_SUPABASE_SECRET_KEY
+
+name: Upload content storage
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "الوضع: dry-run (جرد فقط) أو upload (رفع فعلي)"
+        required: true
+        default: upload
+        type: choice
+        options: [dry-run, upload]
+  push:
+    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps, arena/8379e662-ps, arena/75fb0e28-ps, arena/5622bbf6-ps ]
+    paths:
+      - '.content-upload-request'
+
+permissions:
+  contents: read
+
+jobs:
+  upload-content:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: قراءة الطلب
+        id: req
+        run: |
+          MODE="upload"
+          if [ -f .content-upload-request ]; then
+            m=$(grep -E '^mode:' .content-upload-request | head -1 | sed 's/^mode://' | tr -d ' \r')
+            [ -n "$m" ] && MODE="$m"
+          fi
+          if [ -n "${{ inputs.mode }}" ]; then MODE="${{ inputs.mode }}"; fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "⟹ الوضع: $MODE"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: التحقق من السرّين
+        env:
+          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          S_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          if [ -z "$S_URL" ] || [ -z "$S_KEY" ]; then
+            echo "::error::السرّان غير مضبوطين: ADDONSTATION_SUPABASE_URL و ADDONSTATION_SUPABASE_SECRET_KEY"
+            exit 1
+          fi
+          echo "✓ السرّان موجودان"
+
+      - name: تنزيل أصول الإصدارات
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dl
+          tags=$(python3 - <<'PY'
+          import glob, json
+          for p in sorted(glob.glob("content-staging/*.publish.json")):
+              print(json.load(open(p))["tag"])
+          PY
+          )
+          echo "الإصدارات: $tags"
+          for tag in $tags; do
+            slug=${tag#content-}; slug=${slug%-*}
+            mkdir -p "dl/$slug"
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir "dl/$slug" --clobber
+            echo "— $tag: $(ls "dl/$slug" | wc -l) ملف"
+          done
+          find dl -type f | sort | head -40
+
+      - name: رفع إلى site-assets (content/<slug>/)
+        if: ${{ steps.req.outputs.mode == 'upload' }}
+        env:
+          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: python3 tools/upload_content_storage.py --src dl --verify
+
+      - name: جرد فقط (dry-run)
+        if: ${{ steps.req.outputs.mode != 'upload' }}
+        run: |
+          echo "⟸ وضع التجربة — لا رفع. الملفات:"
+          find dl -type f -printf '%p %s\n' | sort
