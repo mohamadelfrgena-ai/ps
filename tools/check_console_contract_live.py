@@ -147,7 +147,26 @@ def verify_forbidden_rpcs(key: str) -> None:
     print("PASS: obsolete console_code_* RPC signatures are absent")
 
 
-def verify_live_flow(key: str) -> None:
+def request_contract_rpc(
+    key: str,
+    required_rpc: str,
+    legacy_rpc: str,
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any], bool]:
+    """Call the required name, using the known legacy alias only for diagnosis."""
+    try:
+        response = request_json("POST", f"/rest/v1/rpc/{required_rpc}", key, payload)
+        return as_object(response, required_rpc), True
+    except ContractError as exc:
+        detail = str(exc)
+        if "HTTP 404" not in detail or "PGRST202" not in detail or legacy_rpc not in detail:
+            raise
+        response = request_json("POST", f"/rest/v1/rpc/{legacy_rpc}", key, payload)
+        return as_object(response, legacy_rpc), False
+
+
+def verify_live_flow(key: str) -> list[str]:
+    issues: list[str] = []
     created = as_object(
         request_json(
             "POST",
@@ -182,44 +201,54 @@ def verify_live_flow(key: str) -> None:
 
     # Check the exact phone endpoint before polling so diagnostics report both
     # halves of the shared contract independently.
-    rejected = as_object(
-        request_json(
-            "POST",
-            "/rest/v1/rpc/claim_console_link",
-            key,
-            {
-                "p_code": code.lower(),
-                "p_access_token": "contract-check-invalid-access-token",
-                "p_refresh_token": "contract-check-invalid-refresh-token",
-            },
-        ),
+    claim_payload = {
+        "p_code": code.lower(),
+        "p_access_token": "contract-check-invalid-access-token",
+        "p_refresh_token": "contract-check-invalid-refresh-token",
+    }
+    rejected, exact_claim = request_contract_rpc(
+        key,
         "claim_console_link",
+        "claim_console_link_code",
+        claim_payload,
     )
     if rejected.get("ok") is not False or response_status(rejected) != "sign_in_required":
         raise ContractError("anonymous claim must return {ok:false, message:'sign_in_required'}")
-    print("PASS: claim_console_link exposes the exact phone parameter contract")
+    if exact_claim:
+        print("PASS: claim_console_link exposes the exact phone parameter contract")
+    else:
+        issues.append("claim_console_link is missing; only claim_console_link_code is available")
+        print("DIAG: claim_console_link_code works, but the required claim_console_link name is missing")
 
     poll_payload = {"p_code": code.lower(), "p_poll_token": str(poll_token)}
-    waiting = as_object(
-        request_json("POST", "/rest/v1/rpc/poll_console_link", key, poll_payload),
+    waiting, exact_poll = request_contract_rpc(
+        key,
         "poll_console_link",
+        "poll_console_link_code",
+        poll_payload,
     )
     if response_status(waiting) != "waiting":
         raise ContractError("a fresh code did not poll as waiting")
     remaining = waiting.get("expires_in_seconds")
     if not isinstance(remaining, int) or not 0 < remaining <= 600:
         raise ContractError("waiting did not return a valid expires_in_seconds")
-    print("PASS: poll_console_link accepts normalized case and reports waiting")
+    if exact_poll:
+        print("PASS: poll_console_link accepts normalized case and reports waiting")
+    else:
+        issues.append("poll_console_link is missing; only poll_console_link_code is available")
+        print("DIAG: poll_console_link_code works, but the required poll_console_link name is missing")
 
+    active_poll_rpc = "poll_console_link" if exact_poll else "poll_console_link_code"
     still_waiting = as_object(
-        request_json("POST", "/rest/v1/rpc/poll_console_link", key, poll_payload),
-        "poll_console_link",
+        request_json("POST", f"/rest/v1/rpc/{active_poll_rpc}", key, poll_payload),
+        active_poll_rpc,
     )
     if response_status(still_waiting) != "waiting":
         raise ContractError("a rejected claim consumed or changed the one-time code")
     if any("consumed_at" in response for response in (created, waiting, rejected, still_waiting)):
         raise ContractError("obsolete consumed_at appeared in a shared RPC response")
     print("PASS: anonymous claim is rejected and does not consume the code")
+    return issues
 
 
 def main() -> int:
@@ -227,8 +256,10 @@ def main() -> int:
     if configured_url != EXPECTED_URL:
         raise ContractError(f"refusing unexpected Supabase project URL: {configured_url}")
     key = public_key()
-    verify_live_flow(key)
+    issues = verify_live_flow(key)
     verify_forbidden_rpcs(key)
+    if issues:
+        raise ContractError("; ".join(issues))
     print("PASS: production PS4/phone link contract is live and compatible")
     return 0
 
