@@ -1,7 +1,6 @@
 # One-shot Supabase request-file — the migrate-supabase.yml workflow reads this
 # and runs the requested task against the live project. Rewrite the WHOLE file
-# (a single `task:` line is picked via sed|head -1 — never append a second one).
+# (a single `task:` line is picked via sed|head-1 — never append a second one).
 #
-# run 3 (fixed code-gen: no pgcrypto dependency)
-# task: one of (status | migrate | sql | up | down | verify | reset | restore | counts | auth | users | backfill | chat | health | reports)
+# run: apply free-tier content seed (44_free_content_seed.sql) — 10 addons
 task: sql
