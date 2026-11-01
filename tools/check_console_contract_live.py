@@ -180,18 +180,8 @@ def verify_live_flow(key: str) -> None:
         raise ContractError("expires_at is not approximately ten minutes in the future")
     print("PASS: create_console_link_code returns the exact ten-minute response shape")
 
-    poll_payload = {"p_code": code.lower(), "p_poll_token": str(poll_token)}
-    waiting = as_object(
-        request_json("POST", "/rest/v1/rpc/poll_console_link", key, poll_payload),
-        "poll_console_link",
-    )
-    if response_status(waiting) != "waiting":
-        raise ContractError("a fresh code did not poll as waiting")
-    remaining = waiting.get("expires_in_seconds")
-    if not isinstance(remaining, int) or not 0 < remaining <= 600:
-        raise ContractError("waiting did not return a valid expires_in_seconds")
-    print("PASS: poll_console_link accepts normalized case and reports waiting")
-
+    # Check the exact phone endpoint before polling so diagnostics report both
+    # halves of the shared contract independently.
     rejected = as_object(
         request_json(
             "POST",
@@ -207,6 +197,19 @@ def verify_live_flow(key: str) -> None:
     )
     if rejected.get("ok") is not False or response_status(rejected) != "sign_in_required":
         raise ContractError("anonymous claim must return {ok:false, message:'sign_in_required'}")
+    print("PASS: claim_console_link exposes the exact phone parameter contract")
+
+    poll_payload = {"p_code": code.lower(), "p_poll_token": str(poll_token)}
+    waiting = as_object(
+        request_json("POST", "/rest/v1/rpc/poll_console_link", key, poll_payload),
+        "poll_console_link",
+    )
+    if response_status(waiting) != "waiting":
+        raise ContractError("a fresh code did not poll as waiting")
+    remaining = waiting.get("expires_in_seconds")
+    if not isinstance(remaining, int) or not 0 < remaining <= 600:
+        raise ContractError("waiting did not return a valid expires_in_seconds")
+    print("PASS: poll_console_link accepts normalized case and reports waiting")
 
     still_waiting = as_object(
         request_json("POST", "/rest/v1/rpc/poll_console_link", key, poll_payload),
