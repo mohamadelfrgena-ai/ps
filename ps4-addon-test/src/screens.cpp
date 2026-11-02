@@ -708,8 +708,10 @@ struct AnimCall {
 std::vector<AnimCall> gAnimCalls;
 std::vector<int> gAnimRects;      // x, y, w, h quads (draw space, already clipped later)
 bool gAnimRec = true;
+bool gAnimBlock = false;   // v0.38: page animations must NOT replay over a modal
+void animBlock(bool b) { gAnimBlock = b; }
 void animPush(const AnimCall& call, int x, int y, int w, int h) {
-    if (!gAnimRec) return;
+    if (!gAnimRec || gAnimBlock) return;
     gAnimCalls.push_back(call);
     gAnimRects.push_back(x); gAnimRects.push_back(y);
     gAnimRects.push_back(w); gAnimRects.push_back(h);

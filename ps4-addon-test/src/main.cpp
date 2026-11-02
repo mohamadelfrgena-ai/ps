@@ -1154,6 +1154,11 @@ static void handle(Btn b) {
 // ---------------------------------------------------------------- drawing ---
 static void drawFrame(UiEngine& e) {
     const std::string& L = A.lang;
+    // v0.38: while a modal is open the page's focus rings must not be animation-replayed
+    // over it (they were drawing ON TOP of the sign-in dialog). The dialog's own gleams
+    // register after this block, so they keep animating normally.
+    const bool modal = A.askSignIn || A.confirmSignOut;
+    animBlock(modal);
     switch (A.scr) {
         case Scr::SignIn:   drawSignIn(e, A.focus, A.code, A.codeSecs, A.codeStatus, L, A.back != Scr::Home, A.qrView); break;
         case Scr::Home:     drawHome(e, A.focus, A.hero, A.filter, L); break;
@@ -1165,6 +1170,7 @@ static void drawFrame(UiEngine& e) {
         case Scr::Search:   drawSearch(e, A.focus, A.query, A.filter, L); break;
         case Scr::Detail:   drawAddonDetail(e, A.focus, A.detailIdx, (DemoState)A.dl.load(), A.dlPct.load(), L, A.notice); break;
     }
+    animBlock(false);
     if (A.askSignIn) drawSignInRequired(e, A.askFocus, L);
     if (A.confirmSignOut)
         drawConfirmDialog(e, tr("signout_q", L), tr("signout_sub", L), tr("settings_signout", L), tr("cancel", L), A.confirmFocus, L);
