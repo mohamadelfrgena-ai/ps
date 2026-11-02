@@ -79,6 +79,7 @@ import com.addonstation.mobile.ui.common.metaOf
 import com.addonstation.mobile.ui.common.planLabelOf
 import com.addonstation.mobile.ui.components.appLocaleCode
 import com.addonstation.mobile.ui.rememberContainer
+import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.HomePalette
 import com.addonstation.mobile.ui.theme.LocalHomePalette
 import com.addonstation.mobile.ui.theme.NunitoFont
@@ -1526,7 +1527,7 @@ private fun Modifier.homeCardShadow(palette: HomePalette, shape: RoundedCornerSh
 
 @Composable
 private fun homeBadgeFor(item: ContentItem, palette: HomePalette): Triple<String, Color, Color>? = when {
-    item.weeklyFree -> Triple(stringResource(R.string.weekly_epic_free), palette.green, palette.buttonText)
+    item.weeklyFree -> Triple(stringResource(R.string.weekly_epic_free), AppColors.Green2, palette.buttonText)
     item.plan == "legendary" -> Triple("LEGENDARY", palette.goldFill, palette.goldInk)
     item.plan == "epic" -> Triple("EPIC", palette.epic, palette.buttonText)
     item.isFeatured -> Triple("NEW", palette.blue, palette.buttonText)

@@ -924,6 +924,13 @@ private fun AdminUserRow(
     var role by remember(user.id) { mutableStateOf(user.role) }
     var expanded by remember(user.id) { mutableStateOf(false) }
     val shape = RoundedCornerShape(16.dp)
+    val roleChoices = listOf(
+        "user" to stringResource(R.string.role_user),
+        "creator" to stringResource(R.string.role_creator_plain),
+        "moderator" to stringResource(R.string.role_moderator_plain),
+        "head_moderator" to stringResource(R.string.role_head_moderator_plain),
+        "admin" to stringResource(R.string.role_admin),
+    )
 
     Column(
         Modifier
@@ -985,15 +992,7 @@ private fun AdminUserRow(
             }
             Text(stringResource(R.string.profile_roles), style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold), color = palette.textMuted)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(
-                    listOf(
-                        "user" to stringResource(R.string.role_user),
-                        "creator" to stringResource(R.string.role_creator_plain),
-                        "moderator" to stringResource(R.string.role_moderator_plain),
-                        "head_moderator" to stringResource(R.string.role_head_moderator_plain),
-                        "admin" to stringResource(R.string.role_admin),
-                    )
-                ) { (value, label) ->
+                items(roleChoices) { (value, label) ->
                     AdminFilterChip(label, role == value, { role = value }, palette, height = 36.dp)
                 }
             }
