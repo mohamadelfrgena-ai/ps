@@ -1,4 +1,5 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
+# v0.37 (2026-11-02): main line — marketplace cards + new nav sound
 TITLE       := pkg addon test
 # AddonStation PS4 — v0.23 (UI v7.3 final)
 VERSION     := 0.34
