@@ -2206,7 +2206,7 @@ void itemCover(UiEngine& e, const AddonItem& it, int x, int y, int w, int h, int
     if (gCoverReq) gCoverReq(it);
     const SDL_Color acc = it.tier == Tier::Legendary ? SDL_Color{226, 160, 40, 255} : it.tier == Tier::Epic ? kEPIC : kBLl;
     e.drawRoundGradD(x, y, w, h, r, SDL_Color{acc.r, acc.g, acc.b, 70}, kSF2);
-    const int s = std::min(w, h) * 30 / 100;
+    const int s = std::min(96, std::min(w, h) * 30 / 100);   // v0.38: never a giant ghost glyph at hero size
     glyph(e, it.isWorld ? 0 : 12, x + (w - s) / 2, y + (h - s) / 2, s, ink(70), ink(70), false);
 }
 
@@ -3021,12 +3021,20 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     const int cur = nS ? ((heroIndex % nS) + nS) % nS : 0;
     const int slide = nS ? slides[static_cast<std::size_t>(cur)] : -2;   // -1 sale, -2 empty catalog
     const AddonItem* hero = slide >= 0 ? &gCat[static_cast<std::size_t>(slide)] : nullptr;
-    // v0.38: the hero banner follows the focused card — image + name change live
+    // v0.38: the hero banner follows the focused card — image + name change live.
+    // It KEEPS the card when focus moves up to the CTA («عرض الإضافة» opens it),
+    // and hands the banner back to the carousel when a tab is focused.
     const std::vector<int> homeItems = viewItems(View::Home, filterIndex);
+    static int sFollow = -1, sFollowFilter = -2;
+    if (sFollowFilter != filterIndex) { sFollowFilter = filterIndex; sFollow = -1; }
     if (focus >= 12) {
         const std::size_t gi = static_cast<std::size_t>(focus - 12);
-        if (gi < homeItems.size()) hero = &gCat[static_cast<std::size_t>(homeItems[gi])];
+        if (gi < homeItems.size()) sFollow = homeItems[gi];
+    } else if (focus >= 2 && focus <= 11) {
+        sFollow = -1;
     }
+    if ((focus <= 1 || focus >= 12) && sFollow >= 0 && sFollow < (int)gCat.size())
+        hero = &gCat[static_cast<std::size_t>(sFollow)];
     const int cx = kCL + 20;
     const int textMax = 1180;
 
