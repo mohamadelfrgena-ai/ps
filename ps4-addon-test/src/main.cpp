@@ -1391,6 +1391,7 @@ int main(int, char**) {
             A.dirty = true;
         }
 
+        if (bakedFadeActive()) { bakedFadeReset(); A.dirty = true; }   // v0.38: banner glide ticks per frame
         const Uint32 nowMs = SDL_GetTicks();
         if (A.dirty.exchange(false)) {
             animReset();

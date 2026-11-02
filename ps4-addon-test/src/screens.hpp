@@ -201,6 +201,8 @@ void drawSignInRequired(UiEngine& e, int focus, const std::string& langCode);
 
 // ---- main screens --------------------------------------------------------------------------
 // Home focus: 0-1 hero buttons, 2-4 exclusives, 5-11 tabs, 12-16 shelf cards (viewItems(Home, filter) from scrollOf)
+bool bakedFadeActive();   // v0.38: banner crossfade running — keep the frame loop ticking
+void bakedFadeReset();
 void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std::string& langCode);
 // Deals focus: 0-4 tabs, 5-9 cards (items with a sale price, or every paid item while a sale banner is active)
 void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langCode);

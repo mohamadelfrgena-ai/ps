@@ -2073,21 +2073,58 @@ const char* pageArt(UiEngine& e, const char* primary, const char* fallback) {
 // PERFORMANCE: a page background made of full-screen art + several shade layers is composed ONCE per key
 // (screen / item / art / theme / direction) and kept as one opaque image "__bg_page"; every later frame is a
 // single straight copy (memcpy fast path) instead of ~4 full-screen alpha blends.
+static bool gBakeFade = false;
+bool bakedFadeActive() { return gBakeFade; }
+void bakedFadeReset() { gBakeFade = false; }
+
 void bakedBackdrop(UiEngine& e, const std::string& key, const std::function<void()>& paint) {
-    static std::string bakedFor;
+    // v0.38: 3-slot LRU + smooth crossfade — revisits are instant, banner
+    // changes glide (old art under, new art fading in over 240ms).
+    struct Slot { std::string key; Uint32 at = 0; };
+    static Slot slot[3];
+    static int cur = -1, prev = -1;
+    static Uint32 fadeAt = 0;
     const std::string want = key + (gLight ? "|L" : "|D");
-    if (bakedFor == want && e.hasImage("__bg_page")) { e.drawImage("__bg_page", 0, 0, 1920, 1080); return; }
-    e.clear(kBG);
-    paint();
-    const auto& fb = e.framebuffer();
-    std::vector<std::uint8_t> rgba(fb.size() * 4);
-    for (std::size_t i = 0; i < fb.size(); ++i) {
-        const std::uint32_t px = fb[i];
-        rgba[i * 4] = static_cast<std::uint8_t>(px >> 16); rgba[i * 4 + 1] = static_cast<std::uint8_t>(px >> 8);
-        rgba[i * 4 + 2] = static_cast<std::uint8_t>(px); rgba[i * 4 + 3] = 255;
+    int found = -1;
+    for (int i = 0; i < 3; ++i) if (slot[i].key == want) { found = i; break; }
+    if (found < 0) {
+        int tgt = -1;
+        for (int i = 0; i < 3; ++i) if (i != cur && slot[i].key.empty()) { tgt = i; break; }
+        if (tgt < 0) for (int i = 0; i < 3; ++i) if (i != cur && (tgt < 0 || slot[i].at < slot[tgt].at)) tgt = i;
+        if (tgt < 0) tgt = (cur + 1) % 3;
+        e.clear(kBG);
+        paint();
+        const auto& fb = e.framebuffer();
+        std::vector<std::uint8_t> rgba(fb.size() * 4);
+        for (std::size_t i = 0; i < fb.size(); ++i) {
+            const std::uint32_t px = fb[i];
+            rgba[i * 4] = static_cast<std::uint8_t>(px >> 16); rgba[i * 4 + 1] = static_cast<std::uint8_t>(px >> 8);
+            rgba[i * 4 + 2] = static_cast<std::uint8_t>(px); rgba[i * 4 + 3] = 255;
+        }
+        e.addImageRGBA("__bg_" + std::to_string(tgt), 1920, 1080, rgba.data());
+        slot[tgt].key = want;
+        slot[tgt].at = SDL_GetTicks();
+        prev = (cur >= 0 && cur != tgt) ? cur : -1;
+        cur = tgt;
+        fadeAt = SDL_GetTicks();
+        found = tgt;
+    } else {
+        if (found != cur) { prev = cur; cur = found; fadeAt = SDL_GetTicks(); }
+        slot[found].at = SDL_GetTicks();
     }
-    e.addImageRGBA("__bg_page", 1920, 1080, rgba.data());
-    bakedFor = want;
+    const Uint32 el = SDL_GetTicks() - fadeAt;
+    const Uint32 DUR = 240;
+    const std::string cn = "__bg_" + std::to_string(cur);
+    gBakeFade = false;
+    if (prev >= 0 && el < DUR && !slot[prev].key.empty()) {
+        gBakeFade = true;
+        e.drawImage("__bg_" + std::to_string(prev), 0, 0, 1920, 1080);
+        float t = (float)el / (float)DUR;
+        t = t * t * (3.f - 2.f * t);   // smoothstep — the glide
+        e.drawImage(cn, 0, 0, 1920, 1080, (Uint8)(t * 255.f));
+    } else {
+        e.drawImage(cn, 0, 0, 1920, 1080);
+    }
 }
 // Sale art as the full-screen backdrop (same look as the featured hero). 16:9 art fills 1920x1080 exactly —
 // nothing is cut. Taller art (16:10) is fitted to the screen width and anchored at the top (only the very bottom
@@ -2982,12 +3019,18 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     const int cur = nS ? ((heroIndex % nS) + nS) % nS : 0;
     const int slide = nS ? slides[static_cast<std::size_t>(cur)] : -2;   // -1 sale, -2 empty catalog
     const AddonItem* hero = slide >= 0 ? &gCat[static_cast<std::size_t>(slide)] : nullptr;
+    // v0.38: the hero banner follows the focused card — image + name change live
+    const std::vector<int> homeItems = viewItems(View::Home, filterIndex);
+    if (focus >= 12) {
+        const std::size_t gi = static_cast<std::size_t>(focus - 12);
+        if (gi < homeItems.size()) hero = &gCat[static_cast<std::size_t>(homeItems[gi])];
+    }
     const int cx = kCL + 20;
     const int textMax = 1180;
 
     int ctaY = 476;
     std::string b0, b1;
-    if (slide == -1) {
+    if (!hero && slide == -1) {
         // ---- sale: the season artwork is the full-screen backdrop (whole 16:9 image), text on the leading side ----
         const std::string art = saleArt(e, "hero");
         const bool baked = !art.empty() && saleArtHasTitle(art);
@@ -3017,38 +3060,39 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     } else if (hero) {
         // ---- featured / exclusive / newest item: its own cover full-bleed (covers are 16:9) ----
         const AddonItem& h = *hero;
-        bakedBackdrop(e, "home|item|" + h.id + (!h.cover.empty() && e.hasImage(h.cover) ? "|1" : "|0") + (L.rtl ? "|R" : "|N"), [&] {
-            backdrop(e);
-            itemCover(e, h, 0, 0, 1920, 1080, 0);
-            leadShade(e, L, 1080, false);
-            bottomShade(e);
-            e.fillGradV(0, 0, 1920, 150, shade(140), shade(0));
-        });
         std::string kick;
         if (sale && onSale(h)) kick = saleKicker(lang) + "  \xC2\xB7  " + saleTitle(lang);
         else {
             if (h.exclusive) kick = tr("exclusive", lang) + "  \xC2\xB7  ";
             kick += isNewItem(h) ? tr("newest_k", lang) : tr(h.isWorld ? "type_world" : "type_addon", lang);
         }
-        kickerText(e, L, cx, 150, kick, kGD);
-        bigTitle(e, L, h.title, cx, textMax, 186, L.rtl ? 96 : 112, false);
         const std::string lead = !h.description.empty() ? h.description : (h.creator.empty() ? std::string() : tr("by", lang) + " " + h.creator);
-        if (!lead.empty()) paragraphAt(e, L, lead, cx, std::min(820, textMax), 330, 25, kCHIPTX, 2, 10);
-        {   // meta row — only real values: downloads · rating · category · type
-            int mx = cx;
-            const int my = 420;
-            auto item = [&](void (*ic)(UiEngine&, int, int, int, SDL_Color), SDL_Color icc, const std::string& t, SDL_Color tc) {
-                if (ic) { ic(e, L.X(mx, 22), my + 1, 22, icc); mx += 30; }
-                const int tw = textW(e, L, t, 21);
-                boxText(e, L, t, mx, tw + 4, my, 21, tc);
-                mx += tw + 30;
-            };
-            if (h.downloads > 0) item(icDownloadArrow, kCHIPTX, fmtCompact(h.downloads), kTX);
-            if (h.ratingCount > 0) { char b[16]; std::snprintf(b, sizeof b, "%.1f", h.rating); item(icStar, kGD, b, kTX); }
-            std::string ct = (!h.category.empty() && h.category != "other") ? h.category + "  \xC2\xB7  " : std::string();
-            ct += tr(h.isWorld ? "type_world" : "type_addon", lang);
-            item(nullptr, kMU, ct, kCHIPTX);
-        }
+        // v0.38: hero text bakes WITH the art (incl. lang + sale state) so banner changes glide
+        bakedBackdrop(e, "home|item|" + h.id + (!h.cover.empty() && e.hasImage(h.cover) ? "|1" : "|0") + (L.rtl ? "|R" : "|N") + "|" + lang + (sale ? "|S" : ""), [&] {
+            backdrop(e);
+            itemCover(e, h, 0, 0, 1920, 1080, 0);
+            leadShade(e, L, 1080, false);
+            bottomShade(e);
+            e.fillGradV(0, 0, 1920, 150, shade(140), shade(0));
+            kickerText(e, L, cx, 150, kick, kGD);
+            bigTitle(e, L, h.title, cx, textMax, 186, L.rtl ? 96 : 112, false);
+            if (!lead.empty()) paragraphAt(e, L, lead, cx, std::min(820, textMax), 330, 25, kCHIPTX, 2, 10);
+            {   // meta row — only real values: downloads · rating · category · type
+                int mx = cx;
+                const int my = 420;
+                auto mitem = [&](void (*ic)(UiEngine&, int, int, int, SDL_Color), SDL_Color icc, const std::string& t, SDL_Color tc) {
+                    if (ic) { ic(e, L.X(mx, 22), my + 1, 22, icc); mx += 30; }
+                    const int tw = textW(e, L, t, 21);
+                    boxText(e, L, t, mx, tw + 4, my, 21, tc);
+                    mx += tw + 30;
+                };
+                if (h.downloads > 0) mitem(icDownloadArrow, kCHIPTX, fmtCompact(h.downloads), kTX);
+                if (h.ratingCount > 0) { char b[16]; std::snprintf(b, sizeof b, "%.1f", h.rating); mitem(icStar, kGD, b, kTX); }
+                std::string ct = (!h.category.empty() && h.category != "other") ? h.category + "  \xC2\xB7  " : std::string();
+                ct += tr(h.isWorld ? "type_world" : "type_addon", lang);
+                mitem(nullptr, kMU, ct, kCHIPTX);
+            }
+        });
         b0 = tr("view_addon", lang);
     } else {
         // ---- empty catalog: no templates, just a calm welcome ----
@@ -3112,7 +3156,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     // ---- tabs (focus 5-11) + shelf (focus 12-16): newest first ----
     tabRow(e, L, cx, 636, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang), tr("chip_free", lang),
                            tr("chip_epic", lang), tr("chip_legendary", lang), tr("chip_new", lang)}, filterIndex, 5, focus);
-    cardGrid(e, L, viewItems(View::Home, filterIndex), scrollOf(View::Home), 12, focus, cx, 684, kCR - cx, 1010, lang, sale);
+    cardGrid(e, L, homeItems, scrollOf(View::Home), 12, focus, cx, 684, kCR - cx, 1010, lang, sale);
 
     std::vector<std::pair<std::string, std::string>> leg = {{"\xE2\x9C\x95", "select"}, {"\xE2\x96\xB3", "search"}};
     if (nS > 1) { leg.push_back({"L2", "prev_offer"}); leg.push_back({"R2", "next_offer"}); }
