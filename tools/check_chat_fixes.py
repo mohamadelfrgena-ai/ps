@@ -55,18 +55,19 @@ else:
 # تحميل الغرفة: لا تنتظر بيانات تزيينية/إيصالات القراءة كي تُعرض الرسائل.
 load_initial = vm[vm.find("private suspend fun loadInitial("):vm.find("private fun startRealtime(")]
 rows.append(("الرسائل والتفضيل المحلي يُقرآن بالتوازي",
-             "async { container.chat.messages(channelId, limit = 100) }" in load_initial
+             "async { container.chat.messages(channelId, limit = PAGE_SIZE) }" in load_initial
              and "val muted = async" in load_initial))
 rows.append(("يختفي skeleton قبل جلب الملفات والتفاعلات",
              "_loading.value = false\n\n        visible.maxByOrNull" in load_initial
              and "loadInitialMetadata(channelId, visible, byId)" in load_initial))
 rows.append(("إيصالات القراءة لا تحجب أول عرض للرسائل",
-             "scope.launch {\n                runCatching { container.chat.markRead(channelId, readId) }" in load_initial))
+             "enqueueReadReceipt(channelId, lastReadId)" in load_initial
+             and vm.find("private fun enqueueReadReceipt(") > vm.find("_loading.value = false")))
 rows.append(("قائمة الحظر والكتم تُحدَّث بعد جلب الصفحة الأولى",
-             vm.find("runCatching { loadInitial(channel.id) }") < vm.find("refreshAccessFilters(channel.id)")))
+             vm.find("loadInitial(channel.id)") < vm.find("refreshAccessFilters(channel.id)")))
 rows.append(("الكتم/الحظر يطبّقان على الصفحة الأولى والرسائل الأقدم",
              "it.userId in _blockedIds.value || it.userId in cachedMutedIds" in vm
-             and "filterNot { it.userId in _blockedIds.value || it.userId in _mutedIds.value }" in vm))
+             and "it.userId in _blockedIds.value || it.userId in _mutedIds.value" in vm))
 rows.append(("metadata قديم لا يستبدل تفاعلاً حديثاً",
              "reactionChangeRevision" in vm and "reactionWasChanged" in vm))
 

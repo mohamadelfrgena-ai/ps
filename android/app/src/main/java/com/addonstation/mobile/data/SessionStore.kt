@@ -22,7 +22,16 @@ import com.addonstation.mobile.data.model.Session
  */
 class SessionStore(context: Context) {
 
-    private val prefs: SharedPreferences = create(context)
+    private val appContext = context.applicationContext
+
+    /**
+     * إنشاء MasterKey وEncryptedSharedPreferences قد يوقظ Android Keystore
+     * ويقرأ XML. إبقاؤه lazy ينقل هذه الكلفة من أول إطار إلى مسار استعادة
+     * الجلسة الذي يعمل أصلاً على Dispatchers.IO أثناء شاشة البداية.
+     */
+    private val prefs: SharedPreferences by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        create(appContext)
+    }
 
     /** نسخة الجلسة الحالية في الذاكرة — تُقرأ في كل نداء بلا لمس القرص. */
     @Volatile

@@ -118,7 +118,7 @@ rows = [
     ("المبدعون بطلب واحد", "created_by,content_type,downloads_count" in creators),
     ("ذاكرة TTL مشتركة", "class TtlCache<T>" in ttl and "suspend fun <T> through(" in ttl),
     ("الرئيسية تُبذر من الذاكرة", all(x in home for x in ("cachedFeatured()", "cachedCreators()"))),
-    ("لا مؤقّت فوق بيانات موجودة", "loading && featured.isEmpty()" in home),
+    ("لا مؤقّت فوق بيانات موجودة", "loading && latestShown.isEmpty()" in home),
 ]
 for name, ok in rows:
     print(f"{name:<40} | {'✅' if ok else '❌'}")

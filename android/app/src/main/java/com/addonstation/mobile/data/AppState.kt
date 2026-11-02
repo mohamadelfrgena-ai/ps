@@ -10,9 +10,12 @@ import com.addonstation.mobile.data.model.StickerPack
 import com.addonstation.mobile.data.model.SubscriptionPlan
 import com.addonstation.mobile.data.model.UnreadCount
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 
 /**
  * حالة التطبيق المشتركة: الملف الشخصي، المحفظة، الخطط، طرق الدفع، الأصول، الإشعارات.
@@ -35,7 +38,10 @@ class AppState(private val container: AppContainer) {
     private val _profileLoadStatus = MutableStateFlow(ProfileLoadStatus.IDLE)
     val profileLoadStatus: StateFlow<ProfileLoadStatus> = _profileLoadStatus.asStateFlow()
 
-    private val _signedIn = MutableStateFlow(container.supabase.isSignedIn())
+    // لا نفتح Android Keystore على خيط الواجهة أثناء إنشاء Application.
+    // مسار الإقلاع يقرأ الجلسة على Dispatchers.IO ثم يحدّث هذه الحالة قبل
+    // انكشاف الشاشة التي تُبنى خلف شاشة البداية.
+    private val _signedIn = MutableStateFlow(false)
     val signedIn: StateFlow<Boolean> = _signedIn.asStateFlow()
 
     private val _wallet = MutableStateFlow<AcWallet?>(null)
@@ -252,7 +258,25 @@ class AppState(private val container: AppContainer) {
         _loadError.value = error
     }
 
-    /** إعادة تحميل كل ما يعتمد على المستخدم الحالي. */
+    /** نفّذ طلب بدء اختياري من دون أن يحوّل فشل خدمة واحدة إلى فشل الإقلاع كله. */
+    private suspend fun refreshSafely(block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (cancelled: CancellationException) {
+            // مهلة الإقلاع وإغلاق الشاشة يجب أن يلغيا OkHttp والعمل التابع فوراً.
+            throw cancelled
+        } catch (_: Throwable) {
+            // لكل شاشة حالة إعادة محاولة؛ نبقي بقية بيانات البدء قابلة للتحميل.
+        }
+    }
+
+    /**
+     * إعادة تحميل كل ما يعتمد على المستخدم الحالي.
+     *
+     * الملف والمحفظة والخطط والدفع وحالة الشات وعدّادات القراءة مستقلة. كانت
+     * تُطلب بالتتابع (ست رحلات شبكة)، فتساوي مدة الإقلاع مجموع أزمنتها. الآن
+     * تبدأ معاً تحت supervisorScope، مع بقاء فشل كل واحدة معزولاً عن البقية.
+     */
     suspend fun refreshAll() {
         val repos = container
         if (!repos.supabase.isSignedIn()) {
@@ -260,11 +284,13 @@ class AppState(private val container: AppContainer) {
             return
         }
         setSignedIn(true)
-        runCatching { repos.profile.refreshProfile() }
-        runCatching { repos.profile.refreshWallet() }
-        runCatching { repos.plans.loadPlans() }
-        runCatching { repos.plans.loadPaymentMethods() }
-        runCatching { repos.chat.refreshMyStatus() }
-        runCatching { repos.chat.refreshUnread() }
+        supervisorScope {
+            launch { refreshSafely { repos.profile.refreshProfile() } }
+            launch { refreshSafely { repos.profile.refreshWallet() } }
+            launch { refreshSafely { repos.plans.loadPlans() } }
+            launch { refreshSafely { repos.plans.loadPaymentMethods() } }
+            launch { refreshSafely { repos.chat.refreshMyStatus() } }
+            launch { refreshSafely { repos.chat.refreshUnread() } }
+        }
     }
 }

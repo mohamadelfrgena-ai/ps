@@ -1,5 +1,6 @@
 package com.addonstation.mobile.ui.chat
 
+import android.os.SystemClock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -33,7 +34,17 @@ import kotlinx.serialization.json.decodeFromJsonElement
 class ChatViewModel(private val container: AppContainer) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var openJob: Job? = null
     private var pollJob: Job? = null
+    private var mutedUsersJob: Job? = null
+    private var readJob: Job? = null
+    private var typingJob: Job? = null
+    private var olderJob: Job? = null
+    private var pendingReadId = 0L
+    private var lastSyncedReadId = 0L
+    private var lastTypingSentAt = 0L
+    private var olderCursorId: Long? = null
+    private var reachedOldestPage = false
 
     /** هل شاشة الشات معروضة الآن؟ (الاستطلاع يتوقّف تماماً في الخلفية) */
     @Volatile
@@ -121,6 +132,15 @@ class ChatViewModel(private val container: AppContainer) {
 
     fun open(channel: ChatChannel) {
         if (_channel.value?.id != channel.id) {
+            readJob?.cancel()
+            typingJob?.cancel()
+            olderJob?.cancel()
+            pendingReadId = 0L
+            lastSyncedReadId = 0L
+            lastReadId = 0L
+            lastTypingSentAt = 0L
+            olderCursorId = null
+            reachedOldestPage = false
             _pinned.value = emptyList()
             _online.value = 0
             _newMessagesBelow.value = false
@@ -132,11 +152,13 @@ class ChatViewModel(private val container: AppContainer) {
             reactionChangeRevision.clear()
         }
         _channel.value = channel
-        scope.launch {
+        openJob?.cancel()
+        openJob = scope.launch {
             _loading.value = true
-            // Keep the local mute cache live, but don't make the message request
-            // wait for any moderation/profile round trip.
-            scope.launch {
+            // Keep exactly one local-mute collector for this model. Re-opening a
+            // room must not leave another infinite DataStore collector behind.
+            mutedUsersJob?.cancel()
+            mutedUsersJob = scope.launch {
                 container.prefs.mutedUsers.collect { ids ->
                     if (_channel.value?.id == channel.id && ids != _mutedIds.value) {
                         val previouslyMuted = _mutedIds.value
@@ -149,7 +171,13 @@ class ChatViewModel(private val container: AppContainer) {
 
             // Render the first page as soon as it arrives. Profiles, reactions,
             // read receipts and moderation refreshes continue in the background.
-            runCatching { loadInitial(channel.id) }
+            try {
+                loadInitial(channel.id)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                // Full-screen error state remains available; Realtime may still recover.
+            }
             if (_channel.value?.id != channel.id) return@launch
             _loading.value = false
             startRealtime(channel.id)
@@ -163,7 +191,7 @@ class ChatViewModel(private val container: AppContainer) {
         // Local mute state and network messages are read concurrently; the
         // local cache therefore does not add a network round trip to the skeleton.
         val (list, cachedMutedIds) = coroutineScope {
-            val messages = async { container.chat.messages(channelId, limit = 100) }
+            val messages = async { container.chat.messages(channelId, limit = PAGE_SIZE) }
             val muted = async {
                 runCatching { container.prefs.readMutedUsers() }.getOrDefault(_mutedIds.value)
             }
@@ -172,6 +200,8 @@ class ChatViewModel(private val container: AppContainer) {
         if (_channel.value?.id != channelId) return
 
         _mutedIds.value = cachedMutedIds
+        olderCursorId = list.firstOrNull()?.id
+        reachedOldestPage = list.size < PAGE_SIZE
         lastReadId = list.lastOrNull()?.id ?: 0L
         val visible = list.filterNot { it.userId in _blockedIds.value || it.userId in cachedMutedIds }
         val byId = visible.associateBy { it.id }
@@ -203,11 +233,7 @@ class ChatViewModel(private val container: AppContainer) {
         loadInitialMetadata(channelId, visible, byId)
 
         if (container.supabase.session() != null) {
-            val readId = lastReadId
-            scope.launch {
-                runCatching { container.chat.markRead(channelId, readId) }
-                runCatching { container.chat.refreshUnread() }
-            }
+            enqueueReadReceipt(channelId, lastReadId)
         }
     }
 
@@ -322,6 +348,28 @@ class ChatViewModel(private val container: AppContainer) {
         if (visible.size != current.size) _messages.value = visible
     }
 
+    /**
+     * دمج إشعارات القراءة المتكررة الناتجة عن snapshotFlow/التمرير في طلب واحد.
+     * لا نعيد RPC للمعرّف نفسه، ونرسل أعلى معرّف وصل خلال نافذة قصيرة فقط.
+     */
+    private fun enqueueReadReceipt(channelId: String, messageId: Long) {
+        if (messageId <= 0L || messageId <= lastSyncedReadId) return
+        pendingReadId = maxOf(pendingReadId, messageId)
+        if (readJob?.isActive == true) return
+        readJob = scope.launch {
+            delay(READ_RECEIPT_DEBOUNCE_MS)
+            while (_channel.value?.id == channelId && pendingReadId > lastSyncedReadId) {
+                val target = pendingReadId
+                container.chat.markRead(channelId, target)
+                if (_channel.value?.id != channelId) return@launch
+                lastSyncedReadId = maxOf(lastSyncedReadId, target)
+                runCatching { container.chat.refreshUnread() }
+                if (pendingReadId <= lastSyncedReadId) break
+                delay(READ_RECEIPT_DEBOUNCE_MS)
+            }
+        }
+    }
+
     private fun startRealtime(channelId: String) {
         container.realtime.close()
         realtimeHealthy = false
@@ -387,8 +435,16 @@ class ChatViewModel(private val container: AppContainer) {
         if (_messages.value.any { it.message.id == message.id }) return
         if (message.userId in _blockedIds.value) return          // محظور: لا يظهر
         if (message.userId in _mutedIds.value) return            // مكتوم عندي: لا يظهر
-        val ui = toUi(message)
-        _messages.value = _messages.value + ui
+        // أظهر السجل فور وصول Realtime؛ الاسم/التفاعلات بيانات تزيينية تُدمج
+        // لاحقاً بطلب مجمّع، فلا تنتظر الرسالة الجديدة ثلاث رحلات شبكة.
+        val ui = toUiCached(message)
+        val updated = _messages.value + ui
+        _messages.value = updated
+        loadInitialMetadata(
+            channelId,
+            listOf(message),
+            updated.associate { it.message.id to it.message },
+        )
         ChatPeek.note(
             message.channelId,
             message.createdAt,
@@ -441,10 +497,20 @@ class ChatViewModel(private val container: AppContainer) {
                         message.userId !in _mutedIds.value &&
                         list.none { it.message.id == message.id }
                     ) {
-                        mapped += toUi(message)
+                        mapped += toUiCached(message)
                     }
                 }
-                if (mapped.isNotEmpty() || list !== current) _messages.value = list + mapped
+                if (mapped.isNotEmpty() || list !== current) {
+                    val updated = list + mapped
+                    _messages.value = updated
+                    if (mapped.isNotEmpty()) {
+                        loadInitialMetadata(
+                            channelId,
+                            mapped.map { it.message },
+                            updated.associate { it.message.id to it.message },
+                        )
+                    }
+                }
                 mapped.lastOrNull()?.let { lastUi ->
                     val last = lastUi.message
                     ChatPeek.note(
@@ -466,36 +532,86 @@ class ChatViewModel(private val container: AppContainer) {
         }
     }
 
-    private suspend fun toUi(message: ChatMessage): ChatMessageUi {
-        val profiles = _authors.value.toMutableMap()
-        if (profiles[message.userId] == null) {
-            profiles.putAll(loadAuthorProfiles(listOf(message.userId)))
-            _authors.value = profiles
+    /** بناء فوري من الذاكرة فقط؛ [loadInitialMetadata] يملأ البيانات الاختيارية لاحقاً. */
+    private fun toUiCached(message: ChatMessage): ChatMessageUi {
+        val authors = _authors.value
+        val reply = message.replyToId?.let { id ->
+            _messages.value.firstOrNull { it.message.id == id }?.message
         }
-        val reply = message.replyToId?.let { id -> _messages.value.firstOrNull { it.message.id == id }?.message }
-        val reactions = container.chat.reactionsFor(listOf(message.id))[message.id] ?: emptyMap()
-        val mine = container.chat.myReactionsFor(listOf(message.id))
-            .filter { it.first == message.id }.map { it.second }.toSet()
         return ChatMessageUi(
             message = message,
-            author = profiles[message.userId],
+            author = authors[message.userId],
             replyTo = reply,
-            replyAuthorName = reply?.let { profiles[it.userId]?.username },
-            reactions = reactions,
-            myReactions = mine,
+            replyAuthorName = reply?.let { authors[it.userId]?.username },
         )
     }
 
     fun loadOlder() {
         val channel = _channel.value ?: return
-        val firstId = _messages.value.firstOrNull()?.message?.id ?: return
-        scope.launch {
-            val older = container.chat.messages(channel.id, beforeId = firstId, limit = 100)
-                .filterNot { it.userId in _blockedIds.value || it.userId in _mutedIds.value }
-            if (older.isEmpty()) return@launch
-            val profiles = loadAuthorProfiles(older.map { it.userId })
-            _authors.value = _authors.value + profiles
-            _messages.value = older.map { toUi(it) } + _messages.value
+        val beforeId = olderCursorId ?: return
+        if (reachedOldestPage || olderJob?.isActive == true) return
+
+        olderJob = scope.launch {
+            try {
+                val page = container.chat.messages(channel.id, beforeId = beforeId, limit = PAGE_SIZE)
+                if (_channel.value?.id != channel.id) return@launch
+                if (page.isEmpty()) {
+                    reachedOldestPage = true
+                    return@launch
+                }
+                olderCursorId = page.first().id
+                reachedOldestPage = page.size < PAGE_SIZE
+
+                val older = page.filterNot {
+                    it.userId in _blockedIds.value || it.userId in _mutedIds.value
+                }
+                if (older.isEmpty()) return@launch
+
+                // صفحة من 100 رسالة كانت تستدعي reactions + myReactions لكل
+                // رسالة (حتى 200 طلب). الآن ثلاثة طلبات مجمّعة ومتوازية فقط.
+                val messageIds = older.map { it.id }
+                val (profiles, reactions, myReactions) = coroutineScope {
+                    val profileRequest = async { loadAuthorProfiles(older.map { it.userId }) }
+                    val reactionsRequest = async {
+                        runCatching { container.chat.reactionsFor(messageIds) }.getOrDefault(emptyMap())
+                    }
+                    val mineRequest = async {
+                        runCatching { container.chat.myReactionsFor(messageIds) }.getOrDefault(emptySet())
+                    }
+                    Triple(profileRequest.await(), reactionsRequest.await(), mineRequest.await())
+                }
+                if (_channel.value?.id != channel.id) return@launch
+
+                val authors = _authors.value + profiles
+                _authors.value = authors
+                val mineByMessage = mutableMapOf<Long, MutableSet<String>>()
+                myReactions.forEach { (messageId, emoji) ->
+                    mineByMessage.getOrPut(messageId) { linkedSetOf() }.add(emoji)
+                }
+                val current = _messages.value
+                val allById = (older + current.map { it.message }).associateBy { it.id }
+                val existingIds = current.asSequence().map { it.message.id }.toHashSet()
+                val mapped = older
+                    .asSequence()
+                    .filterNot { it.id in existingIds }
+                    .map { message ->
+                        val reply = message.replyToId?.let(allById::get)
+                        ChatMessageUi(
+                            message = message,
+                            author = authors[message.userId],
+                            replyTo = reply,
+                            replyAuthorName = reply?.let { authors[it.userId]?.username },
+                            reactions = reactions[message.id].orEmpty(),
+                            myReactions = mineByMessage[message.id].orEmpty(),
+                        )
+                    }
+                    .toList()
+                if (mapped.isNotEmpty()) _messages.value = mapped + current
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                // يبقى موضع القائمة كما هو، ويمكن للمستخدم إعادة المحاولة بالتمرير.
+            }
         }
     }
 
@@ -808,19 +924,25 @@ class ChatViewModel(private val container: AppContainer) {
 
     fun notifyTyping() {
         val channel = _channel.value ?: return
-        scope.launch { container.chat.setTyping(channel.id) }
+        if (!screenActive || typingJob?.isActive == true) return
+        val wait = (lastTypingSentAt + TYPING_REFRESH_MS - SystemClock.elapsedRealtime())
+            .coerceAtLeast(0L)
+        typingJob = scope.launch {
+            if (wait > 0L) delay(wait)
+            if (screenActive && _channel.value?.id == channel.id) {
+                container.chat.setTyping(channel.id)
+                lastTypingSentAt = SystemClock.elapsedRealtime()
+            }
+        }
     }
 
     fun markReadUpToBottom() {
         val channel = _channel.value ?: return
-        val last = _messages.value.lastOrNull()?.message?.id ?: return
+        val last = _messages.value.lastOrNull { it.message.id > 0L }?.message?.id ?: return
         lastReadId = maxOf(lastReadId, last)
         _newMessagesBelow.value = false
         _newDividerId.value = null
-        scope.launch {
-            container.chat.markRead(channel.id, lastReadId)
-            container.chat.refreshUnread()
-        }
+        enqueueReadReceipt(channel.id, lastReadId)
     }
 
     fun loadPinned(channelId: String) {
@@ -843,9 +965,20 @@ class ChatViewModel(private val container: AppContainer) {
     }
 
     fun close() {
+        openJob?.cancel()
         pollJob?.cancel()
+        mutedUsersJob?.cancel()
+        readJob?.cancel()
+        typingJob?.cancel()
+        olderJob?.cancel()
         container.realtime.close()
         _online.value = 0
         scope.cancel()
+    }
+
+    private companion object {
+        const val PAGE_SIZE = 100
+        const val READ_RECEIPT_DEBOUNCE_MS = 300L
+        const val TYPING_REFRESH_MS = 4_000L
     }
 }

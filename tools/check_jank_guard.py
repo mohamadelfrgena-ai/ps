@@ -25,6 +25,10 @@
      تظهر في كل تشغيل. الشريط يجمع مراحل الإقلاع الفعلية مع حدّ زمني أدنى،
      وينتظر الجاهزية أو انتهاء المهلة، مع نبض متحرك وتخطي صريح واحترام تقليل الحركة.
 
+  7) الاستجابة العامة: لا Keystore/DataStore حاجب في إنشاء Application، طلبات
+     OkHttp قابلة للإلغاء، بيانات الإقلاع متوازية، TTL يمنع الطلبات المتطابقة،
+     والكتابة/إيصالات القراءة وصفحات الشات مجمّعة لا تولّد مئات الطلبات.
+
 الاستخدام:
     python3 tools/check_jank_guard.py        # 0 = سليم · 1 = عاد أحد الأسباب
 """
@@ -155,9 +159,48 @@ for token in ("val refresh = async", "val assets = async", "val plans = async", 
     if token not in nav:
         problems.append(f"ui/nav/AppNav.kt: تحميل الإقلاع المتوازي مفقود ({token})")
 
+# 7) لا حجب عند البدء + شبكة قابلة للإلغاء + تجميع الطلبات المتكررة
+container = read("data/AppContainer.kt")
+client = read("data/SupabaseClient.kt")
+ttl = read("data/repo/TtlCache.kt")
+vm = read("ui/chat/ChatViewModel.kt")
+if "runBlocking" in code_lines(container) or "runBlocking" in code_lines(client):
+    problems.append("data: عاد runBlocking إلى مسار التطبيق")
+if "by lazy(LazyThreadSafetyMode.SYNCHRONIZED)" not in store:
+    problems.append("data/SessionStore.kt: إنشاء المخزن المشفّر ليس lazy")
+if "private val _signedIn = MutableStateFlow(false)" not in state:
+    problems.append("data/AppState.kt: عادت قراءة الجلسة/Keystore أثناء إنشاء الحالة")
+for token, description in (
+    ("supervisorScope", "طلبات بيانات الإقلاع ليست متوازية ومعزولة"),
+    ("launch { refreshSafely { repos.profile.refreshProfile() } }", "الملف لا يبدأ بالتوازي"),
+    ("launch { refreshSafely { repos.chat.refreshUnread() } }", "عدادات الشات لا تبدأ بالتوازي"),
+):
+    if token not in state:
+        problems.append(f"data/AppState.kt: {description}")
+for token, description in (
+    ("private suspend fun executeRequest", "جسر OkHttp القابل للإلغاء مفقود"),
+    ("continuation.invokeOnCancellation { call.cancel() }", "إلغاء coroutine لا يلغي المقبس"),
+    ("var response = executeRequest(builder.build())", "طلبات REST ما زالت حاجبة"),
+):
+    if token not in client:
+        problems.append(f"data/SupabaseClient.kt: {description}")
+if "singleFlight" not in ttl or "SystemClock.elapsedRealtime()" not in ttl:
+    problems.append("data/repo/TtlCache.kt: منع الطلب المتطابق/الساعة الرتيبة مفقود")
+for token, description in (
+    ("TYPING_REFRESH_MS", "إشعار الكتابة غير محدود المعدّل"),
+    ("enqueueReadReceipt", "إيصالات القراءة غير مدمجة"),
+    ("olderJob?.isActive", "تحميل الصفحة الأقدم يمكن أن يتكرر بالتوازي"),
+    ("container.chat.reactionsFor(messageIds)", "تفاعلات الصفحة الأقدم ليست مجمّعة"),
+    ("private fun toUiCached", "رسالة Realtime تنتظر metadata قبل الظهور"),
+):
+    if token not in vm:
+        problems.append(f"ui/chat/ChatViewModel.kt: {description}")
+if "val allItems = remember(latest, featured, recommended)" not in home:
+    problems.append("ui/home/HomeScreen.kt: اشتقاقات القوائم تُعاد مع كل تركيب")
+
 print("حارس الأداء (Jank Guard)")
 print("-" * 52)
-print(f"فُحص: Common · SessionStore · AppEnv · AppState · Home · Chat · Splash · AppNav")
+print("فُحص: Session/HTTP/TTL · AppState · Home · Chat · Splash · AppNav · الصور")
 print()
 if problems:
     for p in problems:
@@ -166,4 +209,5 @@ if problems:
     sys.exit(1)
 print("🟢 لا توليف فرعي في القوائم · الجلسة من الذاكرة · فهرس أدوات O(1) ·")
 print("   الرئيسية كسولة · فاصل التاريخ مرة واحدة · حركة البداية قصيرة ومحدودة بلا حلقات،")
-print("   الكلمات المترجمة ثابتة في الوسط · الشريط يعكس مراحل الإقلاع الفعلية · والوجهة تُركّب بعد هدوء الحركة.")
+print("   الكلمات المترجمة ثابتة في الوسط · الشبكة قابلة للإلغاء · الإقلاع متوازٍ ·")
+print("   وطلبات الذاكرة/الكتابة/القراءة وصفحات الشات مدمجة بلا تكرار.")

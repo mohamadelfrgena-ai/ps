@@ -192,25 +192,39 @@ fun HomeScreen(
         }
     }
 
-    val creatorNames = creators.associate { it.profile.id to (it.profile.username ?: it.profile.displayName ?: "") }
+    // هذه القوائم قد تضم عشرات العناصر، بينما المحفظة/الملف يعيدان تركيب الرأس.
+    // نحسب الاشتقاقات فقط حين تتغيّر مصادرها أو الفلتر، لا مع كل إعادة تركيب.
+    val creatorNames = remember(creators) {
+        creators.associate { it.profile.id to (it.profile.username ?: it.profile.displayName ?: "") }
+    }
     fun creatorNameOf(item: ContentItem): String? =
         item.createdBy?.let { creatorNames[it] }?.takeIf(String::isNotBlank)
 
-    val allItems = (latest + featured + recommended).distinctBy { it.id }
-    val latestSource = if (chip == ChipFilter.Favorites) favorites else latest
-    val latestShown = latestSource.filter { chip == ChipFilter.Favorites || chip.accepts(it) }
-    val downloadedSource = if (chip == ChipFilter.Favorites) favorites else allItems
-    val downloaded = downloadedSource
-        .filter { chip == ChipFilter.Favorites || chip.accepts(it) }
-        .sortedByDescending { it.downloadsCount }
-        .take(6)
-    val favoriteCreatorIds = favorites.mapNotNull { it.createdBy }.toSet()
-    val exclusiveItems = allItems.filter { it.isExclusive }.distinctBy { it.id }
-    val recommendedShown = if (chip == ChipFilter.Favorites) favorites else recommended.filter { chip.accepts(it) }
-    val creatorsShown = when (chip) {
-        ChipFilter.Favorites -> creators.filter { it.profile.id in favoriteCreatorIds }
-        ChipFilter.Addons, ChipFilter.Worlds -> creators.filter { it.profile.isCreator }
-        ChipFilter.All -> creators
+    val allItems = remember(latest, featured, recommended) {
+        (latest + featured + recommended).distinctBy { it.id }
+    }
+    val latestShown = remember(latest, favorites, chip) {
+        val source = if (chip == ChipFilter.Favorites) favorites else latest
+        source.filter { chip == ChipFilter.Favorites || chip.accepts(it) }
+    }
+    val downloaded = remember(allItems, favorites, chip) {
+        val source = if (chip == ChipFilter.Favorites) favorites else allItems
+        source
+            .filter { chip == ChipFilter.Favorites || chip.accepts(it) }
+            .sortedByDescending { it.downloadsCount }
+            .take(6)
+    }
+    val favoriteCreatorIds = remember(favorites) { favorites.mapNotNull { it.createdBy }.toSet() }
+    val exclusiveItems = remember(allItems) { allItems.filter { it.isExclusive }.distinctBy { it.id } }
+    val recommendedShown = remember(recommended, favorites, chip) {
+        if (chip == ChipFilter.Favorites) favorites else recommended.filter { chip.accepts(it) }
+    }
+    val creatorsShown = remember(creators, favoriteCreatorIds, chip) {
+        when (chip) {
+            ChipFilter.Favorites -> creators.filter { it.profile.id in favoriteCreatorIds }
+            ChipFilter.Addons, ChipFilter.Worlds -> creators.filter { it.profile.isCreator }
+            ChipFilter.All -> creators
+        }
     }
 
     Column(modifier.fillMaxSize().background(palette.bg)) {

@@ -241,10 +241,17 @@ fun AppRoot(
         startupProgress = 0.04f
         try {
             withTimeoutOrNull(10_000L) {
-                val signedIn = withContext(Dispatchers.IO) {
-                    val hasSession = container.auth.isSignedIn()
-                    if (hasSession) container.auth.ensureFreshSession()
-                    hasSession
+                container.awaitConfigLoaded()
+                configured = container.isConfigured
+                startupProgress = 0.10f
+                if (!configured) return@withTimeoutOrNull
+
+                val signedIn = withContext(Dispatchers.IO) { container.auth.isSignedIn() }
+                // انشر وجود الجلسة فور قراءة المخزن، قبل أي شبكة؛ فإذا انتهت
+                // مهلة التجديد لا تنقلب الواجهة إلى وضع الضيف خطأً.
+                container.state.setSignedIn(signedIn)
+                if (signedIn) {
+                    withContext(Dispatchers.IO) { container.auth.ensureFreshSession() }
                 }
                 startupProgress = 0.18f
 

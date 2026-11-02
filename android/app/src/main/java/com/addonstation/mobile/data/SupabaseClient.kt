@@ -2,10 +2,10 @@ package com.addonstation.mobile.data
 
 import com.addonstation.mobile.data.model.AuthUser
 import com.addonstation.mobile.data.model.Session
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -177,6 +177,8 @@ class SupabaseClient(
             val access = obj["access_token"]?.jsonPrimitive?.contentOrNull() ?: return false
             storeSession(obj, access, fallbackEmail = current.email)
             true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Throwable) {
             // لا نمسح جلسة الحساب ولا نُخرجه تلقائياً عند أي فشل في التجديد.
             false
@@ -682,10 +684,39 @@ class SupabaseClient(
 
     // ------------------------------------------------------------------ HTTP
 
-    private data class UploadHttpResult(val code: Int, val body: String)
+    private data class HttpResult(val code: Int, val body: String) {
+        val isSuccessful: Boolean get() = code in 200..299
+    }
+
+    /**
+     * جسر OkHttp غير حاجب: لا يحتل خيط Dispatchers.IO أثناء انتظار الشبكة،
+     * وإلغاء coroutine (مثل مهلة الإقلاع) يلغي المقبس فوراً بدلاً من انتظار
+     * مهلة HTTP التي قد تصل إلى 90 ثانية.
+     */
+    private suspend fun executeRequest(request: Request): HttpResult =
+        suspendCancellableCoroutine { continuation ->
+            val call = http.newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, error: IOException) {
+                    if (continuation.isActive) continuation.resumeWithException(error)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    try {
+                        val result = response.use {
+                            HttpResult(it.code, it.body?.string().orEmpty())
+                        }
+                        if (continuation.isActive) continuation.resume(result)
+                    } catch (error: Throwable) {
+                        if (continuation.isActive) continuation.resumeWithException(error)
+                    }
+                }
+            })
+        }
 
     /** Async OkHttp bridge: coroutine cancellation immediately cancels a long upload socket. */
-    private suspend fun executeLargeUpload(request: Request): UploadHttpResult =
+    private suspend fun executeLargeUpload(request: Request): HttpResult =
         suspendCancellableCoroutine { continuation ->
             val call = largeUploadHttp.newCall(request)
             continuation.invokeOnCancellation { call.cancel() }
@@ -697,7 +728,7 @@ class SupabaseClient(
                 override fun onResponse(call: Call, response: Response) {
                     try {
                         val result = response.use {
-                            UploadHttpResult(it.code, it.body?.string().orEmpty())
+                            HttpResult(it.code, it.body?.string().orEmpty())
                         }
                         if (continuation.isActive) continuation.resume(result)
                     } catch (error: Throwable) {
@@ -735,20 +766,16 @@ class SupabaseClient(
             "DELETE" -> builder.delete(body)
         }
 
-        var response = withContext(Dispatchers.IO) { http.newCall(builder.build()).execute() }
-        if (response.code == 401 && allowRefresh && token != null) {
-            response.close()
-            if (refreshSession()) {
-                val fresh = sessionStore.current()?.accessToken
-                val retry = builder.header("Authorization", "Bearer ${fresh ?: cfg.anonKey}").build()
-                response = withContext(Dispatchers.IO) { http.newCall(retry).execute() }
-            }
+        var response = executeRequest(builder.build())
+        if (response.code == 401 && allowRefresh && token != null && refreshSession()) {
+            val fresh = sessionStore.current()?.accessToken
+            val retry = builder.header("Authorization", "Bearer ${fresh ?: cfg.anonKey}").build()
+            response = executeRequest(retry)
         }
-        return response.use { res ->
-            val text = res.body?.string().orEmpty()
-            if (!res.isSuccessful) throw apiErrorFromMessage(extractMessage(text), res.code)
-            text
+        if (!response.isSuccessful) {
+            throw apiErrorFromMessage(extractMessage(response.body), response.code)
         }
+        return response.body
     }
 
     private fun extractMessage(text: String): String {
@@ -762,9 +789,6 @@ class SupabaseClient(
             text.take(300)
         }
     }
-
-    /** استدعاء متزامن للاستخدام داخل الـ Application (مثل تحديث الجلسة عند الإقلاع). */
-    fun refreshBlocking(): Boolean = runBlocking { refreshSession() }
 
     private fun JsonPrimitive.contentOrNull(): String? =
         if (this is JsonNull) null else content.takeIf { it.isNotBlank() && it != "null" }

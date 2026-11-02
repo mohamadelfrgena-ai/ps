@@ -13,7 +13,11 @@ import com.addonstation.mobile.data.repo.NotificationsRepository
 import com.addonstation.mobile.data.repo.PlansRepository
 import com.addonstation.mobile.data.repo.ProfileRepository
 import com.addonstation.mobile.data.repo.PushRepository
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * حاوية التطبيق (Service Locator بسيط): تحمل عميل Supabase وكل المستودعات.
@@ -27,7 +31,10 @@ class AppContainer(context: Context) {
     val realtime = RealtimeHolder()
 
     @Volatile
-    private var config: SupabaseConfig? = null
+    private var config: SupabaseConfig? = SupabaseConfig.fromBuild.takeIf { it.isConfigured }
+
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val configLoaded = CompletableDeferred<Unit>()
 
     val supabase: SupabaseClient = SupabaseClient({ config }, sessionStore)
     val realtimeClient: SupabaseRealtime = SupabaseRealtime(supabase)
@@ -50,18 +57,43 @@ class AppContainer(context: Context) {
     val assets = AssetsRepository(supabase, state)
 
     init {
-        config = SupabaseConfig.fromBuild.takeIf { it.isConfigured }
-            ?: runBlocking {
-                val (url, key) = prefs.readSupabase()
-                SupabaseConfig(url, key).takeIf { it.isConfigured }
+        if (config != null) {
+            configLoaded.complete(Unit)
+        } else {
+            // بناء Application لا ينتظر DataStore. AppRoot ينتظر هذه الإشارة
+            // داخل coroutine الإقلاع، بينما يبقى أول إطار حراً للرسم.
+            applicationScope.launch {
+                try {
+                    val (url, key) = prefs.readSupabase()
+                    config = SupabaseConfig(url, key).takeIf { it.isConfigured }
+                } catch (_: Throwable) {
+                    // تلف تفضيل محلي لا يمنع شاشة الإعداد من الظهور.
+                    config = null
+                } finally {
+                    configLoaded.complete(Unit)
+                }
             }
+        }
+    }
+
+    /** انتظر تحميل إعداد أول تشغيل من القرص، إن لم تكن إعدادات البناء جاهزة. */
+    suspend fun awaitConfigLoaded() {
+        configLoaded.await()
     }
 
     val isConfigured: Boolean get() = config?.isConfigured == true
 
     fun saveConfig(url: String, anonKey: String) {
-        runBlocking { prefs.setSupabase(url, anonKey) }
-        config = SupabaseConfig(url.trim().trimEnd('/'), anonKey.trim())
+        val normalized = SupabaseConfig(url.trim().trimEnd('/'), anonKey.trim())
+        config = normalized
+        // تحديث الذاكرة فوري كي تنتقل الواجهة بلا تجمّد؛ الحفظ تسلسلي في الخلفية.
+        applicationScope.launch {
+            try {
+                prefs.setSupabase(normalized.url, normalized.anonKey)
+            } catch (_: Throwable) {
+                // تبقى الإعدادات الحالية صالحة في الذاكرة؛ يمكن إعادة الحفظ لاحقاً.
+            }
+        }
     }
 
     fun currentConfig(): SupabaseConfig? = config
