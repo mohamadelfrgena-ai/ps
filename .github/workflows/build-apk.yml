@@ -8,6 +8,7 @@
 #         task: assets-dry-run ← تجربة رفع بلا كتابة
 #         task: profile-diagnostic ← فحص قراءة البروفايل فقط، بلا كتابة أو نشر
 #         task: console-contract-check ← فحص عقد ربط PS4/الهاتف بمفتاح عام فقط
+#         task: console-claim-diagnostic ← فحص صلاحيات مطالبة الهاتف قراءةً فقط
 #         task: profile-access-fix ← تطبيق إصلاح visible_profiles المحدد والتحقق منه
 #         task: content-diagnostic ← يفحص حزمة Sulfur Cars المصدرية فقط، بلا رفع أو APK
 #         task: content-repair ← يعيد حزمة Sulfur Cars الموثوقة ويرفعها، بلا APK
@@ -51,6 +52,7 @@ on:
           - apk-commit
           - profile-diagnostic
           - console-contract-check
+          - console-claim-diagnostic
           - profile-access-fix
           - content-diagnostic
           - content-repair
@@ -124,7 +126,41 @@ jobs:
           exit "$code"
 
   # ==========================================================================
-  # 0b) تشخيص قراءة ملفات المستخدمين — قراءة فقط، بلا SQL أو نشر أو كتابة بيانات
+  # 0b) تشخيص مطالبة ربط الهاتف — قراءة بيانات الدوال والصلاحيات فقط
+  # ==========================================================================
+  console-claim-diagnostic:
+    needs: request
+    if: needs.request.outputs.task == 'console-claim-diagnostic'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect authenticated console-claim grants without reading user data
+        env:
+          PROJECT_REF: stbmescmexzcszyyambq
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.ADDONSTATION_SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set +e
+          set -o pipefail
+          python3 tools/diagnose_console_claim_backend.py 2>&1 | tee /tmp/console-claim-diagnostic.txt
+          code=${PIPESTATUS[0]}
+          {
+            echo "### Authenticated console-claim diagnostic"
+            echo '```text'
+            cat /tmp/console-claim-diagnostic.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=Console claim::$line"
+          done < /tmp/console-claim-diagnostic.txt
+          if [ "$code" -ne 0 ]; then
+            detail=$(tail -12 /tmp/console-claim-diagnostic.txt | tr '\n' '|' | cut -c1-900)
+            echo "::error title=Console claim diagnostic failed::$detail"
+          fi
+          exit "$code"
+
+  # ==========================================================================
+  # 0c) تشخيص قراءة ملفات المستخدمين — قراءة فقط، بلا SQL أو نشر أو كتابة بيانات
   # ==========================================================================
   profile-diagnostic:
     needs: request
@@ -152,7 +188,7 @@ jobs:
           done < /tmp/profile-diagnostic.txt
 
   # ==========================================================================
-  # 0c) إصلاح قراءة visible_profiles المحدد — لا يشغّل أي بناء أو نشر آخر
+  # 0d) إصلاح قراءة visible_profiles المحدد — لا يشغّل أي بناء أو نشر آخر
   # ==========================================================================
   profile-access-fix:
     needs: request
@@ -193,7 +229,7 @@ jobs:
           exit "$code"
 
   # ==========================================================================
-  # 0d) فحص/استعادة حزمة Sulfur Cars من إصدار GitHub العام الموثوق.
+  # 0e) فحص/استعادة حزمة Sulfur Cars من إصدار GitHub العام الموثوق.
   #     content-diagnostic للقراءة فقط؛ content-repair يحوّل ويرفع الملف، وكلاهما بلا APK.
   # ==========================================================================
   content-diagnostic:
