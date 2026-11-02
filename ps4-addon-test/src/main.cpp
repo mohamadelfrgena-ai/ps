@@ -224,6 +224,24 @@ static void applyAccountFromSession() {
     setAccount(a);
 }
 
+#ifdef AS_BUILD_2121
+// v0.36 build "2121": pre-signed test account (isolated build flavour ONLY).
+// The credentials appear only here and in supabase/48_test_account.sql — never in chat.
+static void autoSignIn2121() {
+    const AuthLogin r = callEmailLogin(gCfg, "test@gmail.com", "Test-2121-PS4");
+    if (!r.ok || r.accessToken.empty()) return;
+    std::lock_guard<std::mutex> lk(gSessionMx);
+    if (gSession.valid) return;
+    gSession.valid = true;
+    gSession.userId = r.userId;
+    gSession.username = r.email;
+    gSession.displayName = r.displayName.empty() ? std::string("test@gmail.com") : r.displayName;
+    gSession.accessToken = r.accessToken;
+    gSession.refreshToken = r.refreshToken;
+    saveLinkSession(gSession);
+}
+#endif
+
 static void loadWalletHistory() {
     if (!gSession.valid || gSession.userId.empty()) return;
     std::vector<WalletTx> tx;
@@ -1206,6 +1224,9 @@ int main(int, char**) {
     // ---- background data loading (runs while the splash is on screen) ----
     gSession = loadLinkSession();
     std::thread([]() {
+#ifdef AS_BUILD_2121
+        if (!gSession.valid) autoSignIn2121();   // 2121 build: sign in the test account (background)
+#endif
         loadCatalogNow();
         loadBannerNow();
         loadPlansNow();

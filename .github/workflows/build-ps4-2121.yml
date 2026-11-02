@@ -1,0 +1,95 @@
+name: Build 2121 (isolated test pkg)
+
+# Isolated test build — NEVER runs with the main storefront work.
+# Output: ps4/downloads/2121.pkg — title "2121", pre-signed test account
+# (AS_BUILD_2121). Trigger: .build-2121-request marker (or this file) only.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - arena/2f6505fc-ps
+      - arena/5622bbf6-ps
+    paths:
+      - '.build-2121-request'
+      - '.github/workflows/build-ps4-2121.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-2121:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out the selected branch
+        uses: actions/checkout@v4
+
+      - name: Install host compiler and tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld make curl
+
+      - name: Download OpenOrbis toolchain and SDL2
+        env:
+          TOOLCHAIN_URL: https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/openorbis"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "$TOOLCHAIN_URL" -o "$RUNNER_TEMP/openorbis-toolchain.tar.gz"
+          tar -xzf "$RUNNER_TEMP/openorbis-toolchain.tar.gz" -C "$RUNNER_TEMP/openorbis"
+          TOOLCHAIN_ROOT="$RUNNER_TEMP/openorbis/OpenOrbis/PS4Toolchain"
+          test -d "$TOOLCHAIN_ROOT/include"
+          test -x "$TOOLCHAIN_ROOT/bin/linux/create-fself"
+          test -s "$TOOLCHAIN_ROOT/samples/SDL2/sce_module/libc.prx"
+          test -s "$TOOLCHAIN_ROOT/samples/SDL2/sce_module/libSceFios2.prx"
+          test -s "$TOOLCHAIN_ROOT/samples/SDL2/sce_sys/about/right.sprx"
+          echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN_ROOT" >> "$GITHUB_ENV"
+          echo "$TOOLCHAIN_ROOT/bin/linux" >> "$GITHUB_PATH"
+          echo "Toolchain extracted to $TOOLCHAIN_ROOT"
+
+      - name: Build 2121 test pkg (title 2121 + pre-signed test account)
+        run: |
+          set -euo pipefail
+          make -C ps4-addon-test clean
+          make -C ps4-addon-test host-test
+          make -C ps4-addon-test clean
+          if ! make -C ps4-addon-test TITLE="2121" EXTRA_DEFINES="-DAS_BUILD_2121" 2>&1 | tee /tmp/pkg-2121-build.log; then
+            echo "::error::2121 test pkg build failed"
+            ( grep -E "Unhandled|   at |error:|No such|no such|not found|Error [0-9]|fatal" /tmp/pkg-2121-build.log | grep -v -- "-Werror" | tail -n 7 | while IFS= read -r line; do
+              echo "::error::E: $line"
+            done ) || true
+            exit 1
+          fi
+          test -s ps4-addon-test/pkg-addon-test.pkg
+          cp ps4-addon-test/pkg-addon-test.pkg ps4-addon-test/2121.pkg
+          echo "### 2121 test PKG built" >> "$GITHUB_STEP_SUMMARY"
+          echo "Title: 2121 · auto sign-in: test@gmail.com (AS_BUILD_2121)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload 2121 pkg for direct download
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg-2121
+          path: ps4-addon-test/2121.pkg
+          if-no-files-found: error
+          retention-days: 30
+        continue-on-error: true   # artifact quota must never block the real publish step
+
+      - name: Publish 2121.pkg to ps4/downloads
+        run: |
+          set -euo pipefail
+          mkdir -p ps4/downloads
+          cp ps4-addon-test/2121.pkg ps4/downloads/2121.pkg
+          git config user.name "AddonStation CI"
+          git config user.email "ci@users.noreply.github.com"
+          git add -f ps4/downloads/2121.pkg
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish 2121.pkg to ps4/downloads [skip ci]"
+            # retry with rebase — a parallel workflow may land first
+            for i in 1 2 3 4 5; do
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then echo "published"; break; fi
+              echo "push raced (attempt $i) — rebasing onto the branch tip"
+              git fetch origin "${GITHUB_REF_NAME}"
+              git rebase "origin/${GITHUB_REF_NAME}"
+            done
+          fi

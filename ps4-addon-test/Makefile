@@ -52,9 +52,10 @@ LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceSystemService -lSceVideo
 COMMONFLAGS := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
                -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include
 CFLAGS      := $(COMMONFLAGS) -std=c11 -mno-red-zone -D__ORBIS__ -Isrc
+EXTRA_DEFINES ?=
 CXXFLAGS    := $(COMMONFLAGS) -std=c++17 -fexceptions -D_POSIX_C_SOURCE=200809L -D_GNU_SOURCE -D__ORBIS__ \
                -Werror=switch \
-               -isystem $(TOOLCHAIN)/include/c++/v1 -Isrc
+               -isystem $(TOOLCHAIN)/include/c++/v1 -Isrc $(EXTRA_DEFINES)
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr \
                -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
 
