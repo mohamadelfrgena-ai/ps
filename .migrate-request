@@ -1,5 +1,5 @@
 # One-shot Supabase request-file — migrate-supabase.yml reads this file.
 # Rewrite the WHOLE file; the FIRST `task:` line wins (sed | head -1).
 #
-# run: apply 48_test_account.sql (confirmed test@gmail.com for the 2121 build)
+# run: apply 48_test_account.sql (confirmed test1@gmail.com for the 2121 build)
 task: sql
