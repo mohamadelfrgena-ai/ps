@@ -150,6 +150,12 @@ DownloadGrant callRecordContentDownload(const SupabaseConfig& cfg,
                                         const std::string& itemId,
                                         const std::string& userAccessToken);
 
+// v0.36 2121: anonymous download grant built from catalog fields (no account)
+DownloadGrant localGrantFrom(const std::string& title,
+                             const std::string& contentType,
+                             const std::string& ps4RawUrl,
+                             const std::string& packTargetsRaw);
+
 // ترجمة كائن i18n {"en":..,"ar":..} للغة المطلوبة (مع fallback للإنجليزية)
 std::string i18nPick(const std::string& i18nJson, const std::string& langCode);
 

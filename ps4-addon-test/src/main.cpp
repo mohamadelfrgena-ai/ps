@@ -225,25 +225,12 @@ static void applyAccountFromSession() {
 }
 
 #ifdef AS_BUILD_2121
-// v0.36 build "2121": pre-signed test account (isolated build flavour ONLY).
-// The credentials appear only here and in supabase/48_test_account.sql — never in chat.
-static void autoSignIn2121() {
-    const AuthLogin r = callEmailLogin(gCfg, "test1@gmail.com", "12345678");
+// v0.36 build "2121": NO account at all — browse + download anonymously.
+// Any saved session is dropped at launch so the build can never hold an account.
+static void forceNoAccount2121() {
     std::lock_guard<std::mutex> lk(gSessionMx);
-    if (!r.ok || r.accessToken.empty()) {
-        // 2121 is a pure test build — never keep a personal account linked in it
-        clearLinkSession();
-        gSession = LinkSession{};
-        return;
-    }
+    clearLinkSession();
     gSession = LinkSession{};
-    gSession.valid = true;
-    gSession.userId = r.userId;
-    gSession.username = r.email;
-    gSession.displayName = r.displayName.empty() ? std::string("test1@gmail.com") : r.displayName;
-    gSession.accessToken = r.accessToken;
-    gSession.refreshToken = r.refreshToken;
-    saveLinkSession(gSession);
 }
 #endif
 
@@ -279,6 +266,8 @@ static AddonItem toItem(const ItemData& d) {
     it.fileSize = d.fileSize;
     it.downloads = (int)d.downloads;
     it.views = (int)d.views;
+    it.ps4RawUrl = d.ps4RawUrl;
+    it.packTargetsRaw = d.packTargetsRaw;
     it.rating = (float)d.rating;
     it.ratingCount = (int)d.ratingCount;
     it.exclusive = d.isExclusive;
@@ -595,7 +584,11 @@ static void startDownloadFlow(int catIdx) {
     const std::string lang = A.lang;
     const bool autoLaunch = A.autoLaunch;
     std::thread([it, lang, autoLaunch]() {
+#ifdef AS_BUILD_2121
+        DownloadGrant g = localGrantFrom(it.title, it.isWorld ? "world" : "addon", it.ps4RawUrl, it.packTargetsRaw);
+#else
         DownloadGrant g = callRecordContentDownload(gCfg, it.id, gSession.accessToken);
+#endif
         if (!g.ok || g.ps4RawUrl.empty()) {
             ui_sfx(Sfx::Error);
             toast(g.message.empty() ? tr("err_network", lang) : g.message);
@@ -728,6 +721,7 @@ static void goBack() {
 }
 static void openItem(int catIdx) {
     if (catIdx < 0) return;
+#ifndef AS_BUILD_2121
     if (!account().signedIn) {
         A.askSignIn = true;
         A.askFocus = 0;
@@ -735,6 +729,7 @@ static void openItem(int catIdx) {
         A.dirty = true;
         return;
     }
+#endif
     A.detailIdx = catIdx;
     gDetailId = catalog()[(std::size_t)catIdx].id;
     A.dl = catalog()[(std::size_t)catIdx].installed ? (int)DemoState::Installed : (int)DemoState::Idle;
@@ -1230,7 +1225,7 @@ int main(int, char**) {
     gSession = loadLinkSession();
     std::thread([]() {
 #ifdef AS_BUILD_2121
-        autoSignIn2121();   // 2121 build: ALWAYS the test account (drops any saved session)
+        forceNoAccount2121();   // 2121 build: no account — downloads work anonymously
 #endif
         loadCatalogNow();
         loadBannerNow();

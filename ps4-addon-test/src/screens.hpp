@@ -65,6 +65,8 @@ struct AddonItem {
     long long fileSize = 0;      // bytes (content_items.file_size)
     int downloads = 0;           // content_items.downloads_count
     int views = 0;               // content_items.views_count (REAL — record_content_view)
+    std::string ps4RawUrl;       // content_items.ps4_raw_url (public file URL)
+    std::string packTargetsRaw;  // content_items.pack_targets (raw jsonb)
     float rating = 0.f;          // content_items.rating
     int ratingCount = 0;         // content_items.rating_count (0 = rating hidden)
     bool exclusive = false;      // is_exclusive

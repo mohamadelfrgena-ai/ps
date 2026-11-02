@@ -405,6 +405,27 @@ std::vector<ItemData> fetchContentItems(const SupabaseConfig& cfg, int limit) {
     return out;
 }
 
+DownloadGrant localGrantFrom(const std::string& title,
+                             const std::string& contentType,
+                             const std::string& ps4RawUrl,
+                             const std::string& packTargetsRaw) {
+    DownloadGrant g;
+    g.ok = !ps4RawUrl.empty();
+    g.title = title;
+    g.contentType = contentType;
+    g.ps4RawUrl = ps4RawUrl;
+    for (const std::string& p : splitJsonObjects(packTargetsRaw)) {
+        PackTarget t;
+        t.target = jsonGetString(p, "target");
+        t.destFolder = jsonGetString(p, "dest_folder");
+        t.rawFile = jsonGetString(p, "raw_file");
+        t.ps4RawUrl = jsonGetString(p, "ps4_raw_url");
+        t.sha256 = jsonGetString(p, "sha256");
+        g.packs.push_back(t);
+    }
+    return g;
+}
+
 DownloadGrant callRecordContentDownload(const SupabaseConfig& cfg,
                                         const std::string& itemId,
                                         const std::string& userAccessToken) {

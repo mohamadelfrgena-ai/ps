@@ -1886,9 +1886,13 @@ std::string langFromSystem(int l) {
 }
 
 Access accessFor(const AddonItem& it) {
+#ifdef AS_BUILD_2121
+    (void)it; return Access::Download;   // 2121 test build: no account needed — always downloadable
+#else
     if (!gAcc.signedIn) return Access::NeedSignIn;
     if (it.unlocked || rankOf(gAcc.plan) >= rankOf(it.tier)) return Access::Download;
     return Access::NeedPlan;
+#endif
 }
 bool acUnlockOffered(const AddonItem& it) {
     if (it.tier == Tier::Free || it.acPrice <= 0) return false;
