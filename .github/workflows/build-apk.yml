@@ -344,9 +344,15 @@ jobs:
         env:
           SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+          DB_PASSWORD: ${{ secrets.NEW_DB_PASSWORD }}
         run: |
           set +e
           set -o pipefail
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "::error::NEW_DB_PASSWORD is missing"
+            exit 1
+          fi
+          echo "::add-mask::$DB_PASSWORD"
           sleep 3
           python3 tools/check_staff_salary_live.py 2>&1 | tee /tmp/staff-salary-live.txt
           code=${PIPESTATUS[0]}

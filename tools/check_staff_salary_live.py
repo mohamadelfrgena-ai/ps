@@ -3,8 +3,9 @@
 
 The check runs only in protected CI against the reviewed production project. It
 creates one confirmed temporary account, records its starting AC balance,
-assigns Moderator through the same profiles.role update used by the admin RPC,
-and proves that exactly 1500 AC is credited once for the current Tripoli month.
+assigns Moderator through the actual ``admin_update_profile`` RPC under an
+existing admin identity, and proves that exactly 1500 AC is credited once for
+the current Tripoli month.
 It then changes roles again in the same month and proves that neither the wallet
 nor the salary ledger is credited twice. The temporary account is always
 removed, and no identifier or credential is printed.
@@ -12,8 +13,12 @@ removed, and no identifier or credential is printed.
 
 from __future__ import annotations
 
+import os
+import re
 import secrets
+import subprocess
 import urllib.parse
+import uuid
 from typing import Any
 
 from check_console_link_authenticated import (
@@ -26,6 +31,9 @@ from check_console_link_authenticated import (
 
 EXPECTED_URL = "https://stbmescmexzcszyyambq.supabase.co"
 EXPECTED_AMOUNT = 1500
+DB_HOST = "aws-0-eu-west-1.pooler.supabase.com"
+DB_USER = "postgres.stbmescmexzcszyyambq"
+DB_IMAGE = "postgres:17"
 
 
 def encoded_id(user_id: str) -> str:
@@ -114,13 +122,111 @@ def salary_transactions(secret_key: str, user_id: str) -> list[dict[str, Any]]:
     )
 
 
-def set_role(secret_key: str, user_id: str, role: str) -> None:
-    service_request(
-        "PATCH",
-        "/rest/v1/profiles?id=eq." + encoded_id(user_id),
-        secret_key,
-        {"role": role},
+def run_private_sql(db_password: str, sql: str, operation: str) -> None:
+    """Execute protected SQL while keeping credentials and row IDs out of logs."""
+    environment = os.environ.copy()
+    environment["PGPASSWORD"] = db_password
+    command = [
+        "docker",
+        "run",
+        "--rm",
+        "-i",
+        "-e",
+        "PGPASSWORD",
+        DB_IMAGE,
+        "psql",
+        "-h",
+        DB_HOST,
+        "-p",
+        "5432",
+        "-U",
+        DB_USER,
+        "-d",
+        "postgres",
+        "-q",
+        "-v",
+        "ON_ERROR_STOP=1",
+    ]
+    completed = subprocess.run(
+        command,
+        input=sql,
+        text=True,
+        capture_output=True,
+        env=environment,
+        check=False,
     )
+    if completed.returncode != 0:
+        # PostgreSQL errors must be useful without leaking either UUID involved.
+        detail = (completed.stderr or completed.stdout or "unknown database error").strip()
+        detail = re.sub(
+            r"(?i)[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+            "<redacted-id>",
+            detail,
+        )
+        raise CheckError(f"{operation} failed: {detail[:500]}")
+
+
+def set_role_via_admin(db_password: str, user_id: str, role: str) -> None:
+    """Run the real admin RPC without exposing an admin or disposable user ID."""
+    if role not in {"user", "moderator", "head_moderator"}:
+        raise CheckError("Refusing an unexpected salary-test role")
+    try:
+        target_id = str(uuid.UUID(user_id))
+    except ValueError as exc:
+        raise CheckError("Salary test received an invalid disposable user ID") from exc
+
+    sql = f"""
+do $salary_test$
+declare
+  v_admin uuid;
+  v_result jsonb;
+begin
+  select id into v_admin
+    from public.profiles
+   where role = 'admin'
+   order by created_at, id
+   limit 1;
+  if v_admin is null then
+    raise exception 'salary_test_admin_missing';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config(
+    'request.jwt.claims',
+    jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text,
+    true
+  );
+
+  v_result := public.admin_update_profile(
+    '{target_id}'::uuid,
+    null::text,
+    '{role}'::text,
+    null::timestamptz,
+    null::int
+  );
+  if coalesce((v_result ->> 'ok')::boolean, false) is not true then
+    raise exception 'salary_test_role_update_failed: %',
+      coalesce(v_result ->> 'message', 'unknown');
+  end if;
+end;
+$salary_test$;
+"""
+    run_private_sql(db_password, sql, "Admin role assignment")
+
+
+def delete_salary_test_audit(db_password: str, user_id: str) -> None:
+    try:
+        target_id = str(uuid.UUID(user_id))
+    except ValueError as exc:
+        raise CheckError("Salary cleanup received an invalid disposable user ID") from exc
+    sql = f"""
+delete from public.admin_audit_log
+ where target_type = 'profile'
+   and target_id = '{target_id}'
+   and action = 'profile_updated';
+"""
+    run_private_sql(db_password, sql, "Salary-test audit cleanup")
 
 
 def delete_profile_if_present(secret_key: str, user_id: str) -> None:
@@ -156,11 +262,13 @@ def assert_single_salary(secret_key: str, user_id: str, expected_balance: int) -
 
 
 def main() -> int:
-    import os
-
     configured_url = os.environ.get("SUPABASE_URL", EXPECTED_URL).rstrip("/")
     if configured_url != EXPECTED_URL:
         raise CheckError(f"Refusing unexpected Supabase URL: {configured_url}")
+
+    db_password = os.environ.get("DB_PASSWORD", "").strip()
+    if not db_password:
+        raise CheckError("DB_PASSWORD is missing for the protected admin-path test")
 
     secret_key = read_secret_key()
     suffix = secrets.token_hex(8)
@@ -180,17 +288,17 @@ def main() -> int:
         print("PASS: disposable salary account created (identity withheld)")
 
         baseline = wallet_balance(secret_key, user_id)
-        set_role(secret_key, user_id, "moderator")
+        set_role_via_admin(db_password, user_id, "moderator")
         expected = baseline + EXPECTED_AMOUNT
         assert_single_salary(secret_key, user_id, expected)
         print("PASS: assigning Moderator immediately credited exactly 1500 AC")
 
-        set_role(secret_key, user_id, "user")
-        set_role(secret_key, user_id, "moderator")
+        set_role_via_admin(db_password, user_id, "user")
+        set_role_via_admin(db_password, user_id, "moderator")
         assert_single_salary(secret_key, user_id, expected)
         print("PASS: reassigning Moderator in the same month did not pay twice")
 
-        set_role(secret_key, user_id, "head_moderator")
+        set_role_via_admin(db_password, user_id, "head_moderator")
         assert_single_salary(secret_key, user_id, expected)
         print("PASS: General Supervisor remains eligible without a duplicate payment")
         return 0
@@ -200,6 +308,10 @@ def main() -> int:
     finally:
         if user_id:
             cleanup_errors: list[BaseException] = []
+            try:
+                delete_salary_test_audit(db_password, user_id)
+            except BaseException as cleanup_error:
+                cleanup_errors.append(cleanup_error)
             try:
                 delete_user(secret_key, user_id)
             except BaseException as cleanup_error:
@@ -213,7 +325,7 @@ def main() -> int:
                 if primary_error is None:
                     raise cleanup_errors[0]
             else:
-                print("PASS: disposable salary account deleted")
+                print("PASS: disposable salary account and test audit entries deleted")
 
 
 if __name__ == "__main__":
