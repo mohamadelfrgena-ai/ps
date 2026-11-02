@@ -111,6 +111,9 @@ begin
 end;
 $$;
 
+-- PostgreSQL cannot CREATE OR REPLACE a function when its TABLE return shape
+-- changes. Drop the no-argument RPC first, then recreate it with the role field.
+drop function if exists public.chat_moderator_list();
 create or replace function public.chat_moderator_list()
 returns table(user_id uuid, display_name text, username text, role text, all_rooms boolean, room_ids text[])
 language sql
