@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,6 +49,7 @@ import coil.request.ImageRequest
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.parseIsoMillis
+import com.addonstation.mobile.ui.theme.AppColors
 import com.addonstation.mobile.ui.theme.Spec
 import com.addonstation.mobile.util.TimeFormat
 import java.util.Locale
@@ -352,6 +354,13 @@ fun SpecIdentityCard(
             SpecBadgeChip(stringResource(R.string.badge_level, level), Spec.surfaceHigh, Spec.chipLabel)
             if (profile.role == "admin") {
                 SpecBadgeChip(stringResource(R.string.badge_admin), Spec.gold, Spec.goldDeepBg)
+            } else if (profile.role == "head_moderator") {
+                SpecBadgeChip(
+                    stringResource(R.string.badge_head_moderator),
+                    AppColors.Purple,
+                    Color.White,
+                    Icons.Filled.Shield,
+                )
             } else if (profile.role == "moderator") {
                 SpecBadgeChip(stringResource(R.string.badge_mod), Spec.blue, Color.White)
             }
@@ -374,13 +383,23 @@ fun SpecIdentityCard(
 
 /** شريحة شارة (11/800 · نصف قطر 8 · حشو 3×9). */
 @Composable
-fun SpecBadgeChip(text: String, background: Color, contentColor: Color) {
-    Box(
+fun SpecBadgeChip(
+    text: String,
+    background: Color,
+    contentColor: Color,
+    icon: ImageVector? = null,
+) {
+    Row(
         Modifier
             .clip(RoundedCornerShape(Spec.badgeRadius))
             .background(background)
             .padding(horizontal = 9.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        icon?.let {
+            Icon(it, contentDescription = null, tint = contentColor, modifier = Modifier.size(12.dp))
+        }
         Text(text, style = Spec.badgeChip, color = contentColor, maxLines = 1)
     }
 }

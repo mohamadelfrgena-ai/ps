@@ -643,14 +643,18 @@ fun MembersSheet(
         }
     }
     val groups = remember(filteredAuthors) {
-        val staffOrCreator = filteredAuthors.filter { it.role in listOf("admin", "moderator", "creator") }
+        val staffOrCreator = filteredAuthors.filter {
+            it.role in listOf("admin", "head_moderator", "moderator", "creator")
+        }
         val paidMembers = filteredAuthors.filter {
-            it.role !in listOf("admin", "moderator", "creator") && it.effectivePlan in listOf("legendary", "epic")
+            it.role !in listOf("admin", "head_moderator", "moderator", "creator") &&
+                it.effectivePlan in listOf("legendary", "epic")
         }
         val alreadyGrouped = (staffOrCreator + paidMembers).map { it.id }.toSet()
         val otherMembers = filteredAuthors.filterNot { it.id in alreadyGrouped }
         listOf(
             "admin" to staffOrCreator.filter { it.role == "admin" },
+            "head_moderator" to staffOrCreator.filter { it.role == "head_moderator" },
             "moderator" to staffOrCreator.filter { it.role == "moderator" },
             "creator" to staffOrCreator.filter { it.role == "creator" },
             "legendary" to paidMembers.filter { it.effectivePlan == "legendary" },
@@ -837,6 +841,7 @@ private fun MemberSheetRow(profile: Profile, avatarUrl: String?, onClick: () -> 
 @Composable
 private fun groupLabel(key: String): String = when (key) {
     "admin" -> stringResource(R.string.grp_admin)
+    "head_moderator" -> stringResource(R.string.grp_head_moderators)
     "moderator" -> stringResource(R.string.grp_moderators)
     "creator" -> stringResource(R.string.grp_creators)
     "legendary" -> stringResource(R.string.grp_legendary_plain)
@@ -1523,7 +1528,7 @@ private fun isSelf(container: com.addonstation.mobile.data.AppContainer, profile
  * عبر `Profile.effectivePlan` (المنتهية تُحسب free فيخفي اللقب).
  */
 fun hasRankTitle(role: String?, plan: String?): Boolean =
-    role == "admin" || role == "moderator" || role == "creator" ||
+    role == "admin" || role == "head_moderator" || role == "moderator" || role == "creator" ||
         plan == "epic" || plan == "legendary"
 
 /** توسيع صغير لعرض بطاقة ملف عضو من الرسائل. */

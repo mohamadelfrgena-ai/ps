@@ -113,4 +113,15 @@
     <string name="admin_publish_content">Published</string>
     <string name="admin_featured_content">Featured</string>
     <string name="admin_exclusive_content">Exclusive</string>
+    <!-- General Supervisor, monthly salary, and weekly Epic gift -->
+    <string name="role_head_moderator_plain">General Supervisor</string>
+    <string name="badge_head_moderator">General Supervisor</string>
+    <string name="grp_head_moderators">General Supervisors</string>
+    <string name="admin_moderator_salary">Moderator monthly salary</string>
+    <string name="admin_moderator_salary_desc">Credits moderators and the General Supervisor once each month.</string>
+    <string name="admin_salary_amount">Salary amount</string>
+    <string name="admin_salary_saved">Salary settings saved</string>
+    <string name="admin_salary_invalid_amount">Enter an amount from 1 to 1,000,000 AC</string>
+    <string name="weekly_epic_free">Free this Thursday</string>
+    <string name="ac_kind_salary">Moderator salary</string>
 </resources>

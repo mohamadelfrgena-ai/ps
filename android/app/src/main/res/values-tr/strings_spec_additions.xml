@@ -113,4 +113,15 @@
     <string name="admin_publish_content">Yayında</string>
     <string name="admin_featured_content">Öne çıkan</string>
     <string name="admin_exclusive_content">Özel</string>
+    <!-- General Supervisor, monthly salary, and weekly Epic gift -->
+    <string name="role_head_moderator_plain">Genel Sorumlu</string>
+    <string name="badge_head_moderator">Genel Sorumlu</string>
+    <string name="grp_head_moderators">Genel Sorumlular</string>
+    <string name="admin_moderator_salary">Moderatör aylık maaşı</string>
+    <string name="admin_moderator_salary_desc">Moderatörlere ve Genel Sorumluya ayda bir kez AC yatırır.</string>
+    <string name="admin_salary_amount">Maaş tutarı</string>
+    <string name="admin_salary_saved">Maaş ayarları kaydedildi</string>
+    <string name="admin_salary_invalid_amount">1 ile 1.000.000 AC arasında bir tutar girin</string>
+    <string name="weekly_epic_free">Bu perşembe ücretsiz</string>
+    <string name="ac_kind_salary">Moderatör maaşı</string>
 </resources>

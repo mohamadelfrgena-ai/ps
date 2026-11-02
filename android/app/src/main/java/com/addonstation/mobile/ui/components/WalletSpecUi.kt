@@ -586,7 +586,7 @@ fun walletTransactionIcon(kind: String, amount: Int): Pair<ImageVector, Color> =
     "unlock" -> Icons.Outlined.Lock to AppColors.AuthRed
     "streak", "code" -> Icons.Outlined.CardGiftcard to if (kind == "code") AppColors.AuthPurple else AppColors.AuthGold
     "event", "welcome" -> Icons.Outlined.Star to AppColors.AuthPurple
-    "admin_reward", "admin_adjustment" -> Icons.Outlined.Shield to AppColors.AuthGold
+    "admin_reward", "admin_adjustment", "salary" -> Icons.Outlined.Shield to AppColors.AuthGold
     else -> Icons.Outlined.History to if (amount < 0) AppColors.AuthRed else AppColors.AuthAccentBlue
 }
 

@@ -258,6 +258,7 @@ data class RankColors(val text: Color, val background: Color)
 
 fun rankColors(role: String, plan: String): RankColors = when {
     role == "admin" -> RankColors(AppColors.AdminBlue, AppColors.AdminBadgeBg)
+    role == "head_moderator" -> RankColors(AppColors.Purple, AppColors.PurpleBadgeBg)
     role == "creator" || role == "moderator" -> RankColors(AppColors.Green, AppColors.GreenGlow)
     plan == "legendary" -> RankColors(AppColors.Gold, AppColors.GoldBadgeBg)
     plan == "epic" -> RankColors(AppColors.Purple, AppColors.PurpleBadgeBg)
@@ -267,6 +268,7 @@ fun rankColors(role: String, plan: String): RankColors = when {
 /** لون اسم المستخدم في الشات حسب الرتبة (Discord-style). */
 fun nameColor(role: String, plan: String): Color = when {
     role == "admin" -> AppColors.AdminBlue
+    role == "head_moderator" -> AppColors.Purple
     role == "moderator" || role == "creator" -> AppColors.Green
     plan == "legendary" -> AppColors.Gold
     plan == "epic" -> AppColors.Purple

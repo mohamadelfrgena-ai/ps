@@ -1513,6 +1513,7 @@ private fun ChatHeader(
  */
 private fun roleColorOf(role: String?, plan: String?, userId: String): Color = when {
     role == "admin" -> Spec.gold
+    role == "head_moderator" -> Spec.epic
     role == "moderator" -> Spec.green
     role == "creator" -> Spec.blueLink
     plan == "legendary" -> Spec.gold

@@ -111,4 +111,15 @@
     <string name="admin_publish_content">已发布</string>
     <string name="admin_featured_content">精选</string>
     <string name="admin_exclusive_content">独家</string>
+    <!-- General Supervisor, monthly salary, and weekly Epic gift -->
+    <string name="role_head_moderator_plain">总负责人</string>
+    <string name="badge_head_moderator">总负责人</string>
+    <string name="grp_head_moderators">总负责人</string>
+    <string name="admin_moderator_salary">版主月薪</string>
+    <string name="admin_moderator_salary_desc">每月为版主和总负责人发放一次 AC。</string>
+    <string name="admin_salary_amount">薪资金额</string>
+    <string name="admin_salary_saved">薪资设置已保存</string>
+    <string name="admin_salary_invalid_amount">请输入 1 到 1,000,000 AC 之间的金额</string>
+    <string name="weekly_epic_free">本周四免费</string>
+    <string name="ac_kind_salary">版主薪资</string>
 </resources>

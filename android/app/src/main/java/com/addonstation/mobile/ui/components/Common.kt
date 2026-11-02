@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -231,22 +232,31 @@ fun RankBadge(
     val colors = rankColors(role, plan)
     val label = when {
         role == "admin" -> stringResource(R.string.role_admin)
+        role == "head_moderator" -> stringResource(R.string.role_head_moderator_plain)
         role == "moderator" -> stringResource(R.string.role_moderator_plain)
         role == "creator" -> stringResource(R.string.role_creator_plain)
         plan == "legendary" -> stringResource(R.string.role_legendary)
         plan == "epic" -> stringResource(R.string.role_epic)
         else -> stringResource(R.string.role_free)
     }
-    Text(
-        text = label,
-        style = AppText.small.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Default),
-        color = colors.text,
-        maxLines = 1,
+    Row(
         modifier = modifier
             .clip(CircleShape)
             .background(colors.background)
             .padding(horizontal = 9.dp, vertical = 3.dp),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (role == "head_moderator") {
+            Icon(Icons.Filled.Shield, contentDescription = null, tint = colors.text, modifier = Modifier.size(12.dp))
+        }
+        Text(
+            text = label,
+            style = AppText.small.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Default),
+            color = colors.text,
+            maxLines = 1,
+        )
+    }
 }
 
 @Composable

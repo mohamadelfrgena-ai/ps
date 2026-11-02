@@ -562,6 +562,7 @@ internal fun AdminOutlineButton(
 internal fun AdminRoleBadge(role: String?, plan: String?, palette: HomePalette = LocalHomePalette.current) {
     val (labelRes, fill, foreground, moderator) = when {
         role == "admin" -> RoleBadgeStyle(R.string.role_admin, palette.goldFill, Color(0xFF1B1405))
+        role == "head_moderator" -> RoleBadgeStyle(R.string.role_head_moderator_plain, palette.epic.copy(alpha = 0.22f), if (palette.isDark) Color(0xFFD3A8FF) else Color(0xFF6930A8), true)
         role == "moderator" -> RoleBadgeStyle(R.string.role_moderator_plain, Color(0xFF3FBF6A).copy(alpha = 0.18f), if (palette.isDark) Color(0xFF7FD99A) else Color(0xFF1E7A44), true)
         role == "creator" -> RoleBadgeStyle(R.string.role_creator_plain, palette.blue, Color.White)
         plan == "legendary" -> RoleBadgeStyle(R.string.role_legendary, palette.goldFill, Color(0xFF1B1405))

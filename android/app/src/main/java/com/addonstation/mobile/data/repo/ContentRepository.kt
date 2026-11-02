@@ -5,6 +5,9 @@ import com.addonstation.mobile.data.ApiError
 import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.SupabaseClient
 import com.addonstation.mobile.data.model.ContentItem
+import com.addonstation.mobile.data.model.parseIsoMillis
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -53,12 +56,65 @@ class ContentRepository(
     private val latestCache = TtlCache<List<ContentItem>>(60_000L)
     private val recommendedCache = TtlCache<List<ContentItem>>(60_000L)
 
+    private val weeklyFreeMutex = Mutex()
+    @Volatile private var weeklyFreeItemId: String? = null
+    @Volatile private var weeklyFreeEndsAt: Long? = null
+    @Volatile private var weeklyFreeCheckedAt: Long = 0L
+
+    private fun activeWeeklyFreeId(now: Long = System.currentTimeMillis()): String? {
+        val end = weeklyFreeEndsAt
+        return weeklyFreeItemId?.takeIf { end == null || now < end }
+    }
+
+    private fun decorateWeeklyFree(items: List<ContentItem>, activeId: String?): List<ContentItem> = items.map { item ->
+        when {
+            item.id == activeId -> item.copy(
+                plan = "free",
+                originalPlan = item.originalPlan ?: item.plan,
+                weeklyFree = true,
+            )
+            item.weeklyFree -> item.copy(
+                plan = item.originalPlan ?: "epic",
+                originalPlan = null,
+                weeklyFree = false,
+            )
+            else -> item
+        }
+    }
+
+    private suspend fun currentWeeklyFreeId(): String? {
+        val now = System.currentTimeMillis()
+        if (now - weeklyFreeCheckedAt < 60_000L) return activeWeeklyFreeId(now)
+
+        return weeklyFreeMutex.withLock {
+            val lockedNow = System.currentTimeMillis()
+            if (lockedNow - weeklyFreeCheckedAt < 60_000L) {
+                return@withLock activeWeeklyFreeId(lockedNow)
+            }
+
+            runCatching {
+                val outcome = supabase.rpc("current_weekly_free_epic").asOutcome().requireOk()
+                val active = outcome.data["active"].asBool() == true
+                weeklyFreeItemId = outcome.data["item_id"].asString().takeIf { active }
+                weeklyFreeEndsAt = (
+                    outcome.data["ends_at_epoch_ms"].asLong()
+                        ?: parseIsoMillis(outcome.data["ends_at"].asString())
+                    ).takeIf { active }
+            }
+            weeklyFreeCheckedAt = lockedNow
+            activeWeeklyFreeId(lockedNow)
+        }
+    }
+
+    private suspend fun decorateWeeklyFree(items: List<ContentItem>): List<ContentItem> =
+        decorateWeeklyFree(items, currentWeeklyFreeId())
+
     /** آخر نسخة معروفة (بلا شبكة) لتبذر بها الشاشة فوراً. */
-    fun cachedFeatured(): List<ContentItem> = featuredCache.peek().orEmpty()
+    fun cachedFeatured(): List<ContentItem> = decorateWeeklyFree(featuredCache.peek().orEmpty(), activeWeeklyFreeId())
 
-    fun cachedLatest(): List<ContentItem> = latestCache.peek().orEmpty()
+    fun cachedLatest(): List<ContentItem> = decorateWeeklyFree(latestCache.peek().orEmpty(), activeWeeklyFreeId())
 
-    fun cachedRecommended(): List<ContentItem> = recommendedCache.peek().orEmpty()
+    fun cachedRecommended(): List<ContentItem> = decorateWeeklyFree(recommendedCache.peek().orEmpty(), activeWeeklyFreeId())
 
     /** إبطال الذاكرة بعد إضافة محتوى أو تعديله. */
     fun invalidate() {
@@ -78,11 +134,18 @@ class ContentRepository(
         category: String? = null,
         plan: String? = null,
     ): List<ContentItem> {
+        val weeklyId = currentWeeklyFreeId()
         val filters = buildString {
             append("select=*&is_published=eq.true")
             contentType?.let { append("&content_type=eq.$it") }
             category?.let { append("&category=eq.$it") }
-            plan?.let { append("&plan=eq.$it") }
+            plan?.let {
+                if (it == "free" && weeklyId != null) {
+                    append("&or=(plan.eq.free,id.eq.$weeklyId)")
+                } else {
+                    append("&plan=eq.$it")
+                }
+            }
             if (query.isNotBlank()) {
                 val q = query.trim()
                 append("&or=(title.ilike.*$q*,description.ilike.*$q*)")
@@ -90,7 +153,8 @@ class ContentRepository(
             append("&order=${orderFor(sort)}")
             append("&limit=$limit")
         }
-        return supabase.decodeList(supabase.select("content_items", filters))
+        val items = supabase.decodeList<ContentItem>(supabase.select("content_items", filters))
+        return decorateWeeklyFree(items, weeklyId)
     }
 
     private fun orderFor(sort: String): String = when (sort) {
@@ -101,74 +165,86 @@ class ContentRepository(
         else -> "created_at.desc"
     }
 
-    suspend fun featured(limit: Int = 8, force: Boolean = false): List<ContentItem> = through(
-        featuredCache, force
-    ) {
+    suspend fun featured(limit: Int = 8, force: Boolean = false): List<ContentItem> = decorateWeeklyFree(
+        through(featuredCache, force) {
+            supabase.decodeList(
+                supabase.select(
+                    "content_items",
+                    "select=*&is_published=eq.true&is_featured=eq.true&order=created_at.desc&limit=$limit",
+                )
+            )
+        }
+    )
+
+    suspend fun latest(limit: Int = 6, force: Boolean = false): List<ContentItem> = decorateWeeklyFree(
+        through(latestCache, force) {
+            supabase.decodeList(
+                supabase.select(
+                    "content_items",
+                    "select=*&is_published=eq.true&order=created_at.desc&limit=$limit",
+                )
+            )
+        }
+    )
+
+    suspend fun recommended(limit: Int = 6, force: Boolean = false): List<ContentItem> = decorateWeeklyFree(
+        through(recommendedCache, force) {
+            supabase.decodeList(
+                supabase.select(
+                    "content_items",
+                    "select=*&is_published=eq.true&order=rating.desc,downloads_count.desc&limit=$limit",
+                )
+            )
+        }
+    )
+
+    suspend fun exclusives(limit: Int = 24): List<ContentItem> = decorateWeeklyFree(
         supabase.decodeList(
             supabase.select(
                 "content_items",
-                "select=*&is_published=eq.true&is_featured=eq.true&order=created_at.desc&limit=$limit",
+                "select=*&is_published=eq.true&is_exclusive=eq.true&order=created_at.desc&limit=$limit",
             )
         )
-    }
+    )
 
-    suspend fun latest(limit: Int = 6, force: Boolean = false): List<ContentItem> = through(
-        latestCache, force
-    ) {
+    suspend fun topDownloaded(limit: Int = 6): List<ContentItem> = decorateWeeklyFree(
         supabase.decodeList(
             supabase.select(
                 "content_items",
-                "select=*&is_published=eq.true&order=created_at.desc&limit=$limit",
+                "select=*&is_published=eq.true&order=downloads_count.desc&limit=$limit",
             )
         )
+    )
+
+    suspend fun byId(id: String): ContentItem? {
+        val item = supabase.decodeOne<ContentItem>(
+            supabase.select("content_items", "select=*&id=eq.$id&limit=1")
+        ) ?: return null
+        return decorateWeeklyFree(listOf(item)).first()
     }
-
-    suspend fun recommended(limit: Int = 6, force: Boolean = false): List<ContentItem> = through(
-        recommendedCache, force
-    ) {
-        supabase.decodeList(
-            supabase.select(
-                "content_items",
-                "select=*&is_published=eq.true&order=rating.desc,downloads_count.desc&limit=$limit",
-            )
-        )
-    }
-
-    suspend fun exclusives(limit: Int = 24): List<ContentItem> = supabase.decodeList(
-        supabase.select(
-            "content_items",
-            "select=*&is_published=eq.true&is_exclusive=eq.true&order=created_at.desc&limit=$limit",
-        )
-    )
-
-    suspend fun topDownloaded(limit: Int = 6): List<ContentItem> = supabase.decodeList(
-        supabase.select(
-            "content_items",
-            "select=*&is_published=eq.true&order=downloads_count.desc&limit=$limit",
-        )
-    )
-
-    suspend fun byId(id: String): ContentItem? = supabase.decodeOne(
-        supabase.select("content_items", "select=*&id=eq.$id&limit=1")
-    )
 
     suspend fun byIds(ids: List<String>): List<ContentItem> {
         if (ids.isEmpty()) return emptyList()
         val filter = ids.distinct().joinToString(",")
-        return supabase.decodeList(supabase.select("content_items", "select=*&id=in.($filter)"))
+        val items = supabase.decodeList<ContentItem>(supabase.select("content_items", "select=*&id=in.($filter)"))
+        return decorateWeeklyFree(items)
     }
 
-    suspend fun byCreator(userId: String, limit: Int = 24): List<ContentItem> = supabase.decodeList(
-        supabase.select(
-            "content_items",
-            "select=*&created_by=eq.$userId&is_published=eq.true&order=created_at.desc&limit=$limit",
+    suspend fun byCreator(userId: String, limit: Int = 24): List<ContentItem> = decorateWeeklyFree(
+        supabase.decodeList(
+            supabase.select(
+                "content_items",
+                "select=*&created_by=eq.$userId&is_published=eq.true&order=created_at.desc&limit=$limit",
+            )
         )
     )
 
-    suspend fun similar(item: ContentItem, limit: Int = 6): List<ContentItem> = supabase.decodeList(
-        supabase.select(
-            "content_items",
-            "select=*&is_published=eq.true&id=neq.${item.id}&category=eq.${item.category ?: "other"}&order=downloads_count.desc&limit=$limit",
+    suspend fun similar(item: ContentItem, limit: Int = 6): List<ContentItem> = decorateWeeklyFree(
+        supabase.decodeList(
+            supabase.select(
+                "content_items",
+                "select=*&is_published=eq.true&id=neq.${item.id}&category=eq.${item.category ?: "other"}&order=downloads_count.desc&limit=$limit",
+            )
         )
     )
 

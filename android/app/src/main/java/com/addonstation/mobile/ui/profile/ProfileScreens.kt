@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.outlined.Inventory2
@@ -648,6 +649,12 @@ private fun ProfileAboutTab(
             when (me.role) {
                 "creator" -> SpecBadgeChip(stringResource(R.string.role_creator_plain), Spec.blue, Color.White)
                 "admin" -> SpecBadgeChip(stringResource(R.string.badge_admin), Spec.gold, Spec.goldDeepBg)
+                "head_moderator" -> SpecBadgeChip(
+                    stringResource(R.string.badge_head_moderator),
+                    com.addonstation.mobile.ui.theme.AppColors.Purple,
+                    Color.White,
+                    Icons.Filled.Shield,
+                )
                 "moderator" -> SpecBadgeChip(stringResource(R.string.badge_mod), Spec.blue, Color.White)
             }
         }

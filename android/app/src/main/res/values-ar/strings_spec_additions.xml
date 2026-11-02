@@ -121,4 +121,15 @@
     <string name="admin_publish_content">منشور</string>
     <string name="admin_featured_content">مميّز</string>
     <string name="admin_exclusive_content">حصري</string>
+    <!-- General Supervisor, monthly salary, and weekly Epic gift -->
+    <string name="role_head_moderator_plain">مسؤول عام</string>
+    <string name="badge_head_moderator">مسؤول عام</string>
+    <string name="grp_head_moderators">المسؤولون العامون</string>
+    <string name="admin_moderator_salary">الراتب الشهري للمشرفين</string>
+    <string name="admin_moderator_salary_desc">يُضاف للمشرفين والمسؤول العام مرة واحدة كل شهر.</string>
+    <string name="admin_salary_amount">قيمة الراتب</string>
+    <string name="admin_salary_saved">تم حفظ إعدادات الراتب</string>
+    <string name="admin_salary_invalid_amount">أدخل قيمة من 1 إلى 1,000,000 AC</string>
+    <string name="weekly_epic_free">مجاناً هذا الخميس</string>
+    <string name="ac_kind_salary">راتب المشرفين</string>
 </resources>

@@ -885,5 +885,6 @@ private fun acKindLabel(kind: String): String = when (kind) {
     "event" -> androidx.compose.ui.res.stringResource(R.string.ac_kind_event)
     "welcome" -> androidx.compose.ui.res.stringResource(R.string.ac_kind_welcome)
     "code" -> androidx.compose.ui.res.stringResource(R.string.ac_kind_code)
+    "salary" -> androidx.compose.ui.res.stringResource(R.string.ac_kind_salary)
     else -> kind
 }

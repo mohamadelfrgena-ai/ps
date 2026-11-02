@@ -50,7 +50,7 @@ data class Profile(
     @SerialName("created_at") val createdAt: String? = null,
 ) {
     val isAdmin: Boolean get() = role == "admin"
-    val isStaff: Boolean get() = role == "admin" || role == "moderator"
+    val isStaff: Boolean get() = role == "admin" || role == "head_moderator" || role == "moderator"
     val isCreator: Boolean get() = role == "creator"
 
     /** الخطة الفعلية: الخطة المنتهية تُحسب free (مطابقة لقاعدة الخادم effective_plan). */
@@ -137,6 +137,10 @@ data class ContentItem(
     @SerialName("content_type") val contentType: String = "addon",
     val category: String? = "other",
     val plan: String = "free",
+    /** الخطة المخزنة قبل تزيين هدية الخميس محلياً؛ ليست عموداً في قاعدة البيانات. */
+    @kotlinx.serialization.Transient val originalPlan: String? = null,
+    /** true فقط عندما تكون هذه الإضافة هي هدية Epic الفعالة يوم الخميس. */
+    @kotlinx.serialization.Transient val weeklyFree: Boolean = false,
     val version: String? = null,
     @SerialName("cover_url") val coverUrl: String? = null,
     @SerialName("file_path") val filePath: String? = null,

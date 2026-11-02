@@ -248,7 +248,7 @@ private fun ContentAccessBadge(
     modifier: Modifier = Modifier,
 ) {
     val plan = item.plan.lowercase(Locale.ROOT)
-    val isAc = item.acPrice > 0
+    val isAc = item.acPrice > 0 && !item.weeklyFree
     val color = when {
         isAc -> Color(0xD91A2438)
         plan == "legendary" -> Color(0xFFF0C25E)
@@ -281,6 +281,7 @@ private fun ContentAccessBadge(
         }
         Text(
             when {
+                item.weeklyFree -> stringResource(R.string.weekly_epic_free)
                 isAc -> item.acPrice.toString()
                 plan == "legendary" -> stringResource(R.string.plan_legendary_name)
                 plan == "epic" -> stringResource(R.string.plan_epic_name)
@@ -471,7 +472,7 @@ internal fun DesignedContentDetailScreen(
         stage == DetailStage.NO_FILE || current.filePath.isNullOrBlank() -> DetailMode.NO_FILE
         access is AccessState.RequiresLegendary -> DetailMode.NEEDS_LEGENDARY
         access is AccessState.RequiresEpic || access is AccessState.RequiresPlan -> DetailMode.NEEDS_EPIC
-        current.acPrice > 0 && !unlocked -> DetailMode.PAID_AC
+        current.acPrice > 0 && !current.weeklyFree && !unlocked -> DetailMode.PAID_AC
         else -> DetailMode.FREE
     }
 

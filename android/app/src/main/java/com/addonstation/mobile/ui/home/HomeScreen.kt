@@ -1524,7 +1524,9 @@ private fun Modifier.homeCardShadow(palette: HomePalette, shape: RoundedCornerSh
     spotColor = palette.cardShadow,
 )
 
+@Composable
 private fun homeBadgeFor(item: ContentItem, palette: HomePalette): Triple<String, Color, Color>? = when {
+    item.weeklyFree -> Triple(stringResource(R.string.weekly_epic_free), palette.green, palette.buttonText)
     item.plan == "legendary" -> Triple("LEGENDARY", palette.goldFill, palette.goldInk)
     item.plan == "epic" -> Triple("EPIC", palette.epic, palette.buttonText)
     item.isFeatured -> Triple("NEW", palette.blue, palette.buttonText)

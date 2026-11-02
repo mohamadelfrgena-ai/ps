@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -641,6 +642,7 @@ private fun acTransactionKindLabel(kind: String): String = when (kind.lowercase(
     "admin_adjustment" -> stringResource(R.string.admin_reason_adjust)
     "admin_reward" -> stringResource(R.string.admin_reason_reward)
     "code" -> stringResource(R.string.ac_kind_code)
+    "salary" -> stringResource(R.string.ac_kind_salary)
     else -> stringResource(R.string.ac_kind_admin)
 }
 
@@ -673,6 +675,7 @@ private fun UsersTab(
     val filters = listOf(
         "all" to stringResource(R.string.common_all),
         "admin" to stringResource(R.string.grp_admin),
+        "head_moderator" to stringResource(R.string.grp_head_moderators),
         "moderator" to stringResource(R.string.grp_moderators),
         "creator" to stringResource(R.string.grp_creators),
         "user" to stringResource(R.string.role_user),
@@ -981,13 +984,16 @@ private fun AdminUserRow(
                 }
             }
             Text(stringResource(R.string.profile_roles), style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold), color = palette.textMuted)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(
-                    "user" to stringResource(R.string.role_user),
-                    "creator" to stringResource(R.string.role_creator_plain),
-                    "moderator" to stringResource(R.string.role_moderator_plain),
-                    "admin" to stringResource(R.string.role_admin),
-                ).forEach { (value, label) ->
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(
+                    listOf(
+                        "user" to stringResource(R.string.role_user),
+                        "creator" to stringResource(R.string.role_creator_plain),
+                        "moderator" to stringResource(R.string.role_moderator_plain),
+                        "head_moderator" to stringResource(R.string.role_head_moderator_plain),
+                        "admin" to stringResource(R.string.role_admin),
+                    )
+                ) { (value, label) ->
                     AdminFilterChip(label, role == value, { role = value }, palette, height = 36.dp)
                 }
             }
@@ -2755,6 +2761,7 @@ fun AdminAcScreen(onBack: () -> Unit, preselectUserId: String? = null) {
 @Composable
 fun AdminSettingsScreen(onBack: () -> Unit) {
     val container = rememberContainer()
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var plans by remember { mutableStateOf<List<com.addonstation.mobile.data.model.SubscriptionPlan>>(emptyList()) }
     var methods by remember { mutableStateOf<List<com.addonstation.mobile.data.model.PaymentMethodSetting>>(emptyList()) }
@@ -2764,10 +2771,17 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
     var accountName by remember { mutableStateOf("") }
     var accountId by remember { mutableStateOf("") }
     var instructions by remember { mutableStateOf("") }
+    var salaryEnabled by remember { mutableStateOf(true) }
+    var salaryAmount by remember { mutableStateOf("1500") }
+    var salaryBusy by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         plans = container.admin.plans()
         methods = container.plans.loadAllPaymentMethods()
+        container.admin.moderatorSalaryConfig().let { config ->
+            salaryEnabled = config.enabled
+            salaryAmount = config.amount.toString()
+        }
     }
 
     Column(Modifier.fillMaxSize().background(LocalHomePalette.current.bg)) {
@@ -2788,6 +2802,63 @@ fun AdminSettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(6.dp))
                 Text(it, style = AppText.tiny, color = AppColors.Green)
             }
+
+            SectionHeader(title = stringResource(R.string.admin_moderator_salary), leadingEmoji = "🛡️")
+            GlassCard(padding = 12.dp) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.admin_moderator_salary),
+                            style = AppText.sectionTitle,
+                            color = AppColors.Text,
+                        )
+                        Text(
+                            stringResource(R.string.admin_moderator_salary_desc),
+                            style = AppText.tiny,
+                            color = AppColors.Muted,
+                        )
+                    }
+                    Switch(
+                        checked = salaryEnabled,
+                        onCheckedChange = { salaryEnabled = it },
+                        enabled = !salaryBusy,
+                    )
+                }
+                OutlinedTextField(
+                    value = salaryAmount,
+                    onValueChange = { value -> salaryAmount = value.filter(Char::isDigit).take(7) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    label = { Text(stringResource(R.string.admin_salary_amount)) },
+                    suffix = { Text("AC") },
+                    singleLine = true,
+                    enabled = !salaryBusy,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                GradientButton(
+                    text = stringResource(R.string.admin_save),
+                    onClick = {
+                        val amount = salaryAmount.toIntOrNull()
+                        if (amount == null || amount !in 1..1_000_000) {
+                            message = context.getString(R.string.admin_salary_invalid_amount)
+                        } else {
+                            scope.launch {
+                                salaryBusy = true
+                                container.admin.updateModeratorSalary(salaryEnabled, amount)
+                                    .onSuccess { message = context.getString(R.string.admin_salary_saved) }
+                                    .onFailure { message = it.message }
+                                salaryBusy = false
+                            }
+                        }
+                    },
+                    enabled = !salaryBusy,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
             SectionHeader(title = stringResource(R.string.plan_title), leadingEmoji = "💠")
             plans.forEach { plan ->
                 var price by remember(plan.id) { mutableStateOf(plan.priceLyd.toString()) }

@@ -10,7 +10,8 @@
 15_assets_v2.sql يزرع دفعة الأصول الأساسية، ثم تنظف الترحيلات اللاحقة الأفاتارات
 المجانية القديمة. 46_profile_avatar_packs.sql يستبدل Profiles بـ24 Epic ويضيف
 Profile 2 بـ11 Legendary مع إبقاء onefree وحدها مجانية. ويضيف 47 مستورد ZIP
-الجماعي الآمن والذري للوحة الإدارة.
+الجماعي الآمن والذري للوحة الإدارة، ثم يضيف 50 المسؤول العام وراتب المشرفين
+وهدية Epic الأسبوعية.
 11_grants.sql إلزامي لمشاريع Supabase الجديدة (منح صلاحيات anon/authenticated).
 
 الاستخدام: python3 tools/build_all_in_one_sql.py
@@ -70,6 +71,7 @@ ORDER = [
     "46_profile_avatar_packs.sql",
     "47_bulk_content_import.sql",
     "48_creator_verification_and_featured_banners.sql",
+    "50_staff_salary_and_weekly_epic.sql",
 ]
 
 HEADER = """-- ============================================================================
@@ -99,6 +101,7 @@ HEADER = """-- =================================================================
 --      → 45_single_attached_free_avatar → 46_profile_avatar_packs
 --      → 47_bulk_content_import (استيراد ZIP جماعي ذري وآمن للأدمن)
 --      → 48_creator_verification_and_featured_banners (بانرات جديدة + عناصر المبدعين/الأدمن)
+--      → 50_staff_salary_and_weekly_epic (مسؤول عام + راتب شهري + هدية Epic الخميس)
 --  ملاحظة: 41_console_link_codes فاحص قراءة فقط لعقد PS4/الهاتف المشترك؛
 --     لا يدخل ملف التثبيت ولا يغيّر بنية الخادم.
 --  ⚠️ ارفع ملفات supabase/profile-pack-files إلى مخزن site-assets قبل تشغيل 46؛

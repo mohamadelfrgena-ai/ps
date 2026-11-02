@@ -27,6 +27,11 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class AdminRepository(private val supabase: SupabaseClient) {
 
+    data class ModeratorSalaryConfig(
+        val enabled: Boolean = true,
+        val amount: Int = 1500,
+    )
+
     private val bulkContentImporter = BulkContentImporter(supabase)
 
     private suspend fun selectProfiles(query: String): JsonElement =
@@ -65,6 +70,34 @@ class AdminRepository(private val supabase: SupabaseClient) {
             )
         }.getOrElse { AdminStats() }
     }
+
+    suspend fun moderatorSalaryConfig(): ModeratorSalaryConfig = withContext(Dispatchers.IO) {
+        runCatching {
+            val rows = supabase.select(
+                "app_settings",
+                "select=value&key=eq.moderator_salary&limit=1",
+            ) as? kotlinx.serialization.json.JsonArray
+            val value = (rows?.firstOrNull() as? JsonObject)?.get("value") as? JsonObject
+            ModeratorSalaryConfig(
+                enabled = value?.get("enabled").asBool() ?: true,
+                amount = value?.get("amount").asInt() ?: 1500,
+            )
+        }.getOrElse { ModeratorSalaryConfig() }
+    }
+
+    suspend fun updateModeratorSalary(enabled: Boolean, amount: Int): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                supabase.rpc(
+                    "admin_update_moderator_salary",
+                    mapOf(
+                        "p_enabled" to JsonPrimitive(enabled),
+                        "p_amount" to JsonPrimitive(amount),
+                    ),
+                ).asOutcome().requireOk()
+                Unit
+            }
+        }
 
     // ------------------------------------------------------------- المستخدمون
 

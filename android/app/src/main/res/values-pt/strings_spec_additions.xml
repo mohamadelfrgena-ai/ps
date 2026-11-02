@@ -113,4 +113,15 @@
     <string name="admin_publish_content">Publicado</string>
     <string name="admin_featured_content">Em destaque</string>
     <string name="admin_exclusive_content">Exclusivo</string>
+    <!-- General Supervisor, monthly salary, and weekly Epic gift -->
+    <string name="role_head_moderator_plain">Supervisor geral</string>
+    <string name="badge_head_moderator">Supervisor geral</string>
+    <string name="grp_head_moderators">Supervisores gerais</string>
+    <string name="admin_moderator_salary">Salário mensal dos moderadores</string>
+    <string name="admin_moderator_salary_desc">Credita moderadores e o supervisor geral uma vez por mês.</string>
+    <string name="admin_salary_amount">Valor do salário</string>
+    <string name="admin_salary_saved">Definições de salário guardadas</string>
+    <string name="admin_salary_invalid_amount">Introduza um valor de 1 a 1.000.000 AC</string>
+    <string name="weekly_epic_free">Grátis nesta quinta-feira</string>
+    <string name="ac_kind_salary">Salário de moderador</string>
 </resources>

@@ -506,7 +506,7 @@ private fun StoreContentCard(
         ) {
             CoverImage(url = coverUrl, radius = 12.dp, modifier = Modifier.fillMaxSize())
             Text(
-                planLabelOf(item.plan),
+                if (item.weeklyFree) stringResource(R.string.weekly_epic_free) else planLabelOf(item.plan),
                 style = androidx.compose.ui.text.TextStyle(fontSize = 10.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold),
                 color = if (item.plan.equals("legendary", true)) Color(0xFF1B1405) else Color.White,
                 modifier = Modifier

@@ -117,4 +117,15 @@
     <string name="admin_publish_content">Опубликовано</string>
     <string name="admin_featured_content">Рекомендуемое</string>
     <string name="admin_exclusive_content">Эксклюзив</string>
+    <!-- General Supervisor, monthly salary, and weekly Epic gift -->
+    <string name="role_head_moderator_plain">Главный модератор</string>
+    <string name="badge_head_moderator">Главный модератор</string>
+    <string name="grp_head_moderators">Главные модераторы</string>
+    <string name="admin_moderator_salary">Ежемесячная зарплата модераторов</string>
+    <string name="admin_moderator_salary_desc">Начисляет AC модераторам и главному модератору один раз в месяц.</string>
+    <string name="admin_salary_amount">Размер зарплаты</string>
+    <string name="admin_salary_saved">Настройки зарплаты сохранены</string>
+    <string name="admin_salary_invalid_amount">Введите сумму от 1 до 1 000 000 AC</string>
+    <string name="weekly_epic_free">Бесплатно в этот четверг</string>
+    <string name="ac_kind_salary">Зарплата модератора</string>
 </resources>

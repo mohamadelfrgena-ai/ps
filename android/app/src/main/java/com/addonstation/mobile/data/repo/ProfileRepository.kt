@@ -31,6 +31,20 @@ class ProfileRepository(
 
     private val uid: String? get() = supabase.currentUserId()
     private val refreshMutex = Mutex()
+    @Volatile private var salaryClaimUserId: String? = null
+    @Volatile private var salaryClaimCheckedAt: Long = 0L
+
+    private suspend fun claimMonthlySalaryIfDue() {
+        val userId = uid ?: return
+        val now = System.currentTimeMillis()
+        if (salaryClaimUserId == userId && now - salaryClaimCheckedAt < 6 * 60 * 60 * 1_000L) return
+        runCatching {
+            supabase.rpc("claim_moderator_salary", signedOnly = true).asOutcome().requireOk()
+        }.onSuccess {
+            salaryClaimUserId = userId
+            salaryClaimCheckedAt = now
+        }
+    }
 
     /**
      * `visible_profiles` ينقّح أصول الأدمن لغير الأدمن، لكنه يعيدها للأدمن فقط
@@ -158,6 +172,7 @@ class ProfileRepository(
 
     suspend fun refreshWallet(): AcWallet? {
         val id = uid ?: return null
+        claimMonthlySalaryIfDue()
         val wallet = supabase.decodeOne<AcWallet>(
             supabase.select("ac_wallets", "select=*&user_id=eq.$id&limit=1")
         )

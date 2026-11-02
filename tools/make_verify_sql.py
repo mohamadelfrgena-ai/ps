@@ -926,13 +926,74 @@ add("48_creator_verification_and_featured_banners", "بانر مجاني واح�
          "where asset_type = 'item' and required_plan = 'admin' and enabled)::text"))
 
 # ═══════════════════════════════════════════════════════════════════════════
+#  50 General Supervisor · monthly salary · Thursday Epic gift
+# ═══════════════════════════════════════════════════════════════════════════
+add("50_staff_salary_and_weekly_epic", "General Supervisor is staff but never an admin",
+    q_ok("select ((public.role_rank('head_moderator') = 4) "
+         "and position('head_moderator' in pg_get_constraintdef((select oid from pg_constraint "
+         "where conrelid = to_regclass('public.profiles') "
+         "and position('profiles_role_check' in conname) > 0))) > 0 "
+         "and position('head_moderator' in pg_get_functiondef('public.is_staff(uuid)'::regprocedure)) > 0 "
+         "and position('head_moderator' in pg_get_functiondef('public.is_admin(uuid)'::regprocedure)) = 0)::text", "true"),
+    qdet("select 'rank=' || public.role_rank('head_moderator')::text "
+         "|| ' · admin=' || public.is_admin((select id from public.profiles where role = 'head_moderator' limit 1))::text"))
+
+add("50_staff_salary_and_weekly_epic", "Monthly salary is configurable, idempotent, logged, and protected",
+    q_ok("select (to_regclass('public.staff_salary_payments') is not null "
+         "and coalesce((select (value->>'amount')::integer = 1500 from public.app_settings "
+         "where key = 'moderator_salary'), false) "
+         "and to_regprocedure('public.claim_moderator_salary()') is not null "
+         "and to_regprocedure('public.process_moderator_salaries()') is not null "
+         "and to_regprocedure('public.moderator_salary_config()') is not null "
+         "and to_regprocedure('public.admin_update_moderator_salary(boolean,integer)') is not null "
+         "and to_regprocedure('public.staff_salary_apply(uuid,date)') is not null "
+         "and to_regclass('public.staff_salary_payments_id_seq') is not null "
+         "and (select count(*) from pg_policies where schemaname = 'public' "
+         "and tablename = 'staff_salary_payments' "
+         "and policyname = 'salary_payments_own_read') = 1 "
+         "and position('salary' in pg_get_constraintdef((select oid from pg_constraint "
+         "where conrelid = to_regclass('public.ac_transactions') "
+         "and position('ac_transactions_kind_check' in conname) > 0))) > 0 "
+         "and has_function_privilege('authenticated', 'public.claim_moderator_salary()', 'execute') "
+         "and not has_function_privilege('anon', 'public.claim_moderator_salary()', 'execute') "
+         "and not has_function_privilege('authenticated', 'public.process_moderator_salaries()', 'execute'))::text", "true"),
+    qdet("select 'salary=' || coalesce((select value::text from public.app_settings "
+         "where key = 'moderator_salary'), 'missing') "
+         "|| ' · payments=' || (select count(*) from public.staff_salary_payments)::text"))
+
+add("50_staff_salary_and_weekly_epic", "Thursday Epic gift is deterministic, time-bound, and server-enforced",
+    q_ok("select (to_regprocedure('public.current_weekly_free_epic()') is not null "
+         "and position('Africa/Tripoli' in pg_get_functiondef("
+         "'public.current_weekly_free_epic()'::regprocedure)) > 0 "
+         "and position('isodow' in pg_get_functiondef("
+         "'public.current_weekly_free_epic()'::regprocedure)) > 0 "
+         "and position('md5' in pg_get_functiondef("
+         "'public.current_weekly_free_epic()'::regprocedure)) > 0 "
+         "and position('is_weekly_free_epic' in pg_get_functiondef("
+         "'public.can_access_item(uuid,uuid)'::regprocedure)) > 0 "
+         "and position('is_weekly_free_epic' in pg_get_functiondef("
+         "'public.ac_unlock_content(uuid)'::regprocedure)) > 0)::text", "true"),
+    qdet("select public.current_weekly_free_epic()::text"))
+
+add("50_staff_salary_and_weekly_epic", "General Supervisor moderates all rooms without admin-only access",
+    q_ok("select (position('head_moderator' in pg_get_functiondef("
+         "'public.chat_can_moderate_channel(text)'::regprocedure)) > 0 "
+         "and position('head_moderator' in pg_get_functiondef("
+         "'public.chat_my_moderation_scope()'::regprocedure)) > 0 "
+         "and position('head_moderator' in pg_get_functiondef("
+         "'public.send_chat_message(text,text,bigint,bigint,text,text,text,text,text,integer,bigint,boolean)'::regprocedure)) > 0 "
+         "and position('admin_only' in pg_get_functiondef("
+         "'public.send_chat_message(text,text,bigint,bigint,text,text,text,text,text,integer,bigint,boolean)'::regprocedure)) > 0)::text", "true"),
+    qdet("select 'chat scope + send checks present'"))
+
+# ═══════════════════════════════════════════════════════════════════════════
 #  كتابة الملف
 # ═══════════════════════════════════════════════════════════════════════════
 HEAD = r'''-- ============================================================================
 --  AddonStation Mobile — ٩٩) فاحص القاعدة: «هل نُفِّذ كل SQL كما نريد؟»
 -- ============================================================================
 --
---  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 46) بنداً بنداً، ويطبع
+--  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 50) بنداً بنداً، ويطبع
 --  جدولاً واحداً: كل صف = بند · العمود «الحالة» ✅ أو ❌ · والعمود «التفاصيل»
 --  يقول لك ما هو الناقص بالاسم بالضبط.
 --

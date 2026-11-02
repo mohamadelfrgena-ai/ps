@@ -170,7 +170,7 @@ class ChatRepository(
                 role = obj["role"]?.asString() ?: "user",
                 plan = obj["plan"]?.asString() ?: "free",
                 moderatesAll = obj["moderates_all"]?.asBool()
-                    ?: (obj["role"]?.asString() == "admin"),
+                    ?: (obj["role"]?.asString() in setOf("admin", "head_moderator")),
                 moderatedChannels = (obj["moderated_channels"] as? JsonArray)
                     ?.mapNotNull { it.asString() } ?: emptyList(),
             )
@@ -182,7 +182,7 @@ class ChatRepository(
     /**
      * هل يملك هذا المستخدم حق **الإشراف** على هذه الغرفة؟
      *
-     * • الأدمن: كل الغرف (بلا جدول ولا إعداد).
+     * • الأدمن والمسؤول العام: كل الغرف (بلا جدول ولا إعداد).
      * • المشرف: الغرف الممنوحة له فقط — أو كلها إن مُنح `all_rooms`.
      * • أي دور آخر: لا شيء.
      *
@@ -191,7 +191,7 @@ class ChatRepository(
      */
     fun canModerateRoom(status: MyChatStatus?, channelId: String): Boolean {
         if (status == null || !status.signedIn || channelId.isBlank()) return false
-        if (status.role == "admin" || status.moderatesAll) return true
+        if (status.role in setOf("admin", "head_moderator") || status.moderatesAll) return true
         return status.role == "moderator" && status.moderatedChannels.contains(channelId)
     }
 
