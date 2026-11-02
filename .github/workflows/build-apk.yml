@@ -295,7 +295,8 @@ jobs:
         env:
           DB_PASSWORD: ${{ secrets.NEW_DB_PASSWORD }}
         run: |
-          set -euo pipefail
+          set +e
+          set -o pipefail
           if [ -z "$DB_PASSWORD" ]; then
             echo "::error::NEW_DB_PASSWORD is missing"
             exit 1
@@ -314,7 +315,14 @@ jobs:
               -U postgres.stbmescmexzcszyyambq \
               -d postgres \
               -v ON_ERROR_STOP=1 \
-            | tee /tmp/staff-rewards-apply.txt
+            2>&1 | tee /tmp/staff-rewards-apply.txt
+          apply_code=${PIPESTATUS[1]}
+          if [ "$apply_code" -ne 0 ]; then
+            detail=$(tail -16 /tmp/staff-rewards-apply.txt | tr '\n' '|' | cut -c1-900)
+            echo "::error title=Staff rewards SQL failed::$detail"
+            exit "$apply_code"
+          fi
+          set -e
 
           live_state=$(docker run --rm \
             -e PGPASSWORD="$DB_PASSWORD" \
