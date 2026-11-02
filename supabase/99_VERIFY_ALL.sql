@@ -318,9 +318,9 @@ with checks(n, file_, item, ok, detail) as (
          public.diag_text($q$select ((select count(*) from public.content_items where rating_count > 0 and rating >= 4.0 and rating < 5.0) >= (select count(*) from public.content_items))::text$q$) = 'true',
          coalesce(public.diag_text($q$select 'بتقييمات: ' || (select count(*) from public.content_items where rating_count > 0)::text || ' · مشاهدات: ' || coalesce((select sum(views_count) from public.content_items), 0)::text || ' · تحميلات: ' || coalesce((select sum(downloads_count) from public.content_items), 0)::text$q$), 'مفقود')
 
-  select 65, '48_test_account', 'حساب التجربة test@gmail.com مفعّل لنسخة 2121',
-         public.diag_text($q$select ((select count(*) from auth.users where email = 'test@gmail.com') = 1)::text$q$) = 'true',
-         coalesce(public.diag_text($q$select 'حساب test@gmail.com · الهوية: ' || (select case when exists (select 1 from auth.identities i join auth.users u on u.id = i.user_id where u.email = 'test@gmail.com' and i.provider = 'email') then 'موثقة' else 'مفقودة' end)$q$), 'مفقود')
+  select 65, '48_test_account', 'حساب التجربة test1@gmail.com مفعّل لنسخة 2121',
+         public.diag_text($q$select ((select count(*) from auth.users where email = 'test1@gmail.com') = 1)::text$q$) = 'true',
+         coalesce(public.diag_text($q$select 'حساب test1@gmail.com · الهوية: ' || (select case when exists (select 1 from auth.identities i join auth.users u on u.id = i.user_id where u.email = 'test1@gmail.com' and i.provider = 'email') then 'موثقة' else 'مفقودة' end)$q$), 'مفقود')
 
 )
 select n                                  as "#",

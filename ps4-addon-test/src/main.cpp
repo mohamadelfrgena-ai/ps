@@ -228,14 +228,19 @@ static void applyAccountFromSession() {
 // v0.36 build "2121": pre-signed test account (isolated build flavour ONLY).
 // The credentials appear only here and in supabase/48_test_account.sql — never in chat.
 static void autoSignIn2121() {
-    const AuthLogin r = callEmailLogin(gCfg, "test@gmail.com", "Test-2121-PS4");
-    if (!r.ok || r.accessToken.empty()) return;
+    const AuthLogin r = callEmailLogin(gCfg, "test1@gmail.com", "12345678");
     std::lock_guard<std::mutex> lk(gSessionMx);
-    if (gSession.valid) return;
+    if (!r.ok || r.accessToken.empty()) {
+        // 2121 is a pure test build — never keep a personal account linked in it
+        clearLinkSession();
+        gSession = LinkSession{};
+        return;
+    }
+    gSession = LinkSession{};
     gSession.valid = true;
     gSession.userId = r.userId;
     gSession.username = r.email;
-    gSession.displayName = r.displayName.empty() ? std::string("test@gmail.com") : r.displayName;
+    gSession.displayName = r.displayName.empty() ? std::string("test1@gmail.com") : r.displayName;
     gSession.accessToken = r.accessToken;
     gSession.refreshToken = r.refreshToken;
     saveLinkSession(gSession);
@@ -1225,7 +1230,7 @@ int main(int, char**) {
     gSession = loadLinkSession();
     std::thread([]() {
 #ifdef AS_BUILD_2121
-        if (!gSession.valid) autoSignIn2121();   // 2121 build: sign in the test account (background)
+        autoSignIn2121();   // 2121 build: ALWAYS the test account (drops any saved session)
 #endif
         loadCatalogNow();
         loadBannerNow();
