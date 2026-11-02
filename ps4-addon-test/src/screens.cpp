@@ -708,8 +708,7 @@ struct AnimCall {
 std::vector<AnimCall> gAnimCalls;
 std::vector<int> gAnimRects;      // x, y, w, h quads (draw space, already clipped later)
 bool gAnimRec = true;
-bool gAnimBlock = false;   // v0.38: page animations must NOT replay over a modal
-void animBlock(bool b) { gAnimBlock = b; }
+bool gAnimBlock = false;   // v0.38: page animations must NOT replay over a modal (wrapper at pkgtest scope)
 void animPush(const AnimCall& call, int x, int y, int w, int h) {
     if (!gAnimRec || gAnimBlock) return;
     gAnimCalls.push_back(call);
@@ -2075,9 +2074,7 @@ const char* pageArt(UiEngine& e, const char* primary, const char* fallback) {
 // PERFORMANCE: a page background made of full-screen art + several shade layers is composed ONCE per key
 // (screen / item / art / theme / direction) and kept as one opaque image "__bg_page"; every later frame is a
 // single straight copy (memcpy fast path) instead of ~4 full-screen alpha blends.
-static bool gBakeFade = false;
-bool bakedFadeActive() { return gBakeFade; }
-void bakedFadeReset() { gBakeFade = false; }
+static bool gBakeFade = false;   // wrappers at pkgtest scope (link!)
 
 void bakedBackdrop(UiEngine& e, const std::string& key, const std::function<void()>& paint) {
     // v0.38: 3-slot LRU + smooth crossfade — revisits are instant, banner
@@ -4280,6 +4277,11 @@ void drawLegalSplash(UiEngine& e, const std::string& /*langCode*/) {
 }
 
 // v0.30: public animation API (pkgtest scope) — used by the main loop
+// v0.38: these three MUST be defined here (pkgtest scope), not in the anon
+// namespace above — internal linkage made the OpenOrbis link fail.
+bool bakedFadeActive() { return gBakeFade; }
+void bakedFadeReset() { gBakeFade = false; }
+void animBlock(bool b) { gAnimBlock = b; }
 void animReset() { gAnimCalls.clear(); gAnimRects.clear(); }
 bool animHas() { return !gAnimCalls.empty(); }
 void animRects(std::vector<int>& out) { out = gAnimRects; }
