@@ -12,6 +12,7 @@ SCREEN_PATH = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/setti
 ERROR_PATH = ROOT / "android/app/src/main/java/com/addonstation/mobile/data/ApiError.kt"
 PLANS_PATH = ROOT / "android/app/src/main/java/com/addonstation/mobile/data/repo/PlansRepository.kt"
 SQL_PATH = ROOT / "supabase/41_console_link_codes.sql"
+CLAIM_FIX_PATH = ROOT / "supabase/APPLY_CONSOLE_LINK_CLAIM_SCHEMA_FIX.sql"
 CONFIG_PATH = ROOT / "supabase/config.toml"
 GRADLE_PROPERTIES = ROOT / "android/gradle.properties"
 
@@ -20,6 +21,7 @@ screen = SCREEN_PATH.read_text(encoding="utf-8")
 errors = ERROR_PATH.read_text(encoding="utf-8")
 plans = PLANS_PATH.read_text(encoding="utf-8")
 sql = SQL_PATH.read_text(encoding="utf-8")
+claim_fix = CLAIM_FIX_PATH.read_text(encoding="utf-8")
 config = CONFIG_PATH.read_text(encoding="utf-8")
 gradle = GRADLE_PROPERTIES.read_text(encoding="utf-8")
 workflow_text = "\n".join(
@@ -76,7 +78,11 @@ checks = [
         "create_console_link_code(text,text)", "claim_console_link(text,text,text)", "poll_console_link(text,uuid)",
     ))),
     ("SQL verifier never mutates the shared PS4/phone schema", not any(statement in sql.lower() for statement in forbidden_schema_statements)),
+    ("read-only verifier requires the claim columns used by production", all(fragment in sql for fragment in ("column_name = 'claimed_by'", "column_name = 'profile'", "data_type = 'uuid'", "data_type = 'jsonb'"))),
     ("contract rejects consumed_at and incompatible console_code RPCs", "consumed_at" in sql and "console_code_%" in sql),
+    ("focused repair targets only the reviewed project", "stbmescmexzcszyyambq" in claim_fix and "jqjmkssgjdsfdojkuqzq" not in claim_fix),
+    ("focused repair adds exactly the missing claim payload columns", "add column if not exists claimed_by uuid" in claim_fix.lower() and "add column if not exists profile jsonb" in claim_fix.lower()),
+    ("focused repair never adds consumed_at or replaces shared RPCs", "add column if not exists consumed_at" not in claim_fix.lower() and "create or replace function" not in claim_fix.lower()),
     ("obsolete console-session Edge Function is gone", "[functions.console-session]" not in config and not (ROOT / "supabase/functions/console-session").exists()),
     ("gateway_not_configured is classified without exposing api_key", "gateway_not_configured" in errors and '"api_key"' not in plans),
 ]

@@ -31,6 +31,32 @@ BEGIN
     RAISE EXCEPTION 'missing shared RPC: poll_console_link(text,uuid)';
   END IF;
 
+  IF to_regclass('public.console_link_codes') IS NULL THEN
+    RAISE EXCEPTION 'missing shared table: public.console_link_codes';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+      FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'console_link_codes'
+       AND column_name = 'claimed_by'
+       AND data_type = 'uuid'
+  ) THEN
+    RAISE EXCEPTION 'missing console_link_codes.claimed_by uuid column';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+      FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'console_link_codes'
+       AND column_name = 'profile'
+       AND data_type = 'jsonb'
+  ) THEN
+    RAISE EXCEPTION 'missing console_link_codes.profile jsonb column';
+  END IF;
+
   IF EXISTS (
     SELECT 1
       FROM information_schema.columns

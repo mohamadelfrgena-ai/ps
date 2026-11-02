@@ -829,13 +829,21 @@ add("41_console_link_codes", "Shared RPC grants match PS4 and signed-in phone ro
          "and has_function_privilege('authenticated', 'public.claim_console_link(text,text,text)', 'execute'))::text", "true"),
     qdet("select 'create/poll anon · claim authenticated'"))
 
-add("41_console_link_codes", "No incompatible console_code RPCs or consumed_at field",
+add("41_console_link_codes", "Claim columns exist without incompatible console_code RPCs or consumed_at",
     q_ok("select (((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
          "where n.nspname = 'public' and p.proname like 'console_code_%') = 0) "
+         "and exists (select 1 from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'console_link_codes' and column_name = 'claimed_by' and data_type = 'uuid') "
+         "and exists (select 1 from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'console_link_codes' and column_name = 'profile' and data_type = 'jsonb') "
          "and not exists (select 1 from information_schema.columns where table_schema = 'public' "
          "and table_name = 'console_link_codes' and column_name = 'consumed_at'))::text", "true"),
     qdet("select 'console_code_*: ' || (select count(*) from pg_proc p join pg_namespace n "
          "on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'console_code_%')::text "
+         "|| ' · claimed_by/profile: ' || (select count(*) from information_schema.columns "
+         "where table_schema = 'public' and table_name = 'console_link_codes' "
+         "and ((column_name = 'claimed_by' and data_type = 'uuid') "
+         "or (column_name = 'profile' and data_type = 'jsonb')))::text || '/2' "
          "|| ' · consumed_at: ' || (select count(*) from information_schema.columns "
          "where table_schema = 'public' and table_name = 'console_link_codes' "
          "and column_name = 'consumed_at')::text"))
