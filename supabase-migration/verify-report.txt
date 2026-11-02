@@ -1,25 +1,25 @@
-=== new project verification 2026-11-02T10:35:05Z ===
+=== new project verification 2026-11-02T17:42:58Z ===
 ac_events=0
 ac_redeem_codes=190
 ac_redeem_uses=0
-ac_task_claims=0
+ac_task_claims=1
 ac_tasks=6
-ac_transactions=0
-ac_wallets=3
+ac_transactions=2
+ac_wallets=4
 admin_audit_log=0
 app_settings=2
 chat_bans=0
 chat_channels=14
-chat_messages=0
+chat_messages=1
 chat_moderator_rooms=0
 chat_mutes=0
 chat_notifications=0
 chat_reactions=0
-chat_read_state=0
+chat_read_state=1
 chat_reports=0
-chat_rule_acceptances=0
+chat_rule_acceptances=1
 chat_rules=8
-chat_typing=0
+chat_typing=1
 console_link_codes=1
 content_downloads=0
 content_favorites=0
@@ -33,10 +33,10 @@ linked_consoles=0
 payment_gateway_credentials=0
 payment_method_settings=8
 payment_orders=0
-profiles=3
+profiles=4
 push_config=1
-push_devices=7
-push_prefs=2
+push_devices=8
+push_prefs=3
 push_queue=12
 site_assets=553
 sticker_packs=7
@@ -45,4 +45,4 @@ subscription_plans=3
 user_blocks=0
 user_friends=0
 user_mutes=0
-users: silverfoxinteractive@gmail.com, test@gmail.com, aloi@gmail.com
+users: silverfoxinteractive@gmail.com, test@gmail.com, aloi@gmail.com, test1@gmail.com
