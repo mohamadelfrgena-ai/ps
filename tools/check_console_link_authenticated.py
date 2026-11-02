@@ -96,6 +96,11 @@ def safe_error_body(raw: bytes) -> str:
     return summary[:500]
 
 
+def safe_request_path(path: str) -> str:
+    """Keep endpoint names in diagnostics while withholding temporary identities."""
+    return re.sub(r"[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,}", "<redacted-id>", path)
+
+
 def request_json(
     method: str,
     path: str,
@@ -124,15 +129,19 @@ def request_json(
             raw = response.read()
     except urllib.error.HTTPError as exc:
         detail = safe_error_body(exc.read())
-        raise CheckError(f"{method} {path} returned HTTP {exc.code}: {detail}") from exc
+        raise CheckError(
+            f"{method} {safe_request_path(path)} returned HTTP {exc.code}: {detail}"
+        ) from exc
     except urllib.error.URLError as exc:
-        raise CheckError(f"{method} {path} could not reach production: {exc.reason}") from exc
+        raise CheckError(
+            f"{method} {safe_request_path(path)} could not reach production: {exc.reason}"
+        ) from exc
     if not raw.strip():
         return None
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise CheckError(f"{method} {path} returned invalid JSON") from exc
+        raise CheckError(f"{method} {safe_request_path(path)} returned invalid JSON") from exc
 
 
 def as_object(value: Any, operation: str) -> dict[str, Any]:

@@ -11783,15 +11783,44 @@ begin
 end;
 $$;
 
+-- A newly assigned Moderator or General Supervisor receives the current
+-- month's salary immediately. Reassigning or changing between the two staff
+-- roles cannot pay twice because staff_salary_payments is unique per month.
+create or replace function public.staff_salary_on_role_assignment()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.role in ('moderator', 'head_moderator')
+     and old.role is distinct from new.role then
+    perform public.staff_salary_apply(new.id, null);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_staff_salary_on_role_assignment on public.profiles;
+create trigger trg_staff_salary_on_role_assignment
+  after update of role on public.profiles
+  for each row
+  execute function public.staff_salary_on_role_assignment();
+
 revoke all on function public.moderator_salary_config() from public, anon, authenticated;
 revoke all on function public.staff_salary_apply(uuid, date) from public, anon, authenticated;
 revoke all on function public.process_moderator_salaries() from public, anon, authenticated;
+revoke all on function public.staff_salary_on_role_assignment() from public, anon, authenticated;
 revoke all on function public.admin_update_moderator_salary(boolean, integer) from public, anon;
 revoke all on function public.claim_moderator_salary() from public, anon;
 
 grant execute on function public.admin_update_moderator_salary(boolean, integer) to authenticated, service_role;
 grant execute on function public.claim_moderator_salary() to authenticated;
 grant execute on function public.process_moderator_salaries() to service_role;
+
+-- Pay any already-assigned eligible staff for the current month when this
+-- migration is first applied. The same unique key makes reruns harmless.
+select public.process_moderator_salaries() as initial_salary_run;
 
 -- Schedule shortly after midnight on the first day of each month when pg_cron
 -- is available. The authenticated claim RPC remains a safe fallback.
