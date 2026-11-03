@@ -2188,9 +2188,18 @@ std::string saleKicker(const std::string& lang) {
 int saleDiscount() { return gSeasonOverride >= 1 ? 50 : gSale.discountPercent; }
 
 // Item cover: real image when loaded, otherwise a calm placeholder (and ask main.cpp to fetch it).
-void itemCover(UiEngine& e, const AddonItem& it, int x, int y, int w, int h, int r) {
+void itemCover(UiEngine& e, const AddonItem& it, int x, int y, int w, int h, int r, bool fitOnly = false) {
     int iw = 0, ih = 0;
     if (!it.cover.empty() && e.imageSize(it.cover, iw, ih)) {
+        if (fitOnly) {
+            // v0.39 (user order): the COMPLETE cover, only scaled down, inside the card
+            // slot — no crop, no bleed copy behind it.
+            e.drawRoundRect(x, y, w, h, r, kSF2);
+            int cw = w, ch = static_cast<int>(static_cast<long long>(w) * ih / iw);
+            if (ch > h) { ch = h; cw = static_cast<int>(static_cast<long long>(h) * iw / ih); }
+            e.drawImageRounded(it.cover, x + (w - cw) / 2, y + (h - ch) / 2, cw, ch, std::min(r, 12));
+            return;
+        }
         // v0.36 (user request): covers are NEVER cropped — the WHOLE cover always shows,
         // centred over a dimmed fill of itself, so nothing baked into the art is ever cut.
         e.drawImageRounded(it.cover, x, y, w, h, r, 90);
@@ -2458,7 +2467,7 @@ void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const Addo
     e.dropShadow(rx, y + 6, w, h, r, 14, focused ? 150 : (gLight ? 40 : 90));
     const SDL_Color bg = focused ? kSF2 : kSF;
     e.drawRoundRect(rx, y, w, h, r, bg);
-    itemCover(e, it, rx, y, w, imgH + r, r);
+    itemCover(e, it, rx, y, w, imgH + r, r, true);   // v0.39: whole cover, scaled only
     e.fillRect(rx, y + imgH, w, r, bg);
     e.drawRoundBorder(rx, y, w, h, r, 2, focused ? ink(40) : kBD);
     // ---- cover badges (v0.36 marketplace look): sale % top-left, NEW top-right, type tag bottom-left ----
@@ -3001,9 +3010,6 @@ void cardGrid(UiEngine& e, const Lay& L, const std::vector<int>& items, int scro
         const int x = xl + (i % cols) * (cw + gap);
         const AddonItem& it = gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])];
         vcard(e, L, x, ry, cw, ih, it, focus == fb + i, lang, false, false, dealBadge);
-        const bool soon = it.fileSize <= 0;
-        e.drawTextCentered(tr(soon ? "card_soon" : "card_dl", lang), L.X(x, cw) + cw / 2, ry + ch + 4, 16,
-                           soon ? kMU : kBLl, FontRole::Body, L.rtl);
     }
 }
 } // namespace
@@ -3282,9 +3288,10 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
         bnH = 128;
         const int brx = L.X(cx, cw);
         e.dropShadow(brx, bnY + 6, cw, bnH, 22, 14, gLight ? 50 : 120);
-        itemCover(e, nw, brx, bnY, cw, bnH, 22);
-        if (L.rtl) e.drawRoundGradH(brx, bnY, cw, bnH, 22, SDL_Color{8, 9, 11, 40}, SDL_Color{8, 9, 11, 235});
-        else e.drawRoundGradH(brx, bnY, cw, bnH, 22, SDL_Color{8, 9, 11, 235}, SDL_Color{8, 9, 11, 40});
+        // v0.39 (user order): NO square cover thumbnail in the strip — clean surface + text + button
+        e.drawRoundRect(brx, bnY, cw, bnH, 22, kSF);
+        if (L.rtl) e.drawRoundGradH(brx, bnY, cw, bnH, 22, SDL_Color{53, 214, 234, 30}, SDL_Color{53, 214, 234, 0});
+        else e.drawRoundGradH(brx, bnY, cw, bnH, 22, SDL_Color{53, 214, 234, 0}, SDL_Color{53, 214, 234, 30});
         kickerText(e, L, cx + 36, bnY + 30, tr("newest_k", lang), SDL_Color{255, 214, 102, 255});
         boxText(e, L, nw.title, cx + 36, 900, bnY + 64, 30, kWHT);
         const std::string vt = tr("view_addon", lang);
@@ -3326,9 +3333,6 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
             const int ry = catY + row * (ch + gap);
             const AddonItem& it = gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])];
             vcard(e, L, gx + col * (gcw + gap), ry, gcw, ih, it, focus == i, lang, true, true, sale);
-            const bool soon = it.fileSize <= 0;
-            e.drawTextCentered(tr(soon ? "card_soon" : "card_dl", lang), L.X(gx + col * (gcw + gap), gcw) + gcw / 2, ry + ch + 4, 15,
-                               soon ? kMU : kBLl, FontRole::Body, L.rtl);
         }
     }
     drawLegendBar(e, {{"\xE2\x9C\x95", "open"}, {"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}}, langCode);
