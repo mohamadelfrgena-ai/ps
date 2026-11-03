@@ -1,5 +1,5 @@
 — الروابط العامة بعد الرفع —
-  ✓ https://jqjmkssgjdsfdojkuqzq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png
+  ✓ https://stbmescmexzcszyyambq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png
 
 ✓ رُفع 1 ملف/ملفات إلى site-assets/brand/
 
