@@ -1,0 +1,63 @@
+# PS4 homebrew preview (keep local Supabase config and generated PKG artifacts out of Git)
+ps4/config.local.hpp
+ps4/build/
+ps4/build-host/
+ps4/eboot.bin
+ps4/pkg.gp4
+ps4/*.pkg
+ps4/sce_sys/param.sfo
+ps4/sce_sys/about/right.sprx
+ps4/sce_module/*.prx
+ps4/nextgen/src/config.h
+ps4/nextgen/src/config.local.h
+ps4/nextgen/build/
+ps4/**/*.o
+ps4/**/*.elf
+ps4/**/*.oelf
+
+# أندرويد / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/captures/
+*.apk
+# ملف APK الذي يسجّله سير العمل (apk-commit) ليتمكّن المالك من تنزيله من المستودع
+!/apk-debug.apk
+*.aab
+*.keystore
+*.jks
+
+# عوالم وأرشيفات كبيرة (تبقى محلياً)
+*.zip
+*.z01
+*.z02
+!supabase/functions/**
+
+# بايثون (أدوات المشروع)
+__pycache__/
+*.pyc
+
+# نظام
+.DS_Store
+Thumbs.db
+
+# حزمة SQL الجاهزة (مقصود تعقّبها لتوفير رابط تحميل مباشر)
+!sql-package/**
+
+# مساحة عمل توليد الأكواد (تبقى محلياً حتى لا تُرفع سهواً)
+redeem-codes/
+
+# أكواد هدايا AC المرفوعة إلى المستودع **الخاص** لتنزيلها من GitHub
+# (المستودع private — لا تجعل المستودع عاماً وأنت هذه الأكواد فيه)
+# ac-codes/  ← متعقّب عمداً (مع استثناء ملف zip من قاعدة *.zip)
+!ac-codes/*.zip
+
+# صور مرجعية من بحث الويب (مواد عمل، لا تُرفع)
+image-search/
+
+# Local SDK archives and extracted toolchains (never include in Git)
+/.cache/
+ps4/.agent-deps/

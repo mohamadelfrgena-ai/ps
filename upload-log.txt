@@ -1,0 +1,6 @@
+— الروابط العامة بعد الرفع —
+  ✓ https://jqjmkssgjdsfdojkuqzq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png
+
+✓ رُفع 1 ملف/ملفات إلى site-assets/brand/
+
+استخدم هذا الرابط في حقل الصورة داخل قوالب البريد (docs/07-EMAIL-BRANDING-AR.md)
