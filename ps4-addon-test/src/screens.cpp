@@ -4068,47 +4068,24 @@ float legalSplashOpacity(int ms) {
     if (ms < kSplashFadeOutMs) return 1.f - static_cast<float>(ms) / kSplashFadeOutMs;
     return 0.f;
 }
-// v0.35 (2026-10-29): the splash loader is now a Minecraft-style "loading box"
-// (Bedrock autosave indicator: pixel barrel + bobbing down-arrow) drawn WITH the
-// "Loading… NN%" text as one group — bottom-right in Arabic, bottom-left in LTR
-// (exactly where the user's red arrow pointed). The old bottom-left rounded box
-// + gold progress bar is removed (user request 2026-10-29).
-static void drawLoadingBoxIcon(UiEngine& e, int x, int y, int a, int bob) {
-    auto A = [&](int v) { return static_cast<Uint8>(std::min(255, v * a / 255)); };
-    auto C = [&](int r, int g, int b) { return SDL_Color{A(r), A(g), A(b), 255}; };
-    // ---- down-arrow: cream fill on dark-gray outline, stepped pixel head ----
-    const int ay = y + bob;
-    e.fillRect(x + 24, ay, 24, 34, C(74, 74, 74));          // stem outline
-    e.fillRect(x + 26, ay + 2, 20, 32, C(245, 237, 192));   // stem cream
-    const int headW[5] = {60, 46, 32, 18, 6};
-    for (int r = 0; r < 5; ++r) {                           // staircase head (outline)
-        const int hw = headW[r], hy = ay + 34 + r * 8;
-        e.fillRect(x + 36 - hw / 2, hy, hw, 9, C(74, 74, 74));
-    }
-    for (int r = 0; r < 5; ++r) {                           // cream fill -> edge outline
-        const int hw = headW[r] - 6, hy = ay + 34 + r * 8;
-        if (hw > 0) e.fillRect(x + 36 - hw / 2, hy + 1, hw, 7, C(245, 237, 192));
-    }
-    // ---- barrel: wood + dark bands + silver latch (pixel chest look) ----
-    const int by = y + 78;
-    e.drawRoundRect(x + 2, by, 72, 58, 10, C(12, 9, 5));            // outline
-    e.drawRoundRect(x + 5, by + 3, 66, 52, 8, C(200, 132, 47));     // wood
-    e.drawRoundRect(x + 8, by + 6, 60, 14, 6, C(222, 164, 82));     // lid
-    e.fillRect(x + 5, by + 24, 66, 8, C(64, 42, 16));               // band 1
-    e.fillRect(x + 5, by + 40, 22, 7, C(64, 42, 16));               // band 2 (latch gap)
-    e.fillRect(x + 51, by + 40, 22, 7, C(64, 42, 16));
-    e.fillRect(x + 15, by + 21, 14, 18, C(20, 16, 10));             // latch outline
-    e.fillRect(x + 17, by + 23, 10, 14, C(154, 160, 168));          // latch silver
-    e.fillRect(x + 37, by + 43, 6, 12, C(120, 78, 28));             // center seam
+// v0.35 (2026-10-29): the splash loader is the Minecraft Bedrock "autosave" box
+// with the "Loading… NN%" text as one group — bottom-right in Arabic, bottom-left
+// in LTR. v0.39 (user order): the EXACT Bedrock autosave indicator from the
+// user's GIF — 9-frame pixel animation (arrow into the chest), blue keyed out.
+static void drawLoadingBoxIcon(UiEngine& e, int x, int y, int a, int elapsedMs) {
+    const int frame = (elapsedMs / 130) % 9;
+    char nm[32];
+    std::snprintf(nm, sizeof nm, "load_box_%d", frame);
+    if (!e.hasImage(nm)) return;
+    e.drawImage(nm, x, y, 64, 120, static_cast<Uint8>(std::min(255, a)));
 }
 void splashLoadingBox(UiEngine& e, const std::string& langCode, int elapsedMs, int a) {
     if (a <= 0) return;
     Lay L; L.rtl = (langCode == "ar");
     auto A = [&](int v) { return static_cast<Uint8>(std::min(255, v * a / 255)); };
     const float p = std::min(1.0f, static_cast<float>(elapsedMs) / static_cast<float>(std::max(1, legalSplashTotalMs())));
-    // one group: icon (72×130) + text (292) + pct (70) — logical 118..580
-    const int bob = ((elapsedMs / 350) % 2) ? 10 : 0;   // chunky 2-frame bounce
-    drawLoadingBoxIcon(e, L.X(118, 72), 890, a, bob);
+    // one group: icon (64×120) + text (292) + pct (70) — logical 118..580
+    drawLoadingBoxIcon(e, L.X(118, 64), 898, a, elapsedMs);
     e.drawText(tr("loading", langCode), L.X(214, 292), 938, 24,
                SDL_Color{A(236), A(236), A(236), A(255)}, FontRole::Body, false, false);
     char pct[16];
