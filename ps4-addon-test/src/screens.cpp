@@ -656,11 +656,11 @@ SDL_Color kMU{134, 169, 181, 255}; // theme-b (was 152,161,172)
 SDL_Color kGD{255, 201, 64, 255};
 SDL_Color kFOCUS{255, 255, 255, 255};
 SDL_Color kINKRGB{255, 255, 255, 255};   // translucent overlays: white on dark, near-black on light
-constexpr SDL_Color kBL{53, 214, 234, 255};
-constexpr SDL_Color kBL2{31, 168, 188, 255};
-SDL_Color kBLl{53, 214, 234, 255};
-constexpr SDL_Color kGRN{53, 214, 234, 255};
-SDL_Color kGRN2{126, 226, 242, 255};
+constexpr SDL_Color kBL{74, 168, 255, 255};
+constexpr SDL_Color kBL2{0, 112, 209, 255};
+SDL_Color kBLl{74, 168, 255, 255};
+constexpr SDL_Color kGRN{74, 168, 255, 255};
+SDL_Color kGRN2{150, 205, 255, 255};
 constexpr SDL_Color kRED{255, 90, 99, 255};
 constexpr SDL_Color kWHT{255, 255, 255, 255};
 SDL_Color ink(Uint8 a) { return SDL_Color{kINKRGB.r, kINKRGB.g, kINKRGB.b, a}; }
@@ -814,13 +814,13 @@ void applyTheme(bool light) {
         kBG = {8, 19, 26, 255}; kSF = {18, 34, 46, 255}; kSF2 = {24, 44, 58, 255}; kBAR = {13, 27, 37, 255};   // theme-b
         kBD = {255, 255, 255, 20}; kTX = {243, 245, 247, 255}; kMU = {134, 169, 181, 255};   // theme-b kCHIPTX = {205, 211, 218, 255};
         kGD = {255, 201, 64, 255}; kFOCUS = {255, 255, 255, 255}; kINKRGB = {255, 255, 255, 255}; kSCRIM = {3, 4, 6, 214};
-        kBLl = {53, 214, 234, 255}; kGRN2 = {126, 226, 242, 255}; kERT = {255, 128, 150, 255}; kEPICT = {186, 164, 255, 255};
+        kBLl = {74, 168, 255, 255}; kGRN2 = {150, 205, 255, 255}; kERT = {255, 128, 150, 255}; kEPICT = {186, 164, 255, 255};
         kWARN = {251, 160, 60, 255};
     } else {
         kBG = {242, 244, 247, 255}; kSF = {255, 255, 255, 255}; kSF2 = {234, 238, 243, 255}; kBAR = {255, 255, 255, 255};
         kBD = {16, 20, 26, 26}; kTX = {17, 20, 24, 255}; kMU = {92, 101, 114, 255}; kCHIPTX = {52, 58, 66, 255};
         kGD = {168, 112, 0, 255}; kFOCUS = {17, 20, 24, 255}; kINKRGB = {16, 20, 26, 255}; kSCRIM = {16, 20, 26, 140};
-        kBLl = {14, 138, 158, 255}; kGRN2 = {10, 118, 138, 255}; kERT = {214, 38, 74, 255}; kEPICT = {110, 66, 230, 255};
+        kBLl = {16, 105, 195, 255}; kGRN2 = {10, 85, 160, 255}; kERT = {214, 38, 74, 255}; kEPICT = {110, 66, 230, 255};
         kWARN = {196, 108, 0, 255};
     }
 }
@@ -1624,8 +1624,8 @@ void button(UiEngine& e, const Lay& L, int xl, int y, int w, int h, const std::s
     };
     if (style == 0) {
         e.dropShadow(rx, y + 4, w, h, r, 14, gLight ? 70 : 120);
-        under(SDL_Color{53, 214, 234, 255}, gLight ? 16 : 14, gLight ? 26 : 24);
-        e.drawRoundGradD(rx, y, w, h, r, SDL_Color{96, 246, 170, 255}, SDL_Color{18, 190, 150, 255});
+        under(SDL_Color{74, 168, 255, 255}, gLight ? 16 : 14, gLight ? 26 : 24);
+        e.drawRoundGradD(rx, y, w, h, r, SDL_Color{74, 168, 255, 255}, SDL_Color{8, 86, 190, 255});   // v0.40 Sony blue
         glass(gLight ? 90 : 78); rim(gLight ? 120 : 90);
     } else if (style == 2) {
         e.dropShadow(rx, y + 4, w, h, r, 14, gLight ? 70 : 110);
@@ -1633,8 +1633,8 @@ void button(UiEngine& e, const Lay& L, int xl, int y, int w, int h, const std::s
         e.drawRoundGradD(rx, y, w, h, r, SDL_Color{255, 226, 130, 255}, SDL_Color{238, 150, 30, 255});
         glass(gLight ? 90 : 80); rim(gLight ? 120 : 90);
     } else if (style == 3) {
-        e.drawRoundGradV(rx, y, w, h, r, SDL_Color{53, 214, 234, 56}, SDL_Color{53, 214, 234, 20});
-        e.drawRoundBorder(rx, y, w, h, r, 2, SDL_Color{53, 214, 234, 230});
+        e.drawRoundGradV(rx, y, w, h, r, SDL_Color{74, 168, 255, 56}, SDL_Color{74, 168, 255, 20});
+        e.drawRoundBorder(rx, y, w, h, r, 2, SDL_Color{74, 168, 255, 230});
         glass(gLight ? 40 : 22);
     } else if (style == 4) {
         e.drawRoundGradV(rx, y, w, h, r, SDL_Color{251, 76, 110, 54}, SDL_Color{251, 76, 110, 18});
@@ -1647,7 +1647,7 @@ void button(UiEngine& e, const Lay& L, int xl, int y, int w, int h, const std::s
         e.drawRoundBorder(rx, y, w, h, r, 2, ink(gLight ? 44 : 72));
         glass(gLight ? 60 : 30);
     }
-    const SDL_Color ink = style == 0 ? SDL_Color{4, 30, 22, 255} : style == 2 ? SDL_Color{44, 26, 2, 255} : (style == 3 ? kGRN2 : (style == 4 ? kERT : kTX));
+    const SDL_Color ink = style == 0 ? SDL_Color{255, 255, 255, 255} : style == 2 ? SDL_Color{44, 26, 2, 255} : (style == 3 ? kGRN2 : (style == 4 ? kERT : kTX));
     e.drawTextCentered(label, rx + w / 2, y + h / 2, px, ink, FontRole::Body, L.rtl);
 }
 
@@ -1710,7 +1710,7 @@ void drawToast(UiEngine& e, const std::string& text, const std::string& langCode
     const int x = 960 - w / 2, y = 1080 - 130 - 84;
     e.dropShadow(x, y + 6, w, 84, 42, 20, 170);
     e.drawRoundGradV(x, y, w, 84, 42, gLight ? SDL_Color{255, 255, 255, 255} : SDL_Color{21, 25, 30, 255}, gLight ? SDL_Color{246, 248, 250, 255} : SDL_Color{13, 15, 18, 255});
-    e.drawRoundBorder(x, y, w, 84, 42, 2, SDL_Color{53, 214, 234, 180});
+    e.drawRoundBorder(x, y, w, 84, 42, 2, SDL_Color{74, 168, 255, 180});
     e.fillRect(x + 42, y + 2, w - 84, 1, SDL_Color{255, 255, 255, 50});
     const int cx = L.rtl ? x + w - 50 : x + 50;
     e.drawCircle(cx, y + 42, 24, kGRN);
@@ -2335,9 +2335,9 @@ int tierChip(UiEngine& e, const Lay& L, int xl, int y, Tier t, const std::string
     const int rx = L.X(xl, w);
     SDL_Color tc;
     if (t == Tier::Free) {
-        e.drawRoundRect(rx, y, w, h, h / 3, SDL_Color{53, 214, 234, 40});
-        e.drawRoundBorder(rx, y, w, h, h / 3, 1, SDL_Color{53, 214, 234, 110});
-        tc = gLight ? SDL_Color{10, 118, 138, 255} : kBLl;
+        e.drawRoundRect(rx, y, w, h, h / 3, SDL_Color{74, 168, 255, 40});
+        e.drawRoundBorder(rx, y, w, h, h / 3, 1, SDL_Color{74, 168, 255, 110});
+        tc = gLight ? SDL_Color{10, 85, 160, 255} : kBLl;
     } else if (t == Tier::Epic) {
         e.drawRoundGradH(rx, y, w, h, h / 3, SDL_Color{150, 104, 255, 255}, SDL_Color{110, 66, 230, 255});
         tc = kWHT;
@@ -2874,7 +2874,7 @@ void drawSignIn(UiEngine& e, int focus, const std::string& code, int secondsLeft
             drawGroupAt(e, L, g, bx + 17, cy + 435);
         }
         {   // v7.0: check badge (clean geometric check) + text = one exact-centred group
-            const SDL_Color col = gLight ? SDL_Color{10, 118, 138, 255} : kGRN2;
+            const SDL_Color col = gLight ? SDL_Color{10, 85, 160, 255} : kGRN2;
             std::vector<GPiece> g;
             g.push_back(gIcon(24, 24, [&](int gx, int gy) {
                 e.drawCircle(gx + 12, gy + 12, 12, kGRN);
@@ -2883,8 +2883,8 @@ void drawSignIn(UiEngine& e, int focus, const std::string& code, int secondsLeft
             g.push_back(gText(e, tr("st_linked", lang), 24, col, L.rtl));
             const int pw = groupW(g) + 2 * 20;
             const int px = crx + (cw - pw) / 2;
-            e.drawRoundRect(px, cy + 494, pw, 56, 28, SDL_Color{53, 214, 234, 40});
-            e.drawRoundBorder(px, cy + 494, pw, 56, 28, 2, SDL_Color{53, 214, 234, 160});
+            e.drawRoundRect(px, cy + 494, pw, 56, 28, SDL_Color{74, 168, 255, 40});
+            e.drawRoundBorder(px, cy + 494, pw, 56, 28, 2, SDL_Color{74, 168, 255, 160});
             drawGroupAt(e, L, g, px + 20, cy + 522);
         }
     } else {
@@ -2898,7 +2898,7 @@ void drawSignIn(UiEngine& e, int focus, const std::string& code, int secondsLeft
         for (int i = 0; i < n; ++i) {
             const int bx = bx0 + i * (bwid + gap);
             e.drawRoundRect(bx, by, bwid, bh, 18, gLight ? SDL_Color{240, 243, 247, 255} : SDL_Color{8, 10, 13, 255});
-            e.drawRoundBorder(bx, by, bwid, bh, 18, 2, dim ? ink(30) : SDL_Color{53, 214, 234, 140});
+            e.drawRoundBorder(bx, by, bwid, bh, 18, 2, dim ? ink(30) : SDL_Color{74, 168, 255, 140});
             if (i < static_cast<int>(c.size()) && status != 4) {
                 const std::string g(1, c[static_cast<std::size_t>(i)]);
                 e.drawTextCentered(g, bx + bwid / 2, by + bh / 2, 64, dim ? kMU : kTX, FontRole::Pixel, false);
@@ -2968,8 +2968,8 @@ void drawSignInRequired(UiEngine& e, int focus, const std::string& langCode) {
     const int w = 780, h = 600, x = 960 - w / 2, y = 540 - h / 2;
     e.dropShadow(x, y + 10, w, h, 32, 30, 200);
     surface(e, x, y, w, h, 32, 1);
-    e.drawCircle(960, y + 96, 58, SDL_Color{53, 214, 234, 36});
-    e.drawRoundBorder(960 - 58, y + 38, 116, 116, 58, 2, SDL_Color{53, 214, 234, 130});
+    e.drawCircle(960, y + 96, 58, SDL_Color{74, 168, 255, 36});
+    e.drawRoundBorder(960 - 58, y + 38, 116, 116, 58, 2, SDL_Color{74, 168, 255, 130});
     lockIcon(e, 960 - 28, y + 66, 56, kBLl);
     e.drawTextCentered(tr("req_title", langCode), 960, y + 206, 38, kTX, FontRole::Body, L.rtl);
     {
@@ -3290,8 +3290,8 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
         e.dropShadow(brx, bnY + 6, cw, bnH, 22, 14, gLight ? 50 : 120);
         // v0.39 (user order): NO square cover thumbnail in the strip — clean surface + text + button
         e.drawRoundRect(brx, bnY, cw, bnH, 22, kSF);
-        if (L.rtl) e.drawRoundGradH(brx, bnY, cw, bnH, 22, SDL_Color{53, 214, 234, 30}, SDL_Color{53, 214, 234, 0});
-        else e.drawRoundGradH(brx, bnY, cw, bnH, 22, SDL_Color{53, 214, 234, 0}, SDL_Color{53, 214, 234, 30});
+        if (L.rtl) e.drawRoundGradH(brx, bnY, cw, bnH, 22, SDL_Color{74, 168, 255, 30}, SDL_Color{74, 168, 255, 0});
+        else e.drawRoundGradH(brx, bnY, cw, bnH, 22, SDL_Color{74, 168, 255, 0}, SDL_Color{74, 168, 255, 30});
         kickerText(e, L, cx + 36, bnY + 30, tr("newest_k", lang), SDL_Color{255, 214, 102, 255});
         boxText(e, L, nw.title, cx + 36, 900, bnY + 64, 30, kWHT);
         const std::string vt = tr("view_addon", lang);
@@ -3475,7 +3475,7 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
         std::string t;
         SDL_Color c = kCHIPTX;
         if (acc == Access::NeedSignIn) { t = it.tier == Tier::Free ? tr("acc_free", lang) : fmt1(tr("acc_need_s", lang), tierName(it.tier, lang)); c = kTX; }
-        else if (acc == Access::Download) { t = it.unlocked && rankOf(gAcc.plan) < rankOf(it.tier) ? tr("acc_unlocked", lang) : (it.tier == Tier::Free ? tr("acc_free", lang) : tr("acc_included", lang)); c = gLight ? SDL_Color{10, 118, 138, 255} : kGRN2; }
+        else if (acc == Access::Download) { t = it.unlocked && rankOf(gAcc.plan) < rankOf(it.tier) ? tr("acc_unlocked", lang) : (it.tier == Tier::Free ? tr("acc_free", lang) : tr("acc_included", lang)); c = gLight ? SDL_Color{10, 85, 160, 255} : kGRN2; }
         else { t = fmt1(tr("acc_need", lang), tierName(it.tier, lang)); c = it.tier == Tier::Legendary ? kGD : kEPICT; }
         if (acc == Access::Download) { e.drawCircle(L.X(x0 + pad, 28) + 14, yy + 15, 14, kGRN); icCheck(e, L.X(x0 + pad, 28) + 6, yy + 7, 16, kWHT); }
         else lockIcon(e, L.X(x0 + pad, 28), yy + 1, 28, c);
@@ -3721,7 +3721,7 @@ void drawProfile(UiEngine& e, int focus, const std::string& langCode) {
             boxText(e, L, t.label.empty() ? t.kind : t.label, wx + 100, ww - 400, ry + 8, 22, kTX);
             boxText(e, L, fmtDate(t.at), wx + 100, 300, ry + 36, 16, kMU);
             const std::string amt = (plus ? "+" : "") + formatAC(t.amount) + " AC";
-            endText(e, L, amt, wx + 30, ww - 80, ry + 18, 24, plus ? (gLight ? SDL_Color{10, 118, 138, 255} : kGRN2) : kERT);
+            endText(e, L, amt, wx + 30, ww - 80, ry + 18, 24, plus ? (gLight ? SDL_Color{10, 85, 160, 255} : kGRN2) : kERT);
             if (focus == i) focusRing(e, rrx, ry, ww - 60, rh, 16, false);   // v0.35: row, frame only
         }
     }
@@ -3789,7 +3789,7 @@ void drawPlans(UiEngine& e, int focus, const std::string& langCode) {
         const int qy = y + h + 28, qh = 170, qw = kCR - cx;
         const int qrx = L.X(cx, qw);
         e.drawRoundGradH(qrx, qy, qw, qh, 24, gLight ? SDL_Color{222, 246, 233, 255} : SDL_Color{18, 44, 32, 255}, kSF);
-        e.drawRoundBorder(qrx, qy, qw, qh, 24, 2, SDL_Color{53, 214, 234, 70});
+        e.drawRoundBorder(qrx, qy, qw, qh, 24, 2, SDL_Color{74, 168, 255, 70});
         const int qs = qh - 36;
         qrTile(e, L.X(cx + qw - 18 - qs, qs), qy + 18, qs);
         glyph(e, 3, L.X(cx + 36, 44), qy + 36, 44, kBLl, kBLl, false);
@@ -3829,7 +3829,7 @@ void themePreview(UiEngine& e, int x, int y, int w, int h, bool light) {
     const int cw = (w - 46 - 10 - 2 * 8) / 3;
     for (int i = 0; i < 3; ++i) {
         e.drawRoundRect(x + 46 + i * (cw + 8), y + h - 66, cw, 52, 8, sf);
-        e.drawRoundRect(x + 46 + i * (cw + 8), y + h - 66, cw, 26, 8, SDL_Color{53, 214, 234, static_cast<Uint8>(140 - i * 30)});
+        e.drawRoundRect(x + 46 + i * (cw + 8), y + h - 66, cw, 26, 8, SDL_Color{74, 168, 255, static_cast<Uint8>(140 - i * 30)});
     }
     e.drawRoundBorder(x, y, w, h, 14, 2, light ? SDL_Color{16, 20, 26, 30} : SDL_Color{255, 255, 255, 30});
 }
@@ -3902,8 +3902,8 @@ void drawSettings(UiEngine& e, int focus, int subFocus, bool autoLaunchOn, const
                 const int xl = innerX + (i % 2) * (cw + 16), yy = cy + (i / 2) * (chh + 14);
                 const int rx = L.X(xl, cw);
                 const bool sel = (i == curLang);
-                e.drawRoundRect(rx, yy, cw, chh, 18, sel ? SDL_Color{53, 214, 234, 30} : kSF2);
-                e.drawRoundBorder(rx, yy, cw, chh, 18, 2, sel ? SDL_Color{53, 214, 234, 150} : kBD);
+                e.drawRoundRect(rx, yy, cw, chh, 18, sel ? SDL_Color{74, 168, 255, 30} : kSF2);
+                e.drawRoundBorder(rx, yy, cw, chh, 18, 2, sel ? SDL_Color{74, 168, 255, 150} : kBD);
                 const int rcx = L.X(xl + 22, 26) + 13;
                 e.drawRoundBorder(rcx - 13, yy + chh / 2 - 13, 26, 26, 13, 2, sel ? kBLl : kMU);
                 if (sel) e.drawCircle(rcx, yy + chh / 2, 7, kBLl);
@@ -3948,8 +3948,8 @@ void drawSettings(UiEngine& e, int focus, int subFocus, bool autoLaunchOn, const
                 // icon — IBM Plex has no U+2715 and rendered a tofu box instead.
                 const int bY = cy + 418, bH = 88, bMid = bY + bH / 2;
                 const int brx = L.X(innerX, innerW);
-                e.drawRoundRect(brx, bY, innerW, bH, 24, SDL_Color{53, 214, 234, 44});
-                e.drawRoundBorder(brx, bY, innerW, bH, 24, 3, SDL_Color{53, 214, 234, 190});
+                e.drawRoundRect(brx, bY, innerW, bH, 24, SDL_Color{74, 168, 255, 44});
+                e.drawRoundBorder(brx, bY, innerW, bH, 24, 3, SDL_Color{74, 168, 255, 190});
                 {
                     std::string s = tr("press_x_code", lang), a, b;
                     const std::size_t p = s.find("\xE2\x9C\x95");           // U+2715
@@ -3966,7 +3966,7 @@ void drawSettings(UiEngine& e, int focus, int subFocus, bool autoLaunchOn, const
                     const int wB = b.empty() ? 0 : e.inkWidth(b, fsz, FontRole::Body, L.rtl);
                     const int total = wA + (b.empty() ? 0 : gap + iw + gap) + wB;
                     const int gx = brx + (innerW - total) / 2;
-                    const SDL_Color cta = gLight ? SDL_Color{10, 118, 138, 255} : kBLl;
+                    const SDL_Color cta = gLight ? SDL_Color{10, 85, 160, 255} : kBLl;
                     if (L.rtl) {
                         if (!a.empty()) e.drawTextCentered(a, gx + total - wA / 2, bMid, fsz, cta, FontRole::Body, true);
                         if (!b.empty()) e.drawTextCentered(b, gx + wB / 2, bMid, fsz, cta, FontRole::Body, true);
