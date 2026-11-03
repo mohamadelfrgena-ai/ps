@@ -1,0 +1,14 @@
+# Generated add-on output (contains Mojang DLC textures -- never commit)
+dist/
+*.mcpack
+*.mcaddon
+*.mcskinpack
+
+# Local copies of the Java mod source used as build input
+source/
+vendor/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

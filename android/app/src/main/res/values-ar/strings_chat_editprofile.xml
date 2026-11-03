@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="edit_profile_unsaved">تغييرات غير محفوظة</string>
+    <string name="chat_admin_only">للمشرف فقط</string>
+    <string name="comm_room_cash">كاش</string>
+    <string name="comm_rules_banner_plain">قواعد المجتمع · المخالفة قد تؤدي إلى الكتم أو الحظر</string>
+</resources>
