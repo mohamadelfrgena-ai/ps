@@ -4108,13 +4108,20 @@ void splashLoadingBox(UiEngine& e, const std::string& langCode, int elapsedMs, i
     Lay L; L.rtl = (langCode == "ar");
     auto A = [&](int v) { return static_cast<Uint8>(std::min(255, v * a / 255)); };
     const float p = std::min(1.0f, static_cast<float>(elapsedMs) / static_cast<float>(std::max(1, legalSplashTotalMs())));
-    // one group: icon (64×120) + text (292) + pct (70) — logical 118..580
-    drawLoadingBoxIcon(e, L.X(118, 64), 898, a, elapsedMs);
-    e.drawText(tr("loading", langCode), L.X(214, 292), 938, 24,
-               SDL_Color{A(236), A(236), A(236), A(255)}, FontRole::Body, false, false);
+    // v0.47 (user order): ONE tight group — the box sits IMMEDIATELY next to the
+    // «loading» text (was: fixed slots with a ~200px gap). Widths measured live.
     char pct[16];
     std::snprintf(pct, sizeof pct, "%d%%", static_cast<int>(p * 100.0f + 0.5f));
-    e.drawText(pct, L.X(510, 70), 940, 22, SDL_Color{A(255), A(214), A(90), A(255)}, FontRole::Pixel, false, false);
+    const std::string lt = tr("loading", langCode);
+    const int tw = std::max(120, e.measureText(lt, 24, FontRole::Body, L.rtl));
+    const int pw = std::max(50, e.measureText(pct, 22, FontRole::Pixel, L.rtl));
+    int lx = 118;
+    drawLoadingBoxIcon(e, L.X(lx, 64), 898, a, elapsedMs);
+    lx += 64 + 16;
+    e.drawText(lt, L.X(lx, tw), 938, 24,
+               SDL_Color{A(236), A(236), A(236), A(255)}, FontRole::Body, false, false);
+    lx += tw + 14;
+    e.drawText(pct, L.X(lx, pw), 940, 22, SDL_Color{A(255), A(214), A(90), A(255)}, FontRole::Pixel, false, false);
 }
 
 bool drawLegalSplashFade(UiEngine& e, const std::string& langCode, int elapsedMs) {
