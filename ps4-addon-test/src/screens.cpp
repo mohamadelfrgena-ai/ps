@@ -2714,6 +2714,17 @@ static bool deviceHHMM(char* buf, std::size_t n) { (void)buf; (void)n; return fa
 #endif
 bool gShowClock = true;
 // railIdx: 0 Home, 1 Deals, 2 Store, 3 Plans, 4 Profile, 5 Settings, -1 none
+// v0.43 (user order): the app logo ALWAYS sits in a COMPLETE rounded tile —
+// same frame on every screen (rail, sign-in), never a cropped/offset shadow box.
+static void appLogoTile(UiEngine& e, int cx, int y, int tile) {
+    const int x = cx - tile / 2;
+    e.dropShadow(x, y + 6, tile, tile, 24, 16, gLight ? 58 : 130);
+    e.drawRoundRect(x, y, tile, tile, 24, gLight ? SDL_Color{255, 255, 255, 242} : SDL_Color{18, 34, 46, 242});
+    e.drawRoundBorder(x, y, tile, tile, 24, 2, ink(30));
+    const int is = tile * 72 / 104;
+    e.drawImageRounded("icon_app", x + (tile - is) / 2, y + (tile - is) / 2, is, is, 16);
+}
+
 void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
     Lay L; L.rtl = (langCode == "ar");
     gRail = true;
@@ -2724,8 +2735,7 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
     if (L.rtl) e.fillGradH(rx, 0, RW, 1080, r1, r0); else e.fillGradH(rx, 0, RW, 1080, r0, r1);
     e.fillRect(L.X(RW - 1, 1), 0, 1, 1080, ink(18));
     const int cx = rx + RW / 2;
-    e.dropShadow(cx - 32, 40, 64, 64, 16, 12, gLight ? 50 : 130);
-    e.drawImageRounded("icon_app", cx - 32, 34, 64, 64, 15);
+    appLogoTile(e, cx, 22, 96);   // v0.43: complete frame, matches the sign-in screen
     struct It { int kind; const char* key; };
     static const It items[6] = {{10, "nav_home"}, {11, "nav_deals"}, {12, "nav_store"},
                                 {7, "nav_plans"}, {1, "rail_profile"}, {9, "nav_settings"}};
@@ -2815,12 +2825,9 @@ void drawSignIn(UiEngine& e, int focus, const std::string& code, int secondsLeft
 
     // ---- leading column: brand, title, steps, what comes with the account ----
     const int x0 = 150, lw = 860;
-    const int lg = 104;   // v0.41: COMPLETE rounded tile frame around the logo (was an incomplete shadow box)
+    const int lg = 104;   // v0.41/0.43: COMPLETE rounded tile frame around the logo
     const int lrx = L.X(x0, lg);
-    e.dropShadow(lrx, 96, lg, lg, 24, 16, gLight ? 60 : 130);
-    e.drawRoundRect(lrx, 90, lg, lg, 24, gLight ? SDL_Color{255, 255, 255, 238} : SDL_Color{18, 34, 46, 238});
-    e.drawRoundBorder(lrx, 90, lg, lg, 24, 2, ink(30));
-    e.drawImageRounded("icon_app", lrx + (lg - 72) / 2, 90 + (lg - 72) / 2, 72, 72, 16);
+    appLogoTile(e, lrx + lg / 2, 90, lg);
     boxText(e, L, "ADDONSTATION", x0 + lg + 22, 600, 112, 34, kTX, FontRole::Pixel);
     bigTitle(e, L, tr("signin_title", lang), x0, lw, 236, L.rtl ? 92 : 100, false);
     int y = paragraphAt(e, L, tr("signin_sub", lang), x0, 760, 364, 27, kCHIPTX, 3, 12) + 34;
