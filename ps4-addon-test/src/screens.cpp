@@ -3188,7 +3188,8 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     }
 
     // ---- tabs (focus 5-11) + shelf (focus 12-16): newest first ----
-    tabRow(e, L, cx, 636, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang), tr("chip_free", lang),
+    // v0.44 (user order): raise the filter bar toward the red guide line (636 -> 604)
+    tabRow(e, L, cx, 604, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang), tr("chip_free", lang),
                            tr("chip_epic", lang), tr("chip_legendary", lang), tr("chip_new", lang)}, filterIndex, 5, focus);
     cardGrid(e, L, homeItems, scrollOf(View::Home), 12, focus, cx, 684, kCR - cx, 1010, lang, sale);
 
