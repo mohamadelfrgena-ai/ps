@@ -3062,7 +3062,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     const int cx = kCL + 20;
     const int textMax = 1180;
 
-    int ctaY = 476;
+    int ctaY = 228;   // v0.45 (option D): compact hero — two whole rows below
     std::string b0, b1;
     if (!hero && slide == -1) {
         // ---- sale: the season artwork is the full-screen backdrop (whole 16:9 image), text on the leading side ----
@@ -3082,12 +3082,12 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
             }
         });
         if (baked) {
-            ctaY = 520;   // buttons low, under the artwork's own logo
+            ctaY = 228;   // v0.45: compact hero (was 520)
         } else {   // baked art already says it — no text over the logo
-            kickerText(e, L, cx, 150, saleKicker(lang), kGD);
-            bigTitle(e, L, saleTitle(lang), cx, textMax, 186, L.rtl ? 96 : 112, false);
+            kickerText(e, L, cx, 36, saleKicker(lang), kGD);
+            bigTitle(e, L, saleTitle(lang), cx, textMax, 56, L.rtl ? 62 : 70, false);
             const std::string sub = saleSubtitle(lang);
-            if (!sub.empty()) paragraphAt(e, L, sub, cx, std::min(820, textMax), 340, 26, kCHIPTX, 2, 12);
+            if (!sub.empty()) paragraphAt(e, L, sub, cx, std::min(820, textMax), 138, 20, kCHIPTX, 2, 10);
         }
         b0 = tr("shop_sale", lang);
         b1 = tr("nav_store", lang);
@@ -3106,19 +3106,19 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
             backdrop(e);
             itemCover(e, h, 0, 0, 1920, 1080, 0);
             leadShade(e, L, 1080, false);
-            bottomShade(e);
+            bottomShade(e, 330);   // v0.45: the page colour starts higher = the hero visually ends earlier
             e.fillGradV(0, 0, 1920, 150, shade(140), shade(0));
-            kickerText(e, L, cx, 150, kick, kGD);
-            bigTitle(e, L, h.title, cx, textMax, 186, L.rtl ? 96 : 112, false);
-            if (!lead.empty()) paragraphAt(e, L, lead, cx, std::min(820, textMax), 330, 25, kCHIPTX, 2, 10);
+            kickerText(e, L, cx, 36, kick, kGD);
+            bigTitle(e, L, h.title, cx, textMax, 56, L.rtl ? 62 : 70, false);
+            if (!lead.empty()) paragraphAt(e, L, lead, cx, std::min(820, textMax), 138, 20, kCHIPTX, 2, 10);
             {   // meta row — only real values: downloads · rating · category · type
                 int mx = cx;
-                const int my = 420;
+                const int my = 202;
                 auto mitem = [&](void (*ic)(UiEngine&, int, int, int, SDL_Color), SDL_Color icc, const std::string& t, SDL_Color tc) {
-                    if (ic) { ic(e, L.X(mx, 22), my + 1, 22, icc); mx += 30; }
-                    const int tw = textW(e, L, t, 21);
-                    boxText(e, L, t, mx, tw + 4, my, 21, tc);
-                    mx += tw + 30;
+                    if (ic) { ic(e, L.X(mx, 19), my + 1, 19, icc); mx += 26; }
+                    const int tw = textW(e, L, t, 17);
+                    boxText(e, L, t, mx, tw + 4, my, 17, tc);
+                    mx += tw + 26;
                 };
                 if (h.downloads > 0) mitem(icDownloadArrow, kCHIPTX, fmtCompact(h.downloads), kTX);
                 if (h.ratingCount > 0) { char b[16]; std::snprintf(b, sizeof b, "%.1f", h.rating); mitem(icStar, kGD, b, kTX); }
@@ -3136,17 +3136,17 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
             leadShade(e, L, 1080, true);
             bottomShade(e);
         });
-        kickerText(e, L, cx, 150, "ADDONSTATION", kGD);
-        bigTitle(e, L, tr("home_empty_t", lang), cx, 1300, 196, L.rtl ? 88 : 96, false);
-        paragraphAt(e, L, tr("home_empty_s", lang), cx, 900, 330, 26, kCHIPTX, 2, 12);
+        kickerText(e, L, cx, 36, "ADDONSTATION", kGD);
+        bigTitle(e, L, tr("home_empty_t", lang), cx, 1300, 56, L.rtl ? 60 : 68, false);
+        paragraphAt(e, L, tr("home_empty_s", lang), cx, 900, 138, 20, kCHIPTX, 2, 10);
         b0 = gAcc.signedIn ? tr("view_plans", lang) : tr("signin_code_btn", lang);
-        ctaY = 452;
+        ctaY = 228;
     }
     drawTopNav(e, 0, langCode);
 
     // ---- CTAs (focus 0-1) + slide dots ----
     {
-        const int bh = 72;
+        const int bh = 64;
         const int w0 = std::max(250, textW(e, L, b0, 24) + 110);
         if (hero) {   // v6.7: play icon + label centred together in the button
             const SDL_Color dk{6, 24, 14, 255};
@@ -3188,10 +3188,10 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     }
 
     // ---- tabs (focus 5-11) + shelf (focus 12-16): newest first ----
-    // v0.44 (user order): raise the filter bar toward the red guide line (636 -> 604)
-    tabRow(e, L, cx, 604, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang), tr("chip_free", lang),
+    // v0.45 (option D, user pick): compact hero + two WHOLE rows at the current card size
+    tabRow(e, L, cx, 332, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang), tr("chip_free", lang),
                            tr("chip_epic", lang), tr("chip_legendary", lang), tr("chip_new", lang)}, filterIndex, 5, focus);
-    cardGrid(e, L, homeItems, scrollOf(View::Home), 12, focus, cx, 684, kCR - cx, 1010, lang, sale);
+    cardGrid(e, L, homeItems, scrollOf(View::Home), 12, focus, cx, 378, kCR - cx, 964, lang, sale);
 
     std::vector<std::pair<std::string, std::string>> leg = {{"\xE2\x9C\x95", "select"}, {"\xE2\x96\xB3", "search"}};
     if (nS > 1) { leg.push_back({"L2", "prev_offer"}); leg.push_back({"R2", "next_offer"}); }
