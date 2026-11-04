@@ -107,13 +107,13 @@ def main() -> int:
              name.replace("ic_set_", ""), f_small)
     y += ((len(items) + cols - 1) // cols) * (box + 60) + 12
 
-    y = section(d, "الشعار وأيقونة المشغّل", 30, y, f_h)
+    y = section(d, "مشهد البداية وأيقونة المشغّل", 30, y, f_h)
     d.rounded_rectangle((30, y, W - 30, y + 176), radius=14, fill="#141C27", outline="#263240")
-    splash = Image.open(os.path.join(RES, "drawable-nodpi", "splash_logo.png")).convert("RGBA")
-    splash.thumbnail((250, 96), Image.LANCZOS)
-    img.paste(splash, (60, y + 26), splash)
-    d.text((60, y + 138), rtl("splash_logo.png — 900×131"), font=f_small, fill="#8EA0B3")
-    d.text((60, y + 156), rtl("شاشة البداية"), font=f_small, fill="#5A6B7D")
+    splash = Image.open(os.path.join(RES, "drawable-nodpi", "splash_cave_chase.jpg")).convert("RGB")
+    splash.thumbnail((92, 132), Image.LANCZOS)
+    img.paste(splash, (60, y + 20))
+    d.text((168, y + 52), rtl("splash_cave_chase.jpg"), font=f_small, fill="#8EA0B3")
+    d.text((168, y + 76), rtl("1080×1920 · شاشة البداية الجديدة"), font=f_small, fill="#5A6B7D")
     bx = 360
     for dens in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
         ic = Image.open(os.path.join(RES, "mipmap-" + dens, "ic_launcher.png")).convert("RGBA")

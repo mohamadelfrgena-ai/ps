@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="edit_profile_unsaved">Kaydedilmemiş değişiklikler</string>
+    <string name="chat_admin_only">Yalnızca yönetici</string>
+    <string name="comm_room_cash">Cash</string>
+    <string name="comm_rules_banner_plain">Topluluk kuralları · İhlaller susturma veya yasak getirebilir</string>
+</resources>

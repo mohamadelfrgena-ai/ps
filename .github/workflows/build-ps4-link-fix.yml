@@ -1,0 +1,101 @@
+name: Build PS4 Console Link Fix
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - arena/75fb0e28-ps
+    paths:
+      - 'ps4-addon-test/**'
+      - '.github/workflows/build-ps4-link-fix.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ps4-console-link-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-ps4-link-fix:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out this branch
+        uses: actions/checkout@v4
+
+      - name: Install host compiler and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld make curl
+
+      - name: Run console-session host tests and guards
+        run: |
+          set -euo pipefail
+          make -C ps4-addon-test clean
+          make -C ps4-addon-test host-test
+
+      - name: Download OpenOrbis toolchain and SDL2 runtime
+        env:
+          TOOLCHAIN_URL: https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.4/toolchain-llvm-18.tar.gz
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/openorbis"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "$TOOLCHAIN_URL" -o "$RUNNER_TEMP/openorbis-toolchain.tar.gz"
+          tar -xzf "$RUNNER_TEMP/openorbis-toolchain.tar.gz" -C "$RUNNER_TEMP/openorbis"
+          TOOLCHAIN_ROOT="$RUNNER_TEMP/openorbis/OpenOrbis/PS4Toolchain"
+          test -d "$TOOLCHAIN_ROOT/include"
+          test -x "$TOOLCHAIN_ROOT/bin/linux/create-fself"
+          test -s "$TOOLCHAIN_ROOT/samples/SDL2/sce_module/libc.prx"
+          test -s "$TOOLCHAIN_ROOT/samples/SDL2/sce_module/libSceFios2.prx"
+          test -s "$TOOLCHAIN_ROOT/samples/SDL2/sce_sys/about/right.sprx"
+          echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN_ROOT" >> "$GITHUB_ENV"
+          echo "$TOOLCHAIN_ROOT/bin/linux" >> "$GITHUB_PATH"
+
+      - name: Build corrected v0.42 PKG
+        run: |
+          set -euo pipefail
+          make -C ps4-addon-test clean
+          if ! make -C ps4-addon-test 2>&1 | tee "$RUNNER_TEMP/pkg-link-fix-build.log"; then
+            grep -E "error:|fatal|undefined reference|No such|not found|Error [0-9]" \
+              "$RUNNER_TEMP/pkg-link-fix-build.log" | tail -n 20 | while IFS= read -r line; do
+                echo "::error::$line"
+              done || true
+            exit 1
+          fi
+          test -s ps4-addon-test/pkg-addon-test.pkg
+          echo "### PS4 console-link fix built" >> "$GITHUB_STEP_SUMMARY"
+          echo "Version: 0.42" >> "$GITHUB_STEP_SUMMARY"
+          echo "Host session guard: passed" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload corrected PKG
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg-addon-test-v0.42-console-link-fix
+          path: ps4-addon-test/pkg-addon-test.pkg
+          if-no-files-found: error
+          retention-days: 30
+        continue-on-error: true
+
+      - name: Publish corrected PKG to this branch
+        run: |
+          set -euo pipefail
+          mkdir -p ps4/downloads
+          cp ps4-addon-test/pkg-addon-test.pkg ps4/downloads/pkg-addon-test.pkg
+          git config user.name "AddonStation CI"
+          git config user.email "ci@users.noreply.github.com"
+          git add -f ps4/downloads/pkg-addon-test.pkg
+          if ! git diff --cached --quiet; then
+            git commit -m "PS4 PKG: v0.42 console-link session fix [skip ci]"
+            for attempt in 1 2 3 4 5; do
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                exit 0
+              fi
+              echo "Push raced (attempt $attempt); rebasing onto the branch tip"
+              git fetch origin "${GITHUB_REF_NAME}"
+              git rebase "origin/${GITHUB_REF_NAME}"
+            done
+            echo "::error::Unable to publish the corrected PKG after five attempts"
+            exit 1
+          fi

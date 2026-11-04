@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,7 +59,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.Profile
@@ -232,22 +232,31 @@ fun RankBadge(
     val colors = rankColors(role, plan)
     val label = when {
         role == "admin" -> stringResource(R.string.role_admin)
-        role == "moderator" -> stringResource(R.string.role_moderator)
-        role == "creator" -> stringResource(R.string.role_creator)
+        role == "head_moderator" -> stringResource(R.string.role_head_moderator_plain)
+        role == "moderator" -> stringResource(R.string.role_moderator_plain)
+        role == "creator" -> stringResource(R.string.role_creator_plain)
         plan == "legendary" -> stringResource(R.string.role_legendary)
         plan == "epic" -> stringResource(R.string.role_epic)
         else -> stringResource(R.string.role_free)
     }
-    Text(
-        text = label,
-        style = AppText.small.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Default),
-        color = colors.text,
-        maxLines = 1,
+    Row(
         modifier = modifier
             .clip(CircleShape)
             .background(colors.background)
             .padding(horizontal = 9.dp, vertical = 3.dp),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (role == "head_moderator") {
+            Icon(Icons.Filled.Shield, contentDescription = null, tint = colors.text, modifier = Modifier.size(12.dp))
+        }
+        Text(
+            text = label,
+            style = AppText.small.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Default),
+            color = colors.text,
+            maxLines = 1,
+        )
+    }
 }
 
 @Composable
@@ -320,17 +329,34 @@ fun roomIconRes(channelId: String): Int = when (channelId) {
 }
 
 /** الأصول الافتراضية في مكتبة الصور: المجاني للحساب، و«Default Profile» قبل الحساب. */
-private val ASSET_FREE_DEFAULT = listOf("profiles/profiles/onefree.png", "profiles/onefree.png")
+/**
+ * روابط **ثبت غياب** لقطتها الثابتة (`…thumb.jpg`) — نسجّلها مرة واحدة في
+ * الجلسة حتى لا يُعاد طلب رابط 404 مع كل تمرير أو إعادة تركيب.
+ *
+ * صور الأصول تُصلَّر في المخزن (بأداة `tools/optimize_site_assets.py` أو زر
+ * الأدمن) فتُوجد اللقطة لكل GIF. قبل ذلك، أو إن غابت لصورة بعينها، نرجع
+ * إلى الأصل بلا تكرار محاولات فاشلة.
+ */
+private val missingThumbUrls: MutableSet<String> =
+    java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+/** الرمز الموقّع خاص بمسار واحد؛ لا يجوز إلحاق .thumb.jpg به لمسار آخر. */
+private fun assetThumbUrl(url: String?, animate: Boolean = false): String? {
+    if (url.isNullOrBlank() || animate || !url.contains(".gif", ignoreCase = true)) return null
+    if (url.contains("/object/sign/admin-assets/", ignoreCase = true)) return null
+    return "$url.thumb.jpg"
+}
+
+private val ASSET_FREE_DEFAULT = listOf("profiles/profiles/onefree.png")
 private val ASSET_AUTH_DEFAULT = listOf("profiles/profiles/default-profile.jpg")
 
 /**
  * صورة من مكتبة الأصول (site-assets) مع نسخة محلية احتياطية: تظهر فوراً محلياً
  * ثم تُستبدل بالأصل الحقيقي عند وصوله — فتعمل بلا إنترنت أيضاً.
  *
- * المسارات تُجرَّب **بالترتيب**: إن فشل الأول (404 لأن سكربت الرفع كرّر اسم
- * المجلد مثلاً: profiles/profiles/onefree.png) ننتقل إلى الذي يليه
- * (profiles/onefree.png) ثم إلى الصورة المحلية — فتظهر الصورة الافتراضية
- * المجانية ولو اختلف مسارها بين قاعدة وأخرى.
+ * المسارات تُجرَّب **بالترتيب** ثم ننتقل إلى الصورة المحلية. للأفاتار
+ * المجاني مسار خادم معتمد واحد فقط (`profiles/profiles/onefree.png`)، والنسخة
+ * المحلية هي نفس ملف المالك حرفياً، لذلك يظهر فوراً وبلا اختلاف عند انقطاع الشبكة.
  */
 @Composable
 private fun SiteAssetOrLocal(
@@ -340,34 +366,39 @@ private fun SiteAssetOrLocal(
     modifier: Modifier = Modifier,
 ) {
     val container = com.addonstation.mobile.ui.rememberContainer()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
     var index by remember(paths) { mutableStateOf(0) }
     val url = remember(paths, index) { paths.getOrNull(index)?.let { container.siteAssetUrl(it) } }
-    val localImage: @Composable () -> Unit = {
+    // الصورة المحلية (مورد داخل التطبيق) تُرسم كـplaceholder وكخطأ معاً:
+    // painterResource لا يبني توليفاً فرعياً (بخلاف SubcomposeAsyncImage) فلا
+    // يُثقل عناصر القوائم — وهي التي كانت تُقطّع التمرير.
+    val localPainter = painterResource(local)
+    if (url.isNullOrBlank()) {
         Image(
-            painter = painterResource(local),
+            painter = localPainter,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(size),
+            modifier = modifier.size(size),
         )
-    }
-    if (url.isNullOrBlank()) {
-        localImage()
     } else {
-        SubcomposeAsyncImage(
-            model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+        val px = with(density) { size.roundToPx() }.coerceAtLeast(1)
+        AsyncImage(
+            model = ImageRequest.Builder(context)
                 .data(url)
+                // مقاس الفكّ = مقاس العرض على الشاشة (لا أبعاد الأصل) ⇒ ذاكرة
+                // أقلّ بمرات، وبلا تقطيع عند تمرير شبكات الصور الكبيرة.
+                .size(px)
                 .crossfade(true)
                 .build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            placeholder = localPainter,
+            error = localPainter,
             modifier = modifier.size(size),
-            loading = { localImage() },
-            error = {
-                if (index + 1 < paths.size) {
-                    // المسار التالي قبل الاستسلام للصورة المحلية
-                    LaunchedEffect(url) { index += 1 }
-                }
-                localImage()
+            onError = {
+                // المسار التالي قبل الاستسلام للصورة المحلية (بلا توليف فرعي)
+                if (index + 1 < paths.size) index += 1
             },
         )
     }
@@ -383,7 +414,7 @@ private fun SiteAssetOrLocal(
  */
 @Composable
 fun AvatarFallback(size: Dp) {
-    SiteAssetOrLocal(ASSET_FREE_DEFAULT, R.drawable.ic_user, size)
+    SiteAssetOrLocal(ASSET_FREE_DEFAULT, R.drawable.ic_free_profile, size)
 }
 
 /**
@@ -454,17 +485,21 @@ fun AssetThumb(url: String?, size: Dp, modifier: Modifier = Modifier, animate: B
             //
             // animate = true (الغلاف المختار في المعاينة) يُبقي GIF متحرّكاً: صورة
             // واحدة فقط على الشاشة فلا خطر على الذاكرة.
-            val thumb = remember(url, animate) {
-                if (!animate && url.contains(".gif", ignoreCase = true)) "$url.thumb.jpg" else null
+            val thumb = remember(url, animate) { assetThumbUrl(url, animate) }
+            // غياب اللقطة يُسجَّل في ذاكرة الجلسة (لا تُفقد مع إعادة تدوير الخلية)
+            var thumbFailed by remember(url, animate) {
+                mutableStateOf(thumb == null || thumb in missingThumbUrls)
             }
-            var thumbFailed by remember(url, animate) { mutableStateOf(false) }
             if (thumb != null && !thumbFailed) {
                 AsyncImage(
                     model = thumb,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(size),
-                    onError = { thumbFailed = true },
+                    onError = {
+                        if (thumb != null) missingThumbUrls.add(thumb)
+                        thumbFailed = true
+                    },
                 )
             } else {
                 AsyncImage(
@@ -500,16 +535,19 @@ fun BannerThumb(
             .background(AppColors.Elevated2),
     ) {
         if (!url.isNullOrBlank()) {
-            val thumb = remember(url, animate) {
-                if (!animate && url.contains(".gif", ignoreCase = true)) "$url.thumb.jpg" else null
+            val thumb = remember(url, animate) { assetThumbUrl(url, animate) }
+            var thumbFailed by remember(url, animate) {
+                mutableStateOf(thumb == null || thumb in missingThumbUrls)
             }
-            var thumbFailed by remember(url, animate) { mutableStateOf(false) }
             AsyncImage(
                 model = if (thumb != null && !thumbFailed) thumb else url,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
-                onError = { thumbFailed = true },
+                onError = {
+                    if (thumb != null && !thumbFailed) missingThumbUrls.add(thumb)
+                    thumbFailed = true
+                },
             )
         }
     }
@@ -534,21 +572,16 @@ fun AvatarImage(
                 .background(AppColors.Elevated2)
                 .border(borderWidth, borderColor, shape),
         ) {
-            if (!url.isNullOrBlank()) {
-                SubcomposeAsyncImage(
-                    model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                        .data(url)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(size).clip(shape),
-                    loading = { },
-                    error = { AvatarFallback(size) },
-                )
-            } else {
-                AvatarFallback(size)
-            }
+            // سلسلة احتياطية بلا توليف فرعي: صورة المستخدم ⇒ `onefree` من مكتبة
+            // الأصول ⇒ المورد المحلي. (كانت SubcomposeAsyncImage تبني توليفاً
+            // فرعياً لكل صورة في كل قائمة ⇒ تقطيع في الشات وفي كل شبكة صور.)
+            val paths = if (url.isNullOrBlank()) ASSET_FREE_DEFAULT else listOf(url) + ASSET_FREE_DEFAULT
+            SiteAssetOrLocal(
+                paths = paths,
+                local = R.drawable.ic_free_profile,
+                size = size,
+                modifier = Modifier.size(size).clip(shape),
+            )
         }
         if (online != null) {
             Box(
@@ -568,6 +601,7 @@ fun AvatarImage(
  *
  * @param model نموذج بديل (ملف أو Uri محلي) يُحمّل **قبل** رابط الخادم —
  *              يستعمله الشات لمعاينة الصورة/إطار الفيديو لحظة اختياره.
+ * @param backgroundColor لون الطبقة خلف الصورة؛ يمكن جعله شفافاً للأيقونات بلا بطاقة.
  */
 @Composable
 fun CoverImage(
@@ -575,30 +609,81 @@ fun CoverImage(
     modifier: Modifier = Modifier,
     radius: Dp = 16.dp,
     model: Any? = null,
+    /**
+     * `true` ⇒ يُعرض الملف كما هو بحركته (GIF متحرّك) — **للمعاينات المفردة
+     * فقط**: صفحة العنصر · الغلاف المختار · عارض الصورة.
+     *
+     * الافتراضي `false`: الشبكات (المتجر · المفضّلة · بطاقات الرئيسية · الأدوات)
+     * تعرض **لقطة ثابتة خفيفة** `…thumb.jpg` إن وُجدت. لماذا؟ تشغيل عشرات
+     * الرسوم المتحركة في شبكة واحدة يستهلك الذاكرة والمعالج ويرهن التمرير —
+     * وهو أشهر سبب لتقطيع القوائم. اللقطة تُولَّد بأداة
+     * `tools/optimize_site_assets.py` (أو بزر الأدمن)، وإن غابت نرجع للأصل
+     * بلا محاولات فاشلة متكرّرة (انظر [missingThumbUrls]).
+     */
+    animate: Boolean = false,
+    backgroundColor: Color = AppColors.Elevated2,
 ) {
+    val thumbCandidate = remember(url, animate) { assetThumbUrl(url) }
+    // غياب اللقطة يُسجَّل في ذاكرة الجلسة (لا تُفقد مع إعادة تدوير الخلية)
+    var thumbMissing by remember(url) {
+        mutableStateOf(thumbCandidate == null || thumbCandidate in missingThumbUrls)
+    }
+    var failed by remember(url, model) { mutableStateOf(false) }
+
+    val thumb = if (thumbCandidate != null && !thumbMissing) thumbCandidate else null
+    // الأساس المعروض: اللقطة الخفيفة إن وُجدت (تظهر فوراً)، وإلا الملف الأصلي
+    val base: Any? = thumb ?: (model ?: url)
+    // الملف المتحرّك يُعرض **فوق** اللقطة عند جهوزيته — في المعاينات المفردة فقط
+    // (صفحة العنصر · بانر الملف الشخصي). النتيجة: ظهور فوري ثم حركة، لا انتظار.
+    val motion: Any? = if (animate && thumb != null) url else null
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(radius))
-            .background(AppColors.Elevated2),
+            .background(backgroundColor),
     ) {
-        if (!url.isNullOrBlank() || model != null) {
-            SubcomposeAsyncImage(
-                model = model ?: url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize(),
-                loading = { },
-                error = {
-                    Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.BrokenImage,
-                            contentDescription = null,
-                            tint = AppColors.Muted,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                },
-            )
+        if (base != null) {
+            if (failed) {
+                Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.BrokenImage,
+                        contentDescription = null,
+                        tint = AppColors.Muted,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            } else {
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                // AsyncImage بدل SubcomposeAsyncImage: الأغلفة تملأ الخلايا في
+                // كل الشبكات (المتجر · الأغلفة · الأدوات) — والتوليف الفرعي فيها
+                // كان من أكبر أسباب التقطيع عند التمرير.
+                AsyncImage(
+                    model = ImageRequest.Builder(ctx).data(base).crossfade(true).build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize(),
+                    onError = {
+                        // غابت اللقطة؟ نعود للأصل فوراً ونسجّلها فلا نُعيد الطلب.
+                        if (thumb != null) {
+                            missingThumbUrls.add(thumb)
+                            thumbMissing = true
+                        } else {
+                            failed = true
+                        }
+                    },
+                )
+                if (motion != null) {
+                    var motionReady by remember(url) { mutableStateOf(false) }
+                    AsyncImage(
+                        model = ImageRequest.Builder(ctx).data(motion).crossfade(true).build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize(),
+                        alpha = if (motionReady) 1f else 0f,
+                        onSuccess = { motionReady = true },
+                    )
+                }
+            }
         }
     }
 }
@@ -607,45 +692,11 @@ fun CoverImage(
 
 @Composable
 fun LoadingBox(modifier: Modifier = Modifier, text: String? = null) {
-    Column(
-        modifier = modifier.fillMaxWidth().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        CircularProgressIndicator(color = AppColors.Green, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
-        if (text != null) Text(text, style = AppText.bodySmall, color = AppColors.Muted)
-    }
-}
-
-/**
- * حالة **فشل التحميل** مع زر «إعادة المحاولة».
- *
- * لماذا؟ الشاشات كانت تفعل هكذا: `loading = true` ⇒ جلب من الشبكة ⇒
- * `loading = false`. فإن فشلت الشبكة (وهو كثير على بيانات الجوال) يرمي
- * الجلب استثناءً فيُقتل كوروتين `LaunchedEffect` **قبل** السطر الأخير،
- * فتبقى دوّامة الانتظار إلى الأبد ولا تعود الشاشة تستجيب لأي لمسة —
- * والمستخدم يظن التطبيق «علّق». الآن: الخطأ يُلتقط، وتظهر رسالة واضحة
- * وزر إعادة محاولة يعيد الجلب فعلياً.
- */
-@Composable
-fun ErrorState(
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-    text: String? = null,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            text ?: stringResource(R.string.msg_network_error),
-            style = AppText.bodySmall,
-            color = AppColors.Red,
-            textAlign = TextAlign.Center,
-        )
-        GhostButton(text = stringResource(R.string.common_retry), onClick = onRetry)
-    }
+    LoadingState(
+        modifier = modifier,
+        pattern = LoadingPattern.CompactBrand,
+        label = text,
+    )
 }
 
 @Composable
@@ -893,12 +944,12 @@ fun FilterChip(
     Box(
         modifier = modifier
             .clip(CircleShape)
-            .background(if (selected) AppColors.GreenGlow else AppColors.Elevated)
-            .border(1.dp, if (selected) AppColors.Green else AppColors.Border, CircleShape)
+            .background(if (selected) AppColors.AuthBlue.copy(alpha = 0.18f) else AppColors.Elevated)
+            .border(1.dp, if (selected) AppColors.AuthBlue else AppColors.Border, CircleShape)
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 7.dp),
     ) {
-        Text(label, style = AppText.small, color = if (selected) AppColors.Green else AppColors.Muted, maxLines = 1)
+        Text(label, style = AppText.small, color = if (selected) AppColors.AuthBlueLight else AppColors.Muted, maxLines = 1)
     }
 }
 

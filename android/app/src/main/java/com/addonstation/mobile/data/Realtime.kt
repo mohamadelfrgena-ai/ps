@@ -42,11 +42,19 @@ class SupabaseRealtime(private val supabase: SupabaseClient) {
         channelId: String,
         onRecord: (JsonObject) -> Unit,
         onStatus: (String) -> Unit = {},
+        /**
+         * عدد الأعضاء المتصلين بالقناة الآن (Realtime presence).
+         * الوثيقة تطلب «[N] online» في شريط الشات — والقناة مقيّدة بهذه الغرفة
+         * (`channel_id=eq.X`) فالحاضرون فيها هم **من في الغرفة** تحديداً.
+         * لا طلب شبكة إضافي: الرقم يأتي مع نفس المقبس المفتوح.
+         */
+        onPresence: (Int) -> Unit = {},
     ): RealtimeSub? = subscribe(
         table = "chat_messages",
         filter = "channel_id=eq.$channelId",
         onRecord = onRecord,
         onStatus = onStatus,
+        onPresence = onPresence,
     )
 
     fun subscribeTable(
@@ -54,13 +62,14 @@ class SupabaseRealtime(private val supabase: SupabaseClient) {
         filter: String? = null,
         onRecord: (JsonObject) -> Unit,
         onStatus: (String) -> Unit = {},
-    ): RealtimeSub? = subscribe(table, filter, onRecord, onStatus)
+    ): RealtimeSub? = subscribe(table, filter, onRecord, onStatus, {})
 
     private fun subscribe(
         table: String,
         filter: String?,
         onRecord: (JsonObject) -> Unit,
         onStatus: (String) -> Unit,
+        onPresence: (Int) -> Unit,
     ): RealtimeSub? {
         val config = supabase.configOrNull() ?: return null
         val session = supabase.session() ?: return null
@@ -123,10 +132,26 @@ class SupabaseRealtime(private val supabase: SupabaseClient) {
                 }
             }
 
+            // الحاضرون الآن في هذه القناة (presence): يُبنى من state الأول ثم diffs
+            val present = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
             override fun onMessage(webSocket: WebSocket, text: String) {
                 runCatching {
                     val obj = supabase.json.parseToJsonElement(text).jsonObject
                     val event = obj["event"]?.jsonPrimitive?.contentOrNull ?: return
+                    // ── الحضور: `presence_state` أولاً ثم `presence_diff` بعده
+                    if (event == "presence_state" || event == "presence_diff") {
+                        val payload = obj["payload"]?.jsonObject ?: return
+                        if (event == "presence_state") {
+                            present.clear()
+                            payload.keys.forEach { present.add(it) }
+                        } else {
+                            payload["joins"]?.jsonObject?.keys?.forEach { present.add(it) }
+                            payload["leaves"]?.jsonObject?.keys?.forEach { present.remove(it) }
+                        }
+                        onPresence(present.size)
+                        return
+                    }
                     if (event != "postgres_changes") return
                     val payload = obj["payload"]?.jsonObject ?: return
                     val data = payload["data"]?.jsonObject ?: return

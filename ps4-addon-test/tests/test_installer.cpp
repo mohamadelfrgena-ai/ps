@@ -1,0 +1,291 @@
+#include "installer.hpp"
+#include "supabase_client.hpp"
+
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <map>
+#include <string>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <vector>
+
+namespace {
+
+bool fileExists(const std::string& path) {
+    struct stat st {};
+    return ::stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+}
+
+void writeTextFile(const std::string& path, const std::string& content) {
+    std::ofstream out(path, std::ios::binary);
+    assert(out.good());
+    out.write(content.data(), static_cast<std::streamsize>(content.size()));
+    assert(out.good());
+}
+
+// Builds a tiny PVRAW001 stream (same format the store pipeline produces)
+void writeTestRaw(const std::string& rawPath,
+                  const std::vector<std::string>& dirs,
+                  const std::vector<std::pair<std::string, std::string>>& files) {
+    std::ofstream out(rawPath, std::ios::binary);
+    assert(out.good());
+    out.write("PVRAW001", 8);
+    const std::uint32_t dirCount = static_cast<std::uint32_t>(dirs.size());
+    out.write(reinterpret_cast<const char*>(&dirCount), sizeof(dirCount));
+    for (const std::string& d : dirs) {
+        const std::uint16_t len = static_cast<std::uint16_t>(d.size());
+        out.write(reinterpret_cast<const char*>(&len), sizeof(len));
+        out.write(d.data(), len);
+    }
+    const std::uint32_t fileCount = static_cast<std::uint32_t>(files.size());
+    out.write(reinterpret_cast<const char*>(&fileCount), sizeof(fileCount));
+    for (const auto& f : files) {
+        const std::uint16_t len = static_cast<std::uint16_t>(f.first.size());
+        const std::uint64_t size = f.second.size();
+        out.write(reinterpret_cast<const char*>(&len), sizeof(len));
+        out.write(reinterpret_cast<const char*>(&size), sizeof(size));
+        out.write(f.first.data(), len);
+        out.write(f.second.data(), static_cast<std::streamsize>(size));
+    }
+}
+
+} // namespace
+
+int main() {
+    // 1. 8-language notification & phase strings
+    assert(pkgtest::formatEnjoyNotification("My Pack", "ar") == "تم تثبيت My Pack — استمتع!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "en") == "My Pack installed — Enjoy!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "fr") == "My Pack installé — Profitez-en !");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "tr") == "My Pack yüklendi — Keyfini çıkarın!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "es") == "My Pack instalado — ¡Disfruta!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "ru") == "My Pack установлен — Приятной игры!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "pt") == "My Pack instalado — Aproveite!");
+    assert(pkgtest::formatEnjoyNotification("My Pack", "zh") == "My Pack 已安装 — 尽情畅玩吧！");
+
+    assert(pkgtest::formatInstallPhaseLabel(pkgtest::InstallPhase::Downloading, "en") == "Downloading...");
+    assert(pkgtest::formatInstallPhaseLabel(pkgtest::InstallPhase::Installing, "ar") == "جارٍ التثبيت...");
+    assert(pkgtest::formatInstallPhaseLabel(pkgtest::InstallPhase::Installed, "en") == "Installed ✓");
+
+    char tempTemplate[] = "/tmp/pkg-addon-test-XXXXXX";
+    char* rootPtr = ::mkdtemp(tempTemplate);
+    assert(rootPtr != nullptr);
+    const std::string root(rootPtr);
+
+    // 2. copyAddonFolder from an extracted folder
+    const std::string srcAddon = root + "/src/My Pack 1.0";
+    assert(::mkdir((root + "/src").c_str(), 0777) == 0);
+    assert(::mkdir(srcAddon.c_str(), 0777) == 0);
+    assert(::mkdir((srcAddon + "/textures").c_str(), 0777) == 0);
+    writeTextFile(srcAddon + "/manifest.json", "{\"format_version\":2,\"header\":{\"name\":\"My Pack\"}}");
+    writeTextFile(srcAddon + "/textures/terrain_texture.json", "{\"resource_pack_name\":\"my-pack\"}");
+
+    const std::string dstPack =
+        root + "/app_tmp/CUSA00744/user987654321/games/com.mojang/resource_packs/My Pack 1.0";
+
+    const pkgtest::CopyResult res = pkgtest::copyAddonFolder(srcAddon, dstPack);
+    assert(res.ok);
+    assert(res.filesCopied == 2);
+    assert(fileExists(dstPack + "/manifest.json"));
+    assert(fileExists(dstPack + "/textures/terrain_texture.json"));
+
+    // 3. Build a synthetic .raw (store pipeline format) — no external assets needed
+    const std::string testRaw = root + "/my-pack-1.0.raw";
+    writeTestRaw(testRaw,
+                 {"textures"},
+                 {
+                     {"manifest.json", "{\"header\":{\"name\":\"My Pack\"}}"},
+                     {"textures/terrain_texture.json", "{\"resource_pack_name\":\"my-pack\"}"},
+                 });
+
+    const std::string stageDir = root + "/data_stage";
+
+    // 4. Mode 1: Minecraft is CLOSED -> stage + flag, then auto-sync when mounted
+    {
+        const std::string closedMojangDir =
+            root + "/closed_mc/CUSA00744/user123456789/games/com.mojang";
+
+        const pkgtest::CopyResult queuedRes = pkgtest::installOrQueueAddon(
+            testRaw, "My Pack 1.0", stageDir, closedMojangDir, "resource_packs", "ar");
+        assert(queuedRes.ok);
+        assert(queuedRes.queuedForMinecraft);
+        assert(fileExists(stageDir + "/My Pack 1.0.raw"));
+        assert(fileExists(stageDir + "/My Pack 1.0.pending"));
+
+        const std::string mkCmd = "mkdir -p \"" + closedMojangDir + "\"";
+        assert(std::system(mkCmd.c_str()) == 0);
+
+        const pkgtest::CopyResult syncRes =
+            pkgtest::syncPendingAddonsIfMounted(stageDir, closedMojangDir, "ar");
+        assert(syncRes.ok);
+        assert(syncRes.filesCopied == 2);
+        assert(fileExists(closedMojangDir + "/resource_packs/My Pack 1.0/manifest.json"));
+        assert(!fileExists(stageDir + "/My Pack 1.0.pending"));
+        assert(!fileExists(stageDir + "/My Pack 1.0.raw"));
+        assert(pkgtest::isAddonMarkedInstalled("My Pack 1.0", stageDir));
+    }
+
+    // 5. Mode 2: Minecraft is OPEN (downloaded source lives in stageDir -> deleted after)
+    {
+        const std::string openMojangDir =
+            root + "/open_mc/CUSA00283/user555666777/games/com.mojang";
+        const std::string mkOpenCmd = "mkdir -p \"" + openMojangDir + "\"";
+        assert(std::system(mkOpenCmd.c_str()) == 0);
+
+        const std::string downloadedRaw = stageDir + "/My Pack 1.0.raw";
+        writeTestRaw(downloadedRaw,
+                     {"textures"},
+                     {
+                         {"manifest.json", "{\"header\":{\"name\":\"My Pack\"}}"},
+                         {"textures/terrain_texture.json", "{\"resource_pack_name\":\"my-pack\"}"},
+                     });
+
+        const pkgtest::CopyResult immediateRes = pkgtest::installOrQueueAddon(
+            downloadedRaw, "My Pack 1.0", stageDir, openMojangDir, "resource_packs", "en");
+        assert(immediateRes.ok);
+        assert(!immediateRes.queuedForMinecraft);
+        assert(immediateRes.filesCopied == 2);
+        assert(fileExists(openMojangDir + "/resource_packs/My Pack 1.0/manifest.json"));
+        assert(!fileExists(downloadedRaw));
+    }
+
+    // 6. Auto-launch setting round-trip + opt-in launch of deferred installs
+    {
+        const std::string cfg = root + "/autolaunch.cfg";
+        assert(!pkgtest::loadAutoLaunchSetting(cfg));                 // default OFF
+        assert(pkgtest::saveAutoLaunchSetting(true, cfg));
+        assert(pkgtest::loadAutoLaunchSetting(cfg));
+        assert(pkgtest::saveAutoLaunchSetting(false, cfg));
+        assert(!pkgtest::loadAutoLaunchSetting(cfg));
+
+        // deferred install with autoLaunch=true reports the launch request
+        const std::string autoMojangDir =
+            root + "/auto_mc/CUSA00265/user497444003/games/com.mojang";
+        const pkgtest::CopyResult autoRes = pkgtest::installOrQueueAddon(
+            testRaw, "My Pack 1.0", stageDir, autoMojangDir, "resource_packs", "en", nullptr, true);
+        assert(autoRes.ok);
+        assert(autoRes.queuedForMinecraft);
+        assert(autoRes.launchedMinecraft);   // host stub launch succeeds
+
+        // default (autoLaunch omitted) never launches the game (mod #4)
+        const pkgtest::CopyResult noAutoRes = pkgtest::installOrQueueAddon(
+            testRaw, "My Pack 1.0", stageDir, autoMojangDir, "resource_packs", "en");
+        assert(noAutoRes.ok);
+        assert(noAutoRes.queuedForMinecraft);
+        assert(!noAutoRes.launchedMinecraft);
+    }
+
+    // 7. Supabase JSON helpers + array splitting (content pipeline parsing)
+    {
+        const std::string created =
+            "{\"ok\":true,\"code\":\"K7P4QX\",\"formatted_code\":\"K7P 4QX\","
+            "\"poll_token\":\"3f1c9a20-1234-4abc-9def-000000000001\","
+            "\"expires_at\":\"2026-10-16T20:00:00Z\",\"expires_in_seconds\":600}";
+        assert(pkgtest::jsonGetBool(created, "ok"));
+        assert(pkgtest::jsonGetString(created, "code") == "K7P4QX");
+        assert(pkgtest::jsonGetString(created, "formatted_code") == "K7P 4QX");
+        assert(pkgtest::jsonGetInt(created, "expires_in_seconds", 0) == 600);
+
+        const std::string linked =
+            "{\"ok\":true,\"status\":\"linked\","
+            "\"user_id\":\"11111111-2222-4333-8444-555555555555\",\"username\":\"gamer\","
+            "\"display_name\":\"Gamer One\",\"avatar_url\":\"profiles/my avatar.png\","
+            "\"plan\":\"epic\",\"ac_balance\":150,"
+            "\"access_token\":\"tok-a\",\"refresh_token\":\"ref-b\"}";
+        assert(pkgtest::jsonGetString(linked, "status") == "linked");
+        assert(pkgtest::jsonGetString(linked, "display_name") == "Gamer One");
+        assert(pkgtest::jsonGetInt(linked, "ac_balance", 0) == 150);
+        assert(pkgtest::jsonGetString(linked, "access_token") == "tok-a");
+        const pkgtest::LinkSession flat = pkgtest::parseLinkSessionResponse(linked);
+        assert(flat.valid);
+        assert(flat.profileKnown);
+        assert(flat.balanceKnown);
+        assert(flat.userId == "11111111-2222-4333-8444-555555555555");
+        assert(flat.displayName == "Gamer One");
+        assert(flat.plan == "epic");
+        assert(flat.acBalance == 150);
+
+        // Production returns credentials at the root and the account identity
+        // in profile{}. This is the payload that previously produced Welcome / 0 AC.
+        const std::string nested =
+            "{\"ok\":true,\"status\":\"linked\",\"access_token\":\"tok-current\","
+            "\"refresh_token\":\"ref-current\",\"profile\":{"
+            "\"id\":\"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee\",\"username\":\"fox\","
+            "\"display_name\":\"Silver Fox\",\"avatar_url\":\"profiles/profile-2/fox face.png\"}}";
+        pkgtest::LinkSession current = pkgtest::parseLinkSessionResponse(nested);
+        assert(current.valid);
+        assert(current.profileKnown);
+        assert(!current.balanceKnown); // wallet must still be hydrated, never assumed to be zero
+        assert(current.userId == "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+        assert(current.username == "fox");
+        assert(current.displayName == "Silver Fox");
+        assert(current.avatarUrl == "profiles/profile-2/fox face.png");
+
+        const pkgtest::LinkSession incomplete = pkgtest::parseLinkSessionResponse(
+            "{\"status\":\"linked\",\"access_token\":\"only-one-token\","
+            "\"profile\":{\"id\":\"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee\"}}");
+        assert(!incomplete.valid); // must never drive the linked-success UI
+
+        const pkgtest::SupabaseConfig cfg{
+            "https://demo-project.supabase.co", "sb_publishable_test_key"};
+        assert(pkgtest::publicStorageUrl(cfg, "site-assets", "profiles/my avatar.png") ==
+               "https://demo-project.supabase.co/storage/v1/object/public/site-assets/profiles/my%20avatar.png");
+        assert(pkgtest::publicStorageUrl(cfg, "site-assets", "https://cdn.example/avatar.png") ==
+               "https://cdn.example/avatar.png");
+
+        // A session becomes persistent only after live profile+wallet hydration.
+        current.plan = "legendary";
+        current.planExpiresAt = "2027-01-02T03:04:05Z";
+        current.acBalance = 425;
+        current.balanceKnown = true;
+        const std::string sessionPath = root + "/session.cfg";
+        assert(pkgtest::saveLinkSession(current, sessionPath));
+        const pkgtest::LinkSession restored = pkgtest::loadLinkSession(sessionPath);
+        assert(restored.valid);
+        assert(restored.userId == current.userId);
+        assert(restored.displayName == "Silver Fox");
+        assert(restored.avatarUrl == current.avatarUrl);
+        assert(restored.plan == "legendary");
+        assert(restored.planExpiresAt == current.planExpiresAt);
+        assert(restored.acBalance == 425);
+        assert(restored.accessToken == "tok-current");
+        assert(restored.refreshToken == "ref-current");
+        pkgtest::clearLinkSession(sessionPath);
+        assert(!fileExists(sessionPath));
+
+        pkgtest::LinkSession half = current;
+        half.balanceKnown = false;
+        assert(!pkgtest::saveLinkSession(half, sessionPath));
+        assert(!fileExists(sessionPath));
+
+        const std::string i18n = "{\"en\":\"Winter Sale\",\"ar\":\"\\xD8\\xAA\\xD8\\xAE\\xD9\\x81\\xD9\\x8A\\xD8\\xB6\\xD8\\xA7\\xD8\\xAA\"}";
+        assert(pkgtest::i18nPick(i18n, "en") == "Winter Sale");
+        assert(!pkgtest::i18nPick(i18n, "ar").empty());
+        assert(pkgtest::i18nPick(i18n, "fr") == "Winter Sale");  // fallback
+
+        const std::string arr =
+            "[{\"id\":\"a1\",\"title\":\"Pack A\",\"sale_ac_price\":null,\"ac_price\":200,"
+            "\"is_exclusive\":true},{\"id\":\"b2\",\"title\":\"Pack B\",\"sale_ac_price\":75,"
+            "\"ac_price\":150,\"is_exclusive\":false}]";
+        const std::vector<std::string> objs = pkgtest::splitJsonObjects(arr);
+        assert(objs.size() == 2);
+        assert(pkgtest::jsonGetString(objs[0], "title") == "Pack A");
+        assert(pkgtest::jsonGetString(objs[1], "id") == "b2");
+        assert(pkgtest::jsonGetRaw(arr, "missing").empty());
+
+        const std::string grant =
+            "{\"ok\":true,\"ps4_raw_url\":\"https://x/y.raw\","
+            "\"pack_targets\":[{\"target\":\"resource_packs\",\"dest_folder\":\"pack_ab12\","
+            "\"raw_file\":\"pack0.raw\",\"ps4_raw_url\":\"https://x/p0.raw\"}]}";
+        const std::string packs = pkgtest::jsonGetRaw(grant, "pack_targets");
+        const std::vector<std::string> packObjs = pkgtest::splitJsonObjects(packs);
+        assert(packObjs.size() == 1);
+        assert(pkgtest::jsonGetString(packObjs[0], "target") == "resource_packs");
+        assert(pkgtest::jsonGetString(packObjs[0], "dest_folder") == "pack_ab12");
+    }
+
+    std::printf("installer host tests passed (dynamic paths, dual-mode, cleanup, 8-lang, autolaunch, json).\n");
+    return 0;
+}

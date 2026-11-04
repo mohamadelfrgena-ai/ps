@@ -1,5 +1,7 @@
 package com.addonstation.mobile.data.repo
 
+import android.content.Context
+import android.net.Uri
 import com.addonstation.mobile.data.ApiError
 import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.SupabaseClient
@@ -11,6 +13,7 @@ import com.addonstation.mobile.data.model.CreatorTip
 import com.addonstation.mobile.data.model.PaymentOrder
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.SubscriptionPlan
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
@@ -23,6 +26,17 @@ import kotlinx.serialization.json.JsonPrimitive
  * أي محاولة من غير الأدمن تُرفض من قاعدة البيانات.
  */
 class AdminRepository(private val supabase: SupabaseClient) {
+
+    data class ModeratorSalaryConfig(
+        val enabled: Boolean = true,
+        val amount: Int = 1500,
+    )
+
+    private val bulkContentImporter = BulkContentImporter(supabase)
+
+    private suspend fun selectProfiles(query: String): JsonElement =
+        runCatching { supabase.select("visible_profiles", query) }
+            .getOrElse { supabase.select("profiles", query) }
 
     /**
      * بوابة لوحة الإدارة: يتحقق **الخادم** أن الدور admin (لا الواجهة فقط)، ويُسجّل
@@ -57,6 +71,34 @@ class AdminRepository(private val supabase: SupabaseClient) {
         }.getOrElse { AdminStats() }
     }
 
+    suspend fun moderatorSalaryConfig(): ModeratorSalaryConfig = withContext(Dispatchers.IO) {
+        runCatching {
+            val rows = supabase.select(
+                "app_settings",
+                "select=value&key=eq.moderator_salary&limit=1",
+            ) as? kotlinx.serialization.json.JsonArray
+            val value = (rows?.firstOrNull() as? JsonObject)?.get("value") as? JsonObject
+            ModeratorSalaryConfig(
+                enabled = value?.get("enabled").asBool() ?: true,
+                amount = value?.get("amount").asInt() ?: 1500,
+            )
+        }.getOrElse { ModeratorSalaryConfig() }
+    }
+
+    suspend fun updateModeratorSalary(enabled: Boolean, amount: Int): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                supabase.rpc(
+                    "admin_update_moderator_salary",
+                    mapOf(
+                        "p_enabled" to JsonPrimitive(enabled),
+                        "p_amount" to JsonPrimitive(amount),
+                    ),
+                ).asOutcome().requireOk()
+                Unit
+            }
+        }
+
     // ------------------------------------------------------------- المستخدمون
 
     suspend fun users(query: String = "", role: String? = null, limit: Int = 100): List<Profile> =
@@ -69,7 +111,7 @@ class AdminRepository(private val supabase: SupabaseClient) {
                 }
                 if (!role.isNullOrBlank() && role != "all") filters.append("&role=eq.$role")
                 filters.append("&order=created_at.desc&limit=$limit")
-                supabase.decodeList<Profile>(supabase.select("profiles", filters.toString()))
+                supabase.decodeList<Profile>(selectProfiles(filters.toString()))
             }.getOrElse { emptyList() }
         }
 
@@ -102,6 +144,12 @@ class AdminRepository(private val supabase: SupabaseClient) {
             supabase.select("content_items", "select=*&order=created_at.desc&limit=$limit")
         )
     }.getOrElse { emptyList() }
+
+    suspend fun contentById(id: String): ContentItem? = runCatching {
+        supabase.decodeList<ContentItem>(
+            supabase.select("content_items", "select=*&id=eq.$id&limit=1")
+        ).firstOrNull()
+    }.getOrNull()
 
     suspend fun upsertContent(
         id: String?,
@@ -167,6 +215,33 @@ class AdminRepository(private val supabase: SupabaseClient) {
             supabase.upload(bucket, path, bytes, mime)
             path
         }
+    }
+
+    /** Copy and validate a selected ZIP without loading it into memory. */
+    suspend fun inspectBulkContentArchive(
+        context: Context,
+        uri: Uri,
+        contentType: String,
+        onProgress: (BulkImportProgress) -> Unit,
+    ): Result<BulkArchiveInspection> = try {
+        Result.success(bulkContentImporter.inspect(context, uri, contentType, onProgress))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        Result.failure(failure)
+    }
+
+    /** Upload every validated folder, then register the whole batch atomically. */
+    suspend fun importBulkContentArchive(
+        inspection: BulkArchiveInspection,
+        options: BulkImportOptions,
+        onProgress: (BulkImportProgress) -> Unit,
+    ): Result<BulkImportResult> = try {
+        Result.success(bulkContentImporter.import(inspection, options, onProgress))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        Result.failure(failure)
     }
 
     // -------------------------------------------------------------- المدفوعات

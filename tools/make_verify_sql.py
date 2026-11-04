@@ -3,7 +3,7 @@
 """
 يولّد **`supabase/99_VERIFY_ALL.sql`** — فاحص القاعدة الكامل (قراءة فقط).
 
-ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 34) نُفِّذت
+ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 46) نُفِّذت
 كما نريد، ويطبع جدولاً: ✅/❌ + التفاصيل (وما هو المفقود بالاسم). يلصقه المالك
 في Supabase → SQL Editor مرة واحدة.
 
@@ -16,6 +16,7 @@
     python3 tools/make_verify_sql.py
 """
 import io
+import json
 import os
 import sys
 
@@ -203,18 +204,22 @@ missing_list("04_rls", f"سياسات RLS ({len(POLICIES)})",
 #  05_storage.sql — المخازن وسياساتها
 # ═══════════════════════════════════════════════════════════════════════════
 BUCKETS = ["content-files", "payment-receipts", "chat-images", "chat-media",
-           "creator-media", "site-assets"]
-add("05_storage", f"المخازن الستة (منها payment-receipts)",
-    q_ok("select (count(*) = 6)::text from storage.buckets where id in "
+           "creator-media", "site-assets", "admin-assets"]
+add("05_storage · 40_admin_asset_privacy", f"المخازن السبعة (منها admin-assets الخاص)",
+    q_ok("select (count(*) = 7)::text from storage.buckets where id in "
          "('content-files', 'payment-receipts', 'chat-images', 'chat-media', "
-         "'creator-media', 'site-assets')", "true"),
+         "'creator-media', 'site-assets', 'admin-assets')", "true"),
     qdet("select string_agg(id, ' · ') from storage.buckets where id in "
          "('content-files', 'payment-receipts', 'chat-images', 'chat-media', "
-         "'creator-media', 'site-assets')"))
+         "'creator-media', 'site-assets', 'admin-assets')"))
 
-add("05_storage", "مخزن site-assets عام (public) — الصور تظهر بلا تسجيل دخول",
+add("05_storage", "مخزن site-assets عام (public) — الصور العادية تظهر بلا تسجيل دخول",
     q_ok("select (count(*) = 1)::text from storage.buckets where id = 'site-assets' and public", "true"),
     qdet("select 'public = ' || public::text from storage.buckets where id = 'site-assets'"))
+
+add("40_admin_asset_privacy", "مخزن admin-assets خاص (public = false)",
+    q_ok("select (count(*) = 1)::text from storage.buckets where id = 'admin-assets' and not public", "true"),
+    qdet("select 'public = ' || public::text from storage.buckets where id = 'admin-assets'"))
 
 STORAGE_POLICIES = ["content_files_read", "content_files_admin_write",
                     "content_files_admin_update", "content_files_admin_delete",
@@ -222,8 +227,10 @@ STORAGE_POLICIES = ["content_files_read", "content_files_admin_write",
                     "chat_images_insert", "chat_images_read", "chat_media_insert",
                     "chat_media_read", "creator_media_insert", "creator_media_read",
                     "site_assets_read", "site_assets_admin_write", "site_assets_creator_write",
-                    "site_assets_admin_update", "site_assets_admin_delete"]
-add("05_storage", f"سياسات المخزن ({len(STORAGE_POLICIES)})",
+                    "site_assets_admin_update", "site_assets_admin_delete",
+                    "admin_assets_read", "admin_assets_insert", "admin_assets_update",
+                    "admin_assets_delete"]
+add("05_storage · 40_admin_asset_privacy", f"سياسات المخزن ({len(STORAGE_POLICIES)})",
     q_ok("select (count(*) = %d)::text from pg_policies where schemaname = 'storage' "
          "and policyname in (%s)" % (len(STORAGE_POLICIES),
                                      ", ".join("'%s'" % p for p in STORAGE_POLICIES)), "true"),
@@ -319,16 +326,18 @@ missing_list("14_redeem_codes", "سياسات أكواد الشحن",
 # ═══════════════════════════════════════════════════════════════════════════
 #  15_assets_v2 (+16_fix_asset_paths) + 21_banners + 27_admin_only_assets
 # ═══════════════════════════════════════════════════════════════════════════
-COLLECTIONS = [("PFP", 14), ("Profiles", 26), ("Pack One", 19), ("Best Cartoon", 7),
-               ("Cartoon Meme", 11), ("Cool Cartoon", 6), ("Call Of Duty", 10), ("Sad", 10),
-               ("Ahh", 8), ("Moumen", 4), ("Animated", 8), ("Memes", 47),
-               ("Minecraft Memes 1", 21), ("Minecraft Memes 2", 87), ("Minecraft Memes 3", 20),
-               ("Minecraft Movie", 6), ("Top", 12), ("Minecraft Items", 103), ("Games", 41),
-               ("PlayStation", 10), ("Random Things", 22), ("Nature 🌿", 13), ("Random 🎲", 27)]
+COLLECTIONS = [("PFP", 1), ("Default", 1), ("Profiles", 24), ("Profile 2", 11),
+               ("Best Cartoon", 7), ("Cartoon Meme", 11), ("Cool Cartoon", 6),
+               ("Call Of Duty", 10), ("Sad", 10), ("Ahh", 8), ("Moumen", 4),
+               ("Animated", 8), ("Memes", 47), ("Minecraft Memes 1", 21),
+               ("Minecraft Memes 2", 87), ("Minecraft Memes 3", 20),
+               ("Minecraft Movie", 6), ("Top", 12), ("Minecraft Items", 103),
+               ("Games", 41), ("PlayStation", 10), ("Random Things", 22),
+               ("Nature 🌿", 13), ("Random 🎲", 27)]
 COLLECTION_VALUES = ",\n              ".join(
     f"('{c}', {n})" for c, n in COLLECTIONS)
 TOTAL_ASSETS = sum(n for _, n in COLLECTIONS)
-TYPE_MIN = {"avatar": 123, "item": 176, "sticker": 193, "banner": 40}
+TYPE_MIN = {"avatar": 101, "item": 176, "sticker": 193, "banner": 40}
 
 # نُقارن بعدد **لا ينقص** عن دفعاتنا: أي زيادة = أصول أضفتها أنت من لوحة الإدارة
 # (مثل بانرين إضافيين) — وهذا لا يُعدّ نقصاً، بل يُذكر في التفاصيل.
@@ -336,13 +345,13 @@ TYPE_CHECKS = " and ".join(
     f"(count(*) filter (where asset_type = '{t}') >= {n})"
     for t, n in TYPE_MIN.items())
 
-add("15_assets_v2 · 21_banners", f"مجموع الأصول >= {TOTAL_ASSETS} (492 من 15 + 40 بانر من 21)",
+add("15_assets_v2 · 21_banners · 45 · 46", f"مجموع الأصول >= {TOTAL_ASSETS} (101 أفاتاراً بعد استبدال الحزمتين + 409 أصول أخرى)",
     q_ok(f"select (count(*) >= {TOTAL_ASSETS})::text from public.site_assets", "true"),
     qdet(f"select count(*)::text || '/{TOTAL_ASSETS} مصدر' "
          "|| ' · إضافاتك: ' || greatest(count(*) - " + str(TOTAL_ASSETS) + ", 0)::text "
          "from public.site_assets"))
 
-add("15_assets_v2", "توزيع الأصول كاملًا (123 أفاتاراً · 176 أداة · 193 ملصقاً · 40 بانراً)",
+add("15_assets_v2 · 45 · 46", "توزيع الأصول كاملًا (101 أفاتاراً · 176 أداة · 193 ملصقاً · 40 بانراً)",
     q_ok(f"select ({TYPE_CHECKS})::text from public.site_assets", "true"),
     qdet("select 'avatar ' || count(*) filter (where asset_type = 'avatar')::text "
          "|| ' · item ' || count(*) filter (where asset_type = 'item')::text "
@@ -369,32 +378,82 @@ add("15_assets_v2 · 21_banners", f"لا نقص في أي قسم من أقسام
                           group by collection) a on a.collection = e.collection
              where coalesce(a.have, 0) < e.want""", "لا نقص في أي قسم"))
 
+# الحزمتان الجديدتان: نقرأ المسارات والبصمات من البيان المثبّت نفسه الذي ولّد 46.
+with io.open(os.path.join(ROOT, "supabase", "profile-packs.json"), encoding="utf-8") as _profile_fh:
+    PROFILE_PACK_ASSETS = json.load(_profile_fh)["assets"]
+PROFILE_PACK_DB_VALUES = ", ".join(
+    "('{path}', '{collection}', '{plan}')".format(
+        path=a["path"].replace("'", "''"),
+        collection=a["collection"].replace("'", "''"),
+        plan=a["plan"].replace("'", "''"),
+    )
+    for a in PROFILE_PACK_ASSETS
+)
+PROFILE_PACK_STORAGE_VALUES = ", ".join(
+    "('{path}', {size}::bigint, '{md5}')".format(
+        path=a["path"].replace("'", "''"), size=a["bytes"], md5=a["md5"])
+    for a in PROFILE_PACK_ASSETS
+)
+
+add("46_profile_avatar_packs", "حزمة Profiles = 24 Epic وحزمة Profile 2 = 11 Legendary بالضبط",
+    q_ok("select (((count(*) filter (where collection = 'Profiles')) = 24) and "
+         "((count(*) filter (where collection = 'Profiles' and required_plan = 'epic' and enabled)) = 24) and "
+         "((count(*) filter (where collection = 'Profile 2')) = 11) and "
+         "((count(*) filter (where collection = 'Profile 2' and required_plan = 'legendary' and enabled)) = 11))::text "
+         "from public.site_assets where asset_type = 'avatar'", "true"),
+    qdet("select string_agg(collection || '/' || required_plan || '=' || total::text, ' · ' order by collection, required_plan) "
+         "from (select collection, required_plan, count(*) total from public.site_assets "
+         "where asset_type = 'avatar' and collection in ('Profiles', 'Profile 2') "
+         "group by collection, required_plan) s"))
+
+add("46_profile_avatar_packs", "كل مسارات الحزمتين الـ35 مسجّلة بالخطة والقسم الصحيحين",
+    q_ok(f"select (count(*) = 0)::text from (values {PROFILE_PACK_DB_VALUES}) e(path, collection, plan) "
+         "left join public.site_assets a on a.file_url = e.path and a.asset_type = 'avatar' "
+         "where a.id is null or not a.enabled or a.collection <> e.collection or a.required_plan <> e.plan", "true"),
+    qdet(f"select string_agg(e.path, ' · ') from (values {PROFILE_PACK_DB_VALUES}) e(path, collection, plan) "
+         "left join public.site_assets a on a.file_url = e.path and a.asset_type = 'avatar' "
+         "where a.id is null or not a.enabled or a.collection <> e.collection or a.required_plan <> e.plan",
+         "كل المسارات مطابقة"))
+
+add("46_profile_avatar_packs", "ملفات الحزمتين الـ35 في Storage مطابقة للحجم والبصمة المثبّتَين",
+    q_ok(f"select (count(*) = 0)::text from (values {PROFILE_PACK_STORAGE_VALUES}) e(path, bytes, md5) "
+         "left join storage.objects o on o.bucket_id = 'site-assets' and o.name = e.path "
+         "where o.id is null or coalesce((o.metadata->>'size')::bigint, -1) <> e.bytes "
+         "or trim(both '\"' from coalesce(o.metadata->>'eTag', '')) <> e.md5", "true"),
+    qdet(f"select string_agg(e.path, ' · ') from (values {PROFILE_PACK_STORAGE_VALUES}) e(path, bytes, md5) "
+         "left join storage.objects o on o.bucket_id = 'site-assets' and o.name = e.path "
+         "where o.id is null or coalesce((o.metadata->>'size')::bigint, -1) <> e.bytes "
+         "or trim(both '\"' from coalesce(o.metadata->>'eTag', '')) <> e.md5",
+         "35/35 ملفاً مطابقاً"))
+
 # المصدر المرجعي: الملفات المرفوعة في المخزن. المسار المكرّر (profiles/profiles/…)
 # ليس خطأً — هكذا رُفعت الملفات فعلاً؛ لذلك نُقارن **بعد تطبيع البادئة المكرّرة**
 # من الطرفين، فالسؤال الصحيح: «هل كل صورة معروضة لها ملف في المخزن؟»
 NORM = "regexp_replace(%s, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/')"
+ASSET_BUCKET = "case when a.file_url like 'admin-private/%' then 'admin-assets' else 'site-assets' end"
+PROFILE_BUCKET = "case when p.avatar_url like 'admin-private/%' then 'admin-assets' else 'site-assets' end"
 
-add("15_assets_v2 · 21_banners", "كل أصل مفعّل ملفه موجود في المخزن (لا صورة مكسورة)",
+add("15_assets_v2 · 21_banners · 40",  "كل أصل مفعّل ملفه موجود في المخزن (لا صورة مكسورة)",
     q_ok("select (count(*) = 0)::text from public.site_assets a "
          "where a.enabled and not exists (select 1 from storage.objects o "
-         "where o.bucket_id = 'site-assets' and "
+         "where o.bucket_id = " + ASSET_BUCKET + " and "
          + NORM % "o.name" + " = " + NORM % "a.file_url" + ")", "true"),
     qdet("select 'أول المفقود: ' || string_agg(a.file_url, ' · ') from ("
          "select a.file_url from public.site_assets a "
          "where a.enabled and not exists (select 1 from storage.objects o "
-         "where o.bucket_id = 'site-assets' and "
+         "where o.bucket_id = " + ASSET_BUCKET + " and "
          + NORM % "o.name" + " = " + NORM % "a.file_url" + ") limit 6) a",
          "كل الملفات موجودة"))
 
 add("15_assets_v2", "كل أفاتار مفعّل ملفه موجود في المخزن",
     q_ok("select (count(*) = 0)::text from public.site_assets a "
          "where a.enabled and a.asset_type = 'avatar' and not exists ("
-         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and "
+         "select 1 from storage.objects o where o.bucket_id = " + ASSET_BUCKET + " and "
          + NORM % "o.name" + " = " + NORM % "a.file_url" + ")", "true"),
     qdet("select string_agg(a.file_url, ' · ') from ("
          "select a.file_url from public.site_assets a "
          "where a.enabled and a.asset_type = 'avatar' and not exists ("
-         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and "
+         "select 1 from storage.objects o where o.bucket_id = " + ASSET_BUCKET + " and "
          + NORM % "o.name" + " = " + NORM % "a.file_url" + ") limit 6) a",
          "كل الأفاتارات موجودة"))
 
@@ -402,12 +461,12 @@ add("24_free_default_avatar · 32", "صور الحسابات موجودة في �
     q_ok("select (count(*) = 0)::text from public.profiles p "
          "where p.avatar_url is not null and btrim(p.avatar_url) <> '' "
          "and lower(btrim(p.avatar_url)) <> 'none' and not exists ("
-         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and "
+         "select 1 from storage.objects o where o.bucket_id = " + PROFILE_BUCKET + " and "
          + NORM % "o.name" + " = " + NORM % "p.avatar_url" + ")", "true"),
     qdet("select count(*)::text || ' حساباً' from public.profiles p "
          "where p.avatar_url is not null and btrim(p.avatar_url) <> '' "
          "and lower(btrim(p.avatar_url)) <> 'none' and not exists ("
-         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and "
+         "select 1 from storage.objects o where o.bucket_id = " + PROFILE_BUCKET + " and "
          + NORM % "o.name" + " = " + NORM % "p.avatar_url" + ")", "كل صور الحسابات موجودة"))
 
 add("21_banners", "بانرات إضافية مسجّلة (40)",
@@ -418,8 +477,49 @@ add("27_admin_only_assets", "أصول حصرية للإدارة (required_plan =
     q_ok("select (count(*) >= 1)::text from public.site_assets where required_plan = 'admin'", "true"),
     qdet("select count(*)::text || ' أصلاً' from public.site_assets where required_plan = 'admin'"))
 
+add("40_admin_asset_privacy", "عرض visible_profiles ودالة تنقيح أصل الأدمن موجودان",
+    q_ok("select (to_regclass('public.visible_profiles') is not null and exists ("
+         "select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname = 'is_admin_only_profile_asset'))::text", "true"),
+    qdet("select 'view=' || (to_regclass('public.visible_profiles') is not null)::text "
+         "|| ' · function=' || exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname = 'is_admin_only_profile_asset')::text"))
+
+add("40_admin_asset_privacy", "لا قراءة REST مباشرة لـ profiles؛ القراءة من العرض المنقّح",
+    q_ok("select ((not has_table_privilege('anon', 'public.profiles', 'select')) "
+         "and (not has_table_privilege('authenticated', 'public.profiles', 'select')) "
+         "and has_table_privilege('anon', 'public.visible_profiles', 'select') "
+         "and has_table_privilege('authenticated', 'public.visible_profiles', 'select') "
+         "and not has_column_privilege('authenticated', 'public.profiles', 'equipped_item_id', 'update'))::text", "true"),
+    qdet("select 'base anon=' || has_table_privilege('anon', 'public.profiles', 'select')::text "
+         "|| ' · base auth=' || has_table_privilege('authenticated', 'public.profiles', 'select')::text "
+         "|| ' · view anon=' || has_table_privilege('anon', 'public.visible_profiles', 'select')::text "
+         "|| ' · view auth=' || has_table_privilege('authenticated', 'public.visible_profiles', 'select')::text "
+         "|| ' · equipped direct update=' || has_column_privilege('authenticated', 'public.profiles', "
+         "'equipped_item_id', 'update')::text"))
+
+add("40_admin_asset_privacy", "سياسة site_assets تخفي required_plan=admin عن غير الأدمن",
+    q_ok("select coalesce((select (qual ilike '%required_plan%' and qual ilike '%is_admin%')::text "
+         "from pg_policies where schemaname = 'public' and tablename = 'site_assets' "
+         "and policyname = 'assets_read'), 'false')", "true"),
+    qdet("select qual from pg_policies where schemaname = 'public' and tablename = 'site_assets' "
+         "and policyname = 'assets_read'"))
+
+add("40_admin_asset_privacy", "كل ملفات admin في المخزن الخاص ولا نسخة عامة منها",
+    q_ok("select (count(*) >= 1 and count(*) filter (where file_url not like 'admin-private/%' "
+         "or not exists (select 1 from storage.objects o where o.bucket_id = 'admin-assets' and o.name = a.file_url) "
+         "or exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' "
+         "and o.name = regexp_replace(a.file_url, '^admin-private/', ''))) = 0)::text "
+         "from public.site_assets a where required_plan = 'admin'", "true"),
+    qdet("select count(*)::text || ' admin · ينتظر النقل/التنظيف: ' || "
+         "count(*) filter (where file_url not like 'admin-private/%' "
+         "or not exists (select 1 from storage.objects o where o.bucket_id = 'admin-assets' and o.name = a.file_url) "
+         "or exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' "
+         "and o.name = regexp_replace(a.file_url, '^admin-private/', '')))::text "
+         "from public.site_assets a where required_plan = 'admin'"))
+
 # ═══════════════════════════════════════════════════════════════════════════
-#  17 · 18 · 19 · 20 · 23 · 24 · 25 · 26 · 29 · 30 · 31
+#  17 · 18 · 19 · 20 · 23 · 24 · 25 · 26 · 29 · 30 · 31 · 40
 # ═══════════════════════════════════════════════════════════════════════════
 add("17_message_delete_window", "نافذة حذف الرسالة = 180 ثانية (٣ دقائق)",
     q_ok("select (public.chat_delete_window_seconds() = 180)::text", "true"),
@@ -516,19 +616,15 @@ add("30_chat_members_only", "الشات للمسجّلين فقط (3 سياسا�
       "and policyname in ('messages_read', 'reactions_read', 'channels_read') "
       "and qual ilike '%auth.uid()%'"))
 
-add("31_single_free_avatar · 32", "أفاتار مجاني مفعّل واحد فقط (onefree) وملفه موجود في المخزن",
-    qbool("select (count(*) = 1)::text from public.site_assets a "
-          "where a.asset_type = 'avatar' and a.required_plan = 'free' and a.enabled "
-          "and exists (select 1 from storage.objects o where o.bucket_id = 'site-assets' "
-          "and regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/') "
-          "  = regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/'))"),
-    qdet("select count(*)::text || ' مفعّل · ملفه: ' || coalesce((select string_agg(a.file_url, ' · ') "
-         "from public.site_assets a where a.asset_type = 'avatar' "
-         "and a.required_plan = 'free' and a.enabled and not exists ("
-         "select 1 from storage.objects o where o.bucket_id = 'site-assets' and "
-         "regexp_replace(o.name, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/') = "
-         "regexp_replace(a.file_url, '^(profiles|banners|items|stickers)/(\\1)/', '\\1/'))), 'موجود ✅') "
-         "from public.site_assets where asset_type = 'avatar' and required_plan = 'free' and enabled"))
+add("31_single_free_avatar · 45 · 46", "سجل أفاتار مجاني واحد فقط في Default وملف onefree موجود",
+    qbool("select (count(*) = 1 and bool_and(a.enabled) and bool_and(a.collection = 'Default') and "
+          "bool_and(a.file_url = 'profiles/profiles/onefree.png') and bool_and(exists ("
+          "select 1 from storage.objects o where o.bucket_id = 'site-assets' "
+          "and o.name = a.file_url)))::text from public.site_assets a "
+          "where a.asset_type = 'avatar' and a.required_plan = 'free'"),
+    qdet("select count(*)::text || ' سجل مجاني · ' || "
+         "coalesce(string_agg(file_url, ' · '), '—') from public.site_assets "
+         "where asset_type = 'avatar' and required_plan = 'free'"))
 
 add("32_onefree_canonical_path", "المسار المعتمد موحّد (الأصل المفعّل · الافتراضي · كل الحسابات)",
     q_ok("select ((select count(*) from public.site_assets where asset_type = 'avatar' "
@@ -567,35 +663,31 @@ add("33_user_block", "الحظر بين المستخدمين (سياسة جوج�
          "from pg_policies where schemaname = 'public' and tablename = 'chat_messages' "
          "and policyname = 'messages_read' and qual like '%is_blocked_pair%') "
          "|| ' · حظرات مسجّلة: ' || (select count(*) from public.user_blocks)::text"))
-add("31_single_free_avatar", "كل الحسابات صورتها onefree (ولا حساب بلا صورة)",
+add("31_single_free_avatar · 45", "لا يوجد حساب بلا صورة افتراضية أو مخصّصة",
     qbool("select (count(*) = 0)::text from public.profiles where avatar_url is null "
           "or btrim(avatar_url) = ''"),
     qdet("select count(*)::text || ' بلا صورة' from public.profiles "
          "where avatar_url is null or btrim(avatar_url) = ''"))
 
-add("31_single_free_avatar", "لا حساب يستعمل صورة مجانية قديمة (معطَّلة)",
-    qbool("select (count(*) = 0)::text from public.profiles p where exists ("
-          "select 1 from public.site_assets a where a.asset_type = 'avatar' "
-          "and a.required_plan = 'free' and not a.enabled and lower(a.file_url) not like '%onefree%' "
-          "and (p.avatar_url = a.file_url or p.avatar_url = 'profiles/' || a.file_url "
-          "or a.file_url = 'profiles/' || p.avatar_url))"),
-    qdet("select count(*)::text || ' حساباً' from public.profiles p where exists ("
-         "select 1 from public.site_assets a where a.asset_type = 'avatar' "
-         "and a.required_plan = 'free' and not a.enabled and lower(a.file_url) not like '%onefree%' "
-         "and (p.avatar_url = a.file_url or p.avatar_url = 'profiles/' || a.file_url "
-         "or a.file_url = 'profiles/' || p.avatar_url))"))
+add("45_single_attached_free_avatar", "لا توجد سجلات أفاتار مجانية قديمة",
+    qbool("select (count(*) = 0)::text from public.site_assets "
+          "where asset_type = 'avatar' and required_plan = 'free' "
+          "and file_url <> 'profiles/profiles/onefree.png'"),
+    qdet("select count(*)::text || ' سجل مجاني قديم' from public.site_assets "
+         "where asset_type = 'avatar' and required_plan = 'free' "
+         "and file_url <> 'profiles/profiles/onefree.png'"))
 
-add("31_single_free_avatar", "ملف الصورة موجود فعلاً في المخزن (site-assets/profiles/onefree.png)",
-    q_ok("select (count(*) >= 1)::text from storage.objects where bucket_id = 'site-assets' "
-         "and name in ('profiles/onefree.png', 'profiles/profiles/onefree.png')", "true"),
-    qdet("select string_agg(name, ' · ') from storage.objects "
-         "where bucket_id = 'site-assets' and name in ('profiles/onefree.png', "
-         "'profiles/profiles/onefree.png')", "غير مرفوع بعد"))
+add("45_single_attached_free_avatar", "ملف صورة المالك موجود على المسار الوحيد المعتمد",
+    q_ok("select (count(*) = 1)::text from storage.objects where bucket_id = 'site-assets' "
+         "and name = 'profiles/profiles/onefree.png'", "true"),
+    qdet("select string_agg(name || ' · ' || coalesce(metadata->>'size', '?') || ' bytes', ' · ') "
+         "from storage.objects where bucket_id = 'site-assets' "
+         "and name = 'profiles/profiles/onefree.png'", "غير مرفوع بعد"))
 
 # ── معلوماتية: ملفات قديمة مُستبدَلة + حالة الشات ─────────────────────────
 add("07_seed_assets · 12_avatars", "دفعات الأصول القديمة (مُستبدَلة بـ15 — لا يلزم تنفيذها)",
     "true",
-    "'لا شيء مطلوب: 15_assets_v2 و21_banners هما المرجع (532 أصلاً)'")
+    "'لا شيء مطلوب: 15_assets_v2 و21_banners و45 و46 هي المرجع (510 أصول مفعّلة على الأقل)'")
 
 add("16_fix_asset_paths", "توحيد المسارات المكرّرة (نسخة آمنة — لا تلزمك الآن)",
     "true",
@@ -653,6 +745,258 @@ add("34_push_notifications", "الإشعارات الفورية: 3 جداول + 
          "|| ' · عروض اشتراك أُرسلت: ' || (select count(*) from public.push_prefs "
          "where last_offer_at is not null)::text"))
 
+add("35_push_live", "تشغيل الإشعارات الحقيقية: جدولة كل دقيقة + فوري للمنشن + طبيب التشخيص",
+    q_ok("select ((select count(*) from information_schema.tables where table_schema = 'public' "
+         "and table_name = 'push_config') = 1 "
+         "and (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname in ('push_dispatch_tick', 'push_daily_tick', "
+         "'push_live_enable', 'push_live_disable', 'push_doctor', 'push_on_queue_urgent')) = 6 "
+         "and (select count(*) from pg_trigger where not tgisinternal "
+         "and tgname = 'trg_push_queue_urgent') = 1 "
+         "and (select count(*) from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'push_config' and column_name in "
+         "('function_url', 'cron_secret', 'enabled')) = 3)::text", "true"),
+    qdet("select 'الجدولة: ' || (select count(*) from pg_extension "
+         "where extname in ('pg_cron', 'pg_net'))::text || '/2 إضافة' "
+         "|| ' · الرابط محفوظ: ' || coalesce((select case when coalesce(btrim(function_url), '') <> '' "
+         "then 'نعم' else 'لا' end from public.push_config where id = 1), 'لا') "
+         "|| ' · الأجهزة: ' || (select count(*) from public.push_devices where enabled)::text "
+         "|| ' · مُرسل 24 ساعة: ' || (select count(*) from public.push_queue "
+         "where status = 'sent' and sent_at > now() - interval '24 hours')::text"))
+
+add("36_profile_stats", "إحصاءات الملف الشخصي للجميع: أصدقاء · تنزيلات · مفضلة · مستوى · سلسلة",
+    q_ok("select ((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname = 'profile_stats') = 1 "
+         "and (select count(*) from information_schema.parameters where specific_name in "
+         "(select specific_name from information_schema.routines where routine_schema = 'public' "
+         "and routine_name = 'profile_stats') and parameter_name in ('friends', 'downloads', "
+         "'favorites', 'level', 'xp_in_level', 'xp_to_next', 'streak', 'daily_claimed', "
+         "'daily_reward')) = 9 "
+         "and (select prosecdef from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname = 'profile_stats' limit 1))::text", "true"),
+    qdet("select 'الدالة: ' || (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname = 'profile_stats')::text || '/1 ' "
+         "|| '· security definer: ' || coalesce((select case when prosecdef then 'نعم' else 'لا' end "
+         "from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' "
+         "and p.proname = 'profile_stats' limit 1), 'لا')"))
+
+add("37_profile_reports", "الإبلاغ عن عضو: عمود الهدف + دالة محمية + فهرس",
+    q_ok("select ((select count(*) from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'chat_reports' and column_name = 'target_user_id') = 1 "
+         "and (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname = 'chat_report_user') = 1 "
+         "and (select count(*) from pg_indexes where schemaname = 'public' "
+         "and indexname = 'chat_reports_target_idx') = 1)::text", "true"),
+    qdet("select 'العمود: ' || (select count(*) from information_schema.columns "
+         "where table_schema = 'public' and table_name = 'chat_reports' "
+         "and column_name = 'target_user_id')::text || '/1 ' "
+         "|| '· الدالة: ' || (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname = 'chat_report_user')::text || '/1'"))
+
+add("38_user_mute · 39_notif_revert", "كتم عضو بزر واحد والإشعارات كما كانت بلا إسقاط",
+    q_ok("select ((select count(*) from information_schema.tables where table_schema = 'public' "
+         "and table_name = 'user_mutes') = 1 "
+         "and (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname in ('can_mute_members', 'user_mute', "
+         "'user_unmute', 'my_muted_users', 'i_muted_user')) = 5 "
+         "and (select count(*) from pg_trigger where not tgisinternal "
+         "and tgname = 'trg_push_drop_muted_actor') = 0 "
+         "and (select count(*) from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'push_prefs' and column_name = 'muted_users') = 0 "
+         "and (select count(*) from pg_policies where schemaname = 'public' "
+         "and tablename = 'user_mutes' and policyname = 'user_mutes_read') = 1)::text", "true"),
+    qdet("select 'الجدول: ' || (select count(*) from information_schema.tables "
+         "where table_schema = 'public' and table_name = 'user_mutes')::text || '/1 ' "
+         "|| '· الدوال: ' || (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname in ('can_mute_members', 'user_mute', "
+         "'user_unmute', 'my_muted_users', 'i_muted_user'))::text || '/5 ' "
+         "|| '· المكتومون: ' || (select count(*) from public.user_mutes)::text"))
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  41_console_link_codes.sql — shared PS4 / phone production contract
+# ═══════════════════════════════════════════════════════════════════════════
+add("41_console_link_codes", "Shared console-link RPC signatures exist (3/3)",
+    q_ok("select ((to_regprocedure('public.create_console_link_code(text,text)') is not null) "
+         "and (to_regprocedure('public.claim_console_link(text,text,text)') is not null) "
+         "and (to_regprocedure('public.poll_console_link(text,uuid)') is not null))::text", "true"),
+    qdet("select (to_regprocedure('public.create_console_link_code(text,text)') is not null)::int::text "
+         "|| '/' || (to_regprocedure('public.claim_console_link(text,text,text)') is not null)::int::text "
+         "|| '/' || (to_regprocedure('public.poll_console_link(text,uuid)') is not null)::int::text"))
+
+add("41_console_link_codes", "Shared RPC grants match PS4 and signed-in phone roles",
+    q_ok("select (has_function_privilege('anon', 'public.create_console_link_code(text,text)', 'execute') "
+         "and has_function_privilege('anon', 'public.poll_console_link(text,uuid)', 'execute') "
+         "and has_function_privilege('authenticated', 'public.claim_console_link(text,text,text)', 'execute'))::text", "true"),
+    qdet("select 'create/poll anon · claim authenticated'"))
+
+add("41_console_link_codes", "Claim columns exist without incompatible console_code RPCs or consumed_at",
+    q_ok("select (((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+         "where n.nspname = 'public' and p.proname like 'console_code_%') = 0) "
+         "and exists (select 1 from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'console_link_codes' and column_name = 'claimed_by' and data_type = 'uuid') "
+         "and exists (select 1 from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'console_link_codes' and column_name = 'profile' and data_type = 'jsonb') "
+         "and not exists (select 1 from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'console_link_codes' and column_name = 'consumed_at'))::text", "true"),
+    qdet("select 'console_code_*: ' || (select count(*) from pg_proc p join pg_namespace n "
+         "on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'console_code_%')::text "
+         "|| ' · claimed_by/profile: ' || (select count(*) from information_schema.columns "
+         "where table_schema = 'public' and table_name = 'console_link_codes' "
+         "and ((column_name = 'claimed_by' and data_type = 'uuid') "
+         "or (column_name = 'profile' and data_type = 'jsonb')))::text || '/2' "
+         "|| ' · consumed_at: ' || (select count(*) from information_schema.columns "
+         "where table_schema = 'public' and table_name = 'console_link_codes' "
+         "and column_name = 'consumed_at')::text"))
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  42–45 focused production fixes
+# ═══════════════════════════════════════════════════════════════════════════
+add("42_visible_profiles_access", "visible_profiles readable while raw profiles stays private",
+    q_ok("select (has_table_privilege('anon', 'public.visible_profiles', 'select') "
+         "and has_table_privilege('authenticated', 'public.visible_profiles', 'select') "
+         "and not has_table_privilege('anon', 'public.profiles', 'select') "
+         "and not has_table_privilege('authenticated', 'public.profiles', 'select'))::text", "true"),
+    qdet("select 'visible anon/auth: ' || "
+         "has_table_privilege('anon', 'public.visible_profiles', 'select')::text || '/' || "
+         "has_table_privilege('authenticated', 'public.visible_profiles', 'select')::text || "
+         "' · raw profiles anon/auth: ' || "
+         "has_table_privilege('anon', 'public.profiles', 'select')::text || '/' || "
+         "has_table_privilege('authenticated', 'public.profiles', 'select')::text"))
+
+add("43_content_download_integrity", "downloads require an existing Storage object before recording",
+    q_ok("select ((position('storage.objects' in pg_get_functiondef("
+         "'public.record_content_download(uuid)'::regprocedure)) > 0) "
+         "and (select count(*) from pg_trigger where not tgisinternal "
+         "and tgname = 'content_items_require_uploaded_file') = 1 "
+         "and to_regprocedure('public.ensure_published_content_file()') is not null)::text", "true"),
+    qdet("select 'record guard: ' || (position('storage.objects' in pg_get_functiondef("
+         "'public.record_content_download(uuid)'::regprocedure)) > 0)::text || "
+         "' · publish trigger: ' || (select count(*) from pg_trigger "
+         "where not tgisinternal and tgname = 'content_items_require_uploaded_file')::text"))
+
+add("44_fix_profile_asset_guard", "trusted profile RPCs pass the strict protected-column trigger",
+    q_ok("select ((position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.guard_profile_update()'::regprocedure)) > 0) "
+         "and (position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.set_profile_asset(text,text)'::regprocedure)) > 0) "
+         "and (position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.update_my_profile(text,text,text,boolean,text)'::regprocedure)) > 0))::text", "true"),
+    qdet("select 'guard/RPCs: ' || "
+         "(position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.guard_profile_update()'::regprocedure)) > 0)::text || '/' || "
+         "(position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.set_profile_asset(text,text)'::regprocedure)) > 0)::text || '/' || "
+         "(position('app.allow_profile_write' in pg_get_functiondef("
+         "'public.update_my_profile(text,text,text,boolean,text)'::regprocedure)) > 0)::text"))
+
+add("47_bulk_content_import", "سجل دفعات الاستيراد محميّ بـRLS والقراءة للأدمن فقط",
+    q_ok("select (to_regclass('public.content_import_batches') is not null "
+         "and (select relrowsecurity from pg_class where oid = 'public.content_import_batches'::regclass) "
+         "and (select count(*) from pg_policies where schemaname = 'public' "
+         "and tablename = 'content_import_batches' "
+         "and policyname = 'content_import_batches_admin_read') = 1 "
+         "and has_table_privilege('authenticated', 'public.content_import_batches', 'select') "
+         "and not has_table_privilege('authenticated', 'public.content_import_batches', 'insert,update,delete') "
+         "and not has_table_privilege('anon', 'public.content_import_batches', 'select'))::text", "true"),
+    qdet("select 'columns: ' || (select count(*) from information_schema.columns "
+         "where table_schema = 'public' and table_name = 'content_import_batches')::text "
+         "|| ' · admin policies: ' || (select count(*) from pg_policies "
+         "where schemaname = 'public' and tablename = 'content_import_batches' "
+         "and policyname = 'content_import_batches_admin_read')::text"))
+
+add("47_bulk_content_import", "RPC جماعي أمني وذري وidempotent مع تحقق Storage",
+    q_ok("select (to_regprocedure('public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)') is not null "
+         "and (select prosecdef from pg_proc where oid = "
+         "'public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)'::regprocedure) "
+         "and has_function_privilege('authenticated', "
+         "'public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)', 'execute') "
+         "and not has_function_privilege('anon', "
+         "'public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)', 'execute') "
+         "and position('pg_advisory_xact_lock' in pg_get_functiondef("
+         "'public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)'::regprocedure)) > 0 "
+         "and position('storage.objects' in pg_get_functiondef("
+         "'public.admin_bulk_import_content(uuid,text,bigint,text,text,text,text,integer,boolean,jsonb)'::regprocedure)) > 0)::text", "true"),
+    qdet("select 'security definer + storage validation'"))
+
+add("48_creator_verification_and_featured_banners", "بانر مجاني واحد وصلاحيات creator/admin محمية",
+    q_ok("select ((select count(*) from public.site_assets where asset_type = 'banner' "
+         "and required_plan = 'free' and enabled) = 1 "
+         "and exists (select 1 from public.site_assets where asset_type = 'banner' "
+         "and required_plan = 'free' and enabled "
+         "and file_url = 'banners/featured/06aa4e3ff6eab5eecad52378a694114a.jpg') "
+         "and position('creator' in pg_get_functiondef('public.set_profile_asset(text,text)'::regprocedure)) > 0 "
+         "and position('admin' in pg_get_functiondef('public.set_profile_asset(text,text)'::regprocedure)) > 0)::text", "true"),
+    qdet("select 'free banners: ' || (select count(*) from public.site_assets "
+         "where asset_type = 'banner' and required_plan = 'free' and enabled)::text "
+         "|| ' · creator items: ' || (select count(*) from public.site_assets "
+         "where asset_type = 'item' and required_plan = 'creator' and enabled)::text "
+         "|| ' · admin items: ' || (select count(*) from public.site_assets "
+         "where asset_type = 'item' and required_plan = 'admin' and enabled)::text"))
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  50 General Supervisor · monthly salary · Thursday Epic gift
+# ═══════════════════════════════════════════════════════════════════════════
+add("50_staff_salary_and_weekly_epic", "General Supervisor is staff but never an admin",
+    q_ok("select ((public.role_rank('head_moderator') = 4) "
+         "and position('head_moderator' in pg_get_constraintdef((select oid from pg_constraint "
+         "where conrelid = to_regclass('public.profiles') "
+         "and position('profiles_role_check' in conname) > 0))) > 0 "
+         "and position('head_moderator' in pg_get_functiondef('public.is_staff(uuid)'::regprocedure)) > 0 "
+         "and position('head_moderator' in pg_get_functiondef('public.is_admin(uuid)'::regprocedure)) = 0)::text", "true"),
+    qdet("select 'rank=' || public.role_rank('head_moderator')::text "
+         "|| ' · admin=' || public.is_admin((select id from public.profiles where role = 'head_moderator' limit 1))::text"))
+
+add("50_staff_salary_and_weekly_epic", "Monthly salary is configurable, idempotent, logged, and protected",
+    q_ok("select (to_regclass('public.staff_salary_payments') is not null "
+         "and coalesce((select (value->>'amount')::integer = 1500 from public.app_settings "
+         "where key = 'moderator_salary'), false) "
+         "and to_regprocedure('public.claim_moderator_salary()') is not null "
+         "and to_regprocedure('public.process_moderator_salaries()') is not null "
+         "and to_regprocedure('public.moderator_salary_config()') is not null "
+         "and to_regprocedure('public.admin_update_moderator_salary(boolean,integer)') is not null "
+         "and to_regprocedure('public.staff_salary_apply(uuid,date)') is not null "
+         "and to_regprocedure('public.staff_salary_on_role_assignment()') is not null "
+         "and exists (select 1 from pg_trigger where tgrelid = to_regclass('public.profiles') "
+         "and tgname = 'trg_staff_salary_on_role_assignment' and not tgisinternal) "
+         "and to_regclass('public.staff_salary_payments_id_seq') is not null "
+         "and (select count(*) from pg_policies where schemaname = 'public' "
+         "and tablename = 'staff_salary_payments' "
+         "and policyname = 'salary_payments_own_read') = 1 "
+         "and position('salary' in pg_get_constraintdef((select oid from pg_constraint "
+         "where conrelid = to_regclass('public.ac_transactions') "
+         "and position('ac_transactions_kind_check' in conname) > 0))) > 0 "
+         "and has_function_privilege('authenticated', 'public.claim_moderator_salary()', 'execute') "
+         "and not has_function_privilege('anon', 'public.claim_moderator_salary()', 'execute') "
+         "and not has_function_privilege('authenticated', 'public.process_moderator_salaries()', 'execute'))::text", "true"),
+    qdet("select 'salary=' || coalesce((select value::text from public.app_settings "
+         "where key = 'moderator_salary'), 'missing') "
+         "|| ' · payments=' || (select count(*) from public.staff_salary_payments)::text"))
+
+add("50_staff_salary_and_weekly_epic", "Thursday Epic gift is deterministic, time-bound, and server-enforced",
+    q_ok("select (to_regprocedure('public.current_weekly_free_epic()') is not null "
+         "and position('Africa/Tripoli' in pg_get_functiondef("
+         "'public.current_weekly_free_epic()'::regprocedure)) > 0 "
+         "and position('isodow' in pg_get_functiondef("
+         "'public.current_weekly_free_epic()'::regprocedure)) > 0 "
+         "and position('md5' in pg_get_functiondef("
+         "'public.current_weekly_free_epic()'::regprocedure)) > 0 "
+         "and position('is_weekly_free_epic' in pg_get_functiondef("
+         "'public.can_access_item(uuid,uuid)'::regprocedure)) > 0 "
+         "and position('is_weekly_free_epic' in pg_get_functiondef("
+         "'public.ac_unlock_content(uuid)'::regprocedure)) > 0)::text", "true"),
+    qdet("select public.current_weekly_free_epic()::text"))
+
+add("50_staff_salary_and_weekly_epic", "General Supervisor moderates all rooms without admin-only access",
+    q_ok("select (position('head_moderator' in pg_get_functiondef("
+         "'public.chat_can_moderate_channel(text)'::regprocedure)) > 0 "
+         "and position('head_moderator' in pg_get_functiondef("
+         "'public.chat_my_moderation_scope()'::regprocedure)) > 0 "
+         "and position('head_moderator' in pg_get_functiondef("
+         "'public.send_chat_message(text,text,bigint,bigint,text,text,text,text,text,integer,bigint,boolean)'::regprocedure)) > 0 "
+         "and position('admin_only' in pg_get_functiondef("
+         "'public.send_chat_message(text,text,bigint,bigint,text,text,text,text,text,integer,bigint,boolean)'::regprocedure)) > 0)::text", "true"),
+    qdet("select 'chat scope + send checks present'"))
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  كتابة الملف
 # ═══════════════════════════════════════════════════════════════════════════
@@ -660,7 +1004,7 @@ HEAD = r'''-- ==================================================================
 --  AddonStation Mobile — ٩٩) فاحص القاعدة: «هل نُفِّذ كل SQL كما نريد؟»
 -- ============================================================================
 --
---  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 33) بنداً بنداً، ويطبع
+--  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 50) بنداً بنداً، ويطبع
 --  جدولاً واحداً: كل صف = بند · العمود «الحالة» ✅ أو ❌ · والعمود «التفاصيل»
 --  يقول لك ما هو الناقص بالاسم بالضبط.
 --
@@ -678,12 +1022,13 @@ HEAD = r'''-- ==================================================================
 --
 --  ⚠️ ترتيب مهم — بعض الملفات تُعيد بناء الجدول:
 --     • `15_assets_v2.sql` يبدأ بـ `delete from public.site_assets` ثم يزرع
---       492 أصلاً، و`21_banners.sql` يضيف 40 بانراً ⇒ **نفّذ 15 قبل 21**
---       أبداً؛ وإلا مُحيت البانرات.
---     • الترتيب الموصى به للبقية: 26 (التسلسل) · 27 (أصول الإدارة) ·
---       31 (onefree) في النهاية — و31 آمن للتكرار في أي وقت.
---     • الفاحص يكشف الخلل بنفسه: إن ظهر المجموع 492 بدل 532 أو نقصت
---       البانرات ⇒ أعِد تنفيذ `21_banners.sql` وحده.
+--       الدفعة، و`21_banners.sql` يضيف 40 بانراً ⇒ **نفّذ 15 قبل 21** دائماً؛
+--       وإلا مُحيت البانرات.
+--     • الترتيب الموصى به للبقية: 26 (التسلسل) · 27 (أصول الإدارة) · 31 ثم
+--       45 (صورة onefree الوحيدة) · 46 (الحزمتان المدفوعتان) في النهاية.
+--       ارفع ملفات profile-packs إلى Storage قبل 46؛ وكل هذه الملفات آمنة للتكرار.
+--     • النتيجة المرجعية: 510 أصول مفعّلة على الأقل (101 أفاتار)؛ وقد تظهر
+--       إضافات الإدارة فوق هذا الحد. إن نقصت البانرات فأعِد تنفيذ 21 وحده.
 -- ============================================================================
 
 create or replace function public.diag_text(q text) returns text
@@ -741,7 +1086,7 @@ select 999999,
 
 -- ---------------------------------------------------------------------------
 --  ماذا بعد؟
---   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 33).
+--   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 41).
 --   • الصف الأخير (المجموع) يسرد أسماء الملفات التي فيها بند ❌ — لا يعني أن
 --     الملفات نفسها ناقصة، بل أن بنداً واحداً فيها لم يتحقّق: راجع عموده.
 --   • ظهر ❌ في ملف معيّن ⇒ نفّذ ذلك الملف من `supabase/` في SQL Editor

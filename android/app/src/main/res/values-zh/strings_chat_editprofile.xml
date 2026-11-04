@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="edit_profile_unsaved">有未保存的更改</string>
+    <string name="chat_admin_only">仅管理员</string>
+    <string name="comm_room_cash">Cash</string>
+    <string name="comm_rules_banner_plain">社区规则 · 违规可能导致禁言或封禁</string>
+</resources>

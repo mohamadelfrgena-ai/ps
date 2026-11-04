@@ -34,7 +34,7 @@ PAGE = """<!doctype html>
 </style></head><body>
 <div class="card">
   <h1>📦 تنزيل تطبيق AddonStation</h1>
-  <p class="sub">نسخة debug مبنية من آخر كود (شاشة ترحيب بالقرية عند الغروب · بلا بحث في الشات · لوحة إدارة للأدمن فقط).</p>
+  <p class="sub">نسخة debug مبنية من آخر كود (صورة شاشة الترحيب مقصوصة بمقاس شاشة الهاتف 9:19.5 · بلا بحث في الشات · لوحة إدارة للأدمن فقط).</p>
   <a class="btn" href="/apk-debug.apk?v={tag}" download>تحميل APK ({size})</a>
   <div class="meta">
     الحجم: {size} · {mb} ميغابايت<br>

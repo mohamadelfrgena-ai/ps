@@ -13,6 +13,16 @@ data class Session(
     val expiresAtEpochSeconds: Long,
 )
 
+/** جهاز PlayStation مرتبط بحساب المستخدم؛ صفوفه تُقرأ وتُحذف عبر RLS. */
+@Serializable
+data class LinkedConsole(
+    val id: String,
+    @SerialName("device_name") val deviceName: String? = null,
+    val platform: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("last_seen_at") val lastSeenAt: String? = null,
+)
+
 data class AuthUser(
     val id: String,
     val email: String,
@@ -40,7 +50,7 @@ data class Profile(
     @SerialName("created_at") val createdAt: String? = null,
 ) {
     val isAdmin: Boolean get() = role == "admin"
-    val isStaff: Boolean get() = role == "admin" || role == "moderator"
+    val isStaff: Boolean get() = role == "admin" || role == "head_moderator" || role == "moderator"
     val isCreator: Boolean get() = role == "creator"
 
     /** الخطة الفعلية: الخطة المنتهية تُحسب free (مطابقة لقاعدة الخادم effective_plan). */
@@ -127,6 +137,10 @@ data class ContentItem(
     @SerialName("content_type") val contentType: String = "addon",
     val category: String? = "other",
     val plan: String = "free",
+    /** الخطة المخزنة قبل تزيين هدية الخميس محلياً؛ ليست عموداً في قاعدة البيانات. */
+    @kotlinx.serialization.Transient val originalPlan: String? = null,
+    /** true فقط عندما تكون هذه الإضافة هي هدية Epic الفعالة يوم الخميس. */
+    @kotlinx.serialization.Transient val weeklyFree: Boolean = false,
     val version: String? = null,
     @SerialName("cover_url") val coverUrl: String? = null,
     @SerialName("file_path") val filePath: String? = null,
@@ -149,6 +163,19 @@ data class AcWallet(
     val balance: Int = 0,
     @SerialName("total_earned") val totalEarned: Int = 0,
     @SerialName("total_spent") val totalSpent: Int = 0,
+)
+
+@Serializable
+data class ProfileStats(
+    val friends: Int = 0,
+    val downloads: Int = 0,
+    val favorites: Int = 0,
+    val level: Int = 1,
+    @SerialName("xp_in_level") val xpInLevel: Int = 0,
+    @SerialName("xp_to_next") val xpToNext: Int = 100,
+    val streak: Int = 0,
+    @SerialName("daily_claimed") val dailyClaimed: Boolean = false,
+    @SerialName("daily_reward") val dailyReward: Int = 0,
 )
 
 @Serializable
@@ -234,13 +261,23 @@ data class ChatMessageUi(
      * فوراً من الجهاز قبل أن يوقّع الخادم رابطها — فلا تبقى الصورة بيضاء.
      */
     val localPreview: String? = null,
-)
+) {
+    /**
+     * مفتاح اليوم (بالتوقيت المحلي) — يُحسب **مرة واحدة** عند أول عرض ويُخزَّن.
+     * تقارنه شاشة الشات نصّياً لرسم فاصل التاريخ، فلا يُحسب نصّ التاريخ مرّتين
+     * لكل رسالة في كل إطار (سبب تقطيع أثناء التمرير — انظر [TimeFormat.dayLabel]).
+     */
+    val dayKey: String by lazy(LazyThreadSafetyMode.NONE) {
+        com.addonstation.mobile.util.TimeFormat.localDayKey(message.createdAt)
+    }
+}
 
 @Serializable
 data class ChatReport(
     val id: Long,
     @SerialName("message_id") val messageId: Long? = null,
     @SerialName("reporter_id") val reporterId: String = "",
+    @SerialName("target_user_id") val targetUserId: String? = null,
     val reason: String = "other",
     val note: String? = null,
     val status: String = "open",
@@ -256,6 +293,8 @@ data class ChatNotification(
     @SerialName("message_id") val messageId: Long? = null,
     @SerialName("channel_id") val channelId: String? = null,
     val body: String? = null,
+    /** Structured values used to localize the row; raw server body is never rendered. */
+    val meta: JsonObject = JsonObject(emptyMap()),
     @SerialName("is_read") val isRead: Boolean = false,
     @SerialName("created_at") val createdAt: String? = null,
 )
@@ -287,6 +326,11 @@ data class PushTestResult(val ok: Boolean = false, val message: String? = null)
 data class BlockedUser(
     @SerialName("blocked_id") val blockedId: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class MutedUser(
+    @SerialName("muted_id") val mutedId: String? = null,
 )
 
 @Serializable
@@ -331,6 +375,7 @@ data class CreatorSubmission(
     @SerialName("file_path") val filePath: String? = null,
     val status: String = "pending",
     @SerialName("admin_note") val adminNote: String? = null,
+    @SerialName("content_item_id") val contentItemId: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
 )
 

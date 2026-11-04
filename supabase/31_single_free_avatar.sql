@@ -1,163 +1,161 @@
 -- ============================================================================
---  AddonStation Mobile — 31) أفاتار مجاني واحد: onefree لكل الحسابات
+-- AddonStation Mobile — keep one free/default avatar only
 --
---  الطلب (حرفياً): «أنا أنشئ حساباً جديداً — أريد هذه الصورة المجانية
---  الافتراضية لكل الحساب [onefree.png]، والصور التي معيّنة مجانية
---  والافتراضية القديمة أزلها.»
+-- The canonical image is the owner's onefree.png at:
+--   site-assets/profiles/profiles/onefree.png
 --
---  القرار المتّفق عليه:
---      • الأفاتارات المجانية القديمة (58 صورة: PFP · Profiles · Pack One
---        ومنها «Default Profile») **تُعطَّل** (enabled = false) لا تُحذف:
---        تبقى صفوفها في القاعدة مخفيّة عن التطبيق، وإرجاعها سطر واحد.
---      • الصورة المجانية المفعّلة تبقى **واحدة فقط**: profiles/onefree.png.
---      • كل حساب يستعمل صورة مجانية قديمة يُحوَّل إلى onefree
---        («لكل الحساب»).
---
---  لماذا التعطيل يكفي؟ التطبيق يقرأ الأصول بـ
---      select=*&asset_type=eq.avatar&enabled=eq.true
---  (AssetsRepository.byType) ⇒ المعطَّل لا يظهر في تبويب الأفاتار أصلاً.
---
---  آمن لإعادة التنفيذ (idempotent).
---
---  ⚠️ الملف نفسه مرفوع في المخزن على المسار:
---        site-assets/profiles/profiles/onefree.png   ← المسار المعتمد
---     (نسخة محفوظة في المستودع: supabase/site-assets/profiles/onefree.png
---      — ارفعها على المسار أعلاه إن احتجت، و32 يوحّد كل شيء عليه)
---
---  يُنفَّذ مرة واحدة في Supabase → SQL Editor.
+-- Unlike the previous revision, obsolete free avatar database records are
+-- deleted rather than only disabled. Paid/admin avatars and the separate guest
+-- image used before sign-in are not changed.
 -- ============================================================================
 
--- ---------------------------------------------------------------------------
--- ٠) فهرس فريد على file_url (يحتاجه الـ upsert أدناه) + تنظيف أي تكرار قديم
--- ---------------------------------------------------------------------------
+begin;
+
+-- The upsert below relies on one row per storage path.
 delete from public.site_assets a
  using public.site_assets b
  where a.file_url = b.file_url
    and a.id > b.id;
 
-do $$
-begin
-  if not exists (
-        select 1 from pg_indexes
-         where schemaname = 'public' and indexname = 'site_assets_file_url_uidx'
-     ) then
-    execute 'create unique index site_assets_file_url_uidx on public.site_assets (file_url)';
-  end if;
-end $$;
+create unique index if not exists site_assets_file_url_uidx
+  on public.site_assets (file_url);
 
--- ---------------------------------------------------------------------------
--- ١) تعطيل كل الأفاتارات المجانية القديمة (تبقى في القاعدة · مخفيّة عن التطبيق)
--- ---------------------------------------------------------------------------
-update public.site_assets
-   set enabled = false
- where asset_type = 'avatar'
-   and required_plan = 'free'
-   and lower(file_url) not like '%onefree%';
-
--- المسار المعتمد **واحد فقط**: profiles/profiles/onefree.png — وهو المسار
--- الذي رُفعت إليه الصورة فعلاً في المخزن (تحقّق منه فاحص 99). أي صف onefree
--- آخر (مثل profiles/onefree.png) يُعطَّل، ولا يظهر مرّتين في تبويب الأفاتار.
-update public.site_assets
-   set enabled = false
- where asset_type = 'avatar'
-   and lower(file_url) like '%onefree%'
-   and file_url <> 'profiles/profiles/onefree.png';
-
--- ---------------------------------------------------------------------------
--- ٢) تثبيت الأصل المجاني الوحيد: profiles/profiles/onefree.png (موجود في المخزن)
--- ---------------------------------------------------------------------------
-insert into public.site_assets (asset_type, name, file_url, required_plan, animated, sort_order, enabled)
-values ('avatar', 'Onefree', 'profiles/profiles/onefree.png', 'free', false, 1, true)
+-- Establish the canonical free row before migrating old references.
+insert into public.site_assets
+  (asset_type, name, file_url, required_plan, animated, collection,
+   collection_order, sort_order, enabled)
+values
+  ('avatar', 'Default Free Avatar', 'profiles/profiles/onefree.png', 'free',
+   false, 'Default', 1, 1, true)
 on conflict (file_url) do update
-   set asset_type    = excluded.asset_type,
-       name          = excluded.name,
-       required_plan = excluded.required_plan,
-       animated      = excluded.animated,
-       sort_order    = excluded.sort_order,
-       enabled       = true;
+   set asset_type       = excluded.asset_type,
+       name             = excluded.name,
+       required_plan    = excluded.required_plan,
+       animated         = excluded.animated,
+       collection       = excluded.collection,
+       collection_order = excluded.collection_order,
+       sort_order       = excluded.sort_order,
+       enabled          = true;
 
--- ---------------------------------------------------------------------------
--- ٣) توحيد مسار onefree في الحسابات: profiles/profiles/onefree.png ⇒ profiles/…
--- ---------------------------------------------------------------------------
-update public.profiles
-   set avatar_url = 'profiles/onefree.png',
-       updated_at = now()
- where lower(avatar_url) like '%onefree%'
-   and avatar_url <> 'profiles/onefree.png';
-
--- ---------------------------------------------------------------------------
--- ٤) كل حساب يستعمل صورة مجانية قديمة (معطَّلة الآن) ⇒ onefree
---    المطابقة من الجهتين لأن المسار قد يكون مسبوقاً بـ profiles/
--- ---------------------------------------------------------------------------
+-- Move missing, legacy-onefree, and obsolete-free references to the canonical
+-- image before deleting their asset records.
 update public.profiles p
-   set avatar_url = 'profiles/onefree.png',
+   set avatar_url = 'profiles/profiles/onefree.png',
        updated_at = now()
- where exists (
-        select 1
-          from public.site_assets a
-         where a.asset_type    = 'avatar'
-           and a.required_plan = 'free'
-           and a.enabled       = false
-           and lower(a.file_url) not like '%onefree%'
-           and (   p.avatar_url = a.file_url
-                or p.avatar_url = 'profiles/' || a.file_url
-                or a.file_url   = 'profiles/' || p.avatar_url )
+ where p.avatar_url is null
+    or btrim(p.avatar_url) = ''
+    or lower(btrim(p.avatar_url)) = 'none'
+    or p.avatar_url = 'profiles/onefree.png'
+    or exists (
+         select 1
+           from public.site_assets a
+          where a.asset_type = 'avatar'
+            and a.required_plan = 'free'
+            and a.file_url <> 'profiles/profiles/onefree.png'
+            and (
+                 p.avatar_url = a.file_url
+              or p.avatar_url = 'profiles/' || a.file_url
+              or a.file_url = 'profiles/' || p.avatar_url
+            )
        );
 
--- ---------------------------------------------------------------------------
--- ٥) تحقّق: أفاتار مجاني مفعّل واحد فقط · ولا حساب بلا صورة
--- ---------------------------------------------------------------------------
-select count(*)                                    as "كل الأفاتارات",
-       count(*) filter (where required_plan = 'free' and enabled)     as "مجاني مفعّل",
-       count(*) filter (where required_plan = 'free' and not enabled)  as "مجاني معطّل (قديم)",
-       count(*) filter (where required_plan = 'epic')                  as "epic",
-       count(*) filter (where required_plan = 'legendary')             as "legendary"
-  from public.site_assets
- where asset_type = 'avatar';
+-- Remove every other free avatar record. This is deliberately stricter than
+-- enabled=false so a stale client or admin query cannot expose old defaults.
+delete from public.site_assets
+ where asset_type = 'avatar'
+   and required_plan = 'free'
+   and file_url <> 'profiles/profiles/onefree.png';
 
-select count(*)                                       as "كل الحسابات",
-       count(*) filter (where avatar_url is null
-                           or btrim(avatar_url) = '')  as "بلا صورة",
-       count(*) filter (where lower(avatar_url) like '%onefree%') as "يستعمل onefree"
-  from public.profiles;
+alter table public.profiles
+  alter column avatar_url set default 'profiles/profiles/onefree.png';
 
+-- Every newly created account starts on the free plan with this exact avatar.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_username text;
+  v_welcome  int := 50;
+begin
+  v_username := coalesce(
+    nullif(new.raw_user_meta_data->>'username', ''),
+    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+    'player_' || substr(new.id::text, 1, 8)
+  );
+
+  while exists (select 1 from public.profiles p where p.username = v_username) loop
+    v_username := v_username || floor(random() * 10)::int;
+  end loop;
+
+  insert into public.profiles (id, username, display_name, avatar_url)
+  values (new.id, v_username, v_username, 'profiles/profiles/onefree.png')
+  on conflict (id) do nothing;
+
+  insert into public.ac_wallets (user_id, balance, total_earned)
+  values (new.id, v_welcome, v_welcome)
+  on conflict (user_id) do nothing;
+
+  insert into public.ac_transactions
+    (user_id, amount, kind, reason, request_key, balance_after)
+  values
+    (new.id, v_welcome, 'welcome', 'Welcome reward',
+     'welcome:' || new.id::text, v_welcome)
+  on conflict (request_key) do nothing;
+
+  return new;
+end;
+$$;
+
+-- Fail atomically if another free/default avatar survived.
 do $$
 declare
-  v_enabled int;
-  v_missing int;
+  v_free_count integer;
+  v_canonical_count integer;
+  v_legacy_profiles integer;
   v_default text;
-  v_name    text;
 begin
-  select count(*) into v_enabled
+  select count(*) into v_free_count
     from public.site_assets
-   where asset_type = 'avatar' and required_plan = 'free' and enabled;
+   where asset_type = 'avatar' and required_plan = 'free';
 
-  select count(*) into v_missing
+  select count(*) into v_canonical_count
+    from public.site_assets
+   where asset_type = 'avatar'
+     and required_plan = 'free'
+     and enabled
+     and file_url = 'profiles/profiles/onefree.png';
+
+  select count(*) into v_legacy_profiles
     from public.profiles
-   where avatar_url is null or btrim(avatar_url) = '';
+   where avatar_url is null
+      or btrim(avatar_url) = ''
+      or lower(btrim(avatar_url)) = 'none'
+      or avatar_url = 'profiles/onefree.png';
 
   select column_default into v_default
     from information_schema.columns
-   where table_schema = 'public' and table_name = 'profiles' and column_name = 'avatar_url';
+   where table_schema = 'public'
+     and table_name = 'profiles'
+     and column_name = 'avatar_url';
 
-  select name into v_name
-    from public.site_assets
-   where asset_type = 'avatar' and required_plan = 'free' and enabled
-   limit 1;
-
-  if v_enabled <> 1 then
-    raise exception '✗ عدد الأفاتارات المجانية المفعّلة = % (المطلوب 1 فقط)', v_enabled;
+  if v_free_count <> 1 or v_canonical_count <> 1 then
+    raise exception 'Expected exactly one canonical free avatar; free=%, canonical=%',
+      v_free_count, v_canonical_count;
   end if;
-
-  if v_missing > 0 then
-    raise exception '✗ ما زال هناك % حساباً بلا صورة', v_missing;
+  if v_legacy_profiles <> 0 then
+    raise exception 'Found % profiles without the canonical default path', v_legacy_profiles;
   end if;
-
-  if v_default is null or v_default not like '%onefree%' then
-    raise exception '✗ افتراضي avatar_url ليس onefree: %', coalesce(v_default, '(بلا)');
+  if v_default is null
+     or v_default not like '%profiles/profiles/onefree.png%'
+  then
+    raise exception 'Unexpected profiles.avatar_url default: %', coalesce(v_default, '(none)');
   end if;
-
-  raise notice '✅ 31_single_free_avatar: الأفاتار المجاني المفعّل = % (واحد فقط) · '
-               'وكل الحسابات صورتها onefree', v_name;
 end;
 $$;
+
+commit;
+
+notify pgrst, 'reload schema';

@@ -52,6 +52,25 @@ if send_fn:
 else:
     rows.append(("دالة الإرسال في ChatViewModel", False))
 
+# تحميل الغرفة: لا تنتظر بيانات تزيينية/إيصالات القراءة كي تُعرض الرسائل.
+load_initial = vm[vm.find("private suspend fun loadInitial("):vm.find("private fun startRealtime(")]
+rows.append(("الرسائل والتفضيل المحلي يُقرآن بالتوازي",
+             "async { container.chat.messages(channelId, limit = PAGE_SIZE) }" in load_initial
+             and "val muted = async" in load_initial))
+rows.append(("يختفي skeleton قبل جلب الملفات والتفاعلات",
+             "_loading.value = false\n\n        visible.maxByOrNull" in load_initial
+             and "loadInitialMetadata(channelId, visible, byId)" in load_initial))
+rows.append(("إيصالات القراءة لا تحجب أول عرض للرسائل",
+             "enqueueReadReceipt(channelId, lastReadId)" in load_initial
+             and vm.find("private fun enqueueReadReceipt(") > vm.find("_loading.value = false")))
+rows.append(("قائمة الحظر والكتم تُحدَّث بعد جلب الصفحة الأولى",
+             vm.find("loadInitial(channel.id)") < vm.find("refreshAccessFilters(channel.id)")))
+rows.append(("الكتم/الحظر يطبّقان على الصفحة الأولى والرسائل الأقدم",
+             "it.userId in _blockedIds.value || it.userId in cachedMutedIds" in vm
+             and "it.userId in _blockedIds.value || it.userId in _mutedIds.value" in vm))
+rows.append(("metadata قديم لا يستبدل تفاعلاً حديثاً",
+             "reactionChangeRevision" in vm and "reactionWasChanged" in vm))
+
 # الاستقبال لا يعتمد على المستخدم: آخر رسالة حقيقية فقط + استطلاع لا يُسقط نفسه
 rows.append(("تحديث الذيل يتجاهل الرسالة المؤقتة", "it.message.id > 0L" in vm))
 rows.append(("حلقة التحديث لا تموت عند فشل واحد", "runCatching { refreshTails() }" in vm))
@@ -74,7 +93,9 @@ rows.append(("خيار «رد» في قائمة الضغط المطوّل", "Ico
 rows.append(("خيار «إبلاغ» في القائمة", "Icons.Filled.Flag" in actions))
 rows.append(("خيار «حذف رسالتي» في القائمة", "Icons.Filled.Delete" in actions))
 rows.append(("الحذف شرطه أنه رسالتي", "ui.message.userId == myId" in actions))
-rows.append(("الضغط المطوّل ما زال يفتح القائمة", "onLongPress = { actionsFor = ui }" in screen))
+rows.append(("الضغط المطوّل يفتح القائمة العائمة عند الرسالة", "onLongPress = { bounds ->" in screen
+             and "actionsFor = ui" in screen
+             and "actionAnchor = bounds.takeIf" in screen))
 
 # ── 3) ضغطة بسيطة ⇒ رد ────────────────────────────────────────────────
 rows.append(("الضغطة البسيطة تردّ لا تفتح القائمة",
@@ -86,7 +107,18 @@ rows.append(("نقر الملصق يمرّر إلى onStickerTap", "if (takeBack
 rows.append(("النقر يشيل الرسالة من الشات", "vm.deleteMine(ui.message.id)" in screen))
 rows.append(("ثم تُفتح لوحة الملصقات", "resentSticker = sticker" in screen and "showEmoji = true" in screen))
 rows.append(("اللوحة تُحدّد الملصق المُعاد", "focusSticker" in sheets and "AppColors.Green else Color.Transparent" in sheets))
-rows.append(("التبويب يفتح على الملصقات", 'mutableStateOf(if (focusSticker != null) 1 else 0)' in sheets))
+rows.append(("التبويب يفتح على الملصقات", 'mutableStateOf(if (focusSticker != null && showStickerTab) 1 else 0)' in sheets))
+
+composer_panel_section = screen[screen.find("ChatInputBar("):screen.find("actionsFor?.let { ui ->")]
+rows.append(("لوحة الإيموجي/الملصقات تحت المحرر داخل عمود الشات",
+             "EmojiStickerPanel(" in composer_panel_section and "if (showEmoji)" in composer_panel_section
+             and "windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))" in screen))
+rows.append(("بعد اختيار الإيموجي يعود التركيز ولوحة المفاتيح",
+             "text += emoji" in composer_panel_section and "focusRequester.requestFocus()" in composer_panel_section
+             and "keyboardController?.show()" in composer_panel_section))
+rows.append(("اختيار التفاعل من القائمة يطبّق الإيموجي على الرسالة",
+             "reactionTargetMessageId = ui.message.id" in screen and "showStickerTab = reactionTargetMessageId == null" in composer_panel_section
+             and "vm.toggleReaction(reactionTarget, emoji)" in composer_panel_section))
 
 # ── 5) النص + الملصق/الوسائط = رسالة واحدة ────────────────────────────
 # (جديد بطلب المالك: اختيار الملصق لا يُرسله فوراً — بل يضعه في مربع الإرسال
@@ -116,12 +148,23 @@ rows.append(("الصورة/الفيديو يُرسلان مع النص المك�
              "imagePath = if (attach?.kind == \"image\") attach.remotePath else null" in send_now
              and "mediaPath = if (attach != null && attach.kind != \"image\") attach.remotePath else null" in send_now))
 # الرسالة نفسها: النص فوقه والملصق تحته مباشرة
-sticker_block = re.search(r'"sticker" -> \{(?:.|\n)*?\n            \}', screen)
-sticker_block = sticker_block.group(0) if sticker_block else ""
+# كتلة الملصق بموازنة الأقواس (النمط النمطي القديم كان يقف عند أول قوس مغلق)
+_i = screen.find('"sticker" -> {')
+sticker_block = ""
+if _i >= 0:
+    _d, _j = 0, screen.index("{", _i)
+    for _k in range(_j, len(screen)):
+        if screen[_k] == "{":
+            _d += 1
+        elif screen[_k] == "}":
+            _d -= 1
+            if _d == 0:
+                sticker_block = screen[_j:_k + 1]
+                break
 rows.append(("عرض النص فوق الملصق في نفس الرسالة",
              "message.content.orEmpty()" in sticker_block
-             and "CoverImage(url = url" in sticker_block
-             and sticker_block.find("message.content.orEmpty()") < sticker_block.find("CoverImage(url = url")))
+             and "CoverImage(" in sticker_block
+             and sticker_block.find("message.content.orEmpty()") < sticker_block.find("CoverImage(")))
 rows.append(("النص يُمسح فوراً لا بعد النجاح", "text = \"\"            // مسح فوري" in screen
              or "text = \"\"                // مسح فوري" in screen))
 rows.append(("ما كتبه يعود لو فشل الإرسال", "val replySnapshot = replyTo" in send_now

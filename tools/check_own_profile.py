@@ -11,6 +11,8 @@
   • لم يُميَّز ملف المستخدم نفسه في شاشة الملف (UserProfileScreen).
   • ظهر «مراسلة» أو «إضافة صديق» على ملفه هو.
   • لم يظهر زرّ «تعديل الملف الشخصي» بدلاً منهما، أو لم يفتح شاشة التعديل.
+  • ظهر زرّ «مراسلة العضو» على ملف غيره — قرار المالك: مخفيّ مؤقتاً لأن
+    المحادثات الخاصة غير موجودة في الخادم بعد (وصف شاشة B في SPEC_PROFILES).
   • بقيت بطاقة الملف في الشات (DiscordProfileCardSheet) تراسل صاحبها.
   • غاب نص profile_edit_mine عن أي لغة من اللغات الثماني.
 """
@@ -97,12 +99,17 @@ if not mine:
 else:
     if "profile_message" in mine or "profile_add_friend" in mine:
         problems.append("ما زال يظهر «مراسلة/إضافة صديق» على ملف المستخدم نفسه")
-    if "profile_edit_mine" not in mine:
+    if "R.string.profile_edit" not in mine:
         problems.append("لا زرّ «تعديل الملف الشخصي» على ملف المستخدم نفسه")
     if "onEditProfile" not in mine:
         problems.append("زرّ تعديل الملف لا يفتح شاشة التعديل")
-if theirs and ("profile_message" not in theirs or "profile_add_friend" not in theirs):
-    problems.append("ملف غيري فقد أزرار المراسلة وإضافة الصديق (يجب أن تبقى)")
+# ملف غيري (وثيقة SPEC_PROFILES §4 + قرار المالك): زرّ طلب الصداقة يعمل،
+# وزرّ «مراسلة [الاسم]» **مخفيّ مؤقتاً** حتى تُضاف المحادثات الخاصة للخادم.
+# (نبحث في الملف كله: أزرار الصداقة في دالة مساعدة أسفل الشاشة)
+if "profile_friend_request" not in profile:
+    problems.append("ملف غيري فقد زرّ «طلب صداقة»")
+if "profile_message" in profile:
+    problems.append("ظهر زرّ «مراسلة العضو» رغم قرار المالك بإخفائه مؤقتاً (لا محادثات خاصة)")
 
 # 3) بطاقة الملف في الشات كذلك: لا مراسلة للنفس
 if "isSelf(container, profile)" not in card:
@@ -136,10 +143,10 @@ rows = [
     ("تمييز ملف صاحبه (isMyProfile)", "isMyProfile" in screen),
     ("بلا «مراسلة» على ملفي", bool(mine) and "profile_message" not in mine),
     ("بلا «إضافة صديق» على ملفي", bool(mine) and "profile_add_friend" not in mine),
-    ("زرّ «تعديل الملف الشخصي»", "profile_edit_mine" in (mine or "")),
+    ("زرّ «تعديل الملف الشخصي»", "R.string.profile_edit" in (mine or "")),
     ("الزرّ يفتح شاشة التعديل", "onEditProfile" in (mine or "")),
-    ("ملف غيري يحتفظ بالزرّين",
-     bool(theirs) and "profile_message" in theirs and "profile_add_friend" in theirs),
+    ("ملف غيري: زرّ الصداقة موجود والمراسلة مخفيّة",
+     "profile_friend_request" in profile and "profile_message" not in profile),
     ("بطاقة الشات: بلا مراسلة للنفس",
      bool(card_mine) and "profile_message" not in card_mine),
     ("بطاقة الشات: زرّ تعديل الملف", "profile_edit_mine" in (card_mine or "")),

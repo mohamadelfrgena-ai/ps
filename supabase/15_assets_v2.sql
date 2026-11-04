@@ -3,7 +3,7 @@
 --
 --  يولّده tools/build_assets_sql.py من assets-manifest.json — لا تعدّله يدوياً.
 --
---  المحتوى: 123 أفاتاراً · 193 ملصقاً · 176 أداة  =  492 أصلاً
+--  final content after free-avatar cleanup: 66 avatars · 193 stickers · 176 items = 435 assets
 --  منها 214 ملفاً متحرّكاً (GIF) يعمل داخل التطبيق مع المعاينات.
 --
 --  ⚠️ هذا الملف **يحذف كل الأصول القديمة** (أفاتارات/ملصقات/أدوات) ثم يزرع الجديدة.
@@ -601,19 +601,15 @@ on conflict (file_url) do update
       enabled = true;
 
 -- ---------------------------------------------------------------------------
--- الأفاتار المجاني = واحد فقط (onefree)
+-- Keep exactly one free avatar record: the owner's canonical onefree image.
 -- ---------------------------------------------------------------------------
--- طلب المالك: «أريد هذه الصورة المجانية الافتراضية لكل الحساب، والصور التي
--- معيّنة مجانية والافتراضية القديمة أزلها.»
--- ⇒ نُعطّل (لا نحذف) كل أفاتار مجاني قديم، فيبقى مفعّلاً أصلٌ واحد:
---    profiles/onefree.png  (يُثبَّته ويُفعَّل في 31_single_free_avatar.sql).
--- التعطيل يكفي: التطبيق يستعلم بـ enabled=eq.true فلا تظهر المعطَّلات أصلاً،
--- والصفوف باقية في القاعدة ⇒ إرجاع أي صورة سطر UPDATE واحد.
-update public.site_assets
-   set enabled = false
+-- Old free/default avatar records are intentionally removed rather than merely
+-- hidden. Migration 45 maps any legacy profile references before enforcing the
+-- same invariant on existing installations.
+delete from public.site_assets
  where asset_type = 'avatar'
    and required_plan = 'free'
-   and lower(file_url) not like '%onefree%';
+   and file_url <> 'profiles/profiles/onefree.png';
 
 -- ---------------------------------------------------------------------------
 -- تحقق: يجب أن ترى 21 قسماً والأعداد كما في الجدول أدناه
@@ -624,7 +620,7 @@ select asset_type as "النوع", collection as "القسم", count(*) as "ال
  group by asset_type, collection, collection_order
  order by asset_type, collection_order;
 
--- الإجمالي المتوقّع: avatar = 123 · sticker = 193 · item = 176
+-- Expected final totals: avatar = 66 · sticker = 193 · item = 176
 select asset_type, count(*) as total, count(*) filter (where animated) as animated
   from public.site_assets group by asset_type order by asset_type;
 

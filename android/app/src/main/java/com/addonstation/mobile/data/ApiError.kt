@@ -60,7 +60,7 @@ fun apiErrorFromMessage(message: String?, status: Int = 0): ApiError {
         m.contains("file_not_uploaded") -> ApiErrorKind.FILE_NOT_UPLOADED
         m.contains("not_found") -> ApiErrorKind.NOT_FOUND
         m.contains("plan_unavailable") -> ApiErrorKind.PLAN_UNAVAILABLE
-        m.contains("method_disabled") || m.contains("method_unavailable") -> ApiErrorKind.METHOD_DISABLED
+        m.contains("gateway_not_configured") || m.contains("method_disabled") || m.contains("method_unavailable") -> ApiErrorKind.METHOD_DISABLED
         m.contains("too_many_open_orders") -> ApiErrorKind.TOO_MANY_ORDERS
         m.contains("already_claimed") -> ApiErrorKind.ALREADY_CLAIMED
         m.contains("already_unlocked") || m.contains("not_priced") -> ApiErrorKind.ALREADY_UNLOCKED
@@ -73,6 +73,7 @@ fun apiErrorFromMessage(message: String?, status: Int = 0): ApiError {
         m.contains("image_format") -> ApiErrorKind.INVALID_IMAGE_FORMAT
         m.contains("image_too_large") -> ApiErrorKind.IMAGE_TOO_LARGE
         m.contains("media_too_large") -> ApiErrorKind.MEDIA_TOO_LARGE
+        status == 401 -> ApiErrorKind.NOT_SIGNED_IN
         status >= 500 -> ApiErrorKind.SERVER
         else -> ApiErrorKind.GENERIC
     }

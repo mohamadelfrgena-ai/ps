@@ -23,12 +23,20 @@ rows = []
 time_fn = screen[screen.find("private fun MessageTime("):]
 time_fn = time_fn[:time_fn.find("\n}\n")] if "\n}\n" in time_fn else time_fn
 rows.append(("بانية وقت الرسالة معرَّفة", "private fun MessageTime(" in screen))
-rows.append(("الوقت بخطّ صغير باهت", "AppText.chatTime" in time_fn and "AppColors.Dim" in time_fn))
+rows.append(("الوقت بخطّ صغير باهت", "Spec.msgTime" in time_fn and "Spec.textMuted" in time_fn))
 
-# 2) الوقت لم يعد في سطر الاسم: TimeFormat.timeOnly يُستدعى مرة واحدة فقط (داخل MessageTime)
+# 2) الوقت لم يعد في سطر الاسم: الوارد يستخدم MessageTime، والصادر يمرّ
+#    عبر MessageStatus (الوقت مع علامة التسليم)؛ كلاهما داخل نهاية الرسالة.
+status_fn = screen[screen.find("private fun MessageStatus("):]
+status_fn = status_fn[:status_fn.find("\n}\n")] if "\n}\n" in status_fn else status_fn
+author_start = screen.find("text = author?.displayName")
+author_end = screen.find("if (author?.equippedItemId", author_start)
+author_header = screen[author_start:author_end] if author_start >= 0 and author_end >= 0 else ""
 rows.append(("لا وقت بجانب اسم صاحب الرسالة",
-             screen.count("TimeFormat.timeOnly(") == 1
-             and "TimeFormat.timeOnly(createdAt" in time_fn))
+             screen.count("TimeFormat.timeOnly(") == 2
+             and "TimeFormat.timeOnly(createdAt" in time_fn
+             and "TimeFormat.timeOnly(createdAt" in status_fn
+             and "TimeFormat.timeOnly(" not in author_header))
 
 # 3) الوقت مع كل الأنواع — يُعرض اليوم عبر MessageStatus (الوقت حين تُؤكَّد
 #    الرسالة، وحالة الإرسال حين تكون قيده أو فاشلة) في نهاية كل نوع.
