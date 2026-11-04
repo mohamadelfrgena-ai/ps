@@ -27,6 +27,9 @@ SupabaseConfig loadSupabaseConfig();
 std::string jsonGetString(const std::string& json, const std::string& key);
 long jsonGetInt(const std::string& json, const std::string& key, long def = 0);
 bool jsonGetBool(const std::string& json, const std::string& key, bool def = false);
+// v0.42: extract a nested JSON object as a raw substring (e.g. "profile" from a
+// poll response) so its fields can be read with jsonGetString on the result.
+std::string jsonGetObject(const std::string& json, const std::string& key);
 // قيمة كائن/مصفوفة خام متوازنة {...} أو [...] بعد المفتاح
 std::string jsonGetRaw(const std::string& json, const std::string& key);
 // تفكيك مصفوفة JSON [...] إلى كائنات {...} منفصلة

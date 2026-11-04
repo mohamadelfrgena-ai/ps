@@ -103,6 +103,7 @@ struct App {
     bool confirmSignOut = false;
     int confirmFocus = 1;
     std::string query, notice, code, pollSecret, exchangeId, linkedConsoleId, sessionRef, sessionRefresh;
+    std::string linkedUsername, linkedDisplayName;   // v0.42: profile returned inside the poll response
     int codeSecs = 0, codeStatus = 4;
     bool qrView = false;
     std::atomic<int> dl{0};          // DemoState
@@ -209,7 +210,7 @@ static void ensureFreshSession() {
 static void applyAccountFromSession() {
     ensureFreshSession();
     ProfileRow p = fetchProfile(gCfg, gSession.userId, gSession.accessToken);
-    if (!p.ok && gSession.displayName.empty()) return;
+    if (!p.ok && gSession.displayName.empty() && gSession.username.empty()) return;   // v0.42
     Account a;
     a.signedIn = true;
     a.displayName = p.ok ? p.displayName : gSession.displayName;
@@ -501,6 +502,14 @@ static int pollCodeOnce() {
             A.sessionRef = jsonGetString(old.body, "access_token");
             A.sessionRefresh = jsonGetString(old.body, "refresh_token");
             A.linkedConsoleId = jsonGetString(old.body, "user_id");
+            // v0.42: the RPC returns the account nested under "profile" — parse it
+            // (was ignored entirely: blank name, 0 AC and no saved session).
+            const std::string prof = jsonGetObject(old.body, "profile");
+            if (!prof.empty()) {
+                if (A.linkedConsoleId.empty()) A.linkedConsoleId = jsonGetString(prof, "id");
+                A.linkedUsername = jsonGetString(prof, "username");
+                A.linkedDisplayName = jsonGetString(prof, "display_name");
+            }
             A.exchangeId.clear();
             return 1;
         }
@@ -521,6 +530,16 @@ static int pollCodeOnce() {
         A.linkedConsoleId = jsonGetString(r.body, "linked_console_id");
         A.sessionRef = jsonGetString(r.body, "session_ref");
         if (A.sessionRefresh.empty()) A.sessionRefresh = jsonGetString(r.body, "refresh_token");
+        // v0.42: also try user_id + nested profile on this schema
+        if (A.linkedConsoleId.empty()) A.linkedConsoleId = jsonGetString(r.body, "user_id");
+        {
+            const std::string prof = jsonGetObject(r.body, "profile");
+            if (!prof.empty()) {
+                if (A.linkedConsoleId.empty()) A.linkedConsoleId = jsonGetString(prof, "id");
+                if (A.linkedUsername.empty()) A.linkedUsername = jsonGetString(prof, "username");
+                if (A.linkedDisplayName.empty()) A.linkedDisplayName = jsonGetString(prof, "display_name");
+            }
+        }
         if (st == "approved" || jsonGetBool(r.body, "approved", false) || jsonGetBool(r.body, "claimed", false))
             return 1;
         if (st == "expired") return 2;
@@ -542,14 +561,32 @@ static void finishSignIn() {
         gSession.refreshToken = A.sessionRefresh;
         gSession.plan = "free";
         gTokenAtMs = SDL_GetTicks();   // توكن جديد — لا حاجة لتجديد فوري
-    }
-    // the complete/consume response may carry the linked console/user id
-    {
-        std::lock_guard<std::mutex> lk(gSessionMx);
+        // the complete/consume response may carry the linked console/user id
         if (!A.linkedConsoleId.empty()) gSession.userId = A.linkedConsoleId;
+        // v0.42: seed the profile captured from the poll response (was discarded)
+        if (gSession.username.empty()) gSession.username = A.linkedUsername;
+        if (gSession.displayName.empty()) gSession.displayName = A.linkedDisplayName;
+        // v0.42: SAVE NOW — a slow profile fetch must never lose the session
+        // (this was the bug: «كأنني لم أسجّل» after every launch).
+        saveLinkSession(gSession);
     }
     applyAccountFromSession();
     loadWalletHistory();
+    {
+        // v0.42: if the profile fetch failed but the poll delivered the account,
+        // build it from what we HAVE so the UI is never blank.
+        if (!account().signedIn && (!gSession.username.empty() || !gSession.displayName.empty())) {
+            Account a;
+            a.signedIn = true;
+            a.displayName = gSession.displayName.empty() ? gSession.username : gSession.displayName;
+            a.username = gSession.username;
+            a.plan = tierFromPlan(gSession.plan);
+            a.acBalance = (int)gSession.acBalance;
+            for (const AddonItem& it : catalog())
+                if (it.installed) a.installed += 1;
+            setAccount(a);
+        }
+    }
     {
         std::lock_guard<std::mutex> lk(gSessionMx);
         if (account().signedIn) {

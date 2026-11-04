@@ -74,6 +74,34 @@ SupabaseConfig loadSupabaseConfig() {
     return cfg;
 }
 
+// v0.42: nested object extractor (string-aware brace matching)
+std::string jsonGetObject(const std::string& json, const std::string& key) {
+    const std::string pat = "\"" + key + "\"";
+    std::size_t k = json.find(pat);
+    while (k != std::string::npos) {
+        std::size_t i = k + pat.size();
+        while (i < json.size() && (json[i] == ' ' || json[i] == '\t' || json[i] == ':')) ++i;
+        if (i < json.size() && json[i] == '{') {
+            int depth = 0;
+            bool inStr = false, esc = false;
+            for (std::size_t j = i; j < json.size(); ++j) {
+                const char c = json[j];
+                if (esc) { esc = false; continue; }
+                if (c == '\\') { esc = true; continue; }
+                if (c == '"') { inStr = !inStr; continue; }
+                if (inStr) continue;
+                if (c == '{') ++depth;
+                else if (c == '}') {
+                    if (--depth == 0) return json.substr(i, j - i + 1);
+                }
+            }
+            return json.substr(i);
+        }
+        k = json.find(pat, k + 1);
+    }
+    return std::string();
+}
+
 std::string jsonGetString(const std::string& json, const std::string& key) {
     const std::string pat = "\"" + key + "\"";
     std::size_t p = 0;
