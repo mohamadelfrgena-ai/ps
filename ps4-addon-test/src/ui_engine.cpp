@@ -971,32 +971,99 @@ void UiEngine::drawImageCropped(const std::string& name,
                 }
             }
         } else {
+        // v0.46 (user: «اللافتات HD»): GROW = Catmull-Rom bicubic + a light unsharp.
+        // The old plain bilinear upscale made big banners soft/blurry (ضباب). This
+        // runs ONCE per (image,size) into the same cache — no per-frame cost.
+        auto cr = [](float t) {
+            t = std::fabs(t);
+            const float t2 = t * t;
+            const float t3 = t2 * t;
+            if (t < 1.0f) return 1.5f * t3 - 2.5f * t2 + 1.0f;
+            if (t < 2.0f) return -0.5f * t3 + 2.5f * t2 - 4.0f * t + 2.0f;
+            return 0.0f;
+        };
+        const int cxMin = std::max(0, sx0);
+        const int cxMax = std::min(img.w - 1, sx0 + sw - 1);
+        const int cyMin = std::max(0, sy0);
+        const int cyMax = std::min(img.h - 1, sy0 + sh - 1);
+        std::vector<int> tapX(static_cast<std::size_t>(w) * 4), tapY(static_cast<std::size_t>(h) * 4);
+        std::vector<float> wgtX(static_cast<std::size_t>(w) * 4), wgtY(static_cast<std::size_t>(h) * 4);
+        for (int dx = 0; dx < w; ++dx) {
+            const float sx = sx0 + ((dx + 0.5f) / w) * sw - 0.5f;
+            const int bx = static_cast<int>(std::floor(sx));
+            const float u = sx - bx;
+            float wsum = 0.0f;
+            for (int i = 0; i < 4; ++i) {
+                const float wi = cr(u - (i - 1));
+                wgtX[static_cast<std::size_t>(dx) * 4 + i] = wi;
+                wsum += wi;
+                tapX[static_cast<std::size_t>(dx) * 4 + i] = std::max(cxMin, std::min(cxMax, bx + (i - 1)));
+            }
+            if (wsum != 0.0f)
+                for (int i = 0; i < 4; ++i) wgtX[static_cast<std::size_t>(dx) * 4 + i] /= wsum;
+        }
         for (int dy = 0; dy < h; ++dy) {
             const float sy = sy0 + ((dy + 0.5f) / h) * sh - 0.5f;
-            const int y0 = std::max(0, std::min(img.h - 1, static_cast<int>(std::floor(sy))));
-            const int y1 = std::min(img.h - 1, y0 + 1);
-            const float fy = std::max(0.0f, std::min(1.0f, sy - y0));
+            const int by = static_cast<int>(std::floor(sy));
+            const float v = sy - by;
+            float wsum = 0.0f;
+            for (int j = 0; j < 4; ++j) {
+                const float wj = cr(v - (j - 1));
+                wgtY[static_cast<std::size_t>(dy) * 4 + j] = wj;
+                wsum += wj;
+                tapY[static_cast<std::size_t>(dy) * 4 + j] = std::max(cyMin, std::min(cyMax, by + (j - 1)));
+            }
+            if (wsum != 0.0f)
+                for (int j = 0; j < 4; ++j) wgtY[static_cast<std::size_t>(dy) * 4 + j] /= wsum;
+        }
+        for (int dy = 0; dy < h; ++dy) {
             for (int dx = 0; dx < w; ++dx) {
-                const float sx = sx0 + ((dx + 0.5f) / w) * sw - 0.5f;
-                const int x0 = std::max(0, std::min(img.w - 1, static_cast<int>(std::floor(sx))));
-                const int x1 = std::min(img.w - 1, x0 + 1);
-                const float fx = std::max(0.0f, std::min(1.0f, sx - x0));
-                const std::uint8_t* p00 = &img.rgba[(static_cast<std::size_t>(y0) * img.w + x0) * 4];
-                const std::uint8_t* p10 = &img.rgba[(static_cast<std::size_t>(y0) * img.w + x1) * 4];
-                const std::uint8_t* p01 = &img.rgba[(static_cast<std::size_t>(y1) * img.w + x0) * 4];
-                const std::uint8_t* p11 = &img.rgba[(static_cast<std::size_t>(y1) * img.w + x1) * 4];
-                float sample[4];
-                for (int c = 0; c < 4; ++c) {
-                    const float top = p00[c] * (1.0f - fx) + p10[c] * fx;
-                    const float bot = p01[c] * (1.0f - fx) + p11[c] * fx;
-                    sample[c] = top * (1.0f - fy) + bot * fy;
+                float acc[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+                for (int j = 0; j < 4; ++j) {
+                    const float wy = wgtY[static_cast<std::size_t>(dy) * 4 + j];
+                    if (wy == 0.0f) continue;
+                    const std::uint8_t* prow =
+                        &img.rgba[static_cast<std::size_t>(tapY[static_cast<std::size_t>(dy) * 4 + j]) * img.w * 4];
+                    for (int i = 0; i < 4; ++i) {
+                        const float wxy = wy * wgtX[static_cast<std::size_t>(dx) * 4 + i];
+                        if (wxy == 0.0f) continue;
+                        const std::uint8_t* p = &prow[static_cast<std::size_t>(tapX[static_cast<std::size_t>(dx) * 4 + i]) * 4];
+                        acc[0] += p[0] * wxy;
+                        acc[1] += p[1] * wxy;
+                        acc[2] += p[2] * wxy;
+                        acc[3] += p[3] * wxy;
+                    }
                 }
-                const std::uint32_t a = static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, sample[3])));
                 built.px[static_cast<std::size_t>(dy) * w + dx] =
-                    (a << 24) |
-                    (static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, sample[0]))) << 16) |
-                    (static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, sample[1]))) << 8) |
-                    static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, sample[2])));
+                    (static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, acc[3]))) << 24) |
+                    (static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, acc[0]))) << 16) |
+                    (static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, acc[1]))) << 8) |
+                    static_cast<std::uint32_t>(std::min(255.0f, std::max(0.0f, acc[2])));
+            }
+        }
+        // light unsharp mask (3x3) — extra "HD" bite on the grown banner
+        if (w >= 8 && h >= 8) {
+            const std::vector<std::uint32_t> soft(built.px);
+            for (int dy = 1; dy < h - 1; ++dy) {
+                for (int dx = 1; dx < w - 1; ++dx) {
+                    const std::size_t o = static_cast<std::size_t>(dy) * w + dx;
+                    int bR = 0, bG = 0, bB = 0;
+                    for (int j = -1; j <= 1; ++j) {
+                        for (int i = -1; i <= 1; ++i) {
+                            const std::uint32_t q = soft[o + static_cast<std::size_t>(j) * w + i];
+                            bR += (q >> 16) & 255u;
+                            bG += (q >> 8) & 255u;
+                            bB += q & 255u;
+                        }
+                    }
+                    const std::uint32_t px = soft[o];
+                    auto sh = [](int v) { return v < 0 ? 0 : (v > 255 ? 255 : v); };
+                    const int R = sh(static_cast<int>((px >> 16) & 255u) + static_cast<int>(0.36f * (static_cast<int>((px >> 16) & 255u) - bR / 9)));
+                    const int G = sh(static_cast<int>((px >> 8) & 255u) + static_cast<int>(0.36f * (static_cast<int>((px >> 8) & 255u) - bG / 9)));
+                    const int B = sh(static_cast<int>(px & 255u) + static_cast<int>(0.36f * (static_cast<int>(px & 255u) - bB / 9)));
+                    built.px[o] = (px & 0xFF000000u) | (static_cast<std::uint32_t>(R) << 16) |
+                                  (static_cast<std::uint32_t>(G) << 8) | static_cast<std::uint32_t>(B);
+                }
             }
         }
         }
