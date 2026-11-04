@@ -210,7 +210,7 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
 // Store focus: 0-7 cards (2 rows x 4), 8 banner, 9-11 categories
 void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langCode);
 // Addon page. focus 0 main button, 1 "Unlock for X AC" (only when acUnlockOffered). notice = optional server message
-enum class DemoState { Idle = 0, Downloading = 1, Installing = 2, Installed = 3 };
+enum class DemoState { Idle = 0, Downloading = 1, Installing = 2, Installed = 3, Queued = 4 };   // v0.41: staged, waiting for Minecraft
 void drawAddonDetail(UiEngine& e, int focus, int catalogIndex, DemoState state, int percent,
                      const std::string& langCode, const std::string& notice = "");
 // Search (△): focus 0 field, 1-3 tabs, 4-8 results. Empty query shows the most downloaded items.

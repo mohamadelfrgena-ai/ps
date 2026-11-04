@@ -391,6 +391,64 @@ std::string findMountedMojangDir(const std::string& preferredMojangDir) {
         ::closedir(rdir);
     }
 
+    // Pass 3 (v0.41): native sandbox mounts — a suspended game keeps its sandbox
+    // at /mnt/sandbox/<id>_000; check the layout the FTP guides use.
+    {
+        DIR* sdir = ::opendir("/mnt/sandbox");
+        if (sdir) {
+            while (dirent* sent = ::readdir(sdir)) {
+                const std::string sb(sent->d_name);
+                if (sb.empty() || sb == "." || sb == "..") continue;
+                const std::string cands[3] = {
+                    "/mnt/sandbox/" + sb + "/user/games/com.mojang",
+                    "/mnt/sandbox/" + sb + "/savedata0/games/com.mojang",
+                    "/mnt/sandbox/" + sb + "/app0/user/games/com.mojang",
+                };
+                for (const std::string& c : cands) {
+                    if (isDirectory(c)) {
+                        ::closedir(sdir);
+                        return c;
+                    }
+                }
+            }
+            ::closedir(sdir);
+        }
+    }
+
+    // Pass 4 (v0.41): with jailbreak root the persistent savedata store is
+    // directly readable — /user/home/<uid>/savedata/<entry>/games/com.mojang
+    // (the same data the game mounts while it runs). This lets the install
+    // complete even while Minecraft is CLOSED.
+    {
+        DIR* hdir = ::opendir("/user/home");
+        if (hdir) {
+            while (dirent* hent = ::readdir(hdir)) {
+                const std::string hn(hent->d_name);
+                if (hn.empty() || hn == "." || hn == "..") continue;
+                const std::string saveRoot = "/user/home/" + hn + "/savedata";
+                DIR* edir = ::opendir(saveRoot.c_str());
+                if (!edir) continue;
+                while (dirent* eent = ::readdir(edir)) {
+                    const std::string en(eent->d_name);
+                    if (en.empty() || en == "." || en == "..") continue;
+                    const std::string cands[2] = {
+                        saveRoot + "/" + en + "/games/com.mojang",
+                        saveRoot + "/" + en + "/com.mojang",
+                    };
+                    for (const std::string& c : cands) {
+                        if (isDirectory(c)) {
+                            ::closedir(edir);
+                            ::closedir(hdir);
+                            return c;
+                        }
+                    }
+                }
+                ::closedir(edir);
+            }
+            ::closedir(hdir);
+        }
+    }
+
     return "";
 }
 
@@ -764,6 +822,17 @@ std::string formatEnjoyNotification(const std::string& addonName, const std::str
     return addonName + " installed — Enjoy!";
 }
 
+std::string formatQueuedMessage(const std::string& langCode) {
+    if (langCode == "ar") return "جاهز — شغّل Minecraft ثم اضغط زر PS وعُد للتطبيق ليُثبَّت تلقائياً";
+    if (langCode == "fr") return "Prêt — lancez Minecraft, appuyez sur PS et revenez ici pour installer";
+    if (langCode == "tr") return "Hazır — Minecraft'ı başlat, PS'ye bas ve kurulum için buraya dön";
+    if (langCode == "es") return "Listo — inicia Minecraft, pulsa PS y vuelve aquí para instalar";
+    if (langCode == "ru") return "Готово — запустите Minecraft, нажмите PS и вернитесь сюда для установки";
+    if (langCode == "pt") return "Pronto — inicie Minecraft, aperte PS e volte aqui para instalar";
+    if (langCode == "zh") return "就绪 — 启动 Minecraft，按 PS 键回到这里完成安装";
+    return "Ready — launch Minecraft, press PS and return here to finish installing";
+}
+
 std::string formatInstallPhaseLabel(InstallPhase phase, const std::string& langCode) {
     switch (phase) {
         case InstallPhase::Downloading:
@@ -978,13 +1047,13 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
 
     result.ok = true;
     result.queuedForMinecraft = true;
+    result.message = formatQueuedMessage(langCode);
     // v0.13: إطلاق Minecraft تلقائياً اختياري — يُفعَّل من الإعدادات
     // «تشغيل Minecraft تلقائياً بعد التثبيت» (الافتراضي: إيقاف). حتى مع
     // الإيقاف يبقى الملف مؤجَّلاً في stageDir وتُكمله المزامنة التلقائية
     // (syncPendingAddonsIfMounted) في أول ظهور لمجلد com.mojang، سواء
     // شغّلت Minecraft بنفسك من △ في صفحة الإضافة أو يدوياً من القائمة.
     result.launchedMinecraft = autoLaunchMinecraft && launchMinecraftOnPs4();
-    result.message = formatInstallPhaseLabel(InstallPhase::Installing, langCode);
     return result;
 }
 

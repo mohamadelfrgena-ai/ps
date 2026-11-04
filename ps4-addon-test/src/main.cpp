@@ -628,7 +628,13 @@ static void startDownloadFlow(int catIdx) {
                 }
             },
             autoLaunch);
-        if (r.ok) {
+        if (r.ok && r.queuedForMinecraft) {
+            // v0.41: HONEST status — staged only, NOT inside the game yet.
+            A.dl = (int)DemoState::Queued;
+            ui_sfx(Sfx::DownloadDone);
+            toast(formatQueuedMessage(lang));
+            A.detailIdx = findItem(it.id);
+        } else if (r.ok) {
             A.dl = (int)DemoState::Installed;
             ui_sfx(Sfx::DownloadDone);
             toast(formatEnjoyNotification(displayName, lang));

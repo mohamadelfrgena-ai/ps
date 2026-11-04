@@ -36,6 +36,10 @@ std::string formatEnjoyNotification(const std::string& addonName, const std::str
 // Returns localized status label ("Downloading...", "Installing...", "Installed") for any of the 8 languages.
 std::string formatInstallPhaseLabel(InstallPhase phase, const std::string& langCode);
 
+// v0.41: honest "ready — waiting for Minecraft" message (8 languages) shown when
+// the addon is staged but NOT yet inside the game (queuedForMinecraft).
+std::string formatQueuedMessage(const std::string& langCode);
+
 // Checks if an addon is recorded as installed in /data/AddonStation/installed/installed.json
 bool isAddonMarkedInstalled(const std::string& addonName,
                             const std::string& stageDir = "/data/AddonStation/installed");

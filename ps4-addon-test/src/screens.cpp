@@ -91,6 +91,17 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
         {"downloading", {{"en", "Downloading..."}, {"ar", "جارٍ التنزيل..."}, {"fr", "Téléchargement..."},
                          {"tr", "İndiriliyor..."}, {"es", "Descargando..."}, {"ru", "Загрузка..."},
                          {"pt", "Baixando..."}, {"zh", "下载中..."}}},
+        {"queued_state", {{"en", "Waiting for Minecraft"}, {"ar", "بانتظار Minecraft"}, {"fr", "En attente de Minecraft"},
+                          {"tr", "Minecraft bekleniyor"}, {"es", "Esperando Minecraft"}, {"ru", "Ожидание Minecraft"},
+                          {"pt", "Aguardando Minecraft"}, {"zh", "等待 Minecraft"}}},
+        {"queued_hint", {{"en", "Launch Minecraft, press PS and return here — it installs automatically"},
+                         {"ar", "شغّل Minecraft ثم اضغط زر PS وعُد للتطبيق — يُثبَّت تلقائياً"},
+                         {"fr", "Lancez Minecraft, appuyez sur PS et revenez ici — installation auto"},
+                         {"tr", "Minecraft'ı başlat, PS'ye bas ve buraya dön — otomatik kurulur"},
+                         {"es", "Inicia Minecraft, pulsa PS y vuelve aquí — se instala solo"},
+                         {"ru", "Запустите Minecraft, нажмите PS и вернитесь — установится само"},
+                         {"pt", "Inicie Minecraft, aperte PS e volte aqui — instala sozinho"},
+                         {"zh", "启动 Minecraft，按 PS 键回到这里 — 自动安装"}}},
         {"installing", {{"en", "Installing..."}, {"ar", "جارٍ التثبيت..."}, {"fr", "Installation..."},
                         {"tr", "Yükleniyor..."}, {"es", "Instalando..."}, {"ru", "Установка..."},
                         {"pt", "Instalando..."}, {"zh", "安装中..."}}},
@@ -2804,9 +2815,12 @@ void drawSignIn(UiEngine& e, int focus, const std::string& code, int secondsLeft
 
     // ---- leading column: brand, title, steps, what comes with the account ----
     const int x0 = 150, lw = 860;
-    const int lg = 84;
-    e.dropShadow(L.X(x0, lg), 96, lg, lg, 20, 14, 120);
-    e.drawImageRounded("icon_app", L.X(x0, lg), 90, lg, lg, 20);
+    const int lg = 104;   // v0.41: COMPLETE rounded tile frame around the logo (was an incomplete shadow box)
+    const int lrx = L.X(x0, lg);
+    e.dropShadow(lrx, 96, lg, lg, 24, 16, gLight ? 60 : 130);
+    e.drawRoundRect(lrx, 90, lg, lg, 24, gLight ? SDL_Color{255, 255, 255, 238} : SDL_Color{18, 34, 46, 238});
+    e.drawRoundBorder(lrx, 90, lg, lg, 24, 2, ink(30));
+    e.drawImageRounded("icon_app", lrx + (lg - 72) / 2, 90 + (lg - 72) / 2, 72, 72, 16);
     boxText(e, L, "ADDONSTATION", x0 + lg + 22, 600, 112, 34, kTX, FontRole::Pixel);
     bigTitle(e, L, tr("signin_title", lang), x0, lw, 236, L.rtl ? 92 : 100, false);
     int y = paragraphAt(e, L, tr("signin_sub", lang), x0, 760, 364, 27, kCHIPTX, 3, 12) + 34;
@@ -3495,6 +3509,8 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
         e.drawRoundRect(L.rtl ? pbx + pbw - pw : pbx, yy + bh - 16, pw, 6, 3, SDL_Color{6, 24, 14, 200});
     } else if (state == DemoState::Installing) {
         button(e, L, bx, yy, bw, bh, tr("installing", lang), 2, 28, 20);
+    } else if (state == DemoState::Queued) {
+        button(e, L, bx, yy, bw, bh, tr("queued_state", lang), 3, 26, 20);   // v0.41: honest "waiting for Minecraft"
     } else if (state == DemoState::Installed || it.installed) {
         button(e, L, bx, yy, bw, bh, tr("installed", lang), 3, 28, 20);
     } else {
