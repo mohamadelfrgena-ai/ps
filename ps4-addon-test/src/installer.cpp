@@ -60,6 +60,40 @@ bool ensureDirectory(const std::string& path, int& outErrno) {
     return false;
 }
 
+// v0.48: installation diagnostics — so a failed install can be explained.
+static bool gRootActive = false;
+static void diagLine(const std::string& line) {
+    const int fd = ::open("/data/AddonStation/install_diag.txt",
+                          O_WRONLY | O_CREAT | O_APPEND, 0666);
+    if (fd >= 0) {
+        const std::string t = line + "\n";
+        ssize_t r = ::write(fd, t.data(), t.size());
+        (void)r;
+        ::close(fd);
+    }
+}
+
+// bounded recursive search for a directory by name (used to locate com.mojang)
+static std::string findDirNamed(const std::string& root, const std::string& name, int depth) {
+    if (depth < 0) return std::string();
+    DIR* dir = ::opendir(root.c_str());
+    if (!dir) return std::string();
+    std::string found;
+    while (dirent* ent = ::readdir(dir)) {
+        const std::string n(ent->d_name);
+        if (n.empty() || n == "." || n == "..") continue;
+        const std::string full = root + "/" + n;
+        if (n == name && isDirectory(full)) { found = full; break; }
+        struct stat st {};
+        if (depth > 0 && ::stat(full.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+            found = findDirNamed(full, name, depth - 1);
+            if (!found.empty()) break;
+        }
+    }
+    ::closedir(dir);
+    return found;
+}
+
 void removeTreeRecursive(const std::string& path) {
     struct stat st {};
     if (::stat(path.c_str(), &st) != 0) return;
@@ -154,6 +188,7 @@ struct ScopedRootJailbreak {
                 active = true;
             }
         }
+        gRootActive = active;
     }
 
     ~ScopedRootJailbreak() {
@@ -431,16 +466,28 @@ std::string findMountedMojangDir(const std::string& preferredMojangDir) {
                 while (dirent* eent = ::readdir(edir)) {
                     const std::string en(eent->d_name);
                     if (en.empty() || en == "." || en == "..") continue;
-                    const std::string cands[2] = {
-                        saveRoot + "/" + en + "/games/com.mojang",
-                        saveRoot + "/" + en + "/com.mojang",
+                    const std::string entry = saveRoot + "/" + en;
+                    // v0.48: direct candidates + "entry has minecraftWorlds -> it IS the
+                    // packs home" rule + bounded deep search for a com.mojang dir.
+                    const std::string cands[3] = {
+                        entry + "/games/com.mojang",
+                        entry + "/com.mojang",
+                        (isDirectory(entry + "/minecraftWorlds") ? entry : std::string()),
                     };
                     for (const std::string& c : cands) {
-                        if (isDirectory(c)) {
+                        if (!c.empty() && isDirectory(c)) {
                             ::closedir(edir);
                             ::closedir(hdir);
+                            diagLine("mojang found: " + c);
                             return c;
                         }
+                    }
+                    const std::string deep = findDirNamed(entry, "com.mojang", 3);
+                    if (!deep.empty()) {
+                        ::closedir(edir);
+                        ::closedir(hdir);
+                        diagLine("mojang found (deep): " + deep);
+                        return deep;
                     }
                 }
                 ::closedir(edir);
@@ -981,7 +1028,10 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
     const std::string pendingFlagPath = stageDir + "/" + addonFolderName + ".pending";
 
     // Dynamically check if ANY Minecraft CUSAxxxxx/userYYYY/games/com.mojang is mounted right now
+    diagLine("--- install attempt: " + addonFolderName +
+             " root=" + (gRootActive ? "ok" : "FAILED"));
     const std::string mountedMojang = findMountedMojangDir(preferredMojangDir);
+    diagLine(std::string("scan result: ") + (mountedMojang.empty() ? "NONE (addon queued)" : mountedMojang));
     if (!mountedMojang.empty()) {
         result.detectedMojangDir = mountedMojang;
         if (onProgress) {

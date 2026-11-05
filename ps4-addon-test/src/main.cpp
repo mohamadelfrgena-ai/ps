@@ -103,7 +103,7 @@ struct App {
     bool confirmSignOut = false;
     int confirmFocus = 1;
     std::string query, notice, code, pollSecret, exchangeId, linkedConsoleId, sessionRef, sessionRefresh;
-    std::string linkedUsername, linkedDisplayName;   // v0.42: profile returned inside the poll response
+    std::string linkedUsername, linkedDisplayName, linkedAvatar;   // v0.42/0.48: profile from the poll response
     int codeSecs = 0, codeStatus = 4;
     bool qrView = false;
     std::atomic<int> dl{0};          // DemoState
@@ -216,6 +216,7 @@ static void applyAccountFromSession() {
     a.displayName = p.ok ? p.displayName : gSession.displayName;
     if (a.displayName.empty()) a.displayName = gSession.username;
     a.username = p.ok ? p.username : gSession.username;
+    a.avatar = p.ok ? p.avatarUrl : gSession.avatarUrl;   // v0.48: the picture was never assigned
     a.plan = tierFromPlan(p.ok ? p.plan : gSession.plan);
     a.acBalance = p.ok ? p.acBalance : (int)gSession.acBalance;
     a.downloads = (int)p.downloads;
@@ -509,6 +510,7 @@ static int pollCodeOnce() {
                 if (A.linkedConsoleId.empty()) A.linkedConsoleId = jsonGetString(prof, "id");
                 A.linkedUsername = jsonGetString(prof, "username");
                 A.linkedDisplayName = jsonGetString(prof, "display_name");
+                A.linkedAvatar = jsonGetString(prof, "avatar_url");
             }
             A.exchangeId.clear();
             return 1;
@@ -538,6 +540,7 @@ static int pollCodeOnce() {
                 if (A.linkedConsoleId.empty()) A.linkedConsoleId = jsonGetString(prof, "id");
                 if (A.linkedUsername.empty()) A.linkedUsername = jsonGetString(prof, "username");
                 if (A.linkedDisplayName.empty()) A.linkedDisplayName = jsonGetString(prof, "display_name");
+                if (A.linkedAvatar.empty()) A.linkedAvatar = jsonGetString(prof, "avatar_url");
             }
         }
         if (st == "approved" || jsonGetBool(r.body, "approved", false) || jsonGetBool(r.body, "claimed", false))
@@ -566,6 +569,7 @@ static void finishSignIn() {
         // v0.42: seed the profile captured from the poll response (was discarded)
         if (gSession.username.empty()) gSession.username = A.linkedUsername;
         if (gSession.displayName.empty()) gSession.displayName = A.linkedDisplayName;
+        if (gSession.avatarUrl.empty()) gSession.avatarUrl = A.linkedAvatar;   // v0.48
         // v0.42: SAVE NOW — a slow profile fetch must never lose the session
         // (this was the bug: «كأنني لم أسجّل» after every launch).
         saveLinkSession(gSession);
@@ -580,6 +584,7 @@ static void finishSignIn() {
             a.signedIn = true;
             a.displayName = gSession.displayName.empty() ? gSession.username : gSession.displayName;
             a.username = gSession.username;
+            a.avatar = gSession.avatarUrl;   // v0.48
             a.plan = tierFromPlan(gSession.plan);
             a.acBalance = (int)gSession.acBalance;
             for (const AddonItem& it : catalog())
@@ -592,6 +597,7 @@ static void finishSignIn() {
         if (account().signedIn) {
             gSession.displayName = account().displayName;
             gSession.username = account().username;
+            gSession.avatarUrl = account().avatar;   // v0.48
             gSession.plan = account().plan == Tier::Legendary ? "legendary"
                             : account().plan == Tier::Epic ? "epic" : "free";
             gSession.acBalance = account().acBalance;

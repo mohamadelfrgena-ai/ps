@@ -213,6 +213,7 @@ struct LinkSession {
     std::string userId;
     std::string username;
     std::string displayName;
+    std::string avatarUrl;   // v0.48: profile picture (was dropped -> no avatar in the app)
     std::string plan;
     long acBalance = 0;
     std::string accessToken;

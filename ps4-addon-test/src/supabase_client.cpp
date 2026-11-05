@@ -493,6 +493,7 @@ void saveLinkSession(const LinkSession& s) {
         << "user_id=" << s.userId << "\n"
         << "username=" << s.username << "\n"
         << "display_name=" << s.displayName << "\n"
+        << "avatar_url=" << s.avatarUrl << "\n"
         << "plan=" << s.plan << "\n"
         << "ac_balance=" << s.acBalance << "\n"
         << "access_token=" << s.accessToken << "\n"
@@ -513,6 +514,7 @@ LinkSession loadLinkSession() {
         else if (k == "user_id") s.userId = v;
         else if (k == "username") s.username = v;
         else if (k == "display_name") s.displayName = v;
+        else if (k == "avatar_url") s.avatarUrl = v;
         else if (k == "plan") s.plan = v;
         else if (k == "ac_balance") s.acBalance = std::strtol(v.c_str(), nullptr, 10);
         else if (k == "access_token") s.accessToken = v;
