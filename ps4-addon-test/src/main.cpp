@@ -640,37 +640,56 @@ static void startDownloadFlow(int catIdx) {
             A.dirty = true;
             return;
         }
-        const std::string rawName = basenameOf(g.ps4RawUrl);
-        const std::string rawPath = std::string(kStageDir) + "/" + rawName;
-        DownloadResult dr = downloadToFile(g.ps4RawUrl, rawPath, [](int p) {
-            A.dlPct = p;
-            A.dirty = true;
-        });
-        if (!dr.ok) {
-            ui_sfx(Sfx::Error);
-            toast(tr("err_network", lang));
-            A.dl = (int)DemoState::Idle;
-            A.busyDownload = false;
-            A.dirty = true;
-            return;
-        }
-        A.dl = (int)DemoState::Installing;
-        A.dlPct = 100;
-        A.dirty = true;
-        std::string category = "resource_packs";
-        if (!g.packs.empty() && !g.packs[0].target.empty()) category = g.packs[0].target;
-        else if (it.isWorld) category = "minecraftWorlds";
+        // v0.49 (the real install bug): an addon ships TWO packs (behavior +
+        // resource) in pack_targets — the old code downloaded ONE file only, so
+        // the addon could never work in-game. Download + install EVERY pack,
+        // each into its own category and unique dest_folder.
         const std::string displayName = it.title;
-        CopyResult r = installOrQueueAddon(
-            rawPath, displayName, kStageDir, "", category, lang,
-            [](InstallPhase phase, int pct) {
-                if (phase == InstallPhase::Installing) {
-                    A.dl = (int)DemoState::Installing;
-                    A.dlPct = pct;
-                    A.dirty = true;
-                }
-            },
-            autoLaunch);
+        std::vector<PackTarget> packs = g.packs;
+        if (packs.empty()) {
+            PackTarget one;
+            one.ps4RawUrl = g.ps4RawUrl;
+            one.target = it.isWorld ? "minecraftWorlds" : "resource_packs";
+            one.destFolder = displayName;
+            packs.push_back(one);
+        }
+        bool allOk = true;
+        bool anyQueued = false;
+        CopyResult r;
+        const int npk = static_cast<int>(packs.size());
+        for (int idx = 0; idx < npk; ++idx) {
+            const PackTarget& pk = packs[static_cast<std::size_t>(idx)];
+            if (pk.ps4RawUrl.empty()) continue;
+            const std::string rawPath = std::string(kStageDir) + "/" + basenameOf(pk.ps4RawUrl);
+            DownloadResult dr = downloadToFile(pk.ps4RawUrl, rawPath, [idx, npk](int p) {
+                A.dlPct = (idx * 100 + p) / std::max(1, npk);
+                A.dirty = true;
+            });
+            if (!dr.ok) {
+                allOk = false;
+                r.message = dr.message;
+                break;
+            }
+            A.dl = (int)DemoState::Installing;
+            A.dlPct = ((idx + 1) * 100) / std::max(1, npk);
+            A.dirty = true;
+            const std::string folder = pk.destFolder.empty() ? displayName : pk.destFolder;
+            const std::string category = !pk.target.empty() ? pk.target
+                                         : (it.isWorld ? "minecraftWorlds" : "resource_packs");
+            r = installOrQueueAddon(
+                rawPath, folder, kStageDir, "", category, lang,
+                [](InstallPhase phase, int pct) {
+                    if (phase == InstallPhase::Installing) {
+                        A.dl = (int)DemoState::Installing;
+                        A.dirty = true;
+                    }
+                },
+                autoLaunch && idx + 1 == npk);
+            if (!r.ok) { allOk = false; break; }
+            if (r.queuedForMinecraft) anyQueued = true;
+        }
+        r.queuedForMinecraft = anyQueued;
+        r.ok = allOk;
         if (r.ok && r.queuedForMinecraft) {
             // v0.41: HONEST status — staged only, NOT inside the game yet.
             A.dl = (int)DemoState::Queued;
