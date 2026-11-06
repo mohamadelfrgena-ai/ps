@@ -140,7 +140,7 @@ void setCoverRequestHandler(std::function<void(const AddonItem&)> fn);
 
 // ---- helpers ------------------------------------------------------------------------------
 std::string langFromSystem(int sceSystemParamLang);     // SCE_SYSTEM_PARAM_LANG_* -> "en","ar","fr","tr","es","ru","pt","zh"
-enum class View { Home, Deals, Store, Search };
+enum class View { Home, Deals, Store, Search, Mine };
 // Catalog indices shown by a screen for a filter (same order as drawn). Use it for focus limits and ✕.
 //  Home filter 0..6: All Addons Worlds Free Epic Legendary New   |  Deals 0..4: All Addons Worlds Under100AC Biggest
 //  Store filter 0..6: All Addons Worlds Free Epic Legendary New (+ storeSort) |  Search 0..2: All Addons Worlds (+query)
@@ -217,6 +217,7 @@ void drawAddonDetail(UiEngine& e, int focus, int catalogIndex, DemoState state, 
 void drawSearch(UiEngine& e, int focus, const std::string& query, int filterIndex, const std::string& langCode);
 // Profile + AC wallet. Guest: focus 0 = "Sign in with code". Signed in: focus = history row 0..5 (-1 none)
 void drawProfile(UiEngine& e, int focus, const std::string& langCode);
+void drawMine(UiEngine& e, int focus, const std::string& langCode);
 // Plans (view-only, subscribe from phone). focus 0..2
 void drawPlans(UiEngine& e, int focus, const std::string& langCode);
 // Settings rows: 0 Language, 1 Appearance, 2 Account, 3 Auto-launch, 4 About, 5 Sign out (signed in only)

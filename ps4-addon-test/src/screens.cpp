@@ -153,6 +153,10 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
         {"sort", {{"en", "Sort"}, {"ar", "ترتيب"}, {"fr", "Trier"}, {"tr", "Sırala"},
                   {"es", "Ordenar"}, {"ru", "Сортировка"}, {"pt", "Ordenar"}, {"zh", "排序"}}},
         {"up_to_50", {{"en", "50% off all addons and worlds"}, {"ar", "خصم 50٪ على كل الإضافات والعوالم"}, {"fr", "-50% sur tous les addons et mondes"}, {"tr", "Tüm eklenti ve dünyalarda %50 indirim"}, {"es", "50% de descuento en todos los addons y mundos"}, {"ru", "Скидка 50% на все аддоны и миры"}, {"pt", "50% de desconto em todos os addons e mundos"}, {"zh", "所有附加包和世界五折优惠"}}},
+        {"nav_search", {{"en", "Search"}, {"ar", "\u0628\u062d\u062b"}, {"fr", "Recherche"}, {"tr", "Ara"},
+                         {"es", "Buscar"}, {"ru", "\u041f\u043e\u0438\u0441\u043a"}, {"pt", "Pesquisar"}, {"zh", "\u641c\u7d22"}}},
+        {"nav_mine", {{"en", "My Addons"}, {"ar", "\u062a\u0646\u0632\u064a\u0644\u0627\u062a\u064a"}, {"fr", "Mes addons"}, {"tr", "Eklentilerim"},
+                       {"es", "Mis addons"}, {"ru", "\u041c\u043e\u0438 \u0430\u0434\u0434\u043e\u043d\u044b"}, {"pt", "Meus addons"}, {"zh", "\u6211\u7684\u9644\u52a0\u5305"}}},
         {"nav_store", {{"en", "Store"}, {"ar", "المتجر"}, {"fr", "Boutique"}, {"tr", "Mağaza"},
                        {"es", "Tienda"}, {"ru", "Магазин"}, {"pt", "Loja"}, {"zh", "商店"}}},
         {"nav_settings", {{"en", "Settings"}, {"ar", "الإعدادات"}, {"fr", "Réglages"}, {"tr", "Ayarlar"},
@@ -1443,6 +1447,15 @@ void glyph(UiEngine& e, int kind, int x, int y, int s, SDL_Color ink, SDL_Color 
             }
             break;
         }
+        case 14: {  // download (arrow into tray) — the «تنزيلاتي» rail item
+            seg(e, px(0.5f), py(0.16f), px(0.5f), py(0.58f), t, ink);
+            seg(e, px(0.28f), py(0.38f), px(0.5f), py(0.6f), t, ink);
+            seg(e, px(0.72f), py(0.38f), px(0.5f), py(0.6f), t, ink);
+            seg(e, px(0.18f), py(0.72f), px(0.18f), py(0.86f), t, ink);
+            seg(e, px(0.18f), py(0.86f), px(0.82f), py(0.86f), t, ink);
+            seg(e, px(0.82f), py(0.72f), px(0.82f), py(0.86f), t, ink);
+            break;
+        }
         case 8: {   // search
             const int st = filled ? t + 2 : t;
             ring(e, px(0.42f), py(0.42f), S * 0.3f, st, ink);
@@ -1975,6 +1988,8 @@ std::vector<int> viewItems(View v, int filter, const std::string& query) {
             if (keep && filter == 1) keep = !it.isWorld;
             if (keep && filter == 2) keep = it.isWorld;
             if (keep && filter == 3) keep = it.acPrice < 100;
+        } else if (v == View::Mine) {
+            keep = it.installed;
         } else {   // Store: 0 All, 1 Addons, 2 Worlds, 3 Free, 4 Epic, 5 Legendary, 6 New
             switch (filter) {
                 case 1: keep = !it.isWorld; break;
@@ -2745,9 +2760,10 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
     const int cx = rx + RW / 2;
     appLogoTile(e, cx, 22, 96);   // v0.43: complete frame, matches the sign-in screen
     struct It { int kind; const char* key; };
-    static const It items[6] = {{10, "nav_home"}, {11, "nav_deals"}, {12, "nav_store"},
+    static const It items[8] = {{10, "nav_home"}, {11, "nav_deals"}, {12, "nav_store"},
+                                {8, "nav_search"}, {14, "nav_mine"},
                                 {7, "nav_plans"}, {1, "rail_profile"}, {9, "nav_settings"}};
-    const int bw = 72, bh = 60, itemH = bh + 7 + 18, gap = 14;
+    const int bw = 72, bh = 56, itemH = bh + 7 + 18, gap = 10;   // v0.55: 8 rail items
     auto item = [&](int i, int y) {
         const bool on = (i == railIdx);
         const int bx = cx - bw / 2;
@@ -2758,7 +2774,7 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
         }
         const SDL_Color in = on ? kBG : kMU;
         const int is = 30;
-        if (i == 4 && gAcc.signedIn && !gAcc.avatar.empty()) {
+        if (i == 6 && gAcc.signedIn && !gAcc.avatar.empty()) {   // profile item
             int iw = 0, ih = 0;
             if (e.imageSize(gAcc.avatar, iw, ih)) e.drawImageRounded(gAcc.avatar, cx - 17, y + (bh - 34) / 2, 34, 34, 17);
             else glyph(e, items[i].kind, cx - is / 2, y + (bh - is) / 2, is, in, in, false);
@@ -2770,10 +2786,10 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
         while (px > 11 && e.measureText(lab, px, FontRole::Body, L.rtl) > RW - 14) --px;
         e.drawTextCentered(lab, cx, y + bh + 7 + 9, px, on ? kTX : kMU, FontRole::Body, L.rtl);
     };
-    const int navTop = 540 - (4 * itemH + 3 * gap) / 2;
-    for (int i = 0; i < 4; ++i) item(i, navTop + i * (itemH + gap));
-    const int botTop = 1080 - 30 - (2 * itemH + 12);
-    for (int i = 0; i < 2; ++i) item(4 + i, botTop + i * (itemH + 12));
+    const int navTop = 540 - (5 * itemH + 4 * gap) / 2;
+    for (int i = 0; i < 5; ++i) item(i, navTop + i * (itemH + gap));
+    const int botTop = 1080 - 30 - (3 * itemH + 2 * gap);
+    for (int i = 0; i < 3; ++i) item(5 + i, botTop + i * (itemH + gap));
 
     // ---- status: AC pill (guest = 0) · clock · avatar ----
     const int top = 34;
@@ -2811,8 +2827,9 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
 } // namespace
 
 void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int /*acBalance: from account()*/) {
-    static const int kMap[6] = {0, 1, 2, 5, 3, 4};
-    drawRail(e, (activeTab >= 0 && activeTab < 6) ? kMap[activeTab] : -1, langCode);
+    // activeTab: 0 Home, 1 Deals, 2 Store, 3 Settings, 4 Plans, 5 Profile, 6 Mine, 7 Search
+    static const int kMap[8] = {0, 1, 2, 7, 5, 6, 4, 3};
+    drawRail(e, (activeTab >= 0 && activeTab < 8) ? kMap[activeTab] : -1, langCode);
 }
 
 void setThemeLight(bool light) { applyTheme(light); }
@@ -3610,7 +3627,7 @@ void drawSearch(UiEngine& e, int focus, const std::string& query, int filterInde
     Lay L; L.rtl = (langCode == "ar");
     const std::string& lang = langCode;
     backdrop(e);
-    drawTopNav(e, -1, langCode);
+    drawTopNav(e, 7, langCode);
     const int cx = kCL + 20, fw = 1460 - cx, fh = 84, fy = 34;
     {
         const int frx = L.X(cx, fw);
@@ -3657,6 +3674,19 @@ void drawSearch(UiEngine& e, int focus, const std::string& query, int filterInde
 // ============================================================================
 //  Profile + AC wallet (one place)
 // ============================================================================
+void drawMine(UiEngine& e, int focus, const std::string& langCode) {
+    // v0.55: «تنزيلاتي» — every addon installed on this console, one grid.
+    Lay L; L.rtl = (langCode == "ar");
+    const std::string& lang = langCode;
+    backdrop(e);
+    drawTopNav(e, 6, langCode);
+    pageTitle(e, L, tr("nav_mine", lang), kCL + 20, 44);
+    const int cx = kCL + 20;
+    const std::vector<int> items = viewItems(View::Mine, 0);
+    cardGrid(e, L, items, scrollOf(View::Mine), 0, focus, cx, 150, kCR - cx, 964, lang, false);
+    drawLegendBar(e, {{"\xE2\x9C\x95", "select"}, {"\xE2\x97\x8B", "back"}}, langCode);
+}
+
 void drawProfile(UiEngine& e, int focus, const std::string& langCode) {
     Lay L; L.rtl = (langCode == "ar");
     const std::string& lang = langCode;

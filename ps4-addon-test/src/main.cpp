@@ -91,7 +91,7 @@ static std::string basenameOf(const std::string& url) {
 }
 
 // ---------------------------------------------------------------- app state -
-enum class Scr { SignIn, Home, Deals, Store, Plans, Profile, Settings, Search, Detail };
+enum class Scr { SignIn, Home, Deals, Store, Plans, Profile, Settings, Search, Detail, Mine };
 
 struct App {
     Scr scr = Scr::Home;            // v5: guest Home (no welcome page)
@@ -850,6 +850,7 @@ static int focusedCard() {
         case Scr::Deals:  v = viewItems(View::Deals, A.filter); first = scrollOf(View::Deals); idx = A.focus - 5; break;
         case Scr::Store:  v = viewItems(View::Store, A.filter); first = scrollOf(View::Store); idx = A.focus; break;
         case Scr::Search: v = viewItems(View::Search, A.filter, A.query); first = scrollOf(View::Search); idx = A.focus - 4; break;
+        case Scr::Mine:   v = viewItems(View::Mine, 0);  first = scrollOf(View::Mine);  idx = A.focus; break;
         default: return -1;
     }
     const int k = first + idx;
@@ -864,6 +865,7 @@ static void clampScroll() {
     else if (A.scr == Scr::Deals) { idx = A.focus - 5; view = View::Deals; }
     else if (A.scr == Scr::Store) { idx = A.focus; view = View::Store; }
     else if (A.scr == Scr::Search) { idx = A.focus - 4; view = View::Search; win = 5; }
+    else if (A.scr == Scr::Mine)   { idx = A.focus;      view = View::Mine;  win = 10; }
     if (idx < 0) return;
     int first = scrollOf(view);
     if (idx < first) first = idx;
@@ -1026,6 +1028,12 @@ static void moveFocus(int dx, int dy) {
             }
             break;
         }
+        case Scr::Mine: {
+            const std::vector<int> v = viewItems(View::Mine, 0);
+            if (v.empty()) A.focus = 0;
+            else moveGridCard(View::Mine, 0, 5, 10, dx, dy);
+            break;
+        }
         case Scr::Plans:
             break;   // v6.6 view-only
     }
@@ -1104,10 +1112,11 @@ static void handle(Btn b) {
         const bool shoulder = (b == Btn::L1 || b == Btn::R1) ||
                               ((b == Btn::L2 || b == Btn::R2) && A.scr != Scr::Home);
         if (shoulder) {
-            static const Scr order[6] = {Scr::Home, Scr::Deals, Scr::Store, Scr::Plans, Scr::Profile, Scr::Settings};
+            static const Scr order[8] = {Scr::Home, Scr::Deals, Scr::Store, Scr::Search, Scr::Mine,
+                                         Scr::Plans, Scr::Profile, Scr::Settings};
             int i = 0;
-            while (i < 6 && order[i] != A.scr) ++i;
-            go(order[(i + (b == Btn::R1 || b == Btn::R2 ? 1 : 5)) % 6]);
+            while (i < 8 && order[i] != A.scr) ++i;
+            go(order[(i + (b == Btn::R1 || b == Btn::R2 ? 1 : 7)) % 8]);
             return;
         }
     }
@@ -1286,6 +1295,7 @@ static void drawFrame(UiEngine& e) {
         case Scr::Plans:    drawPlans(e, -1, L); break;
         case Scr::Profile:  drawProfile(e, A.focus, L); break;
         case Scr::Settings: drawSettings(e, A.focus, A.subFocus, A.autoLaunch, L); break;
+        case Scr::Mine: drawMine(e, A.focus, L); break;
         case Scr::Search:   drawSearch(e, A.focus, A.query, A.filter, L); break;
         case Scr::Detail:   drawAddonDetail(e, A.focus, A.detailIdx, (DemoState)A.dl.load(), A.dlPct.load(), L, A.notice); break;
     }
