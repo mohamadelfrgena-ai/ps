@@ -1009,14 +1009,19 @@ static void moveFocus(int dx, int dy) {
             break;
         }
         case Scr::Settings: {
+            const int rows = account().signedIn ? 6 : 5;
             if (A.subFocus >= 0) {
                 const int n = A.focus == 0 ? 8 : 2, cols = 2;
                 if (dx > 0) A.subFocus = std::min(n - 1, A.subFocus + 1);
                 else if (dx < 0) A.subFocus = std::max(0, A.subFocus - 1);
                 else if (dy > 0 && A.focus == 0) A.subFocus = std::min(n - 1, A.subFocus + cols);
                 else if (dy < 0 && A.focus == 0) A.subFocus = std::max(0, A.subFocus - cols);
+                // v0.54: the side rows NEVER get stuck — stepping past a
+                // sub-menu edge returns to the row list (Up/Down keep working).
+                if (A.focus == 0 && dy < 0 && A.subFocus < cols) A.subFocus = -1;
+                else if (A.focus == 0 && dy > 0 && A.subFocus >= n - cols) A.subFocus = -1;
+                else if (A.focus != 0 && dy != 0) A.subFocus = -1;
             } else {
-                const int rows = account().signedIn ? 6 : 5;
                 A.focus = clampInto(A.focus + dy, 0, rows - 1);
             }
             break;
@@ -1091,6 +1096,20 @@ static void handle(Btn b) {
     if (b == Btn::Triangle && A.scr != Scr::SignIn && A.scr != Scr::Search) {
         pushScr(Scr::Search);
         return;
+    }
+    // ---- v0.54: the sidebar rail cycles on EVERY screen (was missing on
+    // Settings/Detail/Search/SignIn — "at Settings the sidebar does nothing").
+    // L1/R1 always work; L2/R2 join in everywhere except Home (hero slides).
+    {
+        const bool shoulder = (b == Btn::L1 || b == Btn::R1) ||
+                              ((b == Btn::L2 || b == Btn::R2) && A.scr != Scr::Home);
+        if (shoulder) {
+            static const Scr order[6] = {Scr::Home, Scr::Deals, Scr::Store, Scr::Plans, Scr::Profile, Scr::Settings};
+            int i = 0;
+            while (i < 6 && order[i] != A.scr) ++i;
+            go(order[(i + (b == Btn::R1 || b == Btn::R2 ? 1 : 5)) % 6]);
+            return;
+        }
     }
     switch (A.scr) {
         case Scr::SignIn:
@@ -1245,12 +1264,6 @@ static void handle(Btn b) {
                     if (A.hero >= n) A.hero = 0;
                     A.dirty = true;
                 }
-            }
-            if (b == Btn::L1 || b == Btn::R1) {
-                static const Scr order[6] = {Scr::Home, Scr::Deals, Scr::Store, Scr::Plans, Scr::Profile, Scr::Settings};
-                int i = 0;
-                while (i < 6 && order[i] != A.scr) ++i;
-                go(order[(i + (b == Btn::R1 ? 1 : 5)) % 6]);
             }
             break;
     }
