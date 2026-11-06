@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <sys/stat.h>
 #include <deque>
 #include <mutex>
 #include <string>
@@ -801,7 +802,33 @@ static void openItem(int catIdx) {
 #endif
     A.detailIdx = catIdx;
     gDetailId = catalog()[(std::size_t)catIdx].id;
-    A.dl = catalog()[(std::size_t)catIdx].installed ? (int)DemoState::Installed : (int)DemoState::Idle;
+    {
+        // v0.51: if this item is staged (its .raw is downloaded and waiting for
+        // Minecraft), show the TRUE «بانتظار Minecraft» state instead of a plain
+        // «تحميل» button that would download everything again.
+        const AddonItem& itt = catalog()[(std::size_t)catIdx];
+        bool staged = false;
+        std::string j = itt.packTargetsRaw;
+        std::size_t pos = 0;
+        while (!staged && (pos = j.find("\"raw_file\"", pos)) != std::string::npos) {
+            const std::size_t c = j.find(':', pos);
+            const std::size_t q1 = (c == std::string::npos) ? std::string::npos : j.find('"', c + 1);
+            const std::size_t q2 = (q1 == std::string::npos) ? std::string::npos : j.find('"', q1 + 1);
+            if (q2 == std::string::npos) break;
+            const std::string rawName = j.substr(q1 + 1, q2 - q1 - 1);
+            struct stat stt {};
+            if (::stat((std::string(kStageDir) + "/" + rawName + ".pending").c_str(), &stt) == 0)
+                staged = true;
+            pos = q2 + 1;
+        }
+        if (!staged && !itt.ps4RawUrl.empty()) {
+            struct stat stt {};
+            if (::stat((std::string(kStageDir) + "/" + basenameOf(itt.ps4RawUrl) + ".pending").c_str(), &stt) == 0)
+                staged = true;
+        }
+        A.dl = itt.installed ? (int)DemoState::Installed
+             : (staged ? (int)DemoState::Queued : (int)DemoState::Idle);
+    }
     pushScr(Scr::Detail);
     {   // v0.36: REAL view counter (record_content_view RPC) — fire and forget
         const std::string body = std::string("{\"p_item_id\":\"") + gDetailId + "\"}";
@@ -1136,7 +1163,16 @@ static void handle(Btn b) {
                     A.focus = 0;
                 } else {
                     ui_sfx(Sfx::Error);
-                    A.notice = tr("err_not_enough_ac", A.lang);
+                    if (r.statusCode == 401) {
+                        // v0.51: the session expired — ask to link again instead
+                        // of a misleading "not enough AC" message.
+                        A.notice = tr("sign_in_continue", A.lang);
+                        gSession.accessToken.clear();
+                        gSession.valid = false;
+                        startSignIn();
+                    } else {
+                        A.notice = tr("err_not_enough_ac", A.lang);
+                    }
                 }
             } else if (b == Btn::Cross && A.focus == 0) {
                 switch (accessFor(it)) {

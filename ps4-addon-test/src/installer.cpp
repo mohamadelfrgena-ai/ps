@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <fstream>
 #include <sys/stat.h>
+#include <ctime>
 #include <unistd.h>
 #include <vector>
 
@@ -1119,29 +1120,51 @@ CopyResult syncPendingAddonsIfMounted(const std::string& stageDir,
         return result;
     }
 
-    const std::string mountedMojang = findMountedMojangDir(preferredMojangDir);
-    if (mountedMojang.empty()) {
-        return result;
-    }
-    result.detectedMojangDir = mountedMojang;
-
+    // v0.51 DEEP fix: scan for pending work FIRST (cheap readdir). The deep
+    // mount scan below used to run every 2 seconds even with nothing to do —
+    // constant disk churn that made the whole UI feel heavy.
     DIR* dir = ::opendir(stageDir.c_str());
     if (!dir) {
         return result;
     }
 
     std::vector<std::string> pendingAddons;
+    std::vector<std::string> stagedRaw;
+    const std::time_t now = std::time(nullptr);
     while (dirent* ent = ::readdir(dir)) {
         const std::string fname(ent->d_name);
         if (fname.size() > 8 && fname.substr(fname.size() - 8) == ".pending") {
             pendingAddons.push_back(fname.substr(0, fname.size() - 8));
+        } else if (fname.size() > 4 && fname.substr(fname.size() - 4) == ".raw") {
+            stagedRaw.push_back(fname);
         }
     }
     ::closedir(dir);
 
     if (pendingAddons.empty()) {
+        // No install waiting: also clear orphan .raw files (failed/aborted
+        // downloads) older than 30 minutes. A download in progress writes its
+        // .raw before the .pending marker, so the age guard keeps it safe.
+        for (const std::string& raw : stagedRaw) {
+            const std::string full = stageDir + "/" + raw;
+            bool hasPending = false;
+            for (const std::string& pend : pendingAddons) {
+                if (raw == pend) { hasPending = true; break; }
+            }
+            (void)hasPending;
+            struct stat st {};
+            if (::stat(full.c_str(), &st) == 0 && now > st.st_mtime + 1800) {
+                ::remove(full.c_str());
+            }
+        }
         return result;
     }
+
+    const std::string mountedMojang = findMountedMojangDir(preferredMojangDir);
+    if (mountedMojang.empty()) {
+        return result;
+    }
+    result.detectedMojangDir = mountedMojang;
 
     for (const std::string& addonName : pendingAddons) {
         const std::string rawPath = stageDir + "/" + addonName + ".raw";
