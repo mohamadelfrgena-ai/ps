@@ -2760,10 +2760,9 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
     const int cx = rx + RW / 2;
     appLogoTile(e, cx, 22, 96);   // v0.43: complete frame, matches the sign-in screen
     struct It { int kind; const char* key; };
-    static const It items[8] = {{10, "nav_home"}, {11, "nav_deals"}, {12, "nav_store"},
-                                {8, "nav_search"}, {14, "nav_mine"},
+    static const It items[7] = {{10, "nav_home"}, {11, "nav_deals"}, {12, "nav_store"}, {14, "nav_mine"},
                                 {7, "nav_plans"}, {1, "rail_profile"}, {9, "nav_settings"}};
-    const int bw = 72, bh = 56, itemH = bh + 7 + 18, gap = 10;   // v0.55: 8 rail items
+    const int bw = 72, bh = 60, itemH = bh + 7 + 18, gap = 14;   // v0.56: 7 rail items (Search removed)
     auto item = [&](int i, int y) {
         const bool on = (i == railIdx);
         const int bx = cx - bw / 2;
@@ -2774,7 +2773,7 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
         }
         const SDL_Color in = on ? kBG : kMU;
         const int is = 30;
-        if (i == 6 && gAcc.signedIn && !gAcc.avatar.empty()) {   // profile item
+        if (i == 5 && gAcc.signedIn && !gAcc.avatar.empty()) {   // profile item
             int iw = 0, ih = 0;
             if (e.imageSize(gAcc.avatar, iw, ih)) e.drawImageRounded(gAcc.avatar, cx - 17, y + (bh - 34) / 2, 34, 34, 17);
             else glyph(e, items[i].kind, cx - is / 2, y + (bh - is) / 2, is, in, in, false);
@@ -2786,10 +2785,10 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
         while (px > 11 && e.measureText(lab, px, FontRole::Body, L.rtl) > RW - 14) --px;
         e.drawTextCentered(lab, cx, y + bh + 7 + 9, px, on ? kTX : kMU, FontRole::Body, L.rtl);
     };
-    const int navTop = 540 - (5 * itemH + 4 * gap) / 2;
-    for (int i = 0; i < 5; ++i) item(i, navTop + i * (itemH + gap));
-    const int botTop = 1080 - 30 - (3 * itemH + 2 * gap);
-    for (int i = 0; i < 3; ++i) item(5 + i, botTop + i * (itemH + gap));
+    const int navTop = 540 - (4 * itemH + 3 * gap) / 2;
+    for (int i = 0; i < 4; ++i) item(i, navTop + i * (itemH + gap));
+    const int botTop = 1080 - 30 - (3 * itemH + 12);
+    for (int i = 0; i < 3; ++i) item(4 + i, botTop + i * (itemH + 12));
 
     // ---- status: AC pill (guest = 0) · clock · avatar ----
     const int top = 34;
@@ -2827,8 +2826,8 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
 } // namespace
 
 void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int /*acBalance: from account()*/) {
-    // activeTab: 0 Home, 1 Deals, 2 Store, 3 Settings, 4 Plans, 5 Profile, 6 Mine, 7 Search
-    static const int kMap[8] = {0, 1, 2, 7, 5, 6, 4, 3};
+    // activeTab: 0 Home, 1 Deals, 2 Store, 3 Settings, 4 Plans, 5 Profile, 6 Mine, 7 Search(none)
+    static const int kMap[8] = {0, 1, 2, 6, 4, 5, 3, -1};
     drawRail(e, (activeTab >= 0 && activeTab < 8) ? kMap[activeTab] : -1, langCode);
 }
 

@@ -1112,11 +1112,11 @@ static void handle(Btn b) {
         const bool shoulder = (b == Btn::L1 || b == Btn::R1) ||
                               ((b == Btn::L2 || b == Btn::R2) && A.scr != Scr::Home);
         if (shoulder) {
-            static const Scr order[8] = {Scr::Home, Scr::Deals, Scr::Store, Scr::Search, Scr::Mine,
+            static const Scr order[7] = {Scr::Home, Scr::Deals, Scr::Store, Scr::Mine,
                                          Scr::Plans, Scr::Profile, Scr::Settings};
             int i = 0;
-            while (i < 8 && order[i] != A.scr) ++i;
-            go(order[(i + (b == Btn::R1 || b == Btn::R2 ? 1 : 7)) % 8]);
+            while (i < 7 && order[i] != A.scr) ++i;
+            go(order[(i + (b == Btn::R1 || b == Btn::R2 ? 1 : 6)) % 7]);
             return;
         }
     }
