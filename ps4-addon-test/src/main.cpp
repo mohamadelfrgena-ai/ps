@@ -224,6 +224,7 @@ static void applyAccountFromSession() {
     for (const AddonItem& it : catalog())
         if (it.installed) a.installed += 1;
     setAccount(a);
+    A.dirty = true;   // v0.50: the AC balance chip repaints the moment it changes
 }
 
 #ifdef AS_BUILD_2121
@@ -1125,8 +1126,9 @@ static void handle(Btn b) {
                 RpcResult r = callAcUnlock(gCfg, it.id, gSession.accessToken);
                 if (r.ok && (r.rpcOk || jsonGetBool(r.body, "ok", true))) {
                     ui_sfx(Sfx::Purchase);
-                    applyAccountFromSession();
+                    applyAccountFromSession();   // v0.50: balance drops in the same moment
                     loadWalletHistory();
+                    A.dirty = true;
                     AddonItem u = it;
                     u.unlocked = true;
                     upsertCatalogItem(u);
@@ -1361,6 +1363,13 @@ int main(int, char**) {
             syncCatalogLive();
             if (cycle % 6 == 0) loadBannerNow();       // 30s: sale banner goes live at once
             if (cycle % 60 == 0) loadPlansNow();       // 5min: plan changes
+            // v0.50: LIVE currency — the AC balance moves BOTH ways in the same
+            // moment (spends refresh instantly; gains from the phone/other devices
+            // appear within seconds). Also keeps plan/streak state fresh.
+            if (gSession.valid && gSession.accessToken.size() > 20) {
+                if (cycle % 3 == 0) applyAccountFromSession();   // ~15s
+                if (cycle % 6 == 0) loadWalletHistory();         // ~30s
+            }
         }
     }).detach();
 
