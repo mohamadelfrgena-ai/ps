@@ -100,6 +100,6 @@ private:
     std::uint64_t tick_ = 0;                          // v5: LRU clock
     std::size_t imageBytes_ = 0;                      // v5
     std::size_t scaledBytes_ = 0;                     // v5
-    std::size_t scaledBudget_ = 48u * 1024u * 1024u;  // v5: 48 MB of pre-scaled pixels
+    std::size_t scaledBudget_ = 128u * 1024u * 1024u;  // v0.53 SPEED: 128 MB (PS4 has 8 GB) — zero re-resample thrash
 };
 }

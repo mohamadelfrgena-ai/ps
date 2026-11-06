@@ -2099,17 +2099,17 @@ void bakedBackdrop(UiEngine& e, const std::string& key, const std::function<void
     // v0.38: 3-slot LRU + smooth crossfade — revisits are instant, banner
     // changes glide (old art under, new art fading in over 240ms).
     struct Slot { std::string key; Uint32 at = 0; };
-    static Slot slot[3];
+    static Slot slot[8];   // v0.53 SPEED: 8 slots = every recent screen is a hit
     static int cur = -1, prev = -1;
     static Uint32 fadeAt = 0;
     const std::string want = key + (gLight ? "|L" : "|D");
     int found = -1;
-    for (int i = 0; i < 3; ++i) if (slot[i].key == want) { found = i; break; }
+    for (int i = 0; i < 8; ++i) if (slot[i].key == want) { found = i; break; }
     if (found < 0) {
         int tgt = -1;
-        for (int i = 0; i < 3; ++i) if (i != cur && slot[i].key.empty()) { tgt = i; break; }
-        if (tgt < 0) for (int i = 0; i < 3; ++i) if (i != cur && (tgt < 0 || slot[i].at < slot[tgt].at)) tgt = i;
-        if (tgt < 0) tgt = (cur + 1) % 3;
+        for (int i = 0; i < 8; ++i) if (i != cur && slot[i].key.empty()) { tgt = i; break; }
+        if (tgt < 0) for (int i = 0; i < 8; ++i) if (i != cur && (tgt < 0 || slot[i].at < slot[tgt].at)) tgt = i;
+        if (tgt < 0) tgt = (cur + 1) % 8;
         e.clear(kBG);
         paint();
         const auto& fb = e.framebuffer();

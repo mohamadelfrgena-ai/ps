@@ -1187,7 +1187,7 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
     auto it = textCache_.find(key);
     if (it != textCache_.end()) { it->second.used = ++tick_; return it->second; }
 
-    if (textCache_.size() > 600) trimText();   // v5: drop the least-recently-used half only
+    if (textCache_.size() > 1500) trimText();   // v0.53 SPEED: keep far more rasterized strings
 
     if (!fontsLoaded_) {
         return buildFallbackText(utf8, pxSize);
@@ -1510,7 +1510,8 @@ bool UiEngine::addImageRGBA(const std::string& name, int w, int h, const std::ui
     // v0.48 (HD without the lag): one-time light unsharp at DECODE for wide images
     // (covers/banners). Glyph atlases (square) and small icons are skipped. This
     // costs a few ms ONCE per image instead of stalling every hero change.
-    if (w >= 400 && h >= 200 && w > h && rgba) {
+    if (w >= 400 && h >= 200 && w > h && rgba &&
+        (name.size() < 2 || name[0] != '_' || name[1] != '_')) {
         std::vector<std::uint8_t> buf(rgba, rgba + static_cast<std::size_t>(w) * h * 4);
         auto cl = [](int v) { return v < 0 ? 0 : (v > 255 ? 255 : v); };
         for (int y = 1; y < h - 1; ++y) {
