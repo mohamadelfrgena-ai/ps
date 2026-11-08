@@ -3140,7 +3140,10 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     static int sFollow = -1, sFollowFilter = -2;
     if (sFollowFilter != filterIndex) { sFollowFilter = filterIndex; sFollow = -1; }
     if (focus >= 12) {
-        const std::size_t gi = static_cast<std::size_t>(focus - 12);
+        // v0.63: + scroll offset — the banner followed the WRONG card once the grid
+        // scrolled (it read focus-12 as an absolute index into the full list).
+        const std::size_t gi = static_cast<std::size_t>(scrollOf(View::Home)) +
+                               static_cast<std::size_t>(focus - 12);
         if (gi < homeItems.size()) sFollow = homeItems[gi];
     } else if (focus >= 2 && focus <= 11) {
         sFollow = -1;

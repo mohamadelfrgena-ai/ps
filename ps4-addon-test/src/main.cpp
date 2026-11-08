@@ -128,6 +128,8 @@ struct CoverBlob { std::string name; std::vector<unsigned char> data; };
 static std::deque<CoverBlob> gCoverQ;
 static std::mutex gCoverMx;
 static std::map<std::string, bool> gCoverRequested;
+static std::map<std::string, int> gCoverTries;   // v0.63: bounded retry (was: lost forever)
+static const char* kCoverDir = "/data/AddonStation/covers";
 
 // ---- v7.3 live-publish sync: a phone publish appears on PS4/PS5 at once ----
 static std::mutex gSyncMx;
@@ -412,24 +414,48 @@ static void requestCoverAsync(const AddonItem& it) {
                 job = gCoverJobs.front();
                 gCoverJobs.pop_front();
             }
-            const std::string tmp = std::string(kStageDir) + "/.cover_tmp";
-            DownloadResult r = downloadToFile(job.url, tmp, nullptr);
-            if (!r.ok) continue;
-            FILE* f = std::fopen(tmp.c_str(), "rb");
-            if (!f) continue;
-            std::fseek(f, 0, SEEK_END);
-            long sz = std::ftell(f);
-            std::fseek(f, 0, SEEK_SET);
+            // v0.63: covers are CACHED on disk (/data/AddonStation/covers/<name>.img).
+            // The old flow wrote every cover to a shared tmp inside the install dir —
+            // if that dir was missing the fopen failed and the cover was lost forever
+            // («صور الاضافات لم تظهر»), and every launch redownloaded everything.
+            const std::string cache = std::string(kCoverDir) + "/" + job.name + ".img";
             CoverBlob blob;
             blob.name = job.name;
-            blob.data.resize((std::size_t)(sz > 0 ? sz : 0));
-            if (!blob.data.empty()) std::fread(blob.data.data(), 1, blob.data.size(), f);
-            std::fclose(f);
-            std::remove(tmp.c_str());
-            if (blob.data.empty()) continue;
-            std::lock_guard<std::mutex> lk(gCoverMx);
-            gCoverQ.push_back(std::move(blob));
-            A.dirty = true;
+            auto readAll = [&blob](const std::string& path) {
+                FILE* f = std::fopen(path.c_str(), "rb");
+                if (!f) return false;
+                std::fseek(f, 0, SEEK_END);
+                long sz = std::ftell(f);
+                std::fseek(f, 0, SEEK_SET);
+                blob.data.resize((std::size_t)(sz > 0 ? sz : 0));
+                if (!blob.data.empty()) std::fread(blob.data.data(), 1, blob.data.size(), f);
+                std::fclose(f);
+                return !blob.data.empty();
+            };
+            if (!readAll(cache)) {
+                ::mkdir("/data", 0777);
+                ::mkdir("/data/AddonStation", 0777);
+                ::mkdir(kCoverDir, 0777);
+                const std::string tmp = cache + ".tmp";
+                DownloadResult r = downloadToFile(job.url, tmp, nullptr);
+                bool got = r.ok && readAll(tmp);
+                if (got) {
+                    ::rename(tmp.c_str(), cache.c_str());   // atomic-ish cache write
+                } else {
+                    ::remove(tmp.c_str());
+                }
+                if (!got) {
+                    // bounded retry on the next frame — never lose a cover to one failure
+                    std::lock_guard<std::mutex> lk(gCoverMx);
+                    if (++gCoverTries[job.name] < 3) gCoverRequested[job.name] = false;
+                    continue;
+                }
+            }
+            {
+                std::lock_guard<std::mutex> lk(gCoverMx);
+                gCoverQ.push_back(std::move(blob));
+                A.dirty = true;
+            }
         }
     }).detach();
 }
@@ -880,12 +906,13 @@ static void clampScroll() {
     // v0.58: window = ONE full row (5) — the half-peeked row scrolls fully into view on Down.
     // v0.61: windows are ROW-ALIGNED — the old clamp could start mid-row (first = idx - win + 1)
     // which visually shuffled the cards («البطاقات عشوائية»). Mine = 7-row list (cols 1).
-    int win = 5, idx = -1, cols = 5;
+    // v0.63: window = the VISIBLE 2 rows (10) — focus walks the visible cards without jumps.
+    int win = 10, idx = -1, cols = 5;
     View view = View::Home;
     if (A.scr == Scr::Home) { idx = A.focus - 12; view = View::Home; }
     else if (A.scr == Scr::Deals) { idx = A.focus - 5; view = View::Deals; }
     else if (A.scr == Scr::Store) { idx = A.focus; view = View::Store; }
-    else if (A.scr == Scr::Search) { idx = A.focus - 4; view = View::Search; win = 5; }
+    else if (A.scr == Scr::Search) { idx = A.focus - 4; view = View::Search; win = 5; }  // single-row render
     else if (A.scr == Scr::Mine)   { idx = A.focus - 1;  view = View::Mine;  win = 7; cols = 1; }
     if (idx < 0) return;
     int first = (std::max(0, scrollOf(view)) / cols) * cols;
@@ -897,6 +924,10 @@ static void clampScroll() {
 
 // v0.36 grid navigation: the focused card walks the WHOLE list with wrap-around («التقليب عبر
 // البطاقات» — never bounces back mid-list), and the visible window follows it (row-aligned).
+// v0.63 («التنقل بالبطاقات غير صحيح»): the window is the VISIBLE 2 rows — Left/Right walk to
+// the neighbouring card with NO scroll-jump (the old 1-row window teleported the highlight to
+// the far side on every row change), and vertical wrap keeps the COLUMN (down at the end goes
+// to the top of the same column — the old mod-wrap landed mid-list at a random card).
 static void moveGridCard(View view, int fb, int cols, int win, int dx, int dy) {
     const std::vector<int> v = viewItems(view, A.filter);
     const int n = (int)v.size();
@@ -905,12 +936,21 @@ static void moveGridCard(View view, int fb, int cols, int win, int dx, int dy) {
     int abs = first + (A.focus - fb);
     if (abs < 0) abs = 0;
     if (abs >= n) abs = n - 1;
-    if (dx != 0) abs += dx;
-    if (dy != 0) abs += dy * cols;
-    if (abs < 0) abs += n;
-    if (abs >= n) abs -= n;
-    if (abs < first) first = (abs / cols) * cols;
-    if (abs >= first + win) first = ((abs / cols) - (win / cols) + 1) * cols;
+    if (dx != 0) {
+        abs += dx;
+        if (abs < 0) abs += n;
+        if (abs >= n) abs -= n;
+    }
+    if (dy != 0) {
+        const int rows = (n + cols - 1) / cols;
+        const int col = abs % cols;
+        int row = abs / cols + dy;
+        while (row < 0) row += rows;
+        while (row >= rows) row -= rows;
+        abs = std::min(row * cols + col, n - 1);
+    }
+    // minimal row-aligned scroll: the focused row becomes the full top row (peek below)
+    if (abs < first || abs >= first + win) first = (abs / cols) * cols;
     if (first < 0) first = 0;
     if (first != scrollOf(view)) setScroll(view, first);
     A.focus = fb + (abs - first);
@@ -944,7 +984,7 @@ static void moveFocus(int dx, int dy) {
             } else {
                 if (v.empty()) A.focus = 5 + std::min(A.filter, 6);
                 else if (dy < 0 && A.focus < 17 && scrollOf(View::Home) == 0) A.focus = 5 + std::min(A.filter, 6);
-                else moveGridCard(View::Home, 12, 5, 5, dx, dy);
+                else moveGridCard(View::Home, 12, 5, 10, dx, dy);
             }
             break;
         }
@@ -962,7 +1002,7 @@ static void moveFocus(int dx, int dy) {
             } else {
                 if (v.empty()) A.focus = std::min(A.filter, 4);
                 else if (dy < 0 && A.focus < 10 && scrollOf(View::Deals) == 0) A.focus = std::min(A.filter, 4);
-                else moveGridCard(View::Deals, 5, 5, 5, dx, dy);
+                else moveGridCard(View::Deals, 5, 5, 10, dx, dy);
             }
             break;
         }
@@ -974,7 +1014,7 @@ static void moveFocus(int dx, int dy) {
                 if (v.empty()) A.focus = 10;
                 else if (dy < 0 && A.focus < 5 && scrollOf(View::Store) == 0) A.focus = 10;
                 else if (dy > 0 && A.focus >= 5 && scrollOf(View::Store) + 10 >= (int)v.size()) A.focus = 10;
-                else moveGridCard(View::Store, 0, 5, 5, dx, dy);
+                else moveGridCard(View::Store, 0, 5, 10, dx, dy);
             } else if (A.focus == 10) {
                 if (dy > 0) A.focus = 11 + std::min(A.filter, 6);
                 else if (dy < 0) A.focus = gridN > 0 ? 9 : 11 + std::min(A.filter, 6);
@@ -1008,14 +1048,10 @@ static void moveFocus(int dx, int dy) {
                     A.focus = 1 + f;
                 }
             } else {
-                if (dy < 0) A.focus = 1 + std::min(A.filter, 2);
-                else {
-                    int k = A.focus - 4 + dx;
-                    if (cardN > 0) { if (k < 0) k = cardN - 1;
-                    if (k > cardN - 1) k = 0; }
-                    else k = 0;
-                    A.focus = 4 + k;
-                }
+                // v0.63: the result row scrolls like every grid (results 6+ were UNREACHABLE —
+                // the old code wrapped inside the first five only).
+                if (dy < 0 && scrollOf(View::Search) == 0) A.focus = 1 + std::min(A.filter, 2);
+                else moveGridCard(View::Search, 4, 5, 5, dx, dy);
             }
             break;
         }
@@ -1379,6 +1415,14 @@ int main(int, char**) {
         return 1;
     }
     engine.setScaledCacheBudget(48u * 1024u * 1024u);
+
+    // v0.63: app data dirs ALWAYS exist (covers cache + .raw downloads + icons wrote
+    // into /data/AddonStation/... and silently failed when the folder was missing).
+    {
+        const char* dirs[] = {"/data", "/data/AddonStation", "/data/AddonStation/installed",
+                              "/data/AddonStation/icons", "/data/AddonStation/covers"};
+        for (const char* d : dirs) ::mkdir(d, 0777);
+    }
 
     // ---- language: saved choice, else the PS4 system language (auto) ----
     gCfg = loadSupabaseConfig();
