@@ -609,7 +609,13 @@ static void finishSignIn() {
 }
 
 static void hookSignOut() {
-    callConsoleUnlink(gCfg, gSession.accessToken);
+    // v0.61 («تسجيل الخروج لا يعمل» + «ويعلق»): the unlink RPC ran on the UI thread and
+    // froze the whole app on a slow/offline network. Local clear is INSTANT — the server
+    // unlink is fire-and-forget in the background.
+    {
+        const std::string tok = gSession.accessToken;
+        std::thread([tok]() { callConsoleUnlink(gCfg, tok); }).detach();
+    }
     clearLinkSession();
     gSession = LinkSession{};
     setAccount(Account{});
@@ -858,18 +864,20 @@ static int focusedCard() {
 }
 
 static void clampScroll() {
-    // v0.58: window = ONE full row (5) — the half-peeked row scrolls fully into view on Down
-    int win = 5, idx = -1;
+    // v0.58: window = ONE full row (5) — the half-peeked row scrolls fully into view on Down.
+    // v0.61: windows are ROW-ALIGNED — the old clamp could start mid-row (first = idx - win + 1)
+    // which visually shuffled the cards («البطاقات عشوائية»). Mine = 7-row list (cols 1).
+    int win = 5, idx = -1, cols = 5;
     View view = View::Home;
     if (A.scr == Scr::Home) { idx = A.focus - 12; view = View::Home; }
     else if (A.scr == Scr::Deals) { idx = A.focus - 5; view = View::Deals; }
     else if (A.scr == Scr::Store) { idx = A.focus; view = View::Store; }
     else if (A.scr == Scr::Search) { idx = A.focus - 4; view = View::Search; win = 5; }
-    else if (A.scr == Scr::Mine)   { idx = A.focus - 1;  view = View::Mine;  win = 7; }
+    else if (A.scr == Scr::Mine)   { idx = A.focus - 1;  view = View::Mine;  win = 7; cols = 1; }
     if (idx < 0) return;
-    int first = scrollOf(view);
-    if (idx < first) first = idx;
-    if (idx > first + win - 1) first = idx - win + 1;
+    int first = (std::max(0, scrollOf(view)) / cols) * cols;
+    if (idx < first) first = (idx / cols) * cols;
+    else if (idx > first + win - 1) first = ((idx - win + 1 + cols - 1) / cols) * cols;
     if (first < 0) first = 0;
     if (first != scrollOf(view)) setScroll(view, first);
 }
@@ -1180,30 +1188,42 @@ static void handle(Btn b) {
             if (b == Btn::Up || b == Btn::Left) moveFocus(-1, 0);
             else if (b == Btn::Down || b == Btn::Right) moveFocus(1, 0);
             else if (b == Btn::Cross && A.focus == 1 && ac) {
-                // AC unlock (v7 payment rules)
-                RpcResult r = callAcUnlock(gCfg, it.id, gSession.accessToken);
-                if (r.ok && (r.rpcOk || jsonGetBool(r.body, "ok", true))) {
-                    ui_sfx(Sfx::Purchase);
-                    applyAccountFromSession();   // v0.50: balance drops in the same moment
-                    loadWalletHistory();
-                    A.dirty = true;
-                    AddonItem u = it;
-                    u.unlocked = true;
-                    upsertCatalogItem(u);
-                    A.detailIdx = findItem(u.id);
-                    A.focus = 0;
-                } else {
-                    ui_sfx(Sfx::Error);
-                    if (r.statusCode == 401) {
-                        // v0.51: the session expired — ask to link again instead
-                        // of a misleading "not enough AC" message.
-                        A.notice = tr("sign_in_continue", A.lang);
-                        gSession.accessToken.clear();
-                        gSession.valid = false;
-                        startSignIn();
-                    } else {
-                        A.notice = tr("err_not_enough_ac", A.lang);
-                    }
+                // AC unlock (v7 payment rules) — v0.61: BACKGROUND thread (was on the UI
+                // thread: the app froze for the whole round-trip «بطء استجابة» + «ويعلق»).
+                static std::atomic<bool> sAcBusy{false};
+                if (!sAcBusy.exchange(true)) {
+                    const std::string itemId = it.id;
+                    const std::string langU = A.lang;
+                    std::thread([itemId, langU]() {
+                        RpcResult r = callAcUnlock(gCfg, itemId, gSession.accessToken);
+                        if (r.ok && (r.rpcOk || jsonGetBool(r.body, "ok", true))) {
+                            ui_sfx(Sfx::Purchase);
+                            applyAccountFromSession();   // balance drops in the same moment
+                            loadWalletHistory();
+                            const int gi = findItem(itemId);
+                            if (gi >= 0) {
+                                AddonItem u = catalog()[(std::size_t)gi];
+                                u.unlocked = true;
+                                upsertCatalogItem(u);
+                                A.detailIdx = findItem(u.id);
+                                A.focus = 0;
+                            }
+                        } else {
+                            ui_sfx(Sfx::Error);
+                            if (r.statusCode == 401) {
+                                // v0.51: the session expired — ask to link again instead
+                                // of a misleading "not enough AC" message.
+                                A.notice = tr("sign_in_continue", langU);
+                                gSession.accessToken.clear();
+                                gSession.valid = false;
+                                startSignIn();
+                            } else {
+                                A.notice = tr("err_not_enough_ac", langU);
+                            }
+                        }
+                        sAcBusy = false;
+                        A.dirty = true;
+                    }).detach();
                 }
             } else if (b == Btn::Cross && A.focus == 0) {
                 switch (accessFor(it)) {

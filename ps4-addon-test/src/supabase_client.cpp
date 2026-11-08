@@ -485,9 +485,13 @@ DownloadGrant callRecordContentDownload(const SupabaseConfig& cfg,
     return out;
 }
 
+// v0.61 («التطبيق يسجل خروج بنفسه»): ATOMIC save — a crash mid-write used to truncate
+// the session file and silently sign the user out on the next launch. Write .tmp first,
+// rotate the old file to .bak, then rename into place.
 void saveLinkSession(const LinkSession& s) {
     ensureParentDir(kSessionPath);
-    std::ofstream out(kSessionPath, std::ios::trunc);
+    const std::string tmp = std::string(kSessionPath) + ".tmp";
+    std::ofstream out(tmp, std::ios::trunc);
     if (!out) return;
     out << "valid=" << (s.valid ? "1" : "0") << "\n"
         << "user_id=" << s.userId << "\n"
@@ -498,11 +502,15 @@ void saveLinkSession(const LinkSession& s) {
         << "ac_balance=" << s.acBalance << "\n"
         << "access_token=" << s.accessToken << "\n"
         << "refresh_token=" << s.refreshToken << "\n";
+    out.close();
+    std::remove((std::string(kSessionPath) + ".bak").c_str());
+    std::rename(kSessionPath, (std::string(kSessionPath) + ".bak").c_str());
+    std::rename(tmp.c_str(), kSessionPath);
 }
 
-LinkSession loadLinkSession() {
+static LinkSession loadLinkSessionFrom(const char* path) {
     LinkSession s;
-    std::ifstream in(kSessionPath);
+    std::ifstream in(path);
     if (!in) return s;
     std::string line;
     while (std::getline(in, line)) {
@@ -519,6 +527,15 @@ LinkSession loadLinkSession() {
         else if (k == "ac_balance") s.acBalance = std::strtol(v.c_str(), nullptr, 10);
         else if (k == "access_token") s.accessToken = v;
         else if (k == "refresh_token") s.refreshToken = v;
+    }
+    return s;
+}
+
+LinkSession loadLinkSession() {
+    LinkSession s = loadLinkSessionFrom(kSessionPath);
+    if (!s.valid) {   // v0.61: heal from the .bak rotation if the live file was damaged
+        LinkSession b = loadLinkSessionFrom((std::string(kSessionPath) + ".bak").c_str());
+        if (b.valid) { s = b; saveLinkSession(b); }
     }
     return s;
 }
