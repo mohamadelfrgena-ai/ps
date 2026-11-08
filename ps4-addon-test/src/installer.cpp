@@ -705,53 +705,8 @@ bool copyFromOpenStream(std::FILE* inFp,
     return true;
 }
 
-bool stageStreamToFile(std::FILE* inFp,
-                       const std::string& stagedFilePath,
-                       int& outErrno,
-                       const ProgressCallback& onProgress) {
-    outErrno = 0;
-    struct stat st {};
-    std::uint64_t totalBytes = 0;
-    if (::fstat(fileno(inFp), &st) == 0 && st.st_size > 0) {
-        totalBytes = static_cast<std::uint64_t>(st.st_size);
-    }
+// v0.62: stageStreamToFile removed with the staging flow (no temp storage)
 
-    const int outFd = ::open(stagedFilePath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (outFd < 0) {
-        outErrno = errno;
-        return false;
-    }
-    std::vector<char> buf(64 * 1024);
-    std::uint64_t written = 0;
-    int lastPct = -1;
-    while (true) {
-        const std::size_t r = std::fread(buf.data(), 1, buf.size(), inFp);
-        if (r > 0) {
-            if (!writeExact(outFd, buf.data(), r, outErrno)) {
-                ::close(outFd);
-                return false;
-            }
-            written += r;
-            if (onProgress && totalBytes > 0) {
-                const int pct = static_cast<int>(std::min<std::uint64_t>(100ULL, (written * 100ULL) / totalBytes));
-                if (pct != lastPct && (pct % 5 == 0 || pct == 100)) {
-                    lastPct = pct;
-                    onProgress(InstallPhase::Downloading, pct);
-                }
-            }
-        }
-        if (r < buf.size()) {
-            if (std::ferror(inFp)) {
-                outErrno = errno != 0 ? errno : EIO;
-                ::close(outFd);
-                return false;
-            }
-            break;
-        }
-    }
-    ::close(outFd);
-    return true;
-}
 
 bool copySingleFile(const std::string& srcPath,
                     const std::string& dstPath,
@@ -1029,6 +984,9 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
                                const std::string& langCode,
                                ProgressCallback onProgress,
                                bool autoLaunchMinecraft) {
+    // v0.62: auto-launch is cancelled (user launches the game first);
+    // the parameter stays for API compatibility with older callers.
+    static_cast<void>(autoLaunchMinecraft);
     CopyResult result;
     result.targetCategory = sanitizeTargetCategory(targetCategory);
 
@@ -1117,7 +1075,6 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
     result.errorCode = -2;
     result.message.clear();
     diagLine("game not mounted -> refusing (no staging, v0.62)");
-    return result;
     return result;
 }
 
