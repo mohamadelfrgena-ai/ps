@@ -1,0 +1,55 @@
+{
+  "geometry": "skinpacks/skins.json",
+  "skins": [
+    {
+      "localization_name": "steve_hd",
+      "geometry": "geometry.humanoid.custom",
+      "texture": "skins/steve_hd.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "alex_hd",
+      "geometry": "geometry.humanoid.customSlim",
+      "texture": "skins/alex_hd.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "dragon_hd",
+      "geometry": "geometry.dragon_hd",
+      "texture": "skins/dragon_hd.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "ender_hd",
+      "geometry": "geometry.ender_hd",
+      "texture": "skins/ender_hd.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "nether_hd",
+      "geometry": "geometry.humanoid.custom",
+      "texture": "skins/nether_hd.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "frost_hd",
+      "geometry": "geometry.frost_hd",
+      "texture": "skins/frost_hd.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "void_hd",
+      "geometry": "geometry.humanoid.customSlim",
+      "texture": "skins/void_hd.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "sunny_hd",
+      "geometry": "geometry.humanoid.custom",
+      "texture": "skins/sunny_hd.png",
+      "type": "free"
+    }
+  ],
+  "serialize_name": "BedrockSkins-Bedrock",
+  "localization_name": "BedrockSkins-Bedrock"
+}
