@@ -603,6 +603,29 @@ bool copyFromOpenStream(std::FILE* inFp,
         return false;
     }
 
+    // v0.57: capture the pack icon — pack_icon.png (root of the pack) is copied
+    // to /data/AddonStation/icons/<slug>.png so the My-Addons list shows the
+    // addon's OWN art. Both packs carry an icon; the resource pack installs
+    // last, so its (prettier) icon wins by overwrite.
+    std::string iconPath;
+    {
+        std::string base = dstRoot;
+        const std::size_t slash = base.rfind('/');
+        if (slash != std::string::npos) base = base.substr(slash + 1);
+        if (base.size() >= 9 && base[base.size() - 9] == '_' &&
+            std::all_of(base.end() - 8, base.end(), [](char ch) {
+                return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f');
+            })) {
+            base = base.substr(0, base.size() - 9);   // strip the _uuid8 suffix -> slug
+        }
+        if (!base.empty()) {
+            iconPath = "/data/AddonStation/icons/" + base + ".png";
+            int mk = 0;
+            ensureDirectory("/data/AddonStation/icons", mk);
+        }
+    }
+    int iconFd = -1;
+
     int lastReportedPct = -1;
     std::vector<char> buffer(32 * 1024);
     for (std::uint32_t i = 0; i < fileCount; ++i) {
@@ -622,6 +645,9 @@ bool copyFromOpenStream(std::FILE* inFp,
         }
 
         const std::string fullFile = dstRoot + "/" + relFile;
+        if (!iconPath.empty() && relFile == "pack_icon.png") {
+            iconFd = ::open(iconPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        }
         int outFd = ::open(fullFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (outFd < 0) {
             const std::size_t slash = fullFile.rfind('/');
@@ -644,6 +670,7 @@ bool copyFromOpenStream(std::FILE* inFp,
                 std::min<std::uint64_t>(remaining, buffer.size()));
             if (!freadExact(inFp, buffer.data(), chunk, err)) {
                 ::close(outFd);
+                if (iconFd >= 0) ::close(iconFd);
                 result.errorCode = err;
                 result.message = "READ ERR (" + std::to_string(err) + ") AT " +
                                  std::to_string(result.filesCopied);
@@ -651,16 +678,19 @@ bool copyFromOpenStream(std::FILE* inFp,
             }
             if (!writeExact(outFd, buffer.data(), chunk, err)) {
                 ::close(outFd);
+                if (iconFd >= 0) ::close(iconFd);
                 result.errorCode = err;
                 result.message = "WRITE ERR (" + std::to_string(err) + ") AT " +
                                  std::to_string(result.filesCopied);
                 return false;
             }
+            if (iconFd >= 0) writeExact(iconFd, buffer.data(), chunk, err);
             remaining -= chunk;
             result.bytesCopied += chunk;
         }
 
         ::close(outFd);
+        if (iconFd >= 0) { ::close(iconFd); iconFd = -1; }
         ++result.filesCopied;
 
         if (onProgress && fileCount > 0) {

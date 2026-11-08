@@ -1,4 +1,6 @@
 #include "screens.hpp"
+#include <sys/stat.h>
+#include <ctime>
 
 // AddonStation PS4 UI v5 — data-driven screens (see screens.hpp / docs).
 
@@ -155,6 +157,38 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
         {"up_to_50", {{"en", "50% off all addons and worlds"}, {"ar", "خصم 50٪ على كل الإضافات والعوالم"}, {"fr", "-50% sur tous les addons et mondes"}, {"tr", "Tüm eklenti ve dünyalarda %50 indirim"}, {"es", "50% de descuento en todos los addons y mundos"}, {"ru", "Скидка 50% на все аддоны и миры"}, {"pt", "50% de desconto em todos os addons e mundos"}, {"zh", "所有附加包和世界五折优惠"}}},
         {"nav_search", {{"en", "Search"}, {"ar", "\u0628\u062d\u062b"}, {"fr", "Recherche"}, {"tr", "Ara"},
                          {"es", "Buscar"}, {"ru", "\u041f\u043e\u0438\u0441\u043a"}, {"pt", "Pesquisar"}, {"zh", "\u641c\u7d22"}}},
+        {"mine_title", {{"en", "Updates & downloads"}, {"ar", "\u0627\u0644\u062a\u062d\u062f\u064a\u062b\u0627\u062a \u0648\u0627\u0644\u062a\u0646\u0632\u064a\u0644\u0627\u062a"}, {"fr", "Mises \u00e0 jour et t\u00e9l\u00e9chargements"}, {"tr", "G\u00fcncellemeler ve indirmeler"},
+                       {"es", "Actualizaciones y descargas"}, {"ru", "\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438"}, {"pt", "Atualiza\u00e7\u00f5es e downloads"}, {"zh", "\u66f4\u65b0\u4e0e\u4e0b\u8f7d"}}},
+        {"mine_sub", {{"en", "Every addon installed on this console \u2014 with its own pack icon"},
+                      {"ar", "\u0643\u0644 \u0627\u0644\u0625\u0636\u0627\u0641\u0627\u062a \u0627\u0644\u0645\u062b\u0628\u062a\u0629 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u062c\u0647\u0627\u0632 \u2014 \u0628\u0623\u064a\u0642\u0648\u0646\u062a\u0647\u0627 \u0627\u0644\u0623\u0635\u0644\u064a\u0629"},
+                      {"fr", "Tous les addons install\u00e9s sur cette console \u2014 avec leur propre ic\u00f4ne"},
+                      {"tr", "Bu konsolda kurulmu\u015f t\u00fcm eklentiler \u2014 kendi paket simgeleriyle"},
+                      {"es", "Todos los addons instalados en esta consola \u2014 con su propio icono"},
+                      {"ru", "\u0412\u0441\u0435 \u0430\u0434\u0434\u043e\u043d\u044b \u043d\u0430 \u044d\u0442\u043e\u0439 \u043a\u043e\u043d\u0441\u043e\u043b\u0438 \u2014 \u0441\u043e \u0441\u0432\u043e\u0438\u043c\u0438 \u0437\u043d\u0430\u0447\u043a\u0430\u043c\u0438"},
+                      {"pt", "Todos os addons instalados neste console \u2014 com o \u00edcone do pr\u00f3prio pacote"},
+                      {"zh", "\u6b64\u4e3b\u673a\u4e0a\u5df2\u5b89\u88c5\u7684\u6240\u6709\u9644\u52a0\u5305 \u2014 \u4f7f\u7528\u5305\u5185\u56fe\u6807"}}},
+        {"mine_check", {{"en", "Check for updates"}, {"ar", "\u0641\u062d\u0635 \u0639\u0646 \u0627\u0644\u062a\u062d\u062f\u064a\u062b\u0627\u062a"}, {"fr", "Rechercher des mises \u00e0 jour"}, {"tr", "G\u00fcncellemeleri denetle"},
+                        {"es", "Buscar actualizaciones"}, {"ru", "\u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f"}, {"pt", "Procurar atualiza\u00e7\u00f5es"}, {"zh", "\u68c0\u67e5\u66f4\u65b0"}}},
+        {"mine_recent", {{"en", "Installed addons"}, {"ar", "\u0627\u0644\u0625\u0636\u0627\u0641\u0627\u062a \u0627\u0644\u0645\u062b\u0628\u062a\u0629"}, {"fr", "Addons install\u00e9s"}, {"tr", "Kurulu eklentiler"},
+                          {"es", "Addons instalados"}, {"ru", "\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u043d\u044b\u0435 \u0430\u0434\u0434\u043e\u043d\u044b"}, {"pt", "Addons instalados"}, {"zh", "\u5df2\u5b89\u88c5\u7684\u9644\u52a0\u5305"}}},
+        {"mine_modified", {{"en", "Modified"}, {"ar", "\u0622\u062e\u0631 \u062a\u0639\u062f\u064a\u0644"}, {"fr", "Modifi\u00e9"}, {"tr", "De\u011fi\u015ftirilme"},
+                            {"es", "Modificado"}, {"ru", "\u0418\u0437\u043c\u0435\u043d\u0435\u043d\u043e"}, {"pt", "Modificado"}, {"zh", "\u4fee\u6539\u65e5\u671f"}}},
+        {"mine_open", {{"en", "Open"}, {"ar", "\u0641\u062a\u062d"}, {"fr", "Ouvrir"}, {"tr", "A\u00e7"},
+                        {"es", "Abrir"}, {"ru", "\u041e\u0442\u043a\u0440\u044b\u0442\u044c"}, {"pt", "Abrir"}, {"zh", "\u6253\u5f00"}}},
+        {"mine_empty_t", {{"en", "No downloads yet"}, {"ar", "\u0644\u0627 \u062a\u0648\u062c\u062f \u062a\u0646\u0632\u064a\u0644\u0627\u062a \u0628\u0639\u062f"}, {"fr", "Aucun t\u00e9l\u00e9chargement"}, {"tr", "Hen\u00fcz indirme yok"},
+                           {"es", "A\u00fan no hay descargas"}, {"ru", "\u0417\u0430\u0433\u0440\u0443\u0437\u043e\u043a \u043f\u043e\u043a\u0430 \u043d\u0435\u0442"}, {"pt", "Nenhum download ainda"}, {"zh", "\u6682\u65e0\u4e0b\u8f7d"}}},
+        {"mine_empty_s", {{"en", "Install an addon and it will show up here."},
+                          {"ar", "\u062b\u0628\u062a \u0625\u0636\u0627\u0641\u0629 \u0648\u0633\u062a\u0638\u0647\u0631 \u0647\u0646\u0627."},
+                          {"fr", "Installez un addon et il appara\u00eetra ici."},
+                          {"tr", "Bir eklenti kurun, burada g\u00f6r\u00fcnecek."},
+                          {"es", "Instala un addon y aparecer\u00e1 aqu\u00ed."},
+                          {"ru", "\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u0435 \u0430\u0434\u0434\u043e\u043d \u2014 \u043e\u043d \u043f\u043e\u044f\u0432\u0438\u0442\u0441\u044f \u0437\u0434\u0435\u0441\u044c."},
+                          {"pt", "Instale um addon e ele aparecer\u00e1 aqui."},
+                          {"zh", "\u5b89\u88c5\u4e00\u4e2a\u9644\u52a0\u5305\uff0c\u5b83\u4f1a\u51fa\u73b0\u5728\u8fd9\u91cc\u3002"}}},
+        {"mine_checked", {{"en", "Checked for updates \u2014 you are up to date."}, {"ar", "\u062a\u0645 \u0627\u0644\u0641\u062d\u0635 \u0639\u0646 \u0627\u0644\u062a\u062d\u062f\u064a\u062b\u0627\u062a \u2014 \u0643\u0644 \u0634\u064a\u0621 \u0645\u062d\u062f\u062b."},
+                            {"fr", "Mises \u00e0 jour v\u00e9rifi\u00e9es \u2014 tout est \u00e0 jour."}, {"tr", "G\u00fcncellemeler kontrol edildi \u2014 her\u015fey g\u00fcncel."},
+                            {"es", "Actualizaciones comprobadas \u2014 todo est\u00e1 al d\u00eda."}, {"ru", "\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u043f\u0440\u043e\u0432\u0435\u0440\u0435\u043d\u044b \u2014 \u0432\u0441\u0451 \u0430\u043a\u0442\u0443\u0430\u043b\u044c\u043d\u043e."},
+                            {"pt", "Atualiza\u00e7\u00f5es verificadas \u2014 est\u00e1 tudo atualizado."}, {"zh", "\u5df2\u68c0\u67e5\u66f4\u65b0 \u2014 \u5168\u90e8\u5df2\u662f\u6700\u65b0\u3002"}}},
         {"nav_mine", {{"en", "My Addons"}, {"ar", "\u062a\u0646\u0632\u064a\u0644\u0627\u062a\u064a"}, {"fr", "Mes addons"}, {"tr", "Eklentilerim"},
                        {"es", "Mis addons"}, {"ru", "\u041c\u043e\u0438 \u0430\u0434\u0434\u043e\u043d\u044b"}, {"pt", "Meus addons"}, {"zh", "\u6211\u7684\u9644\u52a0\u5305"}}},
         {"nav_store", {{"en", "Store"}, {"ar", "المتجر"}, {"fr", "Boutique"}, {"tr", "Mağaza"},
@@ -3674,15 +3708,121 @@ void drawSearch(UiEngine& e, int focus, const std::string& query, int filterInde
 //  Profile + AC wallet (one place)
 // ============================================================================
 void drawMine(UiEngine& e, int focus, const std::string& langCode) {
-    // v0.55: «تنزيلاتي» — every addon installed on this console, one grid.
+    // v0.57: «التحديثات والتنزيلات» — the Windows-Updates-style list the user
+    // asked for: icon FROM the pack itself (pack_icon.png captured at install),
+    // name + studio, type, modified date, and an «فتح» action per row.
     Lay L; L.rtl = (langCode == "ar");
     const std::string& lang = langCode;
     backdrop(e);
     drawTopNav(e, 6, langCode);
-    pageTitle(e, L, tr("nav_mine", lang), kCL + 20, 44);
-    const int cx = kCL + 20;
+    const int cx = kCL + 20, cw = kCR - cx;
+    pageTitle(e, L, tr("mine_title", lang), cx, 40);
+    {
+        const int tw = e.measureText(tr("mine_sub", lang), 21, FontRole::Body, L.rtl);
+        e.drawText(tr("mine_sub", lang), L.X(cx, tw), 102, 21, kMU, FontRole::Body, L.rtl);
+    }
+    // «فحص التحديثات» button (top-right) — focus zone 0
+    {
+        const int bw = 300, bh = 64, bx = kCR - bw, by = 42;
+        const int brx = L.X(bx, bw);
+        surface(e, brx, by, bw, bh, 18, focus == 0 ? 3 : 1);
+        const std::string lab = tr("mine_check", lang);
+        const int tw = e.measureText(lab, 23, FontRole::Body, L.rtl);
+        e.drawText(lab, brx + (bw - tw) / 2, by + (bh - 26) / 2, 23,
+                   focus == 0 ? kTX : kMU, FontRole::Body, L.rtl);
+        if (focus == 0) focusRing(e, brx, by, bw, bh, 18);
+    }
+    // section label
+    e.drawText(tr("mine_recent", lang), L.X(cx, e.measureText(tr("mine_recent", lang), 26, FontRole::Body, L.rtl)),
+               158, 26, kTX, FontRole::Body, L.rtl);
+
     const std::vector<int> items = viewItems(View::Mine, 0);
-    cardGrid(e, L, items, scrollOf(View::Mine), 0, focus, cx, 150, kCR - cx, 964, lang, false);
+    const int rowH = 100, pitch = 110, top = 212;
+    const int scroll = scrollOf(View::Mine);
+    const int visible = 7;
+    if (items.empty()) {
+        emptyState(e, L, cx, top, cw, 964 - top, 12, tr("mine_empty_t", lang), tr("mine_empty_s", lang));
+        drawLegendBar(e, {{"\xE2\x9C\x95", "select"}, {"\xE2\x97\x8B", "back"}}, langCode);
+        return;
+    }
+    for (int r = 0; r < visible; ++r) {
+        const int k = scroll + r;
+        if (k >= (int)items.size()) break;
+        const AddonItem& it = gCat[(std::size_t)items[(std::size_t)k]];
+        const int y = top + r * pitch;
+        const int rx = L.X(cx, cw);
+        const bool foc = (focus == k + 1);
+        surface(e, rx, y, cw, rowH, 20, foc ? 3 : 0);
+        // --- pack icon (the addon's own art), fallback = studio tile ---
+        // icon slug = dest_folder from pack_targets minus its _uuid8 suffix —
+        // exactly what the installer names the captured pack_icon.png.
+        std::string islug;
+        {
+            const std::string& j = it.packTargetsRaw;
+            const std::size_t pos = j.find("\"dest_folder\"");
+            if (pos != std::string::npos) {
+                const std::size_t c = j.find(':', pos);
+                const std::size_t q1 = (c == std::string::npos) ? std::string::npos : j.find('"', c + 1);
+                const std::size_t q2 = (q1 == std::string::npos) ? std::string::npos : j.find('"', q1 + 1);
+                if (q2 != std::string::npos) {
+                    islug = j.substr(q1 + 1, q2 - q1 - 1);
+                    if (islug.size() >= 9 && islug[islug.size() - 9] == '_')
+                        islug = islug.substr(0, islug.size() - 9);
+                }
+            }
+        }
+        const std::string inm = "ic_" + islug;
+        const int ix = rx + 18, iy = y + (rowH - 64) / 2;
+        if (!islug.empty() && !e.hasImage(inm)) {
+            e.loadImageFile(inm, "/data/AddonStation/icons/" + islug + ".png", 128, 128);
+        }
+        if (!islug.empty() && e.hasImage(inm)) {
+            e.drawImageRounded(inm, ix, iy, 64, 64, 16);
+        } else {
+            const SDL_Color tc = it.tier == Tier::Legendary ? SDL_Color{255, 201, 64, 255}
+                                 : it.tier == Tier::Epic ? SDL_Color{176, 132, 255, 255}
+                                 : SDL_Color{74, 168, 255, 255};
+            e.drawRoundRect(ix, iy, 64, 64, 16, tc);
+            const std::string lt = it.title.substr(0, 1);
+            const int tw = e.measureText(lt, 30, FontRole::Pixel, false);
+            e.drawText(lt, ix + (64 - tw) / 2, iy + 14, 30, SDL_Color{12, 14, 18, 255}, FontRole::Pixel, false, false);
+        }
+        // --- name + studio ---
+        const int tx = ix + 64 + 20;
+        int nameW = cw * 40 / 100;
+        std::string nm = it.title;
+        while (nm.size() > 4 && e.measureText(nm, 25, FontRole::Body, L.rtl) > nameW) nm.pop_back();
+        e.drawText(nm, L.X(tx, nameW), y + 22, 25, kTX, FontRole::Body, L.rtl);
+        const std::string studio = it.creator.empty() ? "silverfoxstudio" : it.creator;
+        e.drawText(studio, L.X(tx, nameW), y + 58, 19, kMU, FontRole::Body, L.rtl);
+        // --- type ---
+        const int colX = rx + cw * 52 / 100, colW = cw * 16 / 100;
+        e.drawText(tr(it.isWorld ? "chip_worlds" : "chip_addons", lang),
+                   L.X(colX, colW), y + (rowH - 22) / 2, 21, kMU, FontRole::Body, L.rtl);
+        // --- modified date (icon file mtime = install moment) ---
+        const int datX = rx + cw * 68 / 100, datW = cw * 18 / 100;
+        {
+            std::time_t mt = 0;
+            struct stat stt {};
+            if (!islug.empty() &&
+                ::stat(("/data/AddonStation/icons/" + islug + ".png").c_str(), &stt) == 0) mt = stt.st_mtime;
+            std::string dt = tr("mine_modified", lang);
+            if (mt > 0) dt += " " + fmtDate(mt);
+            e.drawText(dt, L.X(datX, datW), y + (rowH - 21) / 2, 20, kMU, FontRole::Body, L.rtl);
+        }
+        // --- «فتح» action button ---
+        {
+            const int bw = 132, bh = 52, bx = rx + cw - 24 - bw, by = y + (rowH - bh) / 2;
+            const int brx = L.X(bx, bw);
+            e.drawRoundRect(brx, by, bw, bh, 14, foc ? SDL_Color{74, 168, 255, 255} : ink(16));
+            if (foc) e.drawRoundBorder(brx, by, bw, bh, 14, 2, SDL_Color{255, 255, 255, 60});
+            const std::string bl = tr("mine_open", lang);
+            const int tw = e.measureText(bl, 21, FontRole::Body, L.rtl);
+            e.drawText(bl, brx + (bw - tw) / 2, by + (bh - 24) / 2, 21,
+                       foc ? SDL_Color{12, 16, 22, 255} : kTX, FontRole::Body, L.rtl);
+        }
+        if (foc) focusRing(e, rx, y, cw, rowH, 20);
+    }
     drawLegendBar(e, {{"\xE2\x9C\x95", "select"}, {"\xE2\x97\x8B", "back"}}, langCode);
 }
 
