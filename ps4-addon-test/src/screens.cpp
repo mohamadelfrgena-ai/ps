@@ -1015,9 +1015,11 @@ void icExit(UiEngine& e, int x, int y, int s, SDL_Color c) {
     e.drawRoundRect(x + s * 20 / 100, y + s * 44 / 100, s * 60 / 100, s * 44 / 100, s * 10 / 100, c);
     e.drawRoundBorder(x + s * 30 / 100, y + s * 12 / 100, s * 40 / 100, s * 50 / 100, s * 20 / 100, std::max(3, s / 10), c);
 }
+void shapeIcon(UiEngine& e, int kind, int x, int y, int s, SDL_Color c);   // fwd (v0.64)
 void icCheck(UiEngine& e, int x, int y, int s, SDL_Color c) {
-    for (int i = 0; i < s * 36 / 100; ++i) e.fillRect(x + s * 8 / 100 + i, y + s * 50 / 100 + i, 4, 4, c);
-    for (int i = 0; i < s * 58 / 100; ++i) e.fillRect(x + s * 40 / 100 + i, y + s * 86 / 100 - i, 4, 4, c);
+    // v0.64 («اي علامة صح في تطبيق اصلح شكلها»): the old check was drawn with 4x4
+    // pixel BLOCKS (jagged stairs). Use the clean anti-aliased shape icon (kind 2).
+    shapeIcon(e, 2, x, y, s, c);
 }
 [[maybe_unused]] void icSearch(UiEngine& e, int x, int y, int s, SDL_Color c) {
     e.drawRoundBorder(x + s * 6 / 100, y + s * 6 / 100, s * 62 / 100, s * 62 / 100, s * 31 / 100, std::max(3, s / 9), c);
@@ -1062,6 +1064,9 @@ void shapeIcon(UiEngine& e, int kind, int x, int y, int s, SDL_Color c) {
                 ey.push_back(12.f + 8.5f * std::sin(3.14159265f * t2));
             }
             polys.push_back(ey);
+        } else if (kind == 4) {   // v0.64: X mark (error toasts) — two balanced diagonal strokes
+            polys.push_back({4.6f, 6.4f, 6.4f, 4.6f, 19.4f, 17.6f, 17.6f, 19.4f});
+            polys.push_back({17.6f, 4.6f, 19.4f, 6.4f, 6.4f, 19.4f, 4.6f, 17.6f});
         } else {   // v7.0: kind 2 = clean Material-style check (short arm, long arm, thin balanced stroke)
             polys.push_back({6.7f, 11.2f, 11.3f, 15.7f, 9.1f, 17.9f, 4.5f, 13.4f});
             polys.push_back({8.7f, 16.2f, 17.4f, 6.0f, 19.8f, 8.0f, 11.0f, 18.2f});
@@ -1770,18 +1775,28 @@ void qrTile(UiEngine& e, int x, int y, int s) {
 // ============================================================================
 //  Toast / legend / top navigation
 // ============================================================================
-void drawToast(UiEngine& e, const std::string& text, const std::string& langCode) {
+void drawToast(UiEngine& e, const std::string& text, const std::string& langCode, int kind) {
+    // kind: 0 = success (check) | 1 = error (X, red) | 2 = info (blue 'i')
     Lay L; L.rtl = (langCode == "ar");
     const int tw = e.measureText(text, 28, FontRole::Body, L.rtl);
     const int w = tw + 150;
     const int x = 960 - w / 2, y = 1080 - 130 - 84;
     e.dropShadow(x, y + 6, w, 84, 42, 20, 170);
     e.drawRoundGradV(x, y, w, 84, 42, gLight ? SDL_Color{255, 255, 255, 255} : SDL_Color{21, 25, 30, 255}, gLight ? SDL_Color{246, 248, 250, 255} : SDL_Color{13, 15, 18, 255});
-    e.drawRoundBorder(x, y, w, 84, 42, 2, SDL_Color{74, 168, 255, 180});
+    const SDL_Color ring = kind == 1 ? SDL_Color{224, 82, 82, 180} : kind == 2 ? SDL_Color{74, 168, 255, 180} : SDL_Color{74, 168, 255, 180};
+    e.drawRoundBorder(x, y, w, 84, 42, 2, ring);
     e.fillRect(x + 42, y + 2, w - 84, 1, SDL_Color{255, 255, 255, 50});
     const int cx = L.rtl ? x + w - 50 : x + 50;
-    e.drawCircle(cx, y + 42, 24, kGRN);
-    icCheck(e, cx - 13, y + 29, 26, kWHT);
+    const SDL_Color disc = kind == 1 ? SDL_Color{224, 82, 82, 255} : kGRN;
+    e.drawCircle(cx, y + 42, 24, disc);
+    if (kind == 1) {
+        shapeIcon(e, 4, cx - 13, y + 29, 26, kWHT);   // v0.64: errors show X, never a check
+    } else if (kind == 2) {
+        e.fillRect(cx - 3, y + 31, 6, 6, kWHT);       // info 'i'
+        e.fillRect(cx - 3, y + 41, 6, 13, kWHT);
+    } else {
+        icCheck(e, cx - 13, y + 29, 26, kWHT);
+    }
     e.drawText(text, L.rtl ? x + w - 96 : x + 96, y + 22, 28, kTX, FontRole::Body, L.rtl, L.rtl, tw + 10);
 }
 

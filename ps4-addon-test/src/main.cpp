@@ -112,6 +112,7 @@ struct App {
     std::atomic<bool> busyDownload{false};
     bool autoLaunch = false;
     std::string toastText;
+    int toastKind = 0;   // v0.64: 0 success | 1 error | 2 info
     int toastUntil = 0;              // ms timestamp
     std::atomic<bool> dirty{true};
 };
@@ -138,11 +139,25 @@ static std::string gDetailId;
 
 static UiEngine* gEngine = nullptr;
 
-static void toast(const std::string& text, int ms = 4200) {
+static void toast(const std::string& text, int ms = 4200, int kind = 0) {
     A.toastText = text;
+    A.toastKind = kind;   // v0.64: errors show a red X — never a green check
     A.toastUntil = (int)(std::chrono::duration_cast<std::chrono::milliseconds>(
                              std::chrono::steady_clock::now().time_since_epoch()).count()) + ms;
     A.dirty = true;
+}
+
+// v0.64 («كنت تطلع مثل ذي الاخطاء»): raw engine strings like "SEND FAILED (-2143088536)"
+// never reach the user — they map to the localized network error. Real server messages
+// (e.g. "not enough AC") pass through unchanged.
+static std::string netErrText(const std::string& msg, const std::string& lang) {
+    static const char* raw[] = {"SEND FAILED", "CONNECT FAILED", "REQUEST FAILED", "TEMPLATE FAILED",
+                                "STATUS FAILED", "HTTP STATUS", "OPEN FAILED", "READ ", "WRITE ",
+                                "TIMEOUT", "INIT FAILED", "NOT AVAILABLE"};
+    for (const char* r : raw) {
+        if (msg.find(r) != std::string::npos) return tr("err_network", lang);
+    }
+    return msg.empty() ? tr("err_network", lang) : msg;
 }
 
 // ---------------------------------------------------------------- settings --
@@ -726,7 +741,7 @@ static void startDownloadFlow(int catIdx) {
         // v0.62 (user spec): the game must be RUNNING first — no staging / temp storage.
         if (mountedMojangDir().empty()) {
             ui_sfx(Sfx::Error);
-            toast(tr("need_game_first", lang));
+            toast(tr("need_game_first", lang), 4200, 2);   // info: guidance, not a failure
             A.dl = (int)DemoState::Idle;
             A.busyDownload = false;
             A.dirty = true;
@@ -739,7 +754,7 @@ static void startDownloadFlow(int catIdx) {
 #endif
         if (!g.ok || g.ps4RawUrl.empty()) {
             ui_sfx(Sfx::Error);
-            toast(g.message.empty() ? tr("err_network", lang) : g.message);
+            toast(netErrText(g.message, lang), 4200, 1);
             A.dl = (int)DemoState::Idle;
             A.busyDownload = false;
             A.dirty = true;
@@ -766,13 +781,20 @@ static void startDownloadFlow(int catIdx) {
             const PackTarget& pk = packs[static_cast<std::size_t>(idx)];
             if (pk.ps4RawUrl.empty()) continue;
             const std::string rawPath = std::string(kStageDir) + "/" + basenameOf(pk.ps4RawUrl);
-            DownloadResult dr = downloadToFile(pk.ps4RawUrl, rawPath, [idx, npk](int p) {
-                A.dlPct = (idx * 100 + p) / std::max(1, npk);
-                A.dirty = true;
-            });
+            // v0.64: flaky networks (0x80431068 = connection/timeout) must not kill the
+            // download — three attempts with a short pause between them.
+            DownloadResult dr;
+            for (int attempt = 0; attempt < 3; ++attempt) {
+                dr = downloadToFile(pk.ps4RawUrl, rawPath, [idx, npk](int p) {
+                    A.dlPct = (idx * 100 + p) / std::max(1, npk);
+                    A.dirty = true;
+                });
+                if (dr.ok) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+            }
             if (!dr.ok) {
                 allOk = false;
-                r.message = dr.message;
+                r.message = dr.message;   // raw text kept for the diag only
                 break;
             }
             A.dl = (int)DemoState::Installing;
@@ -812,7 +834,7 @@ static void startDownloadFlow(int catIdx) {
         } else {
             A.dl = (int)DemoState::Idle;
             ui_sfx(Sfx::Error);
-            toast(r.message.empty() ? tr("err_network", lang) : r.message);
+            toast(netErrText(r.message, lang), 4200, 1);
         }
         A.busyDownload = false;
         A.dirty = true;
@@ -1434,7 +1456,7 @@ static void drawFrame(UiEngine& e) {
     if (A.askSignIn) drawSignInRequired(e, A.askFocus, L);
     if (A.confirmSignOut)
         drawConfirmDialog(e, tr("signout_q", L), tr("signout_sub", L), tr("settings_signout", L), tr("cancel", L), A.confirmFocus, L);
-    if (!A.toastText.empty()) drawToast(e, A.toastText, L);
+    if (!A.toastText.empty()) drawToast(e, A.toastText, L, A.toastKind);
 }
 
 // ---------------------------------------------------------------- main ------

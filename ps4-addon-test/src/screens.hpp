@@ -183,7 +183,7 @@ void animRects(std::vector<int>& out);
 int legalSplashTotalMs();
 bool drawLegalSplashOver(UiEngine& e, const std::string& langCode, int elapsedMs);
 void releaseLegalSplash(UiEngine& e);
-void drawToast(UiEngine& e, const std::string& text, const std::string& langCode);
+void drawToast(UiEngine& e, const std::string& text, const std::string& langCode, int kind = 0);
 void drawLegendBar(UiEngine& e, const std::vector<std::pair<std::string, std::string>>& items, const std::string& langCode);
 
 // Rail tabs: 0 Home, 1 Deals, 2 Store, 3 Settings, 4 Plans, 5 Profile (-1 none). AC / avatar come from account().
