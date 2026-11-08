@@ -388,6 +388,8 @@ private fun SiteAssetOrLocal(
             painter = localPainter,
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            placeholder = localPainter,
+            error = localPainter,
             modifier = modifier.size(size),
         )
     } else {

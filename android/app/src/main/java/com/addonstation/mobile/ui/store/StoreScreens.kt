@@ -297,6 +297,61 @@ fun StoreScreen(
                         )
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                when {
+                    loading -> StoreLoadingGrid(palette = homePalette, animate = motionEnabled, modifier = Modifier.padding(horizontal = 16.dp))
+                    failed && items.isEmpty() -> StoreState(
+                        icon = androidx.compose.material.icons.Icons.Outlined.WifiOff,
+                        title = stringResource(R.string.msg_network_error),
+                        subtitle = null,
+                        palette = homePalette,
+                        onRetry = { reloadTick += 1 },
+                    )
+                    items.isEmpty() -> StoreState(
+                        icon = androidx.compose.material.icons.Icons.Outlined.SearchOff,
+                        title = stringResource(R.string.store_empty),
+                        subtitle = stringResource(R.string.store_empty_hint),
+                        palette = homePalette,
+                    )
+                    else -> {
+                        val rowCount = (items.size + 1) / 2
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .height((rowCount * 226 + (rowCount - 1).coerceAtLeast(0) * 12).dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            userScrollEnabled = false,
+                        ) {
+                            items(items, key = { it.id }) { item ->
+                                DesignedStoreContentCard(
+                                    item = item,
+                                    coverUrl = assetUrl(container, item.coverUrl),
+                                    favourite = favourites.contains(item.id),
+                                    creator = item.createdBy?.let(creatorProfiles::get),
+                                    onClick = { onOpenItem(item) },
+                                    onToggleFavourite = {
+                                        if (container.supabase.session() == null) {
+                                            scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_sign_in_needed)) }
+                                        } else {
+                                            scope.launch {
+                                                container.content.toggleFavorite(item.id)
+                                                    .onSuccess { saved ->
+                                                        favourites = if (saved) favourites + item.id else favourites - item.id
+                                                    }
+                                                    .onFailure { snackbarHostState.showSnackbar(networkErrorText) }
+                                            }
+                                        }
+                                    },
+                                    palette = homePalette,
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(28.dp))
             }
         }
         androidx.compose.material3.SnackbarHost(
