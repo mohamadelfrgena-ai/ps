@@ -971,7 +971,12 @@ static int focusedCard() {
     std::vector<int> v;
     int first = 0, idx = -1;
     switch (A.scr) {
-        case Scr::Home:   v = viewItems(View::Home, A.filter);  first = scrollOf(View::Home);  idx = A.focus - 12; break;
+        case Scr::Home: {
+            v = viewItems(View::Home, A.filter);  first = scrollOf(View::Home);  idx = A.focus - 12;
+            const int nCards = (int)std::min<std::size_t>(10, v.size());
+            if (idx < 0 || idx >= nCards) return -1;   // v0.65: the "View more" tile is not an item
+            break;
+        }
         case Scr::Deals:  v = viewItems(View::Deals, A.filter); first = scrollOf(View::Deals); idx = A.focus - 5; break;
         case Scr::Store:  v = viewItems(View::Store, A.filter); first = scrollOf(View::Store); idx = A.focus; break;
         case Scr::Search: v = viewItems(View::Search, A.filter, A.query); first = scrollOf(View::Search); idx = A.focus - 4; break;
@@ -983,6 +988,7 @@ static int focusedCard() {
 }
 
 static void clampScroll() {
+    if (A.scr == Scr::Home) return;   // v0.65: the strip scroll is owned by moveFocus (one-tile scroll + wrap)
     // v0.58: window = ONE full row (5) — the half-peeked row scrolls fully into view on Down.
     // v0.61: windows are ROW-ALIGNED — the old clamp could start mid-row (first = idx - win + 1)
     // which visually shuffled the cards («البطاقات عشوائية»). Mine = 7-row list (cols 1).
@@ -1046,14 +1052,16 @@ static void moveFocus(int dx, int dy) {
             A.focus = clampInto(A.focus + dx + dy, 0, 1);
             break;
         case Scr::Home: {
-            // zones: hero 0-1 | tabs 5-11 | card grid 12-21 (5-wide, v0.36)
+            // v0.65 («نفس ذا»): hero 0-1 | chips 5-11 | ONE strip 12.. = the 10 newest
+            // cards + the gold "View more" tile at the end («شريط واحد يعرض اخر عشر بطاقات»).
             const std::vector<int> v = viewItems(View::Home, A.filter);
-            const int gridN = (int)std::min<std::size_t>(10, v.size());
+            const int nTiles = (int)std::min<std::size_t>(10, v.size()) + 1;
+            if (A.focus >= 12 && A.focus - 12 >= nTiles) A.focus = 12 + std::max(0, nTiles - 1);
             if (A.focus <= 1) {
                 if (dy > 0) A.focus = 5 + std::min(A.filter, 6);
                 else A.focus = clampInto(A.focus + dx, 0, 1);
             } else if (A.focus <= 11) {
-                if (dy > 0 && gridN > 0) A.focus = 12;
+                if (dy > 0) A.focus = 12;
                 else if (dy < 0) A.focus = clampInto(A.hero, 0, 1);
                 else {
                     int f = A.focus - 5 + dx;
@@ -1062,9 +1070,23 @@ static void moveFocus(int dx, int dy) {
                     A.focus = 5 + f;
                 }
             } else {
-                if (v.empty()) A.focus = 5 + std::min(A.filter, 6);
-                else if (dy < 0 && A.focus < 17 && scrollOf(View::Home) == 0) A.focus = 5 + std::min(A.filter, 6);
-                else moveGridCard(View::Home, 12, 5, 10, dx, dy);
+                if (dy < 0) A.focus = 5 + std::min(A.filter, 6);
+                else if (dx != 0) {
+                    // strip walk: Left/Right with wrap-around; the window scrolls one tile at a time
+                    int first = scrollOf(View::Home);
+                    int tt = first + (A.focus - 12);
+                    if (tt < 0) tt = 0;
+                    if (tt >= nTiles) tt = nTiles - 1;
+                    tt += dx;
+                    if (tt < 0) tt += nTiles;
+                    if (tt >= nTiles) tt -= nTiles;
+                    const int win = 5;
+                    if (tt < first) first = tt;
+                    else if (tt >= first + win) first = tt - win + 1;
+                    if (first < 0) first = 0;
+                    if (first != scrollOf(View::Home)) setScroll(View::Home, first);
+                    A.focus = 12 + (tt - first);
+                }
             }
             break;
         }
@@ -1409,6 +1431,12 @@ static void handle(Btn b) {
                     if (saleLive()) go(Scr::Deals);
                     else if (!catalog().empty()) openItem(0);
                     break;
+                }
+                if (A.scr == Scr::Home && A.focus >= 12) {
+                    // v0.65 («واذا اختاره يشيل للمتجر»): the "View more" tile opens the Store
+                    const std::vector<int> v = viewItems(View::Home, A.filter);
+                    const int nCards = (int)std::min<std::size_t>(10, v.size());
+                    if (scrollOf(View::Home) + (A.focus - 12) >= nCards) { go(Scr::Store); break; }
                 }
                 openItem(focusedCard());
             } else if (b == Btn::Circle) {

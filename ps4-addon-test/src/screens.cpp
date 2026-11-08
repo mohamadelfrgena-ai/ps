@@ -366,6 +366,7 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
         {"latest_exclusive", {{"en", "LATEST EXCLUSIVES"}, {"ar", "أحدث الحصريات"}, {"fr", "DERNIERS EXCLUSIFS"}, {"tr", "EN YENİ ÖZELLER"}, {"es", "ÚLTIMOS EXCLUSIVOS"}, {"ru", "СВЕЖИЕ ЭКСКЛЮЗИВЫ"}, {"pt", "ÚLTIMOS EXCLUSIVOS"}, {"zh", "最新独家"}}},
         {"latest_exclusive_sub", {{"en", "Fresh addons, just released"}, {"ar", "إضافات جديدة، نزلت للتو"}, {"fr", "Nouveaux addons, tout juste sortis"}, {"tr", "Yeni çıkmış taze eklentiler"}, {"es", "Addons frescos, recién lanzados"}, {"ru", "Свежие аддоны, только выпущенные"}, {"pt", "Addons novos, recém-lançados"}, {"zh", "新鲜出炉的附加包"}}},
         {"just_released", {{"en", "Just released"}, {"ar", "نزلت للتو"}, {"fr", "Tout juste sorti"}, {"tr", "Yeni çıktı"}, {"es", "Recién lanzado"}, {"ru", "Только выпущено"}, {"pt", "Recém-lançado"}, {"zh", "刚刚发布"}}},
+        {"view_more", {{"en", "View more"}, {"ar", "عرض المزيد"}, {"fr", "Voir plus"}, {"tr", "Daha fazla"}, {"es", "Ver más"}, {"ru", "Ещё"}, {"pt", "Ver mais"}, {"zh", "查看更多"}}},
         {"view_addon", {{"en", "View addon"}, {"ar", "عرض الإضافة"}, {"fr", "Voir l'addon"}, {"tr", "Eklentiyi gör"}, {"es", "Ver addon"}, {"ru", "Смотреть аддон"}, {"pt", "Ver addon"}, {"zh", "查看附加包"}}},
         {"view_newest", {{"en", "View the newest"}, {"ar", "شاهد الأحدث"}, {"fr", "Voir les nouveautés"}, {"tr", "En yenileri gör"}, {"es", "Ver los más nuevos"}, {"ru", "Смотреть новейшие"}, {"pt", "Ver os mais novos"}, {"zh", "查看最新"}}},
         {"rail_profile", {{"en", "Profile"}, {"ar", "حسابي"}, {"fr", "Profil"}, {"tr", "Profil"}, {"es", "Perfil"}, {"ru", "Профиль"}, {"pt", "Perfil"}, {"zh", "我的"}}},
@@ -2547,7 +2548,8 @@ void lineIconTile(UiEngine& e, int kind, int x, int y, int s, SDL_Color acc, boo
 }
 
 // v5 card: cover (16:9), title, optional creator, tier chip (+ rating / downloads). No AC price on cards.
-int vcardHeight(int imgH, bool creator) { (void)creator; return imgH + 12 + 26 + 30 + 26 + 12; }   // v0.36: title + rating row + stats row
+// v0.65 («نفس ذا»): the mockup card = cover + badges + title + tier pill (rating/stats live on the detail page).
+int vcardHeight(int imgH, bool creator) { (void)creator; return imgH + 12 + 26 + 34 + 12; }
 void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const AddonItem& it, bool focused,
            const std::string& lang, bool creator, bool stats, bool dealBadge) {
     (void)creator; (void)stats;
@@ -2587,33 +2589,33 @@ void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const Addo
     // ---- title (pixel — v0.30: names always in Minecraft F77) ----
     const int ty = y + imgH + 12;
     boxText(e, L, it.title, xl + 16, w - 32, ty, 21, kTX, FontRole::Pixel);
-    // ---- rating row: stars + score (approved display rating) + tier chip ----
-    const int ry = y + imgH + 42;
-    const float rate = it.ratingCount > 0 ? it.rating : 0.f;
-    for (int i = 0; i < 5; ++i) {
-        const bool full = rate >= (float)(i + 1) - 0.25f;
-        icStar(e, L.X(xl + 16 + i * 20, 17), ry + 2, 17, full ? kGD : ink(gLight ? 40 : 70));
-    }
-    if (rate > 0.f) {
-        char b[16]; std::snprintf(b, sizeof b, "%.1f", rate);
-        boxText(e, L, b, xl + 16 + 5 * 20 + 2, 70, ry + 1, 18, kGD);
-    }
-    {
-        const int tw = tierChip(e, L, 0, -1000, it.tier, lang, 26, false);
-        tierChip(e, L, xl + w - 16 - tw, ry - 1, it.tier, lang, 26);
-    }
-    // ---- stats row: REAL views + downloads (never fake) ----
-    const int sy = y + imgH + 68;
-    {
-        int sx = xl + 16;
-        icEye(e, L.X(sx, 18), sy + 1, 18, kMU, bg);
-        const std::string v = fmtCompact((long long)it.views);
-        boxText(e, L, v, sx + 24, 90, sy, 17, kCHIPTX);
-        sx += 24 + textW(e, L, v, 17) + 18;
-        icDownloadArrow(e, L.X(sx, 18), sy + 1, 18, kMU);
-        boxText(e, L, fmtCompact((long long)it.downloads), sx + 24, 90, sy, 17, kCHIPTX);
-    }
+    // ---- tier pill under the title (v0.65 mockup card) ----
+    tierChip(e, L, xl + 16, y + imgH + 46, it.tier, lang, 28);
     if (focused) focusRing(e, rx, y, w, h, r, false);   // v0.35: card = list item, frame only
+}
+
+// v0.65 («وفي النهاية مستطيل عرض المزيد»): the gold tile at the end of the home strip —
+// choosing it goes to the Store.
+void viewMoreTile(UiEngine& e, const Lay& L, int xl, int y, int w, int h, bool focused,
+                  const std::string& lang) {
+    const int rx = L.X(xl, w), r = 18;
+    e.dropShadow(rx, y + 6, w, h, r, 14, focused ? 150 : (gLight ? 40 : 90));
+    e.drawRoundRect(rx, y, w, h, r, focused ? kSF2 : ink(gLight ? 10 : 12));
+    e.drawRoundBorder(rx, y, w, h, r, 2, focused ? kGD : SDL_Color{255, 214, 90, 150});
+    const std::string t = tr("view_more", lang);
+    const int cy = y + h / 2;
+    // big » chevron above the label (rotated round bars; points left in RTL)
+    {
+        const int ax = rx + w / 2, ay = cy - 50;
+        const float sgn = L.rtl ? -1.f : 1.f;
+        for (int i = 0; i < 2; ++i) {
+            const int bx = ax + (int)((-14 + i * 24) * sgn);
+            e.drawRoundRectRotated(bx, ay + 8, 30, 8, 4, 45.f * sgn, kGD);
+            e.drawRoundRectRotated(bx, ay + 28, 30, 8, 4, -45.f * sgn, kGD);
+        }
+    }
+    e.drawTextCentered(t, rx + w / 2, cy + 6, 24, kGD, FontRole::Pixel, L.rtl);
+    if (focused) focusRing(e, rx, y, w, h, r, false);
 }
 
 // Empty state panel (no fake templates): icon + title + one line.
@@ -3136,6 +3138,32 @@ void cardGrid(UiEngine& e, const Lay& L, const std::vector<int>& items, int scro
     }
     gridFade(e, L.X(xl, w), yMax, w);   // v0.58: soft peek cut + overflow erase
 }
+
+// v0.65 («شريط واحد يعرض اخر عشر بطاقات»): ONE horizontal strip = the 10 newest
+// filtered cards, then a gold "View more" tile («وفي النهاية مستطيل عرض المزيد»).
+// The strip walks left/right and scrolls one tile at a time; tiles bleed to the
+// screen edge so the next card always peeks («التقليب»).
+static void cardStrip(UiEngine& e, const Lay& L, const std::vector<int>& items, int scroll, int fb,
+                      int focus, int xl, int yTop, const std::string& lang) {
+    const int gap = 24;
+    const int cw = 284;
+    const int ih = cw * 9 / 16;
+    const int ch = vcardHeight(ih, false);
+    const int nCards = (int)std::min<std::size_t>(10, items.size());
+    const int nTiles = nCards + 1;   // + View more
+    const int first = std::max(0, std::min(scroll, std::max(0, nTiles - 1)));
+    for (int i = 0; first + i < nTiles; ++i) {
+        const int x = xl + i * (cw + gap);
+        const int t = first + i;
+        if (t < nCards) {
+            const AddonItem& it = gCat[(std::size_t)items[(std::size_t)t]];
+            vcard(e, L, x, yTop, cw, ih, it, focus == fb + i, lang, false, false, saleActive());
+        } else {
+            viewMoreTile(e, L, x, yTop, cw, ch, focus == fb + i, lang);
+        }
+        if (x > 1920 - 120) break;   // the next tile only peeks at the screen edge
+    }
+}
 } // namespace
 
 void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std::string& langCode) {
@@ -3168,7 +3196,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     const int cx = kCL + 20;
     const int textMax = 1180;
 
-    int ctaY = 228;   // v0.45 (option D): compact hero — two whole rows below
+    int ctaY = 470;   // v0.65 («نفس ذا»): tall hero — CTA sits low, above the chips   // v0.45 (option D): compact hero — two whole rows below
     std::string b0, b1;
     if (!hero && slide == -1) {
         // ---- sale: the season artwork is the full-screen backdrop (whole 16:9 image), text on the leading side ----
@@ -3188,7 +3216,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
             }
         });
         if (baked) {
-            ctaY = 228;   // v0.45: compact hero (was 520)
+            ctaY = 470;   // v0.65: tall hero CTA row
         } else {   // baked art already says it — no text over the logo
             kickerText(e, L, cx, 36, saleKicker(lang), kGD);
             bigTitle(e, L, saleTitle(lang), cx, textMax, 56, L.rtl ? 62 : 70, false);
@@ -3212,14 +3240,14 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
             backdrop(e);
             itemCover(e, h, 0, 0, 1920, 1080, 0);
             leadShade(e, L, 1080, false);
-            bottomShade(e, 330);   // v0.45: the page colour starts higher = the hero visually ends earlier
+            bottomShade(e, 560);   // v0.65: the tall hero fades lower
             e.fillGradV(0, 0, 1920, 150, shade(140), shade(0));
-            kickerText(e, L, cx, 36, kick, kGD);
-            bigTitle(e, L, h.title, cx, textMax, 56, L.rtl ? 62 : 70, false);
-            if (!lead.empty()) paragraphAt(e, L, lead, cx, std::min(820, textMax), 138, 20, kCHIPTX, 2, 10);
+            kickerText(e, L, cx, 130, kick, kGD);
+            bigTitle(e, L, h.title, cx, textMax, 150, L.rtl ? 74 : 84, false);
+            if (!lead.empty()) paragraphAt(e, L, lead, cx, std::min(820, textMax), 290, 22, kCHIPTX, 2, 12);
             {   // meta row — only real values: downloads · rating · category · type
                 int mx = cx;
-                const int my = 202;
+                const int my = 410;
                 auto mitem = [&](void (*ic)(UiEngine&, int, int, int, SDL_Color), SDL_Color icc, const std::string& t, SDL_Color tc) {
                     if (ic) { ic(e, L.X(mx, 19), my + 1, 19, icc); mx += 26; }
                     const int tw = textW(e, L, t, 17);
@@ -3246,7 +3274,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
         bigTitle(e, L, tr("home_empty_t", lang), cx, 1300, 56, L.rtl ? 60 : 68, false);
         paragraphAt(e, L, tr("home_empty_s", lang), cx, 900, 138, 20, kCHIPTX, 2, 10);
         b0 = gAcc.signedIn ? tr("view_plans", lang) : tr("signin_code_btn", lang);
-        ctaY = 228;
+        ctaY = 470;
     }
     drawTopNav(e, 0, langCode);
 
@@ -3295,15 +3323,10 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
 
     // ---- tabs (focus 5-11) + shelf (focus 12-16): newest first ----
     // v0.45 (option D, user pick): compact hero + two WHOLE rows at the current card size
-    tabRow(e, L, cx, 332, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang), tr("chip_free", lang),
+    tabRow(e, L, cx, 630, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang), tr("chip_free", lang),
                            tr("chip_epic", lang), tr("chip_legendary", lang), tr("chip_new", lang)}, filterIndex, 5, focus);
-    {   // v0.58: breathing under the filter chips + one full row & a soft-faded half peek below
-        const int gCols = 5, gGap = 26;
-        const int gCw = (kCR - cx - gGap * (gCols - 1)) / gCols;
-        const int gCh = vcardHeight(gCw * 9 / 16, false);
-        const int yG = 410;
-        cardGrid(e, L, homeItems, scrollOf(View::Home), 12, focus, cx, yG, kCR - cx,
-                 yG + (gCh + gGap) + gCh / 2, lang, sale);
+    {   // v0.65 («نفس ذا»): ONE strip = the 10 newest cards + the gold "View more" tile
+        cardStrip(e, L, homeItems, scrollOf(View::Home), 12, focus, cx, 700, lang);
     }
 
     std::vector<std::pair<std::string, std::string>> leg = {{"\xE2\x9C\x95", "select"}, {"\xE2\x96\xB3", "search"}};
