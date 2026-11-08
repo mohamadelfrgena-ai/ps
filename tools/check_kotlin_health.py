@@ -4,7 +4,7 @@
 فاحص «سلامة الكود» — شبكة أمان قبل البناء (لا نستطيع التصريف هنا):
 
     • كل ملف Kotlin: أقواسه متوازنة (لا قوس ناقص يكسر التصريف)؛
-    • لا استيراد مكرّر (يُسقط التصريف أحياناً)؛
+    • لا تعريف نوع علوي أو استيراد مكرّر (يُسقط التصريف)؛
     • كل ملف يبدأ بـ package com.addonstation.mobile؛
     • لا «قُمامة» مولّدات: سطر تعليق عربي فيه محارف صينية/يابانية/كورية
       (تحدث حين يُخلط نصّان في سطر واحد) — أمّا ملفات اللغة الصينية
@@ -99,6 +99,8 @@ def main() -> int:
         print("✗ لم أجد ملفات Kotlin")
         return 1
 
+    top_level_declarations: dict[tuple[str, str], Path] = {}
+
     for f in files:
         text = f.read_text(encoding="utf-8")
         rel = f.relative_to(ROOT)
@@ -113,6 +115,28 @@ def main() -> int:
         )
         if not head.lstrip().startswith("package com.addonstation.mobile"):
             problems.append(f"تصريح package ناقص · {rel}")
+
+        package_match = re.search(r"^package\s+([\w.]+)", text, re.M)
+        package_name = package_match.group(1) if package_match else ""
+        # Kotlin does not permit two top-level type declarations with the same
+        # name in one package. Catch this before spending minutes on Gradle.
+        declaration_source = strip_noise(text)
+        declaration_pattern = re.compile(
+            r"^(?:(?:data|sealed|enum|annotation|value)\s+)?"
+            r"(?:class|object|interface)\s+([A-Za-z_][A-Za-z0-9_]*)",
+            re.M,
+        )
+        for declaration in declaration_pattern.finditer(declaration_source):
+            name = declaration.group(1)
+            key = (package_name, name)
+            previous = top_level_declarations.get(key)
+            if previous is not None:
+                problems.append(
+                    f"تعريف نوع مكرّر · {rel} → {package_name}.{name} "
+                    f"(موجود أيضاً في {previous.relative_to(ROOT)})"
+                )
+            else:
+                top_level_declarations[key] = f
 
         imports = [
             line.strip()
@@ -151,8 +175,8 @@ def main() -> int:
         print(f"\n✗ عدد المشاكل: {len(problems)}")
         return 1
 
-    print("🟢 الأقواس متوازنة في كل الملفات · لا استيراد مكرّر · لا TODO/FIXME · "
-          "لا نصوص مخلوطة.")
+    print("🟢 الأقواس متوازنة في كل الملفات · لا تعريفات أنواع أو استيرادات مكرّرة · "
+          "لا TODO/FIXME · لا نصوص مخلوطة.")
     return 0
 
 

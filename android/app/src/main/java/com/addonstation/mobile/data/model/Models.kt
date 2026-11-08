@@ -188,20 +188,6 @@ data class ProfileStats(
     @SerialName("daily_reward") val dailyReward: Int = 0,
 )
 
-@Immutable
-@Serializable
-data class ProfileStats(
-    val friends: Int = 0,
-    val downloads: Int = 0,
-    val favorites: Int = 0,
-    val level: Int = 1,
-    @SerialName("xp_in_level") val xpInLevel: Int = 0,
-    @SerialName("xp_to_next") val xpToNext: Int = 100,
-    val streak: Int = 0,
-    @SerialName("daily_claimed") val dailyClaimed: Boolean = false,
-    @SerialName("daily_reward") val dailyReward: Int = 0,
-)
-
 @Serializable
 data class AcTransaction(
     val id: Long = 0,
@@ -358,12 +344,6 @@ data class PushTestResult(val ok: Boolean = false, val message: String? = null)
 data class BlockedUser(
     @SerialName("blocked_id") val blockedId: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
-)
-
-@Immutable
-@Serializable
-data class MutedUser(
-    @SerialName("muted_id") val mutedId: String? = null,
 )
 
 @Immutable

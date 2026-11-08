@@ -42,7 +42,7 @@ old_collectors = re.findall(r"(?<!WithLifecycle)\.collectAsState\s*\(", ui)
 
 checks: list[tuple[str, bool]] = [
     ("All UI flows are lifecycle-aware", not old_collectors and lifecycle_collectors >= 70),
-    ("Store owns one lazy vertical scroller", "LazyVerticalGrid(" in store_screen and "verticalScroll(" not in store_screen),
+    ("Store owns one lazy vertical scroller", store_screen.count("LazyVerticalGrid(") == 1 and "verticalScroll(" not in store_screen),
     ("Store cards are keyed and typed", "key = { it.id }" in store_screen and 'contentType = { "store-card" }' in store_screen),
     ("Search requests are debounced", store_screen.count("320L") >= 1 and "debouncedQuery" in store_screen),
     ("Recent store queries use a bounded TTL cache", "browseCaches" in content and "size > 8" in content and "45_000L" in content),
