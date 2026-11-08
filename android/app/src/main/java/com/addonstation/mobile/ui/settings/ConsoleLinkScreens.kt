@@ -1,6 +1,5 @@
 package com.addonstation.mobile.ui.settings
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -58,7 +57,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -201,29 +199,11 @@ fun ConsoleLinkScreen(
     }
 
     Box(Modifier.fillMaxSize().background(AppColors.AuthBg)) {
-        Image(
-            painter = painterResource(R.drawable.console_link_cave_bg),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.TopCenter,
-            modifier = Modifier.fillMaxSize(),
-        )
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0.0f to Color.Black.copy(alpha = 0.34f),
-                        0.45f to AppColors.AuthBg.copy(alpha = 0.64f),
-                        1.0f to AppColors.AuthBg.copy(alpha = 0.94f),
-                    ),
-                ),
-        )
         Column(Modifier.fillMaxSize()) {
             ConsoleTopBar(
                 title = stringResource(R.string.phone_console_link_title),
                 onBack = onBack,
-                backgroundColor = AppColors.AuthBarSurface.copy(alpha = 0.88f),
+                backgroundColor = AppColors.AuthBarSurface,
             )
             if (linkedDeviceName != null) {
             ConsoleLinkedSuccess(

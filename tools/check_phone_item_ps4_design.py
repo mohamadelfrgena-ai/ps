@@ -40,6 +40,9 @@ checks = [
     ("existing Settings navigation icon is preserved", "Icons.Filled.Settings, Icons.Outlined.Settings" in main_tab),
     ("local confirmation precedes the one-time server claim", 0 <= console.find("prepareCode(normalized)") < console.find("pendingApproval = prepared") < console.find("claimCode(approvedCode)")),
     ("console code stays six-character LTR", "CODE_LENGTH" in console and "LayoutDirection.Ltr" in console),
+    ("console code screen uses the solid theme background without deleted artwork",
+     "console_link_cave_bg" not in console
+     and not (ANDROID / "res/drawable-nodpi/console_link_cave_bg.jpg").exists()),
     ("Android never reads console_link_codes directly", "console_link_codes" not in console + repo),
     ("phone calls the exact shared claim RPC", 'function = "claim_console_link"' in repo),
     ("claim sends exactly the required user-session fields", all(name in repo for name in (
