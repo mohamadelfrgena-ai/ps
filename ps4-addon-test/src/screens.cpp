@@ -2268,7 +2268,9 @@ void itemCover(UiEngine& e, const AddonItem& it, int x, int y, int w, int h, int
             e.drawRoundRect(x, y, w, h, r, SDL_Color{8, 9, 11, 120});
             int cw = w, ch = static_cast<int>(static_cast<long long>(w) * ih / iw);
             if (ch > h) { ch = h; cw = static_cast<int>(static_cast<long long>(h) * iw / ih); }
-            e.drawImageRounded(it.cover, x + (w - cw) / 2, y + (h - ch) / 2, cw, ch, std::min(r, 12));
+            // v0.59 (user: «الصورة نازلة شوي عن المكان محدد»): flush to the TOP of the slot —
+            // 16:9 covers fill the marked area exactly; wider art glows softly below, never drops.
+            e.drawImageRounded(it.cover, x + (w - cw) / 2, y, cw, ch, std::min(r, 12));
             return;
         }
         // v0.36 (user request): covers are NEVER cropped — the WHOLE cover always shows,
@@ -2538,7 +2540,7 @@ void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const Addo
     e.dropShadow(rx, y + 6, w, h, r, 14, focused ? 150 : (gLight ? 40 : 90));
     const SDL_Color bg = focused ? kSF2 : kSF;
     e.drawRoundRect(rx, y, w, h, r, bg);
-    itemCover(e, it, rx, y, w, imgH + r, r, true);   // v0.39: whole cover, scaled only
+    itemCover(e, it, rx, y, w, imgH, r, true);   // v0.59: cover sits IN its marked slot (was imgH+r -> looked dropped)
     e.fillRect(rx, y + imgH, w, r, bg);
     e.drawRoundBorder(rx, y, w, h, r, 2, focused ? ink(40) : kBD);
     // ---- cover badges (v0.36 marketplace look): sale % top-left, NEW top-right, type tag bottom-left ----
