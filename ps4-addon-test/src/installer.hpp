@@ -44,6 +44,10 @@ std::string formatQueuedMessage(const std::string& langCode);
 bool isAddonMarkedInstalled(const std::string& addonName,
                             const std::string& stageDir = "/data/AddonStation/installed");
 
+// v0.63: real-presence + mark reconciliation («يقول مثبتة وهي غير مثبتة»)
+bool addonFolderPresent(const std::string& mojangDir, const std::string& folderName);
+void rewriteInstalledMarks(const std::string& stageDir, const std::vector<std::string>& names);
+
 // Copies a pre-extracted addon folder or .raw stream to destinationFolder.
 CopyResult copyAddonFolder(const std::string& sourceFolder,
                            const std::string& destinationFolder);

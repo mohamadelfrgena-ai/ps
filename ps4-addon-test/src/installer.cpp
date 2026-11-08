@@ -908,6 +908,36 @@ std::string formatInstallPhaseLabel(InstallPhase phase, const std::string& langC
     return "Download";
 }
 
+// v0.63: does this addon's pack folder REALLY exist inside the mounted com.mojang?
+// («يقول مثبتة وهي غير مثبتة» — the staging-era marks could lie forever)
+bool addonFolderPresent(const std::string& mojangDir, const std::string& folderName) {
+    if (mojangDir.empty() || folderName.empty()) return false;
+    static const char* cats[] = {"resource_packs", "behavior_packs", "minecraftWorlds", "skin_packs"};
+    for (const char* cat : cats) {
+        struct stat st {};
+        const std::string p = mojangDir + "/" + cat + "/" + folderName;
+        if (::stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) return true;
+    }
+    return false;
+}
+
+// v0.63: rewrite installed.json fresh from a reconciled name list (heals stale marks)
+void rewriteInstalledMarks(const std::string& stageDir, const std::vector<std::string>& names) {
+    int err = 0;
+    ensureDirectory(stageDir, err);
+    const std::string jsonPath = stageDir + "/installed.json";
+    std::string out = "[\n";
+    for (std::size_t i = 0; i < names.size(); ++i) {
+        out += "  \"" + names[i] + "\"" + (i + 1 < names.size() ? ",\n" : "\n");
+    }
+    out += "]\n";
+    const int fd = ::open(jsonPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd >= 0) {
+        writeExact(fd, out.data(), out.size(), err);
+        ::close(fd);
+    }
+}
+
 bool isAddonMarkedInstalled(const std::string& addonName, const std::string& stageDir) {
 #ifdef __ORBIS__
     ScopedRootJailbreak jailbreakGuard;

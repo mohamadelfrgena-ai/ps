@@ -259,6 +259,63 @@ static void loadWalletHistory() {
     setWalletHistory(tx);
 }
 
+// v0.63 («يقول مثبتة وهي غير مثبتة»): the folder names a REAL install uses — each
+// pack's dest_folder, or the display title for single-file grants. The installed
+// check and the marks must speak the same names.
+static std::vector<std::string> packFolderNames(const AddonItem& it) {
+    std::vector<std::string> names;
+    for (const std::string& p : splitJsonObjects(it.packTargetsRaw)) {
+        const std::string f = jsonGetString(p, "dest_folder");
+        if (!f.empty()) names.push_back(f);
+    }
+    names.push_back(it.title);   // single-file grants install under the display title
+    return names;
+}
+
+// Reality wins when the game is mounted — old staging-era marks lied forever
+// (marked installed on QUEUED, never-copied packs). Marks are the fallback while
+// the game is closed and are reconciled against reality on every mount.
+static bool computeInstalled(const AddonItem& it) {
+    const std::vector<std::string> names = packFolderNames(it);
+    const std::string mounted = mountedMojangDir();
+    if (!mounted.empty()) {
+        for (const std::string& n : names) if (addonFolderPresent(mounted, n)) return true;
+        return false;
+    }
+    for (const std::string& n : names) if (isAddonMarkedInstalled(n, kStageDir)) return true;
+    return false;
+}
+
+// Heal the marks + the visible state whenever the game is mounted.
+static void reconcileInstalled() {
+    const std::string mounted = mountedMojangDir();
+    if (mounted.empty()) return;
+    std::vector<std::string> real;
+    bool changed = false;
+    for (AddonItem it : catalog()) {
+        bool present = false;
+        for (const std::string& n : packFolderNames(it)) {
+            if (addonFolderPresent(mounted, n)) {
+                present = true;
+                real.push_back(n);
+                break;
+            }
+        }
+        if (it.installed != present) {
+            it.installed = present;
+            upsertCatalogItem(it);
+            changed = true;
+        }
+    }
+    static std::string sLast;
+    std::string key;
+    for (const std::string& n : real) key += n + "\n";
+    if (changed || key != sLast) {
+        sLast = key;
+        rewriteInstalledMarks(kStageDir, real);
+    }
+}
+
 static AddonItem toItem(const ItemData& d) {
     AddonItem it;
     it.id = d.id;
@@ -283,7 +340,7 @@ static AddonItem toItem(const ItemData& d) {
     it.exclusive = d.isExclusive;
     it.exclusiveSlot = (int)d.exclusiveSlot;
     it.featured = d.isFeatured;
-    it.installed = isAddonMarkedInstalled(brandTitle(d.title), kStageDir);
+    it.installed = computeInstalled(it);
     it.createdAt = isoToTime(d.createdAt);
     return it;
 }
@@ -300,6 +357,7 @@ static void loadCatalogNow() {
         }
     }
     setCatalog(out);
+    reconcileInstalled();   // v0.63: heal «مثبتة» lies at load
     A.dirty = true;
 }
 
@@ -1423,6 +1481,18 @@ int main(int, char**) {
                               "/data/AddonStation/icons", "/data/AddonStation/covers"};
         for (const char* d : dirs) ::mkdir(d, 0777);
     }
+    {
+        // v0.63: one-time reset of the pre-v0.63 "installed" marks — they were written
+        // on QUEUED (staged) installs and said «مثبتة» for packs that never entered
+        // the game. Reality re-marks real installs on the next mount.
+        const std::string sentinel = std::string(kStageDir) + "/.marks_v2";
+        struct stat st {};
+        if (::stat(sentinel.c_str(), &st) != 0) {
+            ::remove((std::string(kStageDir) + "/installed.json").c_str());
+            FILE* mk = std::fopen(sentinel.c_str(), "wb");
+            if (mk) std::fclose(mk);
+        }
+    }
 
     // ---- language: saved choice, else the PS4 system language (auto) ----
     gCfg = loadSupabaseConfig();
@@ -1575,6 +1645,10 @@ int main(int, char**) {
             }
             if (now / 60 != lastSec / 60) A.dirty = true;   // clock + sale countdown
             lastSec = now;
+            {   // v0.63: keep the installed state honest while the game is mounted
+                static long long lastRec = 0;
+                if (now - lastRec >= 8000) { lastRec = now; reconcileInstalled(); }
+            }
         }
         if (A.scr == Scr::SignIn && (A.codeStatus == 0 || A.codeStatus == 3)) {
             static std::time_t lastPoll = 0;
