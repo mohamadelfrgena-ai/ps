@@ -1,5 +1,5 @@
 # pkg addon test — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
-# v0.47 (2026-11-05): release-candidate build — logo tile + 2 rows + HD banners + loader group
+# v0.58 (2026-11-05): addon page w/o side rail + studio fox avatar (also: grid peek + cover bleed)
 TITLE       := pkg addon test
 # AddonStation PS4 — v0.23 (UI v7.3 final)
 VERSION     := 0.34

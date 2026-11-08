@@ -2785,6 +2785,7 @@ static void appLogoTile(UiEngine& e, int cx, int y, int tile) {
     e.drawImageRounded("icon_app", x + (tile - is) / 2, y + (tile - is) / 2, is, is, 16);
 }
 
+static void drawStatusRow(UiEngine& e, const Lay& L);   // fwd (v0.59)
 void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
     Lay L; L.rtl = (langCode == "ar");
     gRail = true;
@@ -2827,7 +2828,12 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
     const int botTop = 1080 - 30 - (3 * itemH + 12);
     for (int i = 0; i < 3; ++i) item(4 + i, botTop + i * (itemH + 12));
 
-    // ---- status: AC pill (guest = 0) · clock · avatar ----
+    drawStatusRow(e, L);
+}
+
+// v0.59: the status row (avatar · clock · AC) lives WITHOUT the side rail too — detail
+// pages keep it while the nav strip is hidden (user: «الشريط الجنبي لا اريده»).
+static void drawStatusRow(UiEngine& e, const Lay& L) {
     const int top = 34;
     const int av = 56, avX = 1920 - 64 - av;
     accountAvatar(e, L.X(avX, av), top, av, false);
@@ -2862,10 +2868,14 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
 }
 } // namespace
 
-void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int /*acBalance: from account()*/) {
+void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int /*acBalance: from account()*/, bool rail) {
     // activeTab: 0 Home, 1 Deals, 2 Store, 3 Settings, 4 Plans, 5 Profile, 6 Mine, 7 Search(none)
     static const int kMap[8] = {0, 1, 2, 6, 4, 5, 3, -1};
-    drawRail(e, (activeTab >= 0 && activeTab < 8) ? kMap[activeTab] : -1, langCode);
+    if (rail) { drawRail(e, (activeTab >= 0 && activeTab < 8) ? kMap[activeTab] : -1, langCode); return; }
+    // v0.59 (user): on the addon page the side rail is hidden — status row only
+    Lay L; L.rtl = (langCode == "ar");
+    gRail = false;
+    drawStatusRow(e, L);
 }
 
 void setThemeLight(bool light) { applyTheme(light); }
@@ -3454,7 +3464,7 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
     const std::string& lang = langCode;
     if (idx < 0 || idx >= static_cast<int>(gCat.size())) {   // item disappeared (unpublished) -> calm empty page
         backdrop(e);
-        drawTopNav(e, 2, langCode);
+        drawTopNav(e, 2, langCode, -1, false);   // v0.59: no side rail on the addon page
         emptyState(e, L, kCL + 20, 200, kCR - kCL - 20, 600, 12, tr("empty_t", lang), tr("empty_s", lang));
         drawLegendBar(e, {{"\xE2\x97\x8B", "back"}}, langCode);
         return;
@@ -3486,7 +3496,7 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
             bakedFor = want;
         }
     }
-    drawTopNav(e, 2, langCode);
+    drawTopNav(e, 2, langCode, -1, false);   // v0.59: no side rail on the addon page
     const int x0 = kCL + 20, lw = 860;
     int y = 124;
     {   // breadcrumb
@@ -3510,21 +3520,30 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
         }
     }
     y += 10;
-    if (!it.creator.empty()) {   // creator: initials avatar (colour from the name) + name
+    if (!it.creator.empty()) {   // creator: avatar + name — v0.59: the studio shows the FOX logo
         const int s = 44, ax = L.X(x0, s);
-        unsigned hsh = 0;
-        for (unsigned char ch : it.creator) hsh = hsh * 31u + ch;
-        static const SDL_Color kAv[5] = {{20, 184, 166, 255}, {59, 130, 246, 255}, {168, 85, 247, 255}, {245, 158, 11, 255}, {239, 68, 68, 255}};
-        e.drawRoundRect(ax, y, s, s, 12, kAv[hsh % 5]);
-        std::string ini;
-        for (std::size_t i = 0; i < it.creator.size() && ini.size() < 2; ++i) {
-            const unsigned char ch = static_cast<unsigned char>(it.creator[i]);
-            const bool up = ch >= 'A' && ch <= 'Z', lo = ch >= 'a' && ch <= 'z', dg = ch >= '0' && ch <= '9';
-            if ((up || lo || dg) && (i == 0 || it.creator[i - 1] == ' ' || up))
-                ini += static_cast<char>(lo ? ch - 32 : ch);
+        std::string low = it.creator;
+        for (char& c : low) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c + 32);
+        const bool studio = low.find("sliver fox") != std::string::npos ||
+                            low.find("silverfoxstudio") != std::string::npos;
+        if (studio && e.hasImage("fox_avatar")) {
+            e.drawRoundRect(ax, y, s, s, 12, SDL_Color{198, 92, 42, 255});
+            e.drawImageRounded("fox_avatar", ax, y, s, s, 12);
+        } else {
+            unsigned hsh = 0;
+            for (unsigned char ch : it.creator) hsh = hsh * 31u + ch;
+            static const SDL_Color kAv[5] = {{20, 184, 166, 255}, {59, 130, 246, 255}, {168, 85, 247, 255}, {245, 158, 11, 255}, {239, 68, 68, 255}};
+            e.drawRoundRect(ax, y, s, s, 12, kAv[hsh % 5]);
+            std::string ini;
+            for (std::size_t i = 0; i < it.creator.size() && ini.size() < 2; ++i) {
+                const unsigned char ch = static_cast<unsigned char>(it.creator[i]);
+                const bool up = ch >= 'A' && ch <= 'Z', lo = ch >= 'a' && ch <= 'z', dg = ch >= '0' && ch <= '9';
+                if ((up || lo || dg) && (i == 0 || it.creator[i - 1] == ' ' || up))
+                    ini += static_cast<char>(lo ? ch - 32 : ch);
+            }
+            if (ini.empty()) ini = "@";
+            e.drawTextCentered(ini, ax + s / 2, y + s / 2, 19, kWHT, FontRole::Body, false);
         }
-        if (ini.empty()) ini = "@";
-        e.drawTextCentered(ini, ax + s / 2, y + s / 2, 19, kWHT, FontRole::Body, false);
         boxText(e, L, it.creator, x0 + s + 14, 600, y + 9, 23, kTX);
         y += 62;
     }

@@ -187,7 +187,7 @@ void drawToast(UiEngine& e, const std::string& text, const std::string& langCode
 void drawLegendBar(UiEngine& e, const std::vector<std::pair<std::string, std::string>>& items, const std::string& langCode);
 
 // Rail tabs: 0 Home, 1 Deals, 2 Store, 3 Settings, 4 Plans, 5 Profile (-1 none). AC / avatar come from account().
-void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int acBalance = -1);
+void drawTopNav(UiEngine& e, int activeTab, const std::string& langCode, int acBalance = -1, bool rail = true);
 
 // ---- Sign-in by code (replaces the welcome page) ------------------------------------------
 // status: 0 waiting for the phone, 1 linked (shows account), 2 code expired, 3 network error, 4 creating code
