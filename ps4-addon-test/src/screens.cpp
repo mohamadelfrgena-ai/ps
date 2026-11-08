@@ -2261,8 +2261,11 @@ void itemCover(UiEngine& e, const AddonItem& it, int x, int y, int w, int h, int
     if (!it.cover.empty() && e.imageSize(it.cover, iw, ih)) {
         if (fitOnly) {
             // v0.39 (user order): the COMPLETE cover, only scaled down, inside the card
-            // slot — no crop, no bleed copy behind it.
+            // slot. v0.58 (user pick «خلفية ضبابية»): a dimmed copy of the cover fills the
+            // slot behind it — wide art leaves soft glow instead of flat gap bars.
             e.drawRoundRect(x, y, w, h, r, kSF2);
+            e.drawImageRounded(it.cover, x, y, w, h, r, 90);
+            e.drawRoundRect(x, y, w, h, r, SDL_Color{8, 9, 11, 120});
             int cw = w, ch = static_cast<int>(static_cast<long long>(w) * ih / iw);
             if (ch > h) { ch = h; cw = static_cast<int>(static_cast<long long>(h) * iw / ih); }
             e.drawImageRounded(it.cover, x + (w - cw) / 2, y + (h - ch) / 2, cw, ch, std::min(r, 12));
@@ -3068,6 +3071,19 @@ void drawSignInRequired(UiEngine& e, int focus, const std::string& langCode) {
 // ============================================================================
 namespace {
 // Shelf of up to 5 cards from `items` starting at scroll; focus base fb. Empty -> empty state.
+// v0.58 (user pick «أ: نصف + بهتة ناعمة»): the bottom cut of a grid window always peeks the
+// next row — half a card fading softly into the background («باهت»), never a hard edge. When
+// focus walks down, the peeked row scrolls fully into view (win = one full row in main.cpp).
+void gridFade(UiEngine& e, int x, int yMax, int w) {
+    const int fadeH = 56;
+    for (int j = 0; j < fadeH; ++j) {
+        const float t = (float)(j + 1) / (float)fadeH;
+        const Uint8 a = (Uint8)std::min(255.f, 255.f * t * t * 1.35f);
+        e.fillRect(x, yMax - fadeH + j, w, 1, SDL_Color{kBG.r, kBG.g, kBG.b, a});
+    }
+    e.fillRect(x, yMax, w, 1080 - yMax, kBG);   // hard-erase the overflow (legend bar redraws after)
+}
+
 void cardGrid(UiEngine& e, const Lay& L, const std::vector<int>& items, int scroll, int fb, int focus,
               int xl, int yTop, int w, int yMax, const std::string& lang, bool dealBadge) {
     if (items.empty()) {
@@ -3090,6 +3106,7 @@ void cardGrid(UiEngine& e, const Lay& L, const std::vector<int>& items, int scro
         const AddonItem& it = gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])];
         vcard(e, L, x, ry, cw, ih, it, focus == fb + i, lang, false, false, dealBadge);
     }
+    gridFade(e, L.X(xl, w), yMax, w);   // v0.58: soft peek cut + overflow erase
 }
 } // namespace
 
@@ -3249,7 +3266,14 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     // v0.45 (option D, user pick): compact hero + two WHOLE rows at the current card size
     tabRow(e, L, cx, 332, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang), tr("chip_free", lang),
                            tr("chip_epic", lang), tr("chip_legendary", lang), tr("chip_new", lang)}, filterIndex, 5, focus);
-    cardGrid(e, L, homeItems, scrollOf(View::Home), 12, focus, cx, 378, kCR - cx, 964, lang, sale);
+    {   // v0.58: breathing under the filter chips + one full row & a soft-faded half peek below
+        const int gCols = 5, gGap = 26;
+        const int gCw = (kCR - cx - gGap * (gCols - 1)) / gCols;
+        const int gCh = vcardHeight(gCw * 9 / 16, false);
+        const int yG = 410;
+        cardGrid(e, L, homeItems, scrollOf(View::Home), 12, focus, cx, yG, kCR - cx,
+                 yG + (gCh + gGap) + gCh / 2, lang, sale);
+    }
 
     std::vector<std::pair<std::string, std::string>> leg = {{"\xE2\x9C\x95", "select"}, {"\xE2\x96\xB3", "search"}};
     if (nS > 1) { leg.push_back({"L2", "prev_offer"}); leg.push_back({"R2", "next_offer"}); }
@@ -3408,12 +3432,15 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
         emptyState(e, L, gx, catY, gw, std::min(560, 960 - catY), 12, tr(gCat.empty() ? "home_empty_t" : "empty_t", lang),
                    tr(gCat.empty() ? "home_empty_s" : "empty_s", lang));
     } else {
+        const int gyMax = catY + (ch + gap) + ch / 2;   // v0.58: full row + soft-faded half peek
         for (int i = 0; i < shown; ++i) {
             const int col = i % cols, row = i / cols;
             const int ry = catY + row * (ch + gap);
+            if (ry >= gyMax) break;
             const AddonItem& it = gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])];
             vcard(e, L, gx + col * (gcw + gap), ry, gcw, ih, it, focus == i, lang, true, true, sale);
         }
+        gridFade(e, gx, gyMax, gw);
     }
     drawLegendBar(e, {{"\xE2\x9C\x95", "open"}, {"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}}, langCode);
 }

@@ -858,8 +858,8 @@ static int focusedCard() {
 }
 
 static void clampScroll() {
-    // keep the focused card visible; windows: Home 10, Deals 10, Store 10, Search 5 (v0.36 grids)
-    int win = 10, idx = -1;
+    // v0.58: window = ONE full row (5) — the half-peeked row scrolls fully into view on Down
+    int win = 5, idx = -1;
     View view = View::Home;
     if (A.scr == Scr::Home) { idx = A.focus - 12; view = View::Home; }
     else if (A.scr == Scr::Deals) { idx = A.focus - 5; view = View::Deals; }
@@ -923,7 +923,7 @@ static void moveFocus(int dx, int dy) {
             } else {
                 if (v.empty()) A.focus = 5 + std::min(A.filter, 6);
                 else if (dy < 0 && A.focus < 17 && scrollOf(View::Home) == 0) A.focus = 5 + std::min(A.filter, 6);
-                else moveGridCard(View::Home, 12, 5, 10, dx, dy);
+                else moveGridCard(View::Home, 12, 5, 5, dx, dy);
             }
             break;
         }
@@ -941,7 +941,7 @@ static void moveFocus(int dx, int dy) {
             } else {
                 if (v.empty()) A.focus = std::min(A.filter, 4);
                 else if (dy < 0 && A.focus < 10 && scrollOf(View::Deals) == 0) A.focus = std::min(A.filter, 4);
-                else moveGridCard(View::Deals, 5, 5, 10, dx, dy);
+                else moveGridCard(View::Deals, 5, 5, 5, dx, dy);
             }
             break;
         }
@@ -953,7 +953,7 @@ static void moveFocus(int dx, int dy) {
                 if (v.empty()) A.focus = 10;
                 else if (dy < 0 && A.focus < 5 && scrollOf(View::Store) == 0) A.focus = 10;
                 else if (dy > 0 && A.focus >= 5 && scrollOf(View::Store) + 10 >= (int)v.size()) A.focus = 10;
-                else moveGridCard(View::Store, 0, 5, 10, dx, dy);
+                else moveGridCard(View::Store, 0, 5, 5, dx, dy);
             } else if (A.focus == 10) {
                 if (dy > 0) A.focus = 11 + std::min(A.filter, 6);
                 else if (dy < 0) A.focus = gridN > 0 ? 9 : 11 + std::min(A.filter, 6);
