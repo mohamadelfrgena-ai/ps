@@ -1072,20 +1072,27 @@ static void moveFocus(int dx, int dy) {
             } else {
                 if (dy < 0) A.focus = 5 + std::min(A.filter, 6);
                 else if (dx != 0) {
-                    // strip walk: Left/Right with wrap-around; the window scrolls one tile at a time
+                    // v0.65: strip walk with wrap-around. 4 full card slots scroll one tile
+                    // at a time; the "View more" rectangle is the last focus tile (pinned at
+                    // the row end after the peek card — «بس المستطيل العرض بعد آخر بطاقة»).
+                    const int nCards = (int)std::min<std::size_t>(10, v.size());
                     int first = scrollOf(View::Home);
-                    int tt = first + (A.focus - 12);
+                    int tt = (A.focus - 12 >= nCards) ? nCards : first + (A.focus - 12);
                     if (tt < 0) tt = 0;
                     if (tt >= nTiles) tt = nTiles - 1;
                     tt += dx;
                     if (tt < 0) tt += nTiles;
                     if (tt >= nTiles) tt -= nTiles;
-                    const int win = 5;
-                    if (tt < first) first = tt;
-                    else if (tt >= first + win) first = tt - win + 1;
-                    if (first < 0) first = 0;
-                    if (first != scrollOf(View::Home)) setScroll(View::Home, first);
-                    A.focus = 12 + (tt - first);
+                    if (tt >= nCards) {
+                        A.focus = 12 + nCards;   // the View-more tile (window unchanged)
+                    } else {
+                        if (tt < first) first = tt;
+                        else if (tt > first + 3) first = tt - 3;
+                        if (first < 0) first = 0;
+                        if (first > tt) first = tt;
+                        if (first != scrollOf(View::Home)) setScroll(View::Home, first);
+                        A.focus = 12 + (tt - first);
+                    }
                 }
             }
             break;

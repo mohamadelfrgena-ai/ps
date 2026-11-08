@@ -3140,9 +3140,10 @@ void cardGrid(UiEngine& e, const Lay& L, const std::vector<int>& items, int scro
 }
 
 // v0.65 («شريط واحد يعرض اخر عشر بطاقات»): ONE horizontal strip = the 10 newest
-// filtered cards, then a gold "View more" tile («وفي النهاية مستطيل عرض المزيد»).
-// The strip walks left/right and scrolls one tile at a time; tiles bleed to the
-// screen edge so the next card always peeks («التقليب»).
+// filtered cards + a gold "View more" rectangle («وفي النهاية مستطيل عرض المزيد»).
+// Fix per «بس المستطيل العرض بعد آخر بطاقة»: the rectangle is the LAST tile of the
+// row — always visible AFTER the last card (the half-peek included), never before
+// it. The 10 cards scroll behind the row, one tile at a time («يتمشى يسار ويمين»).
 static void cardStrip(UiEngine& e, const Lay& L, const std::vector<int>& items, int scroll, int fb,
                       int focus, int xl, int yTop, const std::string& lang) {
     const int gap = 24;
@@ -3150,19 +3151,14 @@ static void cardStrip(UiEngine& e, const Lay& L, const std::vector<int>& items, 
     const int ih = cw * 9 / 16;
     const int ch = vcardHeight(ih, false);
     const int nCards = (int)std::min<std::size_t>(10, items.size());
-    const int nTiles = nCards + 1;   // + View more
-    const int first = std::max(0, std::min(scroll, std::max(0, nTiles - 1)));
-    for (int i = 0; first + i < nTiles; ++i) {
+    const int vmw = 284, vmx = kCR - vmw;   // the rectangle sits at the row end
+    const int first = std::max(0, std::min(scroll, std::max(0, nCards - 1)));
+    for (int i = 0; i < 5 && first + i < nCards; ++i) {   // 4 full cards + a half-peek (runs under the rectangle)
         const int x = xl + i * (cw + gap);
-        const int t = first + i;
-        if (t < nCards) {
-            const AddonItem& it = gCat[(std::size_t)items[(std::size_t)t]];
-            vcard(e, L, x, yTop, cw, ih, it, focus == fb + i, lang, false, false, saleActive());
-        } else {
-            viewMoreTile(e, L, x, yTop, cw, ch, focus == fb + i, lang);
-        }
-        if (x > 1920 - 120) break;   // the next tile only peeks at the screen edge
+        const AddonItem& it = gCat[(std::size_t)items[(std::size_t)(first + i)]];
+        vcard(e, L, x, yTop, cw, ih, it, focus == fb + i, lang, false, false, saleActive());
     }
+    viewMoreTile(e, L, vmx, yTop, vmw, ch, focus == fb + nCards, lang);   // drawn last = covers the peek
 }
 } // namespace
 
@@ -3187,7 +3183,8 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
         // scrolled (it read focus-12 as an absolute index into the full list).
         const std::size_t gi = static_cast<std::size_t>(scrollOf(View::Home)) +
                                static_cast<std::size_t>(focus - 12);
-        if (gi < homeItems.size()) sFollow = homeItems[gi];
+        const int nCards = (int)std::min<std::size_t>(10, homeItems.size());
+        if (gi < homeItems.size() && focus - 12 < nCards) sFollow = homeItems[gi];   // v0.65: not the View-more tile
     } else if (focus >= 2 && focus <= 11) {
         sFollow = -1;
     }
