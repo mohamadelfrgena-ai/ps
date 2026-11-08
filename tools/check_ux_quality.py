@@ -74,7 +74,7 @@ for path in files:
         if "OutlinedTextField(" not in line and not re.search(r"\bTextField\(", line):
             continue
         depth, started, end = 0, False, i
-        for k in range(i, min(i + 30, len(lines))):
+        for k in range(i, min(i + 200, len(lines))):
             depth += lines[k].count("(") - lines[k].count(")")
             if "(" in lines[k]:
                 started = True

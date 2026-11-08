@@ -111,16 +111,18 @@ class PlansRepository(
         }
     }
 
-    suspend fun myOrders(limit: Int = 50): List<PaymentOrder> = withContext(Dispatchers.IO) {
+    suspend fun myOrders(limit: Int = 50): List<PaymentOrder> =
+        runCatching { myOrdersStrict(limit) }.getOrElse { emptyList() }
+
+    /** Strict variant used when the UI must distinguish an empty list from an error. */
+    suspend fun myOrdersStrict(limit: Int = 50): List<PaymentOrder> = withContext(Dispatchers.IO) {
         val uid = supabase.session()?.userId ?: return@withContext emptyList()
-        runCatching {
-            supabase.decodeList<PaymentOrder>(
-                supabase.select(
-                    "payment_orders",
-                    "select=*&user_id=eq.$uid&order=created_at.desc&limit=$limit",
-                )
+        supabase.decodeList<PaymentOrder>(
+            supabase.select(
+                "payment_orders",
+                "select=*&user_id=eq.$uid&order=created_at.desc&limit=$limit",
             )
-        }.getOrElse { emptyList() }
+        )
     }
 
     suspend fun orderById(id: String): PaymentOrder? = runCatching {

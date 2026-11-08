@@ -20,6 +20,17 @@
 -- ---------------------------------------------------------------------------
 grant select on all tables in schema public to anon, authenticated;
 
+-- إن كانت خصوصية أصول الأدمن (40) مطبقة، لا تعِد فتح profiles عند إعادة هذا
+-- الملف لاحقاً؛ القراءة تكون من العرض المنقّح فقط.
+do $$
+begin
+  if to_regclass('public.visible_profiles') is not null then
+    revoke select on public.profiles from public, anon, authenticated;
+    grant select on public.visible_profiles to anon, authenticated;
+  end if;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- 2) الكتابة المباشرة التي يحتاجها التطبيق (بقية الكتابة تتم عبر دوال RPC)
 --    RLS تتحقق من الدور: أدمن للوحة، وصاحب الحساب لملفه الشخصي
@@ -35,9 +46,12 @@ begin
 
   -- الملف الشخصي: منح على مستوى العمود (المستخدم يعدّل حقوله المسموحة فقط)
   begin
+    -- اختيار الأفاتار/الغلاف/الأداة يمر حصراً عبر set_profile_asset كي تُفحص
+    -- الخطة وadmin على الخادم؛ لا نمنح equipped_item_id مباشرةً.
     grant update (display_name, bio, custom_status, show_online_status, country,
-                  last_seen_at, equipped_item_id)
+                  last_seen_at)
       on public.profiles to authenticated;
+    revoke update (equipped_item_id) on public.profiles from authenticated;
   exception when undefined_table or undefined_column then null;
   end;
 

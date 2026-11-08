@@ -14,8 +14,24 @@ class AcRepository(
     private val state: AppState,
 ) {
 
+    @Volatile private var salaryClaimUserId: String? = null
+    @Volatile private var salaryClaimCheckedAt: Long = 0L
+
+    private suspend fun claimMonthlySalaryIfDue() {
+        val userId = supabase.currentUserId() ?: return
+        val now = System.currentTimeMillis()
+        if (salaryClaimUserId == userId && now - salaryClaimCheckedAt < 6 * 60 * 60 * 1_000L) return
+        runCatching {
+            supabase.rpc("claim_moderator_salary", signedOnly = true).asOutcome().requireOk()
+        }.onSuccess {
+            salaryClaimUserId = userId
+            salaryClaimCheckedAt = now
+        }
+    }
+
     suspend fun refreshWallet() = withContext(Dispatchers.IO) {
         val uid = supabase.session()?.userId ?: return@withContext
+        claimMonthlySalaryIfDue()
         runCatching {
             val wallet = supabase.decodeOne<com.addonstation.mobile.data.model.AcWallet>(
                 supabase.select("ac_wallets", "select=*&user_id=eq.$uid")

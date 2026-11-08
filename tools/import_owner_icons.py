@@ -3,8 +3,10 @@
 """استيراد أيقونات المالك من ملف «logo and thing» (مستودع vae) بلا أي رسم أو توليد.
 
 المبدأ: قصّ + تحجيم بنِسَب محفوظة فقط — لا تمديد ولا تصغير غير متساوٍ، ولا إنشاء صور.
-المصدر: 1.png (شعار الترحيب) · 2.png (عملة AC) · 3.png (ورقة أيقونات الإعدادات)
-        4.png (صورة المستخدم) · 5.jpeg (غرفة السوشيال) · 6.jpeg (ورقة غرف الشات) · 7.png (English)
+المصدر: 2.png (عملة AC) · 3.png (ورقة أيقونات الإعدادات) · 4.png (صورة المستخدم)
+        · 5.jpeg (غرفة السوشيال) · 6.jpeg (ورقة غرف الشات) · 7.png (English)
+
+لم يعد 1.png يُستورد: شعار شاشة البداية القديم حُذف عند اعتماد مشهد الكهف الجديد.
 """
 import os
 import sys
@@ -86,24 +88,10 @@ def disc_box(im, thr=222, verbose=False):
 
 
 def main():
-    print("=== 1) شعار شاشة الترحيب (1.png) ===")
-    logo = Image.open(os.path.join(SRC, "1.png")).convert("RGBA")
-    x0, y0, x1, y1 = alpha_bbox(logo, 10)
-    print(f"  حدود الشعار داخل الصورة: ({x0},{y0})-({x1},{y1}) · "
-          f"عرض {x1-x0} ارتفاع {y1-y0} · نسبة {(x1-x0)/(y1-y0):.2f}")
-    cut = logo.crop((x0, y0, x1, y1))
-    n = int(cut.height * 0.10)                      # هامش شفاف 10% من الارتفاع
-    canvas = Image.new("RGBA", (cut.width + 2 * n, cut.height + 2 * n), (0, 0, 0, 0))
-    canvas.paste(cut, (n, n))
-    w = 1200                                       # العرض النهائي (الارتفاع يتغيّر تلقائياً ⇒ بلا تشويه)
-    h = max(1, round(canvas.height * w / canvas.width))
-    canvas.resize((w, h), Image.LANCZOS).save(os.path.join(DST, "splash_logo.png"), "PNG", optimize=True)
-    print(f"  ✓ splash_logo.png {w}×{h} (نسبة محفوظة {w/h:.2f})")
-
-    print("=== 2) عملة AC (2.png) ===")
+    print("=== 1) عملة AC (2.png) ===")
     save_square(Image.open(os.path.join(SRC, "2.png")), "coin_ac.png", 384)
 
-    print("=== 3) ورقة أيقونات الإعدادات (3.png) ===")
+    print("=== 2) ورقة أيقونات الإعدادات (3.png) ===")
     sheet = Image.open(os.path.join(SRC, "3.png")).convert("RGBA")
     core = np.array(sheet)[:, :, 3] > 200
 
@@ -145,10 +133,10 @@ def main():
     for name, b in zip(settings_map, cells):
         save_square(sheet.crop(b), name + ".png", 160)
 
-    print("=== 4) الصورة الافتراضية للمستخدم (4.png) ===")
+    print("=== 3) الصورة الافتراضية للمستخدم (4.png) ===")
     save_square(Image.open(os.path.join(SRC, "4.png")), "ic_user.png", 256)
 
-    print("=== 5) ورقة غرف الشات (6.jpeg) ===")
+    print("=== 4) ورقة غرف الشات (6.jpeg) ===")
     rooms = Image.open(os.path.join(SRC, "6.jpeg")).convert("RGB")
     COLS = [(278, 573), (680, 971), (1075, 1366), (1473, 1764)]
     ROWS = [(169, 476), (612, 919), (1050, 1353)]
@@ -162,7 +150,7 @@ def main():
         b = disc_box(cell, 224)
         save_square(cell.crop(b), name + ".png", 160, circular=True)
 
-    print("=== 6) غرفة السوشيال (5.jpeg) وغرف English (7.png) ===")
+    print("=== 5) غرفة السوشيال (5.jpeg) وغرف English (7.png) ===")
     social = Image.open(os.path.join(SRC, "5.jpeg")).convert("RGB")
     b = disc_box(social, 226)
     save_square(social.crop(b), "ic_room_social.png", 160, circular=True)

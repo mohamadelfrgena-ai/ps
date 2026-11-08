@@ -6,6 +6,17 @@
 #         task: apk            ← ابنِ APK
 #         task: assets-upload  ← ارفع الأصول الـ311
 #         task: assets-dry-run ← تجربة رفع بلا كتابة
+#         task: profile-diagnostic ← فحص قراءة البروفايل فقط، بلا كتابة أو نشر
+#         task: console-contract-check ← فحص عقد ربط PS4/الهاتف بمفتاح عام فقط
+#         task: console-claim-diagnostic ← فحص صلاحيات مطالبة الهاتف قراءةً فقط
+#         task: console-link-integration ← اختبار ربط كامل بحساب مؤقت يُحذف فوراً
+#         task: console-link-schema-fix ← إصلاح أعمدة المطالبة ثم اختبار الربط الكامل
+#         task: staff-rewards-apply ← تفعيل الراتب الفوري/الشهري وميزات الموظفين والتحقق منها
+#         task: profile-access-fix ← تطبيق إصلاح visible_profiles المحدد والتحقق منه
+#         task: content-diagnostic ← يفحص حزمة Sulfur Cars المصدرية فقط، بلا رفع أو APK
+#         task: content-repair ← يعيد حزمة Sulfur Cars الموثوقة ويرفعها، بلا APK
+#         task: kotlin-check   ← تصريف Kotlin فقط للتحقق، بلا إنشاء APK
+#         task: profile-packs-upload ← ارفع حزمتَي البروفايل المثبّتتين وتحقق من بصماتهما
 #     ثم يُدفع الالتزام. لا تُشترط أي كلمة في تعليق الالتزام — الملف وحده هو المُحكَم،
 #     فإن كان فيه «none» لا يُبنى شيء مهما كان التعليق.
 #
@@ -42,14 +53,25 @@ on:
         options:
           - apk
           - apk-commit
+          - profile-diagnostic
+          - console-contract-check
+          - console-claim-diagnostic
+          - console-link-integration
+          - console-link-schema-fix
+          - staff-rewards-apply
+          - profile-access-fix
+          - content-diagnostic
+          - content-repair
+          - kotlin-check
+          - profile-packs-upload
           - assets-dry-run
           - assets-upload
   # هذا المحفّز لا يعمل إلا إذا تغيّر ملف طلب البناء (.build-request).
   # أي دفعة عادية للكود لا تُشغّل شيئاً.
   push:
-    # ملاحظة: أُضيف فرع الجلسة الحالي (arena/8379e662-ps) ليُبنى منه APK عند طلب
-    # الملف .build-request — يمكن حذفه لاحقاً بعد دمج الفرع.
-    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps, arena/8379e662-ps ]
+    # ملاحظة: تُضاف فروع الجلسات هنا ليُبنى منها APK عند طلب الملف .build-request
+    # — يمكن حذفها لاحقاً بعد دمج الفرع في main.
+    branches: [ main, arena/01a0e97c-ps, arena/01a10743-ps, arena/8379e662-ps, arena/75fb0e28-ps ]
     paths:
       - '.build-request'
 
@@ -78,6 +100,548 @@ jobs:
           echo "task=$TASK" >> "$GITHUB_OUTPUT"
           echo "### المهمّة المطلوبة: **$TASK** (المصدر: $SOURCE)" >> "$GITHUB_STEP_SUMMARY"
           echo "المهمّة: $TASK"
+
+  # ==========================================================================
+  # 0a) فحص عقد PS4/الهاتف الحي — مفتاح عام فقط ورمز مؤقت ينتهي تلقائياً
+  # ==========================================================================
+  console-contract-check:
+    needs: request
+    if: needs.request.outputs.task == 'console-contract-check'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify the shared production console-link contract
+        env:
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
+        run: |
+          set +e
+          set -o pipefail
+          python3 tools/check_console_contract_live.py 2>&1 | tee /tmp/console-contract-check.txt
+          code=${PIPESTATUS[0]}
+          {
+            echo "### Shared PS4/phone console-link contract"
+            echo '```text'
+            cat /tmp/console-contract-check.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" -ne 0 ]; then
+            detail=$(tail -8 /tmp/console-contract-check.txt | tr '\n' '|' | cut -c1-900)
+            echo "::error title=Console contract check failed::$detail"
+          fi
+          exit "$code"
+
+  # ==========================================================================
+  # 0b) تشخيص مطالبة ربط الهاتف — قراءة بيانات الدوال والصلاحيات فقط
+  # ==========================================================================
+  console-claim-diagnostic:
+    needs: request
+    if: needs.request.outputs.task == 'console-claim-diagnostic'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect authenticated console-claim grants without reading user data
+        env:
+          PROJECT_REF: stbmescmexzcszyyambq
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.ADDONSTATION_SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set +e
+          set -o pipefail
+          python3 tools/diagnose_console_claim_backend.py 2>&1 | tee /tmp/console-claim-diagnostic.txt
+          code=${PIPESTATUS[0]}
+          {
+            echo "### Authenticated console-claim diagnostic"
+            echo '```text'
+            cat /tmp/console-claim-diagnostic.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=Console claim::$line"
+          done < /tmp/console-claim-diagnostic.txt
+          if [ "$code" -ne 0 ]; then
+            detail=$(tail -12 /tmp/console-claim-diagnostic.txt | tr '\n' '|' | cut -c1-900)
+            echo "::error title=Console claim diagnostic failed::$detail"
+          fi
+          exit "$code"
+
+  # ==========================================================================
+  # 0c) اختبار تكامل ربط كامل — حساب مؤقت مؤكد يُحذف دائماً في finally
+  # ==========================================================================
+  console-link-integration:
+    needs: request
+    if: needs.request.outputs.task == 'console-link-integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Exercise authenticated claim and delete the disposable user
+        env:
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set +e
+          set -o pipefail
+          python3 tools/check_console_link_authenticated.py 2>&1 | tee /tmp/console-link-integration.txt
+          code=${PIPESTATUS[0]}
+          {
+            echo "### Authenticated console-link integration"
+            echo '```text'
+            cat /tmp/console-link-integration.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=Console link integration::$line"
+          done < /tmp/console-link-integration.txt
+          if [ "$code" -ne 0 ]; then
+            detail=$(tail -14 /tmp/console-link-integration.txt | tr '\n' '|' | cut -c1-900)
+            echo "::error title=Authenticated console link failed::$detail"
+          fi
+          exit "$code"
+
+  # ==========================================================================
+  # 0d) إصلاح مخطط مطالبة الربط ثم إثبات الدورة كاملة بحساب مؤقت
+  # ==========================================================================
+  console-link-schema-fix:
+    needs: request
+    if: needs.request.outputs.task == 'console-link-schema-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard the focused console-link repair
+        run: |
+          set -euo pipefail
+          python3 tools/check_console_link_code.py
+          python3 - <<'PY'
+          from pathlib import Path
+          sql = Path("supabase/APPLY_CONSOLE_LINK_CLAIM_SCHEMA_FIX.sql").read_text(encoding="utf-8").lower()
+          assert "add column if not exists claimed_by uuid" in sql
+          assert "add column if not exists profile jsonb" in sql
+          assert "add column if not exists consumed_at" not in sql
+          assert "stbmescmexzcszyyambq" in sql
+          print("Focused console-link schema repair guard passed")
+          PY
+
+      - name: Apply the two missing claim columns to the reviewed project
+        env:
+          DB_PASSWORD: ${{ secrets.NEW_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "::error::NEW_DB_PASSWORD is missing"
+            exit 1
+          fi
+          echo "::add-mask::$DB_PASSWORD"
+          docker run --rm -i \
+            -e PGPASSWORD="$DB_PASSWORD" \
+            postgres:17 \
+            psql \
+              -h aws-0-eu-west-1.pooler.supabase.com \
+              -p 5432 \
+              -U postgres.stbmescmexzcszyyambq \
+              -d postgres \
+              -v ON_ERROR_STOP=1 \
+            < supabase/APPLY_CONSOLE_LINK_CLAIM_SCHEMA_FIX.sql \
+            | tee /tmp/console-link-schema-fix.txt
+
+      - name: Prove create, authenticated claim, and poll after repair
+        env:
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set +e
+          set -o pipefail
+          python3 tools/check_console_link_authenticated.py 2>&1 | tee /tmp/console-link-after-fix.txt
+          code=${PIPESTATUS[0]}
+          {
+            echo "### Console-link schema repair"
+            echo '```text'
+            cat /tmp/console-link-schema-fix.txt
+            cat /tmp/console-link-after-fix.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=Console link repaired::$line"
+          done < /tmp/console-link-after-fix.txt
+          if [ "$code" -ne 0 ]; then
+            detail=$(tail -14 /tmp/console-link-after-fix.txt | tr '\n' '|' | cut -c1-900)
+            echo "::error title=Console link repair verification failed::$detail"
+          fi
+          exit "$code"
+
+  # ==========================================================================
+  # 0e) تفعيل ميزات الموظفين واختبار راتب التعيين الفوري ومنع التكرار
+  # ==========================================================================
+  staff-rewards-apply:
+    needs: request
+    if: needs.request.outputs.task == 'staff-rewards-apply'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify the staff rewards migration and generated diagnostics
+        run: |
+          set -euo pipefail
+          python3 tools/build_all_in_one_sql.py
+          git diff --exit-code -- supabase/00_ALL_IN_ONE.sql
+          python3 tools/make_verify_sql.py
+          git diff --exit-code -- supabase/99_VERIFY_ALL.sql
+          python3 tools/check_staff_rewards.py
+          python3 tools/check_verify_sql.py
+          python3 -m py_compile tools/check_staff_salary_live.py
+
+      - name: Apply the staff rewards migration atomically to the reviewed project
+        env:
+          DB_PASSWORD: ${{ secrets.NEW_DB_PASSWORD }}
+        run: |
+          set +e
+          set -o pipefail
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "::error::NEW_DB_PASSWORD is missing"
+            exit 1
+          fi
+          echo "::add-mask::$DB_PASSWORD"
+          {
+            echo 'begin;'
+            cat supabase/50_staff_salary_and_weekly_epic.sql
+            echo 'commit;'
+          } | docker run --rm -i \
+            -e PGPASSWORD="$DB_PASSWORD" \
+            postgres:17 \
+            psql \
+              -h aws-0-eu-west-1.pooler.supabase.com \
+              -p 5432 \
+              -U postgres.stbmescmexzcszyyambq \
+              -d postgres \
+              -v ON_ERROR_STOP=1 \
+            2>&1 | tee /tmp/staff-rewards-apply.txt
+          apply_code=${PIPESTATUS[1]}
+          if [ "$apply_code" -ne 0 ]; then
+            detail=$(tail -16 /tmp/staff-rewards-apply.txt | tr '\n' '|' | cut -c1-900)
+            echo "::error title=Staff rewards SQL failed::$detail"
+            exit "$apply_code"
+          fi
+          set -e
+
+          live_state=$(docker run --rm \
+            -e PGPASSWORD="$DB_PASSWORD" \
+            postgres:17 \
+            psql \
+              -h aws-0-eu-west-1.pooler.supabase.com \
+              -p 5432 \
+              -U postgres.stbmescmexzcszyyambq \
+              -d postgres \
+              -Atv ON_ERROR_STOP=1 \
+              -c "select (exists (select 1 from pg_trigger where tgrelid = to_regclass('public.profiles') and tgname = 'trg_staff_salary_on_role_assignment' and not tgisinternal))::text || '|' || (to_regprocedure('public.process_moderator_salaries()') is not null)::text || '|' || ((select count(*) from cron.job where jobname = 'addonstation_moderator_salary') = 1)::text")
+          echo "Staff rewards live state: $live_state"
+          if [ "$live_state" != "true|true|true" ]; then
+            echo "::error::Staff salary trigger, processor, or monthly cron is missing"
+            exit 1
+          fi
+
+      - name: Prove immediate 1500 AC salary and same-month idempotency
+        env:
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+          DB_PASSWORD: ${{ secrets.NEW_DB_PASSWORD }}
+        run: |
+          set +e
+          set -o pipefail
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "::error::NEW_DB_PASSWORD is missing"
+            exit 1
+          fi
+          echo "::add-mask::$DB_PASSWORD"
+          sleep 3
+          python3 tools/check_staff_salary_live.py 2>&1 | tee /tmp/staff-salary-live.txt
+          code=${PIPESTATUS[0]}
+          {
+            echo "### Staff rewards production verification"
+            echo '```text'
+            tail -30 /tmp/staff-rewards-apply.txt
+            cat /tmp/staff-salary-live.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=Staff salary::$line"
+          done < /tmp/staff-salary-live.txt
+          if [ "$code" -ne 0 ]; then
+            detail=$(tail -14 /tmp/staff-salary-live.txt | tr '\n' '|' | cut -c1-900)
+            echo "::error title=Staff salary verification failed::$detail"
+          fi
+          exit "$code"
+
+  # ==========================================================================
+  # 0f) تشخيص قراءة ملفات المستخدمين — قراءة فقط، بلا SQL أو نشر أو كتابة بيانات
+  # ==========================================================================
+  profile-diagnostic:
+    needs: request
+    if: needs.request.outputs.task == 'profile-diagnostic'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Diagnose profile endpoints safely
+        env:
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
+          SUPABASE_PUBLIC_KEY: ${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -o pipefail
+          python3 tools/diagnose_profile_backend.py | tee /tmp/profile-diagnostic.txt
+          {
+            echo "### Profile backend diagnostic"
+            echo '```text'
+            cat /tmp/profile-diagnostic.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=Profile backend::$line"
+          done < /tmp/profile-diagnostic.txt
+
+  # ==========================================================================
+  # 0g) إصلاح قراءة visible_profiles المحدد — لا يشغّل أي بناء أو نشر آخر
+  # ==========================================================================
+  profile-access-fix:
+    needs: request
+    if: needs.request.outputs.task == 'profile-access-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify profile privacy and chat metadata paths
+        run: |
+          python3 tools/check_admin_asset_privacy.py
+          python3 tools/check_chat_message_header.py
+
+      - name: Apply and verify the focused profile access migration
+        env:
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
+          SUPABASE_PUBLIC_KEY: ${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.ADDONSTATION_SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.ADDONSTATION_PROJECT_REF }}
+        run: |
+          set +e
+          set -o pipefail
+          python3 tools/apply_visible_profiles_access_fix.py --apply 2>&1 | tee /tmp/profile-access-fix.txt
+          code=${PIPESTATUS[0]}
+          {
+            echo "### Visible profile access fix"
+            echo '```text'
+            cat /tmp/profile-access-fix.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=Profile access fix::$line"
+          done < /tmp/profile-access-fix.txt
+          if [ "$code" -ne 0 ]; then
+            detail=$(tail -12 /tmp/profile-access-fix.txt | tr '\n' '|' | cut -c1-900)
+            echo "::error title=Profile access fix failed::$detail"
+          fi
+          exit "$code"
+
+  # ==========================================================================
+  # 0h) فحص/استعادة حزمة Sulfur Cars من إصدار GitHub العام الموثوق.
+  #     content-diagnostic للقراءة فقط؛ content-repair يحوّل ويرفع الملف، وكلاهما بلا APK.
+  # ==========================================================================
+  content-diagnostic:
+    needs: request
+    if: needs.request.outputs.task == 'content-diagnostic' || needs.request.outputs.task == 'content-repair'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and inspect the trusted release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/sulfur-cars
+          cd /tmp/sulfur-cars
+          gh release download content-001 \
+            --repo foxinteractive-pixel/content \
+            --pattern 'sulfur-cars_*.raw'
+          printf '%s  %s\n' \
+            'eb19f9cbbfef7639c16508c6baabdcd4bd4960a0f39540a52f70b487384946fc' 'sulfur-cars_ff44ec0a.raw' \
+            '45b26116a1342a5e8cb21a3beb51a30c459f283f47de3ef713c8e9fc3e6cfc9b' 'sulfur-cars_ffe0c865.raw' \
+            | sha256sum --check
+          file sulfur-cars_*.raw
+          python3 - <<'PY' | tee /tmp/content-diagnostic.txt
+          import hashlib
+          import json
+          import pathlib
+          import zipfile
+
+          for path in sorted(pathlib.Path('/tmp/sulfur-cars').glob('sulfur-cars_*.raw')):
+              data = path.read_bytes()
+              print(f'ASSET {path.name}: size={len(data)} sha256={hashlib.sha256(data).hexdigest()} magic={data[:24].hex()}')
+              print(f'ZIP={zipfile.is_zipfile(path)}')
+              if not zipfile.is_zipfile(path):
+                  import re
+                  import struct
+                  strings = [match.decode('ascii') for match in re.findall(rb'[ -~]{4,}', data)]
+                  signatures = {
+                      label: [offset for offset in range(len(data)) if data.startswith(signature, offset)][:12]
+                      for label, signature in {
+                          'zip_local': bytes.fromhex('504b0304'),
+                          'zip_empty': bytes.fromhex('504b0506'),
+                          'json_object': b'{',
+                          'manifest': b'manifest.json',
+                      }.items()
+                  }
+                  print(f'HEAD_HEX={data[:256].hex()}')
+                  print(f'HEADER_U32_LE={[struct.unpack_from("<I", data, offset)[0] for offset in range(8, min(40, len(data) - 3), 4)]}')
+                  print(f'ASCII_STRINGS={strings[:40]}')
+                  print(f'SIGNATURE_OFFSETS={signatures}')
+                  continue
+              with zipfile.ZipFile(path) as archive:
+                  names = archive.namelist()
+                  print(f'ENTRIES={len(names)}')
+                  for name in names[:80]:
+                      info = archive.getinfo(name)
+                      print(f'  {name} ({info.file_size} bytes)')
+                  manifests = [name for name in names if name.lower().endswith('manifest.json')]
+                  print(f'MANIFESTS={manifests}')
+                  for name in manifests:
+                      try:
+                          parsed = json.loads(archive.read(name).decode('utf-8-sig'))
+                          print(f'MANIFEST {name}: {json.dumps(parsed, ensure_ascii=True, sort_keys=True)}')
+                      except Exception as error:
+                          print(f'MANIFEST_ERROR {name}: {error}')
+              print()
+          PY
+          {
+            echo '### Sulfur Cars package diagnostic (read-only)'
+            echo '```text'
+            cat /tmp/content-diagnostic.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::notice title=Content package::$line"
+          done < <(grep -E '^(ASSET|ZIP=|HEAD_HEX=|HEADER_U32_LE=|ASCII_STRINGS=|SIGNATURE_OFFSETS=|ENTRIES=|MANIFESTS=|MANIFEST )' /tmp/content-diagnostic.txt)
+
+      - name: Rebuild the verified Minecraft addon
+        if: needs.request.outputs.task == 'content-repair'
+        run: |
+          set -euo pipefail
+          python3 tools/convert_pvraw_to_mcaddon.py \
+            /tmp/sulfur-cars/sulfur-cars_ff44ec0a.raw \
+            /tmp/sulfur-cars/sulfur-cars_ffe0c865.raw \
+            --output /tmp/sulfur-cars/sulfur-cars_ffe0c865.mcaddon \
+            --report /tmp/sulfur-cars/package-report.json \
+            | tee /tmp/sulfur-cars/package-output.txt
+          unzip -t /tmp/sulfur-cars/sulfur-cars_ffe0c865.mcaddon
+          {
+            echo '### Rebuilt Sulfur Cars mcaddon'
+            echo '```json'
+            cat /tmp/sulfur-cars/package-report.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          python3 - <<'PY'
+          import json
+          report = json.load(open('/tmp/sulfur-cars/package-report.json', encoding='utf-8'))
+          print(f"::notice title=Rebuilt mcaddon::size={report['size']} sha256={report['sha256']} packs={len(report['packs'])}")
+          for pack in report['packs']:
+              print(f"::notice title=Minecraft pack::{pack['kind']} uuid={pack['uuid']} files={pack['files']} sha256={pack['mcpack_sha256']}")
+          PY
+
+      - name: Upload the rebuilt addon to protected storage
+        if: needs.request.outputs.task == 'content-repair'
+        env:
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_URL" || { echo '::error::Missing Supabase URL secret'; exit 1; }
+          test -n "$SUPABASE_SECRET_KEY" || { echo '::error::Missing Supabase server key secret'; exit 1; }
+          python3 tools/upload_storage_object.py \
+            --bucket content-files \
+            --path content-001/sulfur-cars_ffe0c865.mcaddon \
+            --file /tmp/sulfur-cars/sulfur-cars_ffe0c865.mcaddon \
+            --content-type application/zip \
+            | tee /tmp/sulfur-cars/upload-result.json
+          echo '::notice title=Protected content upload::Uploaded content-001/sulfur-cars_ffe0c865.mcaddon; database metadata is updated separately after object verification.'
+
+      - name: Verify the short-lived signed download byte-for-byte
+        if: needs.request.outputs.task == 'content-repair'
+        env:
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          python3 tools/verify_storage_download.py \
+            --bucket content-files \
+            --path content-001/sulfur-cars_ffe0c865.mcaddon \
+            --expected-size 1053329 \
+            --expected-sha256 8e42de5649008804526d414e2c26612502697a265d7d0140a9cd1f52ab196896 \
+            | tee /tmp/sulfur-cars/signed-download-result.json
+          echo '::notice title=Signed content download::Downloaded 1053329 verified bytes through a short-lived Storage URL.'
+
+  # ==========================================================================
+  # 0e) تصريف Kotlin فقط — يتحقق من الواجهة ولا ينشئ أو يسجّل APK
+  # ==========================================================================
+  kotlin-check:
+    needs: request
+    if: needs.request.outputs.task == 'kotlin-check'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0 platform-tools'
+          log-accepted-android-sdk-licenses: false
+
+      - name: Write public Android configuration
+        working-directory: android
+        run: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          echo "ADDONSTATION_SUPABASE_URL=https://stbmescmexzcszyyambq.supabase.co" >> local.properties
+          # The publishable key is sourced from the reviewed android/gradle.properties.
+          # Do not let a stale account-level Actions secret override it.
+
+      - name: Verify redesigned splash resources and behavior
+        run: |
+          python3 tools/check_resources.py
+          python3 tools/check_app_icon.py
+          python3 tools/check_console_link_code.py
+          python3 tools/check_kotlin_health.py
+          python3 tools/check_kotlin_refs.py
+          python3 tools/check_splash_progress.py
+          python3 tools/check_guest_plan_gate.py
+          python3 tools/check_theme_mode.py
+          python3 tools/check_chat_message_header.py
+          python3 tools/check_profile_asset_guard.py
+          python3 tools/check_admin_asset_privacy.py
+          python3 tools/check_auth_state.py
+          python3 tools/check_free_avatar.py
+          python3 tools/check_screen_backgrounds.py
+          python3 tools/check_content_download.py
+          python3 tools/check_jank_guard.py
+          python3 tools/check_bulk_content_import.py
+          python3 tools/check_staff_rewards.py
+
+      - name: Compile debug Kotlin without building an APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          set +e
+          ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace 2>&1 | tee kotlin-check.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            grep -n -E "^e: |error: |What went wrong|> Task .* FAILED|Execution failed|Unresolved reference|Argument type mismatch" kotlin-check.log \
+              | head -70 | while IFS= read -r line; do
+                echo "::error title=Kotlin compile::$line"
+              done
+            exit "$code"
+          fi
 
   # ==========================================================================
   # 1) بناء التطبيق (debug APK)
@@ -109,12 +673,31 @@ jobs:
           chmod +x gradlew
           grep distributionUrl gradle/wrapper/gradle-wrapper.properties
 
-      - name: Write local.properties (مفاتيح Supabase من Secrets إن وُجدت)
+      - name: Write reviewed public Android configuration
         working-directory: android
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-          echo "ADDONSTATION_SUPABASE_URL=${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}" >> local.properties
-          echo "ADDONSTATION_SUPABASE_ANON_KEY=${{ secrets.ADDONSTATION_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}" >> local.properties
+          echo "ADDONSTATION_SUPABASE_URL=https://stbmescmexzcszyyambq.supabase.co" >> local.properties
+          # The publishable key is sourced from the reviewed android/gradle.properties.
+          # Do not let a stale account-level Actions secret override it.
+
+      # إشعارات حقيقية: ملف Firebase يُدمج في التطبيق وقت البناء. لا يوجد في
+      # المودع (وهو ليس سرّاً)، فإن وُضع نصّه في الأسرار كُتب هنا تلقائياً ⇒ يكفي
+      # من الجوال: Settings → Secrets → New secret باسم ADDONSTATION_GOOGLE_SERVICES_JSON.
+      # وإن كان الملف موجوداً في المودع أصلاً فلا حاجة للسرّ إطلاقاً.
+      - name: تجهيز google-services.json (الإشعارات الحقيقية)
+        env:
+          FCM_JSON: ${{ secrets.ADDONSTATION_GOOGLE_SERVICES_JSON }}
+        run: |
+          cd android/app
+          if [ -f google-services.json ]; then
+            echo "✓ google-services.json موجود في المودع ⇒ الإشعارات الفورية (FCM) مفعّلة في هذا البناء."
+          elif [ -n "$FCM_JSON" ]; then
+            printf '%s' "$FCM_JSON" > google-services.json
+            python3 -c "import json,sys; d=json.load(open('google-services.json')); print('✓ كُتب من الأسرار · project_id =', d['project_info']['project_id'], '· الحزم:', [c['client_info']['android_client_info']['package_name'] for c in d['client']])"
+          else
+            echo "::warning title=الإشعارات لن تعمل في هذه النسخة::لا يوجد google-services.json ولا سرّ ADDONSTATION_GOOGLE_SERVICES_JSON ⇒ يُبنى التطبيق بلا Firebase، ولن تستقبل النسخة أي إشعار (ولا حتى التجريبي). انظر docs/15-PUSH-LIVE-AR.md"
+          fi
 
       - name: فحص الموارد res/ قبل البناء
         run: |
@@ -122,6 +705,17 @@ jobs:
             echo "::error::مشاكل في مجلد res/ — أصلحها أولاً (التفاصيل في السجل أعلاه)"
             exit 1
           }
+          python3 tools/check_app_icon.py || {
+            echo "::error::أيقونة الهاتف الجديدة ناقصة أو عادت أيقونة قديمة"
+            exit 1
+          }
+          python3 tools/check_console_link_code.py || {
+            echo "::error::عاد خلل رمز ربط PlayStation أو ترقية مخططه"
+            exit 1
+          }
+
+      - name: حارس تنزيل ملفات الإضافات قبل البناء
+        run: python3 tools/check_content_download.py
 
       - name: فحص جودة التجربة قبل البناء
         run: |
@@ -129,6 +723,41 @@ jobs:
             echo "::error::مشاكل جودة تجربة — نصوص ثابتة أو حجب لوحة المفاتيح (التفاصيل أعلاه)"
             exit 1
           }
+
+      - name: حارس الأداء قبل البناء (لا عودة للتقطيع/الثِقَل)
+        run: |
+          python3 tools/check_jank_guard.py || {
+            echo "::error::عاد أحد أسباب التقطيع/الثِقَل (توليف فرعي · قراءة الجلسة من Keystore · بحث خطّي · عمود متمرّر · بداية حاجبة)"
+            exit 1
+          }
+          python3 tools/check_android_smoothness.py || {
+            echo "::error::فشل حارس السلاسة الشامل (Lifecycle · متجر كسول · RAM · Baseline Profile · بحث مؤجّل)"
+            exit 1
+          }
+
+      - name: حارس حالة الدخول قبل البناء (لا عودة لـ«صفحة التسجيل مرة أخرى»)
+        run: |
+          python3 tools/check_auth_state.py || {
+            echo "::error::عاد أحد أسباب «التطبيق لا يعرف أني سجّلت» (طرد قسري إلى الدخول · تأكيد بريد بلا مخرج · جلسة ميتة تُترك)"
+            exit 1
+          }
+
+      - name: حارس وزن الصور قبل البناء (لا عودة للأصول الثقيلة والتقطيع)
+        run: python3 tools/check_media_optimize.py
+
+      - name: حارس الإشعارات الحقيقية قبل البناء (لا عودة لإشعارات تجريبية)
+        run: python3 tools/check_push_live.py
+
+      - name: حارس بيانات البروفايل في الإعدادات والشات
+        run: |
+          python3 tools/check_admin_asset_privacy.py
+          python3 tools/check_chat_message_header.py
+          python3 tools/check_profile_asset_guard.py
+          python3 tools/check_free_avatar.py
+          python3 tools/check_splash_progress.py
+          python3 tools/check_guest_plan_gate.py
+          python3 tools/check_theme_mode.py
+          python3 tools/check_staff_rewards.py
 
       - name: Build debug APK
         working-directory: android
@@ -145,6 +774,24 @@ jobs:
             exit "$code"
           fi
 
+      # Artifact storage can temporarily reach its GitHub quota. Keep the APK
+      # deliverable available by recording the successful build directly on the
+      # current session branch before optional artifact uploads run.
+      - name: Record freshly built APK in the branch
+        if: success()
+        run: |
+          set -euo pipefail
+          APK=$(find android/app/build/outputs/apk/debug -maxdepth 1 -name "*.apk" | head -1)
+          [ -n "$APK" ] || { echo "::error::Built APK was not found"; exit 1; }
+          cp "$APK" apk-debug.apk
+          sha256sum apk-debug.apk
+          ls -lh apk-debug.apk
+          git config user.name "AddonStation CI"
+          git config user.email "ci@users.noreply.github.com"
+          git add -f apk-debug.apk
+          git commit -m "APK: debug build $(date -u +%Y-%m-%dT%H:%MZ) ($(du -h apk-debug.apk | cut -f1))"
+          git push origin HEAD:${{ github.ref_name }}
+
       - name: نشر قائمة الأخطاء كتعليق على العمولة
         if: failure()
         env:
@@ -153,11 +800,14 @@ jobs:
           LOG=android/build.log
           [ -f "$LOG" ] || exit 0
           {
-            echo "### ❌ فشل بناء APK — قائمة الأخطاء"
+            echo "### ❌ فشل بناء APK — تفاصيل الخطأ"
             echo ""
             echo '```'
-            grep -n -E "^e: |^w: .*(deprecat|warning)|error: |What went wrong|> Task .* FAILED|Execution failed|Could not (resolve|find|determine)|Unresolved reference" "$LOG" \
-              | sed 's|file:///home/runner/work/ps/ps/||' | head -150
+            grep -n -A24 -B12 -Ei "mergeDebugResources FAILED|Android resource linking failed|AAPT2?|What went wrong|Execution failed" "$LOG" \
+              | sed 's|file:///home/runner/work/ps/ps/||' | head -180
+            echo '--- أبرز الأخطاء ---'
+            grep -n -E "^e: |^w: .*(deprecat|warning)|error: |ERROR:|> Task .* FAILED|Execution failed|Could not (resolve|find|determine)|Unresolved reference" "$LOG" \
+              | sed 's|file:///home/runner/work/ps/ps/||' | head -100
             echo '```'
           } > /tmp/body.md
           gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@/tmp/body.md >/dev/null \
@@ -165,6 +815,7 @@ jobs:
 
       - name: Upload build log
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: gradle-build-log
@@ -173,6 +824,7 @@ jobs:
 
       - name: Upload APK
         if: success()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: addonstation-debug-apk
@@ -266,7 +918,74 @@ jobs:
             && echo "✓ نُشر السجل كتعليق" || echo "تعذّر نشر التعليق"
 
   # ==========================================================================
-  # 2) رفع أصول site-assets الجديدة (492 ملفاً · 21 قسماً) — يدوياً فقط
+  # 2) رفع حزمتَي صور البروفايل المثبّتتين — بلا APK وبلا تعديل قاعدة البيانات
+  # ==========================================================================
+  profile-packs-upload:
+    needs: request
+    if: needs.request.outputs.task == 'profile-packs-upload'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify the pinned profile-pack files and generated SQL
+        run: |
+          set -euo pipefail
+          python3 tools/build_all_in_one_sql.py
+          git diff --exit-code -- supabase/00_ALL_IN_ONE.sql
+          python3 tools/check_profile_packs.py
+          python3 tools/check_free_avatar.py
+
+      - name: Check protected Storage credentials
+        env:
+          S_URL: https://stbmescmexzcszyyambq.supabase.co
+          S_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$S_URL" ] || [ -z "$S_KEY" ]; then
+            echo "::error::ADDONSTATION_SUPABASE_URL and ADDONSTATION_SUPABASE_SECRET_KEY are required"
+            exit 1
+          fi
+          case "$S_URL" in https://*.supabase.co) ;; *) echo "::error::Unexpected Supabase URL"; exit 1 ;; esac
+          case "$S_KEY" in
+            sb_secret_*|eyJ*) ;;
+            *) echo "::error::A secret/service-role key is required"; exit 1 ;;
+          esac
+          echo "Protected Storage credentials are configured (secret value not printed)."
+
+      - name: Upload exactly the 35 pinned pack images
+        env:
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          python3 tools/upload_seed_assets.py \
+            --source supabase/profile-pack-files \
+            --bucket site-assets
+
+      - name: Verify every object through the public Storage endpoint
+        env:
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
+        run: |
+          set -euo pipefail
+          python3 tools/verify_profile_pack_storage.py --workers 8 | tee /tmp/profile-pack-verification.txt
+          {
+            echo '### Profile packs uploaded and verified'
+            echo ''
+            echo '- Profiles: **24** exact images (Epic after migration 46)'
+            echo '- Profile 2: **11** exact images (Legendary after migration 46)'
+            echo '- onefree.png was not uploaded, replaced, or deleted by this task'
+            echo ''
+            echo '```text'
+            tail -5 /tmp/profile-pack-verification.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ==========================================================================
+  # 3) رفع أصول site-assets الجديدة (492 ملفاً · 21 قسماً) — يدوياً فقط
   # ==========================================================================
   upload-assets:
     needs: request
@@ -281,7 +1000,7 @@ jobs:
 
       - name: التحقق من السرّين
         env:
-          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          S_URL: https://stbmescmexzcszyyambq.supabase.co
           S_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           if [ -z "$S_URL" ] || [ -z "$S_KEY" ]; then
@@ -310,7 +1029,7 @@ jobs:
 
       - name: رفع الأصول
         env:
-          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           set -o pipefail
@@ -331,7 +1050,7 @@ jobs:
       - name: تسجيل الأصول الجديدة في قاعدة البيانات (بلا لصق SQL)
         if: needs.request.outputs.task == 'assets-upload' || needs.request.outputs.task == 'assets-seed'
         env:
-          SUPABASE_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_URL: https://stbmescmexzcszyyambq.supabase.co
           SUPABASE_SECRET_KEY: ${{ secrets.ADDONSTATION_SUPABASE_SECRET_KEY || secrets.SUPABASE_SECRET_KEY }}
         run: |
           set -o pipefail
@@ -340,7 +1059,7 @@ jobs:
       - name: تحقق بعد الرفع (رابط عام لثلاثة ملفات جديدة)
         if: needs.request.outputs.task == 'assets-upload' || needs.request.outputs.task == 'assets-seed'
         env:
-          S_URL: ${{ secrets.ADDONSTATION_SUPABASE_URL || secrets.SUPABASE_URL }}
+          S_URL: https://stbmescmexzcszyyambq.supabase.co
         run: |
           set -e
           python3 - <<'PY' > /tmp/sample_paths.txt

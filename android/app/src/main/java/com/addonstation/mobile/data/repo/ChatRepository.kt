@@ -9,6 +9,7 @@ import com.addonstation.mobile.data.model.ChatChannel
 import com.addonstation.mobile.data.model.ChatMessage
 import com.addonstation.mobile.data.model.ChatReport
 import com.addonstation.mobile.data.model.ModeratorScope
+import com.addonstation.mobile.data.model.MutedUser
 import com.addonstation.mobile.data.model.MyChatStatus
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.SiteAsset
@@ -38,6 +39,8 @@ class ChatRepository(
         const val MAX_TEXT = 500
         const val MAX_IMAGE_BYTES = 4L * 1024 * 1024
         const val MAX_MEDIA_BYTES = 100L * 1024 * 1024
+        /** Bump only when the community-rule wording changes; keep SQL my_chat_status aligned. */
+        const val COMMUNITY_RULES_VERSION = "v1"
         val ALLOWED_IMAGE_MIME = setOf("image/jpeg", "image/jpg", "image/png", "image/webp")
         val EMOJIS = listOf(
             "😀", "😃", "😄", "😍", "😂", "🥰", "😎", "🤣", "😅", "😇", "😉", "🤔",
@@ -141,7 +144,7 @@ class ChatRepository(
         array?.mapNotNull { it.asString() } ?: emptyList()
     }.getOrElse { emptyList() }
 
-    suspend fun acceptRules(version: String = "v1"): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun acceptRules(version: String = COMMUNITY_RULES_VERSION): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             supabase.rpc("chat_accept_rules", mapOf("p_version" to JsonPrimitive(version)))
                 .asOutcome().requireOk()
@@ -167,7 +170,7 @@ class ChatRepository(
                 role = obj["role"]?.asString() ?: "user",
                 plan = obj["plan"]?.asString() ?: "free",
                 moderatesAll = obj["moderates_all"]?.asBool()
-                    ?: (obj["role"]?.asString() == "admin"),
+                    ?: (obj["role"]?.asString() in setOf("admin", "head_moderator")),
                 moderatedChannels = (obj["moderated_channels"] as? JsonArray)
                     ?.mapNotNull { it.asString() } ?: emptyList(),
             )
@@ -179,7 +182,7 @@ class ChatRepository(
     /**
      * هل يملك هذا المستخدم حق **الإشراف** على هذه الغرفة؟
      *
-     * • الأدمن: كل الغرف (بلا جدول ولا إعداد).
+     * • الأدمن والمسؤول العام: كل الغرف (بلا جدول ولا إعداد).
      * • المشرف: الغرف الممنوحة له فقط — أو كلها إن مُنح `all_rooms`.
      * • أي دور آخر: لا شيء.
      *
@@ -188,7 +191,7 @@ class ChatRepository(
      */
     fun canModerateRoom(status: MyChatStatus?, channelId: String): Boolean {
         if (status == null || !status.signedIn || channelId.isBlank()) return false
-        if (status.role == "admin" || status.moderatesAll) return true
+        if (status.role in setOf("admin", "head_moderator") || status.moderatesAll) return true
         return status.role == "moderator" && status.moderatedChannels.contains(channelId)
     }
 
@@ -621,6 +624,19 @@ class ChatRepository(
         )
     }.getOrElse { emptyList() }
 
+    /** Target of a user report, or the author of a message report. */
+    suspend fun reportedUserId(report: ChatReport): String? {
+        report.targetUserId?.takeIf(String::isNotBlank)?.let { return it }
+        val messageId = report.messageId ?: return null
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                supabase.decodeList<Map<String, kotlinx.serialization.json.JsonElement>>(
+                    supabase.select("chat_messages", "select=user_id&id=eq.$messageId&limit=1")
+                ).firstOrNull()?.get("user_id")?.asString()
+            }.getOrNull()
+        }
+    }
+
     suspend fun closeReport(reportId: Long, action: String = "close"): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -686,6 +702,27 @@ class ChatRepository(
         }
     }
 
+    /**
+     * الإبلاغ عن **عضو** (لا رسالة) من ملفّه الشخصي — بند السلامة في وثيقة
+     * شاشات الملف (37_profile_reports.sql). السبب واحد من أربعة: spam · insult ·
+     * inappropriate · other، والخادم يمنع الإبلاغ عن النفس ويردّ `reported`
+     * أو `already_reported` (مرة كل ٢٤ ساعة لنفس العضو).
+     */
+    suspend fun reportUser(userId: String, reason: String, note: String? = null): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val outcome = supabase.rpc(
+                    "chat_report_user",
+                    mapOf(
+                        "p_user_id" to JsonPrimitive(userId),
+                        "p_reason" to JsonPrimitive(reason),
+                        "p_note" to note?.let { JsonPrimitive(it) },
+                    ),
+                ).asOutcome().requireOk()
+                Unit
+            }
+        }
+
     /** معرّفات المحظورين عندي — تُقرأ عند فتح الشات فتُفلتَر الرسائل فوراً أيضًا في الواجهة. */
     suspend fun blockedIds(): Set<String> = withContext(Dispatchers.IO) {
         runCatching {
@@ -693,6 +730,68 @@ class ChatRepository(
                 supabase.select("user_blocks", "select=blocked_id&order=created_at.desc"),
             ).mapNotNull { it.blockedId }.filter { it.isNotBlank() }.toSet()
         }.getOrElse { emptySet() }
+    }
+
+    // ── كتم الأعضاء (38_user_mute.sql) — زرّ واحد: لا رسائل ولا إشعارات ──────
+
+    /**
+     * كتم عضو: تُخفى رسائله **ولا يصل منه أي إشعار** (لا جرس ولا دفع).
+     * ميزة اشتراك Legendary — والخادم يردّ `legendary_required` لغيره، والشاشة
+     * تفتح صفحة الاشتراك قبل أن يُنادى الخادم أصلاً.
+     */
+    suspend fun muteMember(userId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc("user_mute", mapOf("p_user_id" to JsonPrimitive(userId)))
+                .asOutcome().requireOk()
+            Unit
+        }
+    }
+
+    suspend fun unmuteMember(userId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc("user_unmute", mapOf("p_user_id" to JsonPrimitive(userId)))
+                .asOutcome().requireOk()
+            Unit
+        }
+    }
+
+    /** من كتمتُهم — تُحفظ نسخة محلية (UserPrefs) فيُخفى كلامهم فوراً في الشات. */
+    suspend fun mutedMemberIds(): Set<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.decodeList<MutedUser>(
+                supabase.rpc("my_muted_users", emptyMap(), signedOnly = true) ?: JsonArray(emptyList()),
+            ).mapNotNull { it.mutedId }.filter { it.isNotBlank() }.toSet()
+        }.getOrElse { emptySet() }
+    }
+
+    /** هل كتمتُ هذا العضو؟ (بطاقة السلامة: «كتم» أم «إلغاء الكتم»). */
+    suspend fun iMutedMember(userId: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc("i_muted_user", mapOf("p_user_id" to JsonPrimitive(userId))).asBool() ?: false
+        }.getOrElse { false }
+    }
+
+    /** هل حظرتُ هذا العضو؟ (شاشة ملفه تُظهر «إلغاء الحظر» بدل «حظر»). */
+    suspend fun iBlockedUser(userId: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            supabase.rpc("i_blocked_user", mapOf("p_user_id" to JsonPrimitive(userId))).asBool() ?: false
+        }.getOrElse { false }
+    }
+
+    /**
+     * هل بيني وبينه حظر **بأي اتجاه**؟ (is_blocked_pair من 33_user_block.sql)
+     * الحظر متقابل في الشات، فإن حظرني أحدهم كان الأليق ألّا أرى أزرار
+     * «مراسلة/صداقة» في ملفه — بل حالة واحدة معطَّلة كما تنصّ الوثيقة §4.
+     */
+    suspend fun blockedPair(otherUserId: String): Boolean = withContext(Dispatchers.IO) {
+        val me = supabase.session()?.userId
+        if (me.isNullOrBlank()) return@withContext false
+        runCatching {
+            supabase.rpc(
+                "is_blocked_pair",
+                mapOf("p_a" to JsonPrimitive(me), "p_b" to JsonPrimitive(otherUserId)),
+            ).asBool() ?: false
+        }.getOrElse { false }
     }
 
     suspend fun banUser(userId: String, reason: String? = null): Result<Unit> = withContext(Dispatchers.IO) {

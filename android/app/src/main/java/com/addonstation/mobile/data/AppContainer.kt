@@ -7,18 +7,28 @@ import com.addonstation.mobile.data.repo.AuthRepository
 import com.addonstation.mobile.data.repo.AssetsRepository
 import com.addonstation.mobile.data.repo.ChatRepository
 import com.addonstation.mobile.data.repo.ContentRepository
+import com.addonstation.mobile.data.repo.ConsoleLinkRepository
 import com.addonstation.mobile.data.repo.CreatorRepository
 import com.addonstation.mobile.data.repo.NotificationsRepository
 import com.addonstation.mobile.data.repo.PlansRepository
 import com.addonstation.mobile.data.repo.ProfileRepository
 import com.addonstation.mobile.data.repo.PushRepository
-import kotlinx.coroutines.runBlocking
+import com.addonstation.mobile.util.DevicePerformance
+import com.addonstation.mobile.util.DevicePerformanceProfile
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * حاوية التطبيق (Service Locator بسيط): تحمل عميل Supabase وكل المستودعات.
  * تُنشأ مرة واحدة في AddonStationApp.
  */
-class AppContainer(context: Context) {
+class AppContainer(
+    context: Context,
+    val performanceProfile: DevicePerformanceProfile = DevicePerformance.profile(context),
+) {
 
     val appContext: Context = context.applicationContext
     val prefs: UserPrefs = UserPrefs(appContext)
@@ -26,15 +36,23 @@ class AppContainer(context: Context) {
     val realtime = RealtimeHolder()
 
     @Volatile
-    private var config: SupabaseConfig? = null
+    private var config: SupabaseConfig? = SupabaseConfig.fromBuild.takeIf { it.isConfigured }
 
-    val supabase: SupabaseClient = SupabaseClient({ config }, sessionStore)
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val configLoaded = CompletableDeferred<Unit>()
+
+    val supabase: SupabaseClient = SupabaseClient(
+        configProvider = { config },
+        sessionStore = sessionStore,
+        requestedMaxRequestsPerHost = performanceProfile.apiMaxRequestsPerHost,
+    )
     val realtimeClient: SupabaseRealtime = SupabaseRealtime(supabase)
 
     val state: AppState = AppState(this)
 
     val auth = AuthRepository(supabase, sessionStore)
     val profile = ProfileRepository(supabase, state)
+    val consoleLinks = ConsoleLinkRepository(supabase)
     val content = ContentRepository(supabase, state)
     val plans = PlansRepository(supabase, state)
     val ac = AcRepository(supabase, state)
@@ -43,33 +61,69 @@ class AppContainer(context: Context) {
 
     /** الإشعارات الفورية: تسجيل الجهاز · التفضيلات · إشعار تجريبي · نبضة الحضور. */
     val push = PushRepository(supabase)
-    val creators = CreatorRepository(supabase)
+    val creators = CreatorRepository(supabase, state)
     val admin = AdminRepository(supabase)
     val assets = AssetsRepository(supabase, state)
 
     init {
-        config = SupabaseConfig.fromBuild.takeIf { it.isConfigured }
-            ?: runBlocking {
-                val (url, key) = prefs.readSupabase()
-                SupabaseConfig(url, key).takeIf { it.isConfigured }
+        if (config != null) {
+            configLoaded.complete(Unit)
+        } else {
+            // بناء Application لا ينتظر DataStore. AppRoot ينتظر هذه الإشارة
+            // داخل coroutine الإقلاع، بينما يبقى أول إطار حراً للرسم.
+            applicationScope.launch {
+                try {
+                    val (url, key) = prefs.readSupabase()
+                    config = SupabaseConfig(url, key).takeIf { it.isConfigured }
+                } catch (_: Throwable) {
+                    // تلف تفضيل محلي لا يمنع شاشة الإعداد من الظهور.
+                    config = null
+                } finally {
+                    configLoaded.complete(Unit)
+                }
             }
+        }
+    }
+
+    /** انتظر تحميل إعداد أول تشغيل من القرص، إن لم تكن إعدادات البناء جاهزة. */
+    suspend fun awaitConfigLoaded() {
+        configLoaded.await()
     }
 
     val isConfigured: Boolean get() = config?.isConfigured == true
 
     fun saveConfig(url: String, anonKey: String) {
-        runBlocking { prefs.setSupabase(url, anonKey) }
-        config = SupabaseConfig(url.trim().trimEnd('/'), anonKey.trim())
+        val normalized = SupabaseConfig(url.trim().trimEnd('/'), anonKey.trim())
+        config = normalized
+        // تحديث الذاكرة فوري كي تنتقل الواجهة بلا تجمّد؛ الحفظ تسلسلي في الخلفية.
+        applicationScope.launch {
+            try {
+                prefs.setSupabase(normalized.url, normalized.anonKey)
+            } catch (_: Throwable) {
+                // تبقى الإعدادات الحالية صالحة في الذاكرة؛ يمكن إعادة الحفظ لاحقاً.
+            }
+        }
     }
 
     fun currentConfig(): SupabaseConfig? = config
 
-    /** رابط عام لملف داخل مخزن site-assets (الصور الرمزية والأغلفة والأدوات والملصقات). */
-    fun siteAssetUrl(path: String?): String? {
+    /**
+     * رابط أصل واجهة. الأصول العادية من site-assets العام؛ أما المسار المحجوز
+     * admin-private/ فلا يُرجع إلا رابطاً موقّعاً سبق أن حصل عليه حساب admin.
+     */
+    fun siteAssetUrl(
+        path: String?,
+        privateAssetUrls: Map<String, String> = state.privateAssetUrls.value,
+    ): String? {
         if (path.isNullOrBlank()) return null
+        val clean = path.trim().trimStart('/')
+        if (!state.isAdmin && state.isAdminOnlyAssetValue(clean)) return null
         if (path.startsWith("http://") || path.startsWith("https://")) return path
+        if (isPrivateAdminAssetPath(clean)) {
+            return if (state.isAdmin) privateAssetUrls[clean] else null
+        }
         val cfg = config ?: return null
-        return cfg.publicUrl("site-assets", path)
+        return cfg.publicUrl("site-assets", clean)
     }
 }
 

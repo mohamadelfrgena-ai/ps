@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="edit_profile_unsaved">Alterações não salvas</string>
+    <string name="chat_admin_only">Somente admin</string>
+    <string name="comm_room_cash">Cash</string>
+    <string name="comm_rules_banner_plain">Regras da comunidade · Violações podem gerar silêncio ou banimento</string>
+</resources>

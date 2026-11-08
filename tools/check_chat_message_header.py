@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""فحص ترويسة رسالة الشات (طلب المالك): صورة · اسم · لقب تحته · أداة بجانبهما.
+"""فحص ترويسة الرسائل (المجموعة الواردة فقط) ومحاذاة الفقاعة وأداة الشات.
 
 الترتيب المطلوب (اختاره المالك):
     • الصورة (40dp) جنبها الاسم كما هو.
@@ -25,8 +25,18 @@ CHAT = os.path.join(ROOT, "android", "app", "src", "main", "java", "com",
 
 problems = []
 chat = io.open(CHAT, encoding="utf-8").read() if os.path.exists(CHAT) else ""
+view_model_path = os.path.join(ROOT, "android", "app", "src", "main", "java", "com",
+                               "addonstation", "mobile", "ui", "chat", "ChatViewModel.kt")
+profile_repo_path = os.path.join(ROOT, "android", "app", "src", "main", "java", "com",
+                                 "addonstation", "mobile", "data", "repo", "ProfileRepository.kt")
+view_model = io.open(view_model_path, encoding="utf-8").read() if os.path.exists(view_model_path) else ""
+profile_repo = io.open(profile_repo_path, encoding="utf-8").read() if os.path.exists(profile_repo_path) else ""
 if not chat:
     problems.append("ChatScreen.kt مفقود")
+if not view_model:
+    problems.append("ChatViewModel.kt مفقود")
+if not profile_repo:
+    problems.append("ProfileRepository.kt مفقود")
 
 
 def branch(text: str, marker: str) -> str:
@@ -48,19 +58,45 @@ def branch(text: str, marker: str) -> str:
     return text[start:]
 
 
-header = branch(chat, "if (!grouped) {")
+header = branch(chat, "if (showAuthorHeader) {")
 name_col = branch(header, "Column(modifier = Modifier.weight(1f, fill = false))")
 
 AVATAR_DP, ITEM_DP, OLD_ITEM_DP = 40, 32, 16
 
 if not header:
-    problems.append("لا كتلة ترويسة (!grouped) في ChatScreen.kt")
+    problems.append("لا كتلة ترويسة الرسائل (if showAuthorHeader) في ChatScreen.kt")
+
+# لا نكرر اسم المالك فوق رسائله؛ رؤوس الأعضاء تظهر مرة واحدة عند بداية المجموعة الواردة.
+if "val showAuthorHeader = !isMine && !grouped" not in chat:
+    problems.append("ترويسة المؤلف لا تقتصر على بداية مجموعة الرسائل الواردة")
+if "currentProfile = profile" not in chat or \
+        "currentProfile?.takeIf { isMine && it.id == myId }" not in chat:
+    problems.append("رسالة المالك لا تستخدم ملف الجلسة كبديل إذا غاب المؤلف من الخريطة")
+
+# Metadata is a single required path: the safe view supplies name/rank/item, and
+# a transient failure must be retried instead of becoming an empty map forever.
+metadata_retry_ok = all(token in view_model for token in (
+    "private suspend fun loadAuthorProfiles(",
+    "repeat(3)",
+    "container.profile.loadProfiles(",
+    "val a = async { loadAuthorProfiles(userIds) }",
+))
+profile_source_ok = all(token in profile_repo for token in (
+    '"visible_profiles" to null',
+    'selectProfiles("select=*&id=in.($filter)")',
+    "supabase.decodeList<Profile>",
+))
+if not metadata_retry_ok:
+    problems.append("تحميل اسم/رتبة/أداة كتّاب الشات لا يعيد المحاولة عبر loadAuthorProfiles")
+if not profile_source_ok:
+    problems.append("بيانات كتّاب الشات لا تُفك كاملة من visible_profiles الآمن")
 
 # 1) الاسم واللقب في عمود واحد: الاسم فوق، واللقب تحته
 if not name_col:
     problems.append("الاسم واللقب ليسا في عمود واحد (اللقب يجب أن يكون تحت الاسم)")
 else:
-    if "AppText.chatName" not in name_col:
+    # الخط: وثيقة التصميم تعتمد Spec.msgAuthor (14sp/800) — والقديم AppText.chatName
+    if "AppText.chatName" not in name_col and "Spec.msgAuthor" not in name_col:
         problems.append("اسم صاحب الرسالة ليس داخل عمود الترويسة")
     if "RankBadge(" not in name_col:
         problems.append("اللقب (RankBadge) ليس تحت الاسم داخل العمود نفسه")
@@ -94,8 +130,12 @@ else:
 
 # 3) الأداة بجانبهما (خارج العمود) وبمقاسها الجديد
 if header:
-    if "equippedItemUrl" not in header:
-        problems.append("الأداة المجهّزة غير معروضة في الترويسة")
+    if "equippedItemUrlResolver" not in header:
+        problems.append("الأداة المجهّزة لا تستخدم محلّل رابطها في الترويسة")
+    if "🎖" in header or "🎖" in sheets:
+        problems.append("عاد إيموجي الميدالية بديلاً مضللاً عن صورة الأداة")
+    if "itemUrlIndex.collectAsStateWithLifecycle()" not in chat or "container.assets.all()" not in chat:
+        problems.append("أداة الشات لا تعيد التركيب/تحميل الأصول عند غياب رابط الصورة")
     # الأداة تُقاس بـ Modifier.size(32.dp) والصورة بمعامل size = 40.dp
     if not re.search(r"size\(\s*%d\.dp\s*\)" % ITEM_DP, header):
         problems.append("حجم الأداة ليس %ddp" % ITEM_DP)
@@ -119,7 +159,7 @@ print("-" * 60)
 rows = [
     ("الصورة بمقاسها 40dp", "size = 40.dp" in (header or "")),
     ("الاسم فوق · اللقب تحته (عمود واحد)",
-     bool(name_col) and "AppText.chatName" in name_col and "RankBadge(" in name_col),
+     bool(name_col) and "Spec.msgAuthor" in name_col and "RankBadge(" in name_col),
     ("الأداة بجانبهما لا داخلهما",
      bool(name_col) and "equippedItemUrl" not in name_col and "equippedItemUrl" in (header or "")),
     ("حجم الأداة 32dp (كان 16dp)", bool(re.search(r"size\(\s*32\.dp\s*\)", header or ""))),
@@ -128,6 +168,20 @@ rows = [
     ("المجّاني بلا لقب (لا Free 🍃)",
      bool(gate_text) and '"free"' not in gate_text and "epic" in gate_text and "legendary" in gate_text),
     ("اللقب محكوم بالبوابة في الترويسة", "hasRankTitle(" in (header or "")),
+    ("ترويسة المؤلف تظهر مرة عند بداية مجموعة واردة فقط", "val showAuthorHeader = !isMine && !grouped" in chat
+     and "if (showAuthorHeader)" in chat),
+    ("بيانات المرسل تستعين بملفه الحالي عند الحاجة",
+     "currentProfile = profile" in chat
+     and "currentProfile?.takeIf { isMine && it.id == myId }" in chat),
+    ("اسم/رتبة/أداة الكاتب تُحمّل مع إعادة محاولة", metadata_retry_ok),
+    ("مصدر بيانات الكاتب visible_profiles الكامل والآمن", profile_source_ok),
+    ("خلفية الأداة شفافة بلا إطار مضاف", "backgroundColor = Color.Transparent" in (header or "")),
+    ("لا ميدالية بديلة؛ صورة الأداة أو اسمها", "🎖" not in (header or "") and "🎖" not in sheets),
+    ("فهرس الأداة تفاعلي ويُعاد تحميله عند الحاجة",
+     "itemUrlIndex.collectAsStateWithLifecycle()" in chat and "container.assets.all()" in chat),
+    ("عمود الرسالة يعكس جهة رسائلي", "horizontalAlignment = if (isMine) Alignment.End else Alignment.Start" in chat),
+    ("فقاعة النص الصادر عند نهاية السطر", "horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End)" in chat),
+    ("كل أنواع الوسائط بمحاذاة جهة المرسل", chat.count("horizontalAlignment = if (isMine) Alignment.End else Alignment.Start") >= 5),
 ]
 for name, ok in rows:
     print(f"{name:<40} | {'✅' if ok else '❌'}")
@@ -138,4 +192,4 @@ if problems:
         print("✗", p)
     print(f"\n✗ عدد المشاكل: {len(problems)}")
     sys.exit(1)
-print("🟢 ترويسة الشات: صورة 40 · اسم · لقبه تحته (إن كان مشتركاً أو صاحب رتبة) · وأداة 32 بجانبهما — والمجّاني بلا سطر تحت اسمه.")
+print("🟢 ترويسة الشات: صورة 40 · اسم · لقبه تحته · وصورة الأداة 32 (أو اسمها عند تعذرها) بلا ميدالية مضللة.")

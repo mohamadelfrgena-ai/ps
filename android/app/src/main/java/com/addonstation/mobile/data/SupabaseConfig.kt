@@ -21,22 +21,14 @@ data class SupabaseConfig(val url: String, val anonKey: String) {
         "${storageUrl}/object/public/$bucket/${encodeStoragePath(normalizeStoragePath(path))}"
 
     /**
-     * بعض مسارات الأصول في قاعدة البيانات مكرّرة المجلد — مثل
-     * profiles/profiles/onefree.png ( سكربت التعبئة أضاف المجلد مرّتين).
-     * الرابط الناتج يفشل 404 ⇒ تظل الخانة فارغة حتى تنتهي مهلة الطلب، وهو سبب
-     * ظهور صور البروفايل والبانرات والأدوات ببطء شديد.
-     * إن تكرّر المجلد الأول نُسقط واحداً منه؛ وما عدا ذلك لا يُمسّ.
+     * يحافظ على مسار قاعدة البيانات كما هو بعد تنظيف الشرطة الأولى فقط.
+     *
+     * تكرار المجلد قد يكون جزءاً حقيقياً من اسم الكائن، لا خطأً ينبغي حذفه:
+     * حزم `Profiles` و`Default` مرفوعة فعلياً تحت
+     * `profiles/profiles/...`. إسقاط أحد الجزأين كان يبني رابطاً لكائن آخر
+     * غير موجود، فتظهر معاينات تعديل الملف الشخصي فارغة.
      */
-    fun normalizeStoragePath(path: String): String {
-        val clean = path.trim().trimStart('/')
-        val parts = clean.split('/')
-        val folders = setOf("profiles", "banners", "items", "stickers", "site-assets")
-        return if (parts.size >= 3 && parts[0] == parts[1] && parts[0] in folders) {
-            parts.drop(1).joinToString("/")
-        } else {
-            clean
-        }
-    }
+    fun normalizeStoragePath(path: String): String = path.trim().trimStart('/')
 
     /** رابط موقّع قصير الأجل يُبنى في SupabaseClient (يحتاج توكن المستخدم). */
     fun signedUrl(bucket: String, path: String): String =

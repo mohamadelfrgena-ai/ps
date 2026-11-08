@@ -171,10 +171,10 @@ Email Hook**» وأكتبه لك.
 رفعنا الشعار إلى مخزنك العام:
 
 ```
-https://jqjmkssgjdsfdojkuqzq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png
+https://stbmescmexzcszyyambq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png
 ```
 
-(مُرفَع فعلاً — معرّف مشروعك `jqjmkssgjdsfdojkuqzq`).
+(مُرفَع فعلاً — معرّف مشروعك `stbmescmexzcszyyambq`).
 
 الملف الأصلي في المستودع: `brand/addonstation-logo.png` (٢٥٦×٢٥٦ بشفافية)،
 وإعادة رفعه تتم بـ:
@@ -195,7 +195,7 @@ python3 tools/upload_brand.py --dir ./brand \
 ```html
 <div dir="rtl" style="background:#0B0F14;padding:24px;font-family:Tahoma,Arial,sans-serif">
   <div style="max-width:480px;margin:auto;background:#131A24;border:1px solid #263240;border-radius:16px;padding:24px;text-align:center">
-    <img src="https://jqjmkssgjdsfdojkuqzq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png"
+    <img src="https://stbmescmexzcszyyambq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png"
          alt="AddonStation" width="72" height="72"
          style="display:block;margin:0 auto 12px;border-radius:16px" />
     <h1 style="margin:0 0 6px;font-size:20px;color:#E8EEF5">AddonStation</h1>
@@ -225,7 +225,7 @@ python3 tools/upload_brand.py --dir ./brand \
 ```html
 <div dir="rtl" style="background:#0B0F14;padding:24px;font-family:Tahoma,Arial,sans-serif">
   <div style="max-width:480px;margin:auto;background:#131A24;border:1px solid #263240;border-radius:16px;padding:24px;text-align:center">
-    <img src="https://jqjmkssgjdsfdojkuqzq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png"
+    <img src="https://stbmescmexzcszyyambq.supabase.co/storage/v1/object/public/site-assets/brand/addonstation-logo.png"
          alt="AddonStation" width="72" height="72"
          style="display:block;margin:0 auto 12px;border-radius:16px" />
     <h1 style="margin:0 0 6px;font-size:20px;color:#E8EEF5">مرحباً بك في AddonStation 🎮</h1>

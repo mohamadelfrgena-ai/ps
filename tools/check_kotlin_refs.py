@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 فحص مراجع Kotlin داخل تطبيق أندرويد بدون مترجم (Hekto-checker):
-  1) كل R.string.<key> المستخدمة موجودة في res/values/strings.xml
+    1) كل R.string/R.plurals المستخدمة موجودة في ملفات res/values/strings*.xml
   2) عدد وسائط stringResource يطابق عدد %n$s في النص
   3) أيقونات Material المستخدمة لها import صحيح
   4) كل container.<repo>.<member> المستخدمة في الشاشات معرّفة في المستودعات
@@ -19,7 +19,7 @@ import sys
 ROOT = sys.argv[1] if len(sys.argv) > 1 else "."
 SRC = os.path.join(ROOT, "android/app/src/main")
 KOTLIN = os.path.join(SRC, "java")
-STRINGS = os.path.join(SRC, "res/values/strings.xml")
+VALUES = os.path.join(SRC, "res/values")
 
 CALLBACK = re.compile(r"(on[A-Za-z0-9_]*|launch|invoke|listener|callback)\s*=\s*$")
 
@@ -82,11 +82,16 @@ def kotlin_files():
 
 
 def load_keys():
-    xml = open(STRINGS, encoding="utf-8").read()
     keys = {}
-    for m in re.finditer(r'<string name="([^"]+)"[^>]*>(.*?)</string>', xml, re.S):
-        keys[m.group(1)] = m.group(2)
-    return keys
+    plurals = set()
+    for filename in os.listdir(VALUES):
+        if not (filename.startswith("strings") and filename.endswith(".xml")):
+            continue
+        xml = open(os.path.join(VALUES, filename), encoding="utf-8").read()
+        for m in re.finditer(r'<string name="([^"]+)"[^>]*>(.*?)</string>', xml, re.S):
+            keys[m.group(1)] = m.group(2)
+        plurals.update(re.findall(r'<plurals name="([^"]+)"', xml))
+    return keys, plurals
 
 
 def arg_count(body: str) -> int:
@@ -107,7 +112,7 @@ def arg_count(body: str) -> int:
 
 def main() -> int:
     problems = []
-    keys = load_keys()
+    keys, plural_keys = load_keys()
     sources = {}
     for path in kotlin_files():
         sources[path] = open(path, encoding="utf-8").read()
@@ -136,6 +141,12 @@ def main() -> int:
                     f"{short}:{raw[:m.start()].count(chr(10)) + 1}  {key}: "
                     f"يمرّر {passed} وسيطاً والنص يحتاج {needed}"
                 )
+
+        # 2b) موارد الجمع (plurals)
+        for m in re.finditer(r"pluralStringResource\(\s*R\.plurals\.([A-Za-z0-9_]+)", src):
+            key = m.group(1)
+            if key not in plural_keys:
+                problems.append(f"{short}:{raw[:m.start()].count(chr(10)) + 1}  R.plurals.{key} غير معرّف")
 
         # 3) أيقونات Material
         imports = set(re.findall(r"^import\s+([\w.]+)", src, re.M))
@@ -186,6 +197,7 @@ def main() -> int:
     repo_files = {
         "auth": "data/repo/AuthRepository.kt",
         "profile": "data/repo/ProfileRepository.kt",
+        "consoleLinks": "data/repo/ConsoleLinkRepository.kt",
         "content": "data/repo/ContentRepository.kt",
         "plans": "data/repo/PlansRepository.kt",
         "ac": "data/repo/AcRepository.kt",
@@ -210,7 +222,7 @@ def main() -> int:
 
     skip = {
         "realtime", "realtimeClient", "siteAssetUrl", "currentConfig",
-        "isConfigured", "saveConfig", "appContext",
+        "isConfigured", "saveConfig", "appContext", "performanceProfile",
     }
     for path, raw in sources.items():
         short = path.split("mobile/")[-1]

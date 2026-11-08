@@ -1,5 +1,6 @@
 package com.addonstation.mobile.data.repo
 
+import com.addonstation.mobile.data.AppState
 import com.addonstation.mobile.data.SupabaseClient
 import com.addonstation.mobile.data.model.CreatorApplication
 import com.addonstation.mobile.data.model.CreatorCard
@@ -9,13 +10,21 @@ import com.addonstation.mobile.data.model.FeaturedCreator
 import com.addonstation.mobile.data.model.Profile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * المبدعون: القوائم، ملف المبدع، طلب الانضمام، استوديو المبدع (رفع المحتوى)،
  * وتِيبس الدعم (تحويل يدوي + إيصال).
  */
-class CreatorRepository(private val supabase: SupabaseClient) {
+class CreatorRepository(
+    private val supabase: SupabaseClient,
+    private val state: AppState,
+) {
+
+    private suspend fun selectProfiles(query: String): JsonElement =
+        runCatching { supabase.select("visible_profiles", query) }
+            .getOrElse { supabase.select("profiles", query) }
 
     suspend fun featuredIds(): List<FeaturedCreator> = runCatching {
         supabase.decodeList<FeaturedCreator>(
@@ -50,11 +59,8 @@ class CreatorRepository(private val supabase: SupabaseClient) {
                 val filter = if (query.isBlank()) "" else
                     "&or=(username.ilike.*${query.trim()}*,display_name.ilike.*${query.trim()}*,bio.ilike.*${query.trim()}*)"
                 supabase.decodeList<Profile>(
-                    supabase.select(
-                        "profiles",
-                        "select=*&role=in.(creator,admin)&order=user_level.desc&limit=60$filter",
-                    )
-                )
+                    selectProfiles("select=*&role=in.(creator,admin)&order=user_level.desc&limit=60$filter")
+                ).map(state::redactAdminAssets)
             }.getOrElse { emptyList() }
 
             // إحصاءات كل المبدعين في **طلب واحد** بدل طلب لكل مبدع
@@ -96,7 +102,8 @@ class CreatorRepository(private val supabase: SupabaseClient) {
 
     suspend fun creatorStats(userId: String): CreatorCard? {
         val profile = runCatching {
-            supabase.decodeOne<Profile>(supabase.select("profiles", "select=*&id=eq.$userId"))
+            supabase.decodeOne<Profile>(selectProfiles("select=*&id=eq.$userId"))
+                ?.let(state::redactAdminAssets)
         }.getOrNull() ?: return null
         val rows = (runCatching {
             supabase.select(
@@ -160,16 +167,18 @@ class CreatorRepository(private val supabase: SupabaseClient) {
 
     // ------------------------------------------------------- استوديو المبدع
 
-    suspend fun mySubmissions(): List<CreatorSubmission> = withContext(Dispatchers.IO) {
+    suspend fun mySubmissions(): List<CreatorSubmission> =
+        runCatching { mySubmissionsStrict() }.getOrElse { emptyList() }
+
+    /** Strict variant for screens that must distinguish an empty list from a load failure. */
+    suspend fun mySubmissionsStrict(): List<CreatorSubmission> = withContext(Dispatchers.IO) {
         val uid = supabase.session()?.userId ?: return@withContext emptyList()
-        runCatching {
-            supabase.decodeList<CreatorSubmission>(
-                supabase.select(
-                    "creator_submissions",
-                    "select=*&creator_id=eq.$uid&order=created_at.desc&limit=60",
-                )
+        supabase.decodeList<CreatorSubmission>(
+            supabase.select(
+                "creator_submissions",
+                "select=*&creator_id=eq.$uid&order=created_at.desc&limit=60",
             )
-        }.getOrElse { emptyList() }
+        )
     }
 
     suspend fun submitContent(
@@ -209,13 +218,14 @@ class CreatorRepository(private val supabase: SupabaseClient) {
         runCatching {
             val uid = supabase.session()?.userId
                 ?: throw com.addonstation.mobile.data.ApiError(com.addonstation.mobile.data.ApiErrorKind.NOT_SIGNED_IN)
-            // غلاف المبدع → site-assets/items/<uid>/ (سياسة site_assets_creator_write تسمح
-            // للمبدع بالكتابة داخل مجلده فقط)، وبقية الملفات → creator-media الخاص.
+            // غلاف المبدع → site-assets/items/<uid>/. ملف المحتوى النهائي يذهب
+            // مباشرةً إلى content-files الخاص؛ عند الموافقة تشير content_items إلى
+            // object موجود فعلياً، ولا تُنشر metadata مكسورة من creator-media.
             val isCover = kind == "cover"
-            val bucket = if (isCover) "site-assets" else "creator-media"
+            val bucket = if (isCover) "site-assets" else "content-files"
             val path =
                 if (isCover) "items/$uid/${System.currentTimeMillis()}-$fileName"
-                else "$uid/${System.currentTimeMillis()}-$fileName"
+                else "creators/$uid/${System.currentTimeMillis()}-$fileName"
             supabase.upload(bucket, path, bytes, mime)
             path
         }

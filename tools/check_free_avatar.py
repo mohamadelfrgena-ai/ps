@@ -1,99 +1,139 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-فاحص: **الأفاتار المجاني واحد فقط — onefree لكل الحسابات** (طلب المالك).
+"""Guard the owner's attached image as the one and only free account avatar."""
 
-طلب المالك (حرفياً):
-    «أنا أنشئ حساباً جديداً — أريد هذه الصورة المجانية الافتراضية لكل الحساب
-     [onefree.png]، والصور التي معيّنة مجانية والافتراضية القديمة أزلها.»
+from __future__ import annotations
 
-القواعد التي يحرسها الفاحص:
-  ١) `supabase/31_single_free_avatar.sql` موجود ويعطّل الأفاتارات المجانية
-     القديمة (`enabled = false`) بدل حذفها — فتبقى قابلة للإرجاع؛
-  ٢) يفعّل صف onefree واحداً فقط (المسار المعتمد profiles/profiles/onefree.png
-     — المسار الموجود فعلاً في المخزن)، و`32` يوحّد كل شيء عليه؛
-  ٣) يحوّل الحسابات التي تستعمل صورة مجانية قديمة إلى onefree؛
-  ٤) القيمة الافتراضية لعمود `profiles.avatar_url` = onefree (ملف 24)؛
-  ٥) `handle_new_user()` يولّد الحساب وصورته onefree (ملف 24)؛
-  ٦) البذرة `15_assets_v2.sql` تعطّل الأفاتارات المجانية القديمة كذلك؛
-  ٧) الملف الجامع `00_ALL_IN_ONE.sql` يحوي الملف 31؛
-  ٨) صورة onefree محفوظة في المستودع (للرجوع إليها عند الرفع)؛
-  ٩) التطبيق يقرأ الأصول بـ `enabled=eq.true` (لولاها لظهرت المعطّلات).
-
-الاستخدام:  python3 tools/check_free_avatar.py
-"""
+import hashlib
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SUPABASE = ROOT / "supabase"
+EXPECTED_SHA256 = "6e2e27187e757d8f213d6dd29c6afe9667e960447e752d3ae2c82b66bb33b7a5"
+CANONICAL_PATH = "profiles/profiles/onefree.png"
+
 M31 = SUPABASE / "31_single_free_avatar.sql"
-M24 = SUPABASE / "24_free_default_avatar.sql"
-M32 = SUPABASE / "32_onefree_canonical_path.sql"
+M45 = SUPABASE / "45_single_attached_free_avatar.sql"
+M46 = SUPABASE / "46_profile_avatar_packs.sql"
+SCHEMA = SUPABASE / "01_schema.sql"
+FUNCTIONS = SUPABASE / "02_functions_core.sql"
 SEED = SUPABASE / "15_assets_v2.sql"
 ALL_IN_ONE = SUPABASE / "00_ALL_IN_ONE.sql"
-ASSETS_REPO = ROOT / "android/app/src/main/java/com/addonstation/mobile/data/repo/AssetsRepository.kt"
-IMAGE = SUPABASE / "site-assets" / "profiles" / "onefree.png"
+SERVER_IMAGE = SUPABASE / "site-assets/profiles/onefree.png"
+LOCAL_IMAGE = ROOT / "android/app/src/main/res/drawable-nodpi/ic_free_profile.png"
+COMMON = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/components/Common.kt"
+PROFILE_SPEC = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/components/ProfileSpecUi.kt"
+HOME = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/home/HomeScreen.kt"
+EDITOR = ROOT / "android/app/src/main/java/com/addonstation/mobile/ui/profile/EditProfileEditor.kt"
 
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else ""
 
 
+def sha256(path: Path) -> str:
+    if not path.is_file():
+        return ""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def deletes_other_free_rows(sql: str) -> bool:
+    return bool(
+        re.search(
+            r"delete\s+from\s+public\.site_assets[\s\S]{0,300}?"
+            r"asset_type\s*=\s*'avatar'[\s\S]{0,200}?"
+            r"required_plan\s*=\s*'free'[\s\S]{0,200}?"
+            r"file_url\s*<>\s*'profiles/profiles/onefree\.png'",
+            sql,
+            re.IGNORECASE,
+        )
+    )
+
+
 def main() -> int:
-    m31, m24, m32, seed = read(M31), read(M24), read(M32), read(SEED)
-    allinone, repo = read(ALL_IN_ONE), read(ASSETS_REPO)
+    m31 = read(M31)
+    m45 = read(M45)
+    m46 = read(M46)
+    schema = read(SCHEMA)
+    functions = read(FUNCTIONS)
+    seed = read(SEED)
+    all_in_one = read(ALL_IN_ONE)
+    common = read(COMMON)
+    registered_ui = "\n".join(read(path) for path in (PROFILE_SPEC, HOME, EDITOR))
+
+    asset_line = next(
+        (line.strip() for line in common.splitlines() if line.strip().startswith("private val ASSET_FREE_DEFAULT")),
+        "",
+    )
 
     rows = [
-        ("ملف 31 موجود", M31.exists()),
-        ("تعطيل الأفاتارات المجانية القديمة (لا حذفها)",
-         bool(re.search(r"set\s+enabled\s*=\s*false[\s\S]{0,200}?"
-                        r"required_plan\s*=\s*'free'[\s\S]{0,200}?"
-                        r"not\s+like\s+'%onefree%'", m31, re.I))),
-        ("إبقاء onefree مفعّلاً (أفاتار مجاني واحد على المسار المعتمد)",
-         bool(re.search(r"insert\s+into\s+public\.site_assets[\s\S]{0,400}?"
-                        r"'profiles/profiles/onefree\.png'[\s\S]{0,500}?"
-                        r"on\s+conflict\s*\(\s*file_url\s*\)\s*do\s+update[\s\S]{0,400}?"
-                        r"enabled\s*=\s*true", m31, re.I))),
-        ("الحسابات على صورة قديمة تُحوَّل إلى onefree",
-         bool(re.search(r"update\s+public\.profiles[\s\S]{0,900}?"
-                        r"set\s+avatar_url\s*=\s*'profiles/profiles/onefree\.png'", m31, re.I))
-         or bool(re.search(r"update\s+public\.profiles[\s\S]{0,900}?"
-                           r"set\s+avatar_url\s*=\s*'profiles/profiles/onefree\.png'", m32, re.I))),
-        ("تحقّق داخل 31: مفعّل واحد فقط",
-         "v_enabled <> 1" in m31),
-        ("افتراضي العمود = المسار المعتمد (ملف 24)",
-         "alter column avatar_url set default 'profiles/profiles/onefree.png'" in m24),
-        ("ملف 32 يوحّد المسار على ما هو موجود في المخزن",
-         M32.exists() and "profiles/profiles/onefree.png" in m32),
-        ("حساب جديد ⇒ صورته onefree (handle_new_user)",
-         bool(re.search(r"insert\s+into\s+public\.profiles[\s\S]{0,300}?"
-                        r"'profiles/profiles/onefree\.png'", m24, re.I))),
-        ("البذرة 15 تعطّل المجاني القديم أيضاً",
-         bool(re.search(r"update\s+public\.site_assets\s*\n\s*set\s+enabled\s*=\s*false"
-                        r"[\s\S]{0,200}?not\s+like\s+'%onefree%'", seed, re.I))),
-        ("الملف الجامع يحوي 31 و32",
-         "31) أفاتار مجاني واحد" in allinone and "32) توحيد مسار onefree" in allinone),
-        ("التطبيق يقرأ المفعّل فقط (enabled=eq.true)",
-         "enabled=eq.true" in repo),
-        ("صورة onefree محفوظة في المستودع", IMAGE.exists()),
+        ("ملف المالك محفوظ في مستودع الخادم",
+         sha256(SERVER_IMAGE) == EXPECTED_SHA256),
+        ("نسخة التطبيق المحلية مطابقة للصورة المرفقة بايتاً ببايت",
+         sha256(LOCAL_IMAGE) == EXPECTED_SHA256),
+        ("صورة الخادم والنسخة المحلية متطابقتان",
+         sha256(SERVER_IMAGE) == sha256(LOCAL_IMAGE) != ""),
+        ("ملف 31 يحذف كل سجل مجاني قديم",
+         deletes_other_free_rows(m31)),
+        ("الترحيل 45 يحذف كل سجل مجاني قديم",
+         deletes_other_free_rows(m45)),
+        ("إعادة زرع الأصول لا تعيد السجلات المجانية القديمة",
+         deletes_other_free_rows(seed)),
+        ("الترحيل يثبّت الصورة كسجل free الوحيد المفعّل",
+         all(token in m45 for token in (
+             "'Default Free Avatar'",
+             f"'{CANONICAL_PATH}'",
+             "required_plan",
+             "enabled          = true",
+         ))),
+        ("الحزمتان المدفوعتان لا تبتلعان الصورة المجانية",
+         "'Default', 1, 1, true" in m31
+         and "'Default', 1, 1, true" in m45
+         and "collection = 'Default'" in m46
+         and "onefree.png must remain the sole enabled free avatar" in m46),
+        ("الحسابات ذات المسار القديم تُنقل قبل الحذف",
+         "p.avatar_url = 'profiles/onefree.png'" in m45
+         and m45.index("update public.profiles p") < m45.index("delete from public.site_assets")),
+        ("افتراضي جدول profiles هو المسار المعتمد",
+         f"default '{CANONICAL_PATH}'" in schema),
+        ("دالة إنشاء الحساب تعيّن الصورة صراحةً",
+         bool(re.search(
+             r"insert\s+into\s+public\.profiles\s*\([^)]*avatar_url[^)]*\)"
+             r"[\s\S]{0,180}?profiles/profiles/onefree\.png",
+             m45,
+             re.IGNORECASE,
+         ))),
+        ("إعادة تعيين الصورة عبر RPC تعود إلى المجاني الوحيد",
+         CANONICAL_PATH in functions
+         and "perform set_config('app.allow_profile_write', '1', true);" in functions),
+        ("التطبيق لا يجرب مسار onefree قديم أو مفقود",
+         asset_line == f'private val ASSET_FREE_DEFAULT = listOf("{CANONICAL_PATH}")'),
+        ("Fallback الحساب المسجّل يستخدم صورة المالك المحلية",
+         common.count("R.drawable.ic_free_profile") >= 2
+         and registered_ui.count("R.drawable.ic_free_profile") >= 5),
+        ("صورة المجهول المنفصلة بقيت محصورة في AnonymousAvatarImage",
+         common.count("R.drawable.ic_default_profile") == 1
+         and "R.drawable.ic_default_profile" not in registered_ui),
+        ("الملف الجامع يطبّق 45 ثم حزم 46 في النهاية",
+         "-- ##  القسم: 45_single_attached_free_avatar.sql" in all_in_one
+         and "-- ##  القسم: 46_profile_avatar_packs.sql" in all_in_one
+         and all_in_one.rfind("46_profile_avatar_packs.sql")
+             > all_in_one.rfind("45_single_attached_free_avatar.sql")),
     ]
 
-    print("الفحص                                             | النتيجة")
-    print("-" * 62)
+    print("فحص الصورة المجانية الوحيدة")
+    print("-" * 66)
     for name, ok in rows:
-        print(f"{name:<50} | {'✅' if ok else '❌'}")
+        print(f"{'✅' if ok else '❌'} {name}")
 
-    failed = [n for n, ok in rows if not ok]
-    print()
+    failed = [name for name, ok in rows if not ok]
     if failed:
-        for n in failed:
-            print("✗", n)
         print(f"\n✗ عدد المشاكل: {len(failed)}")
         return 1
-    print("🟢 أفاتار مجاني واحد مفعّل (onefree) لكل حساب جديد ولكل حساب قديم، "
-          "والصور المجانية القديمة معطّلة محفوظة تُرجَع بسطر واحد.")
+
+    print("\n🟢 صورة المالك هي سجل free الوحيد، وافتراضي الحساب الجديد،")
+    print("   والنسخة المحلية المطابقة تمنع ظهور صورة مختلفة عند بطء الشبكة.")
     return 0
 
 

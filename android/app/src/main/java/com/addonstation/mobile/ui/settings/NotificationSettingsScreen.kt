@@ -1,13 +1,16 @@
 package com.addonstation.mobile.ui.settings
 
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,15 +18,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.NightsStay
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,46 +40,43 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.addonstation.mobile.R
 import com.addonstation.mobile.data.model.PushPrefs
-import com.addonstation.mobile.ui.rememberContainer
-import com.addonstation.mobile.ui.components.ContentColumn
-import com.addonstation.mobile.ui.components.GhostButton
-import com.addonstation.mobile.ui.components.GradientButton
-import com.addonstation.mobile.ui.components.SubScreenHeader
-import com.addonstation.mobile.ui.components.GlassCard
-import com.addonstation.mobile.ui.components.SectionHeader
-import com.addonstation.mobile.ui.theme.AppColors
-import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.push.PushNotifications
 import com.addonstation.mobile.push.PushRegistrar
+import com.addonstation.mobile.ui.components.AuthSettingsDivider
+import com.addonstation.mobile.ui.components.AuthSettingsGroupCard
+import com.addonstation.mobile.ui.components.AuthSettingsIconTile
+import com.addonstation.mobile.ui.components.AuthSettingsRow
+import com.addonstation.mobile.ui.components.AuthSettingsSectionLabel
+import com.addonstation.mobile.ui.components.AuthSettingsSwitch
+import com.addonstation.mobile.ui.components.AuthSettingsTopBar
+import com.addonstation.mobile.ui.rememberContainer
+import com.addonstation.mobile.ui.theme.AppColors
+import com.addonstation.mobile.ui.theme.Spec
 import kotlinx.coroutines.launch
 
-/**
- * إعدادات الإشعارات — القلب الذي يجعل الإشعارات «مرتّبة» لا مزعجة.
- *
- * ما يراه المستخدم:
- *   ١) مفتاح رئيسي واحد: أطفئه فتسكت كل الإشعارات فوراً.
- *   ٢) خمسة أقسام مستقلة: رسائل الشات · محتوى جديد · اجتماعي · الحساب ·
- *      تذكير بالعودة — يستطيع كتم أي قسم وحده وترك البقية.
- *   ٣) ساعات الهدوء: من/إلى بتوقيته هو؛ كل إشعار غير عاجل يُؤجَّل حتى تنتهي
- *      (والرسائل الشخصية: منشن وردّ — تصل فوراً لأن تأخيرها يلغي معناها).
- *   ٤) وتيرة تذكير العودة: 7 / 14 / 30 يوماً غياباً — وبحدّ أقصى تلقائي في
- *      الخادم: **تذكير واحد كل أسبوعين** مهما كان.
- *   ٥) زر «جرّب الإشعار الآن» للتأكد بلا انتظار.
- */
+/** إعدادات الإشعارات الحقيقية — تفضيلات الخادم وFCM كما هي؛ التغيير بصري وفق §4. */
 @Composable
 fun NotificationSettingsScreen(onBack: () -> Unit) {
     val container = rememberContainer()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val signedIn by container.state.signedIn.collectAsStateWithLifecycle()
 
     var prefs by remember { mutableStateOf<PushPrefs?>(null) }
     var loading by remember { mutableStateOf(true) }
     var status by remember { mutableStateOf<String?>(null) }
+    var statusIsError by remember { mutableStateOf(false) }
+    var testBusy by remember { mutableStateOf(false) }
     var permissionGranted by remember { mutableStateOf(PushNotifications.permissionGranted(context)) }
     var deviceReady by remember { mutableStateOf(false) }
 
@@ -88,7 +93,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
         loading = false
     }
 
-    /** يحفظ فوراً في الخادم (والواجهة تتفاءل بالقيمة ثم تُصحَّح من رد الخادم). */
+    /** حفظ فوري للتفضيلات على الخادم؛ ترتيب الوسائط يطابق `push_set_prefs` (10). */
     fun save(update: (PushPrefs) -> PushPrefs) {
         val current = prefs ?: return
         val next = update(current)
@@ -110,281 +115,397 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    ContentColumn(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-    ) {
-        SubScreenHeader(title = stringResource(R.string.notif_settings), onBack = onBack)
-        Spacer(Modifier.height(8.dp))
-
-        if (loading || prefs == null) {
-            Text(
-                stringResource(R.string.common_loading),
-                style = AppText.bodySmall,
-                color = AppColors.Muted,
-                modifier = Modifier.padding(16.dp),
-            )
-            return@ContentColumn
-        }
-        val p = prefs!!
-
-        // ── القراءة فقط: إن كان النظام نفسه يمنع الإشعارات لا معنى للمفاتيح
-        if (!deviceReady) {
-            GlassCard {
-                Text(
-                    stringResource(R.string.notif_not_configured),
-                    style = AppText.bodySmall,
-                    color = AppColors.Gold,
+    fun requestPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            runCatching {
+                context.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
                 )
             }
-            Spacer(Modifier.height(10.dp))
-        } else if (!permissionGranted) {
-            GlassCard {
-                Text(stringResource(R.string.notif_need_permission), style = AppText.bodySmall, color = AppColors.Text)
+        }
+    }
+
+    fun chooseTime(initialHour: Int, onSelected: (Int) -> Unit) {
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, _ -> onSelected(hourOfDay) },
+            initialHour,
+            0,
+            true,
+        ).show()
+    }
+
+    Column(Modifier.fillMaxSize().background(AppColors.AuthBg)) {
+        AuthSettingsTopBar(
+            title = stringResource(R.string.notif_settings),
+            onBack = onBack,
+        )
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Spacer(Modifier.height(12.dp))
+            if (!deviceReady) {
+                AuthSettingsGroupCard(
+                    radius = 16.dp,
+                    background = AppColors.AuthPlanBottom,
+                    borderColor = AppColors.AuthPermissionBorder,
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            stringResource(R.string.notif_not_configured),
+                            style = Spec.rowSub.copy(fontSize = 13.sp, lineHeight = 18.2.sp),
+                            color = AppColors.AuthGold,
+                        )
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
-                GradientButton(
-                    text = stringResource(R.string.notif_allow),
-                    onClick = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            // أندرويد 12 وأقدم: لا يوجد طلب إذن — الحل إعدادات النظام
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
-                                )
-                            }
+            } else if (!permissionGranted) {
+                AuthSettingsGroupCard(
+                    radius = 16.dp,
+                    background = AppColors.AuthPlanBottom,
+                    borderColor = AppColors.AuthPermissionBorder,
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            stringResource(R.string.notif_need_permission),
+                            style = Spec.rowSub.copy(fontSize = 13.sp, lineHeight = 18.2.sp),
+                            color = AppColors.AuthGold,
+                        )
+                        Box(
+                            Modifier
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(AppColors.AuthGoldFill)
+                                .clickable(onClick = { requestPermission() })
+                                .padding(horizontal = 18.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                stringResource(R.string.notif_allow),
+                                style = Spec.buttonSmall,
+                                color = AppColors.AuthGoldDark,
+                            )
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
             }
-            Spacer(Modifier.height(10.dp))
-        }
 
-        if (status != null) {
-            Text(
-                status!!,
-                style = AppText.bodySmall,
-                color = AppColors.Green,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
-
-        // ── ١) المفتاح الرئيسي
-        SectionHeader(title = stringResource(R.string.notif_master_section))
-        GlassCard(padding = 10.dp) {
-            ToggleRow(
-                title = stringResource(R.string.notif_master),
-                subtitle = stringResource(R.string.notif_master_desc),
-                checked = p.master,
-                onCheckedChange = { value -> save { it.copy(master = value) } },
-            )
-        }
-
-        // ── ٢) الأقسام الخمسة
-        SectionHeader(title = stringResource(R.string.notif_categories))
-        GlassCard(padding = 10.dp) {
-            ToggleRow(
-                title = stringResource(R.string.notif_cat_chat),
-                subtitle = stringResource(R.string.notif_cat_chat_desc),
-                checked = p.chat, enabled = p.master,
-                onCheckedChange = { v -> save { it.copy(chat = v) } },
-            )
-            ToggleRow(
-                title = stringResource(R.string.notif_cat_content),
-                subtitle = stringResource(R.string.notif_cat_content_desc),
-                checked = p.content, enabled = p.master,
-                onCheckedChange = { v -> save { it.copy(content = v) } },
-            )
-            ToggleRow(
-                title = stringResource(R.string.notif_cat_social),
-                subtitle = stringResource(R.string.notif_cat_social_desc),
-                checked = p.social, enabled = p.master,
-                onCheckedChange = { v -> save { it.copy(social = v) } },
-            )
-            ToggleRow(
-                title = stringResource(R.string.notif_cat_account),
-                subtitle = stringResource(R.string.notif_cat_account_desc),
-                checked = p.account, enabled = p.master,
-                onCheckedChange = { v -> save { it.copy(account = v) } },
-            )
-            ToggleRow(
-                title = stringResource(R.string.notif_cat_reminders),
-                subtitle = stringResource(R.string.notif_cat_reminders_desc),
-                checked = p.reminders, enabled = p.master,
-                onCheckedChange = { v -> save { it.copy(reminders = v) } },
-            )
-        }
-
-        // ── ٣) ساعات الهدوء
-        SectionHeader(title = stringResource(R.string.notif_quiet_section))
-        GlassCard(padding = 10.dp) {
-            ToggleRow(
-                title = stringResource(R.string.notif_quiet),
-                subtitle = stringResource(R.string.notif_quiet_desc),
-                checked = p.quietEnabled, enabled = p.master,
-                onCheckedChange = { v -> save { it.copy(quietEnabled = v) } },
-            )
-            if (p.quietEnabled) {
-                HourRow(
-                    label = stringResource(R.string.notif_quiet_from),
-                    hour = p.quietFrom, enabled = p.master,
-                    onChange = { h -> save { it.copy(quietFrom = h) } },
-                )
-                HourRow(
-                    label = stringResource(R.string.notif_quiet_to),
-                    hour = p.quietTo, enabled = p.master,
-                    onChange = { h -> save { it.copy(quietTo = h) } },
-                )
+            if (loading || prefs == null) {
                 Text(
-                    stringResource(R.string.notif_quiet_note),
-                    style = AppText.tiny,
-                    color = AppColors.Dim,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                    stringResource(R.string.common_loading),
+                    style = Spec.rowSub,
+                    color = AppColors.AuthMuted,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                )
+                return@Column
+            }
+            val p = prefs!!
+
+            status?.let {
+                Text(
+                    it,
+                    style = Spec.rowSub,
+                    color = if (statusIsError) AppColors.AuthRed else AppColors.AuthGreenText,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                 )
             }
-        }
 
-        // ── ٤) تذكير العودة
-        SectionHeader(title = stringResource(R.string.notif_reengage_section))
-        GlassCard(padding = 10.dp) {
-            Text(
-                stringResource(R.string.notif_reengage_desc),
-                style = AppText.bodySmall,
-                color = AppColors.Muted,
-                modifier = Modifier.padding(8.dp),
-            )
-            Spacer(Modifier.height(6.dp))
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            // Master switch card — one switch mutes all five categories.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Brush.linearGradient(listOf(AppColors.AuthMasterTop, AppColors.AuthSurface)))
+                    .border(1.dp, AppColors.AuthBlue, RoundedCornerShape(18.dp))
+                    .padding(16.dp),
             ) {
-                listOf(7, 14, 30).forEach { days ->
-                    val selected = p.reengageDays == days
-                    Text(
-                        text = stringResource(R.string.notif_days, days),
-                        style = AppText.bodySmall,
-                        color = if (selected) AppColors.OnGreen else AppColors.Text,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (selected) AppColors.Green else AppColors.Elevated)
-                            .clickable(enabled = p.master && p.reminders) {
-                                save { it.copy(reengageDays = days) }
-                            }
-                            .padding(vertical = 9.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.notif_master_section).uppercase(),
+                            style = Spec.smallCaps,
+                            color = AppColors.AuthBlueLight,
+                        )
+                        Spacer(Modifier.height(5.dp))
+                        Text(
+                            stringResource(R.string.notif_allow),
+                            style = Spec.planName,
+                            color = AppColors.AuthText,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            stringResource(R.string.notif_master_desc),
+                            style = Spec.rowSub,
+                            color = AppColors.AuthChipLabel,
+                        )
+                    }
+                    AuthSettingsSwitch(
+                        checked = p.master,
+                        onCheckedChange = { value -> save { it.copy(master = value) } },
                     )
                 }
             }
-        }
 
-        // ── ٥) تجربة فورية
-        Spacer(Modifier.height(14.dp))
-        GhostButton(
-            text = stringResource(R.string.notif_test),
-            onClick = {
-                scope.launch {
-                    val result = container.push.testMe()
-                    status = when {
-                        result.ok -> context.getString(R.string.notif_test_sent)
-                        result.message == "no_device" -> context.getString(R.string.notif_test_no_device)
-                        else -> context.getString(R.string.notif_test_failed)
-                    }
+            AuthSettingsSectionLabel(stringResource(R.string.settings_sections_five), AppColors.AuthPurple)
+            Text(
+                stringResource(R.string.notif_settings_subtitle),
+                style = Spec.rowSub,
+                color = AppColors.AuthMuted,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 10.dp),
+            )
+            AuthSettingsGroupCard {
+                AuthNotificationToggleRow(
+                    title = stringResource(R.string.notif_cat_chat),
+                    subtitle = stringResource(R.string.notif_cat_chat_desc),
+                    icon = Icons.Outlined.ChatBubbleOutline,
+                    accent = AppColors.AuthAccentBlue,
+                    checked = p.chat,
+                    enabled = p.master,
+                    onCheckedChange = { value -> save { it.copy(chat = value) } },
+                )
+                AuthSettingsDivider()
+                AuthNotificationToggleRow(
+                    title = stringResource(R.string.notif_cat_social),
+                    subtitle = stringResource(R.string.notif_cat_social_desc),
+                    icon = Icons.Outlined.Groups,
+                    accent = AppColors.AuthGreen,
+                    checked = p.social,
+                    enabled = p.master,
+                    onCheckedChange = { value -> save { it.copy(social = value) } },
+                )
+                AuthSettingsDivider()
+                if (signedIn) {
+                    AuthNotificationToggleRow(
+                        title = stringResource(R.string.plan_title),
+                        subtitle = stringResource(R.string.notif_cat_account_desc),
+                        icon = Icons.Outlined.Star,
+                        accent = AppColors.AuthGold,
+                        checked = p.account,
+                        enabled = p.master,
+                        onCheckedChange = { value -> save { it.copy(account = value) } },
+                    )
+                    AuthSettingsDivider()
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            borderColor = AppColors.Green.copy(alpha = 0.5f),
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            stringResource(R.string.notif_group_note),
-            style = AppText.tiny,
-            color = AppColors.Dim,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        Spacer(Modifier.height(24.dp))
+                AuthNotificationToggleRow(
+                    title = stringResource(R.string.notif_ch_content),
+                    subtitle = stringResource(R.string.notif_ch_content_desc),
+                    icon = Icons.Outlined.AutoAwesome,
+                    accent = AppColors.AuthPurple,
+                    checked = p.content,
+                    enabled = p.master,
+                    onCheckedChange = { value -> save { it.copy(content = value) } },
+                )
+                AuthSettingsDivider()
+                AuthNotificationToggleRow(
+                    title = stringResource(R.string.notif_ch_reminders),
+                    subtitle = stringResource(R.string.notif_ch_reminders_desc),
+                    icon = Icons.Outlined.Schedule,
+                    accent = AppColors.AuthTeal,
+                    checked = p.reminders,
+                    enabled = p.master,
+                    onCheckedChange = { value -> save { it.copy(reminders = value) } },
+                )
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 58.dp, end = 14.dp, bottom = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.notif_reengage_section),
+                        style = Spec.rowTitle.copy(fontSize = 13.sp),
+                        color = if (p.master && p.reminders) AppColors.AuthText else AppColors.AuthMuted,
+                    )
+                    Text(
+                        stringResource(R.string.notif_reengage_desc),
+                        style = Spec.rowSub,
+                        color = AppColors.AuthMuted,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(3, 7, 14).forEach { days ->
+                            val selected = p.reengageDays == days || (p.reengageDays !in listOf(3, 7, 14) && days == 14)
+                            ComebackDayChip(
+                                text = stringResource(R.string.notif_days, days),
+                                selected = selected,
+                                enabled = p.master && p.reminders,
+                                modifier = Modifier.weight(1f),
+                                onClick = { save { it.copy(reengageDays = days) } },
+                            )
+                        }
+                    }
+                    Text(
+                        stringResource(R.string.notif_cat_reminders_desc),
+                        style = TextStyle(fontSize = 11.sp, lineHeight = 14.sp),
+                        color = AppColors.AuthMuted,
+                    )
+                }
+            }
+
+            AuthSettingsSectionLabel(stringResource(R.string.notif_quiet_section), AppColors.AuthTeal)
+            AuthSettingsGroupCard {
+                AuthNotificationToggleRow(
+                    title = stringResource(R.string.notif_quiet),
+                    subtitle = stringResource(R.string.notif_quiet_desc),
+                    icon = Icons.Outlined.NightsStay,
+                    accent = AppColors.AuthPurple,
+                    checked = p.quietEnabled,
+                    enabled = p.master,
+                    onCheckedChange = { value -> save { it.copy(quietEnabled = value) } },
+                )
+                AuthSettingsDivider()
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    QuietHourField(
+                        label = stringResource(R.string.notif_quiet_from),
+                        hour = p.quietFrom,
+                        enabled = p.master && p.quietEnabled,
+                        onClick = { chooseTime(p.quietFrom) { h -> save { it.copy(quietFrom = h) } } },
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuietHourField(
+                        label = stringResource(R.string.notif_quiet_to),
+                        hour = p.quietTo,
+                        enabled = p.master && p.quietEnabled,
+                        onClick = { chooseTime(p.quietTo) { h -> save { it.copy(quietTo = h) } } },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Text(
+                    stringResource(R.string.notif_quiet_note),
+                    style = Spec.rowSub,
+                    color = AppColors.AuthMuted,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 20.dp)
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .border(1.dp, AppColors.AuthBlue, RoundedCornerShape(14.dp))
+                    .clickable(enabled = !testBusy) {
+                        scope.launch {
+                            testBusy = true
+                            val result = container.push.testMe()
+                            statusIsError = !result.ok
+                            status = when {
+                                result.ok -> context.getString(R.string.notif_test_sent)
+                                result.message == "no_device" -> context.getString(R.string.notif_test_no_device)
+                                else -> context.getString(R.string.notif_test_failed)
+                            }
+                            testBusy = false
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    stringResource(R.string.notif_test),
+                    style = Spec.buttonSmall,
+                    color = AppColors.AuthBlueLight,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            Text(
+                stringResource(R.string.notif_group_note),
+                style = TextStyle(fontSize = 11.sp, lineHeight = 15.sp),
+                color = AppColors.AuthMuted,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
+            Spacer(Modifier.height(24.dp))
+        }
     }
 }
 
 @Composable
-private fun ToggleRow(
+private fun AuthNotificationToggleRow(
     title: String,
     subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: androidx.compose.ui.graphics.Color,
     checked: Boolean,
-    enabled: Boolean = true,
+    enabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                title,
-                style = AppText.bodySmall,
-                color = if (enabled) AppColors.Text else AppColors.Dim,
+    AuthSettingsRow(
+        title = title,
+        subtitle = subtitle,
+        tile = { AuthSettingsIconTile(icon, accent) },
+        trailing = {
+            AuthSettingsSwitch(
+                checked = checked,
+                enabled = enabled,
+                onCheckedChange = onCheckedChange,
             )
-            Text(subtitle, style = AppText.tiny, color = AppColors.Dim)
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = AppColors.OnGreen,
-                checkedTrackColor = AppColors.Green,
-                uncheckedThumbColor = AppColors.Muted,
-                uncheckedTrackColor = AppColors.Elevated2,
-                uncheckedBorderColor = AppColors.Border2,
-            ),
-        )
-    }
+        },
+    )
 }
 
-/** صف اختيار الساعة (٠–٢٣) بأسهم − و + بدل قائمة منسدلة طويلة. */
 @Composable
-private fun HourRow(label: String, hour: Int, enabled: Boolean, onChange: (Int) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun ComebackDayChip(
+    text: String,
+    selected: Boolean,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (selected) AppColors.AuthBlue else AppColors.AuthSurfaceHigh)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
-            label,
-            style = AppText.bodySmall,
-            color = if (enabled) AppColors.Text else AppColors.Dim,
-            modifier = Modifier.weight(1f),
+            text,
+            style = Spec.segText,
+            color = if (selected) AppColors.AuthWhite else AppColors.AuthChipLabel,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
         )
-        StepButton("−", enabled) { onChange((hour + 23) % 24) }
-        Text(
-            text = "%02d:00".format(hour),
-            style = AppText.bodySmall,
-            color = AppColors.Text,
-            modifier = Modifier.padding(horizontal = 12.dp),
-        )
-        StepButton("+", enabled) { onChange((hour + 1) % 24) }
     }
 }
 
 @Composable
-private fun StepButton(symbol: String, enabled: Boolean, onClick: () -> Unit) {
-    Text(
-        symbol,
-        style = AppText.bodySmall,
-        color = if (enabled) AppColors.Text else AppColors.Dim,
-        modifier = Modifier
-            .size(32.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(AppColors.Elevated)
-            .clickable(enabled = enabled) { onClick() }
-            .padding(7.dp),
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-    )
+private fun QuietHourField(
+    label: String,
+    hour: Int,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Text(label, style = Spec.fieldLabel, color = AppColors.AuthMuted)
+        Spacer(Modifier.height(6.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(AppColors.AuthBg)
+                .border(1.dp, AppColors.AuthBorder, RoundedCornerShape(12.dp))
+                .clickable(enabled = enabled, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "%02d:00".format(hour),
+                style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.ExtraBold),
+                color = if (enabled) AppColors.AuthText else AppColors.AuthMuted,
+            )
+        }
+    }
 }

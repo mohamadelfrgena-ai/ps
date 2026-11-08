@@ -20,7 +20,8 @@ val localProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 fun configValue(key: String): String =
-    (localProps.getProperty(key) ?: project.findProperty(key)?.toString() ?: "").trim()
+    localProps.getProperty(key)?.trim()?.takeIf(String::isNotBlank)
+        ?: project.findProperty(key)?.toString()?.trim().orEmpty()
 
 // ---------------------------------------------------------------------------
 // حماية إلزامية: المفتاح السري (sb_secret_… / service_role) لا يدخل BuildConfig
@@ -52,10 +53,10 @@ android {
         applicationId = "com.addonstation.mobile"
         minSdk = 24
         targetSdk = 35
-        // 1.3: استعادة كلمة المرور · الدخول التلقائي بعد التسجيل · عين كلمة المرور
-        //      وحقل التأكيد · شريط التنقّل السفلي · إطار الاختيار · استقرار الشات
-        versionCode = 4
-        versionName = "1.3"          // AddonStation Mobile v1.3
+        // 1.4: تمرير كسول للمتجر · جمع حالة مرتبط بدورة الحياة · سياسة صور
+        //      متكيّفة مع RAM · بحث مؤجّل · Baseline Profile للإقلاع والتمرير
+        versionCode = 5
+        versionName = "1.4"          // AddonStation Mobile v1.4
 
         resourceConfigurations += listOf("en", "ar", "pt", "es", "ru", "zh", "fr", "tr")
 
@@ -108,6 +109,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    // Installs the bundled baseline profile after sideload/install so ART can
+    // precompile startup and the hottest Compose/list paths before first use.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")

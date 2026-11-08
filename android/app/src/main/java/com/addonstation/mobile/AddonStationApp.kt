@@ -13,6 +13,12 @@ import coil.memory.MemoryCache
 import coil.request.CachePolicy
 
 import com.addonstation.mobile.data.AppContainer
+import com.addonstation.mobile.util.DevicePerformance
+import com.addonstation.mobile.util.DevicePerformanceProfile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
@@ -28,16 +34,26 @@ import java.io.File
  */
 class AddonStationApp : Application(), ImageLoaderFactory {
 
+    val performanceProfile: DevicePerformanceProfile by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        DevicePerformance.profile(this)
+    }
+
+    private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
     lateinit var container: AppContainer
         private set
 
     override fun onCreate() {
         super.onCreate()
-        container = AppContainer(this)
-        // الإشعارات: نُسجّل الحاوية (تحتاجها خدمة FCM) وننشئ القنوات الخمس
-        // (رسائل · محتوى · اجتماعي · حساب · تذكير) فتظهر بأسماء بلغة المستخدم.
+        // احفظ سبب أي انهيار محلياً كي يستطيع صاحب الهاتف مشاركته دون ADB.
+        com.addonstation.mobile.util.CrashDiagnostics.install(this)
+        container = AppContainer(this, performanceProfile)
+        // تسجيل المرجع فوري لأن خدمة FCM تحتاجه. إنشاء القنوات يتضمن وصولاً
+        // إلى NotificationManager والموارد، لذلك لا نجعله ينافس أول إطار.
         com.addonstation.mobile.push.AppContainerHolder.set(this, container)
-        com.addonstation.mobile.push.PushNotifications.ensureChannels(this)
+        startupScope.launch {
+            com.addonstation.mobile.push.PushNotifications.ensureChannels(this@AddonStationApp)
+        }
     }
 
     override fun attachBaseContext(base: Context) {
@@ -49,8 +65,9 @@ class AddonStationApp : Application(), ImageLoaderFactory {
      * • أندرويد 9 (API 28) وأحدث → ImageDecoderDecoder (يدعم GIF وWebP متحرّك، الأخف).
      * • ما قبله → GifDecoder (يعمل على كل الإصدارات).
      */
-    override fun newImageLoader(): ImageLoader =
-        ImageLoader.Builder(this)
+    override fun newImageLoader(): ImageLoader {
+        val profile = performanceProfile
+        return ImageLoader.Builder(this)
             .components {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     add(ImageDecoderDecoder.Factory())
@@ -58,32 +75,38 @@ class AddonStationApp : Application(), ImageLoaderFactory {
                     add(GifDecoder.Factory())
                 }
             }
-            .crossfade(true)
-            // كل صور الموقع من نفس المضيف ⇒ الحد الافتراضي (5 تنزيلات معاً)
-            // كان يجعل شبكة الأصول تظهر ببطء شديد، فرفعناه إلى 16.
+            // الانتقال اللوني لعشرات الصور معاً يضغط GPU في الأجهزة الضعيفة.
+            .crossfade(!profile.lowRamDevice)
+            // التوازي وحجم الذاكرة يتبعان قدرة الهاتف. الحد السابق (16 صورة من
+            // المضيف و25% من heap) كان يسبب موجات GC وتقطيعاً على أجهزة 2–3 GB.
             .okHttpClient {
                 OkHttpClient.Builder()
                     .dispatcher(
                         Dispatcher().apply {
-                            maxRequests = 48
-                            maxRequestsPerHost = 16
+                            maxRequests = profile.imageMaxRequests
+                            maxRequestsPerHost = profile.imageMaxRequestsPerHost
                         }
                     )
                     .build()
             }
             // خادم التخزين لا يسمح أحياناً بالتخزين المؤقت ⇒ كنا نعيد تنزيل كل صورة
-            // في كل مرة نفتح فيها الشبكة. الآن تُحفظ على القرص.
+            // في كل مرة نفتح فيها الشبكة. الآن تُحفظ على القرص بحجم مناسب للجهاز.
             .respectCacheHeaders(false)
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)
-            .memoryCache { MemoryCache.Builder(this).maxSizePercent(0.25).build() }
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(profile.imageMemoryCachePercent)
+                    .build()
+            }
             .diskCache {
                 DiskCache.Builder()
                     .directory(File(cacheDir, "site-images"))
-                    .maxSizeBytes(192L * 1024 * 1024)
+                    .maxSizeBytes(profile.imageDiskCacheBytes)
                     .build()
             }
             .build()
+    }
 
     companion object {
         fun container(context: Context): AppContainer =

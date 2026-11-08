@@ -1,5 +1,7 @@
 package com.addonstation.mobile.data.model
 
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -13,6 +15,17 @@ data class Session(
     val expiresAtEpochSeconds: Long,
 )
 
+/** جهاز PlayStation مرتبط بحساب المستخدم؛ صفوفه تُقرأ وتُحذف عبر RLS. */
+@Immutable
+@Serializable
+data class LinkedConsole(
+    val id: String,
+    @SerialName("device_name") val deviceName: String? = null,
+    val platform: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("last_seen_at") val lastSeenAt: String? = null,
+)
+
 data class AuthUser(
     val id: String,
     val email: String,
@@ -20,6 +33,7 @@ data class AuthUser(
     val emailConfirmed: Boolean,
 )
 
+@Immutable
 @Serializable
 data class Profile(
     val id: String,
@@ -40,7 +54,7 @@ data class Profile(
     @SerialName("created_at") val createdAt: String? = null,
 ) {
     val isAdmin: Boolean get() = role == "admin"
-    val isStaff: Boolean get() = role == "admin" || role == "moderator"
+    val isStaff: Boolean get() = role == "admin" || role == "head_moderator" || role == "moderator"
     val isCreator: Boolean get() = role == "creator"
 
     /** الخطة الفعلية: الخطة المنتهية تُحسب free (مطابقة لقاعدة الخادم effective_plan). */
@@ -70,6 +84,7 @@ fun parseIsoMillis(value: String?): Long? {
     }
 }
 
+@Immutable
 @Serializable
 data class SubscriptionPlan(
     val id: String,
@@ -86,6 +101,7 @@ data class SubscriptionPlan(
     val isFree: Boolean get() = id == "free"
 }
 
+@Immutable
 @Serializable
 data class PaymentMethodSetting(
     val code: String,
@@ -98,6 +114,7 @@ data class PaymentMethodSetting(
     @SerialName("sort_order") val sortOrder: Int = 0,
 )
 
+@Immutable
 @Serializable
 data class PaymentOrder(
     val id: String,
@@ -118,6 +135,7 @@ data class PaymentOrder(
     @SerialName("reviewed_at") val reviewedAt: String? = null,
 )
 
+@Immutable
 @Serializable
 data class ContentItem(
     val id: String,
@@ -127,6 +145,10 @@ data class ContentItem(
     @SerialName("content_type") val contentType: String = "addon",
     val category: String? = "other",
     val plan: String = "free",
+    /** الخطة المخزنة قبل تزيين هدية الخميس محلياً؛ ليست عموداً في قاعدة البيانات. */
+    @kotlinx.serialization.Transient val originalPlan: String? = null,
+    /** true فقط عندما تكون هذه الإضافة هي هدية Epic الفعالة يوم الخميس. */
+    @kotlinx.serialization.Transient val weeklyFree: Boolean = false,
     val version: String? = null,
     @SerialName("cover_url") val coverUrl: String? = null,
     @SerialName("file_path") val filePath: String? = null,
@@ -143,6 +165,7 @@ data class ContentItem(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+@Immutable
 @Serializable
 data class AcWallet(
     @SerialName("user_id") val userId: String,
@@ -151,6 +174,21 @@ data class AcWallet(
     @SerialName("total_spent") val totalSpent: Int = 0,
 )
 
+@Immutable
+@Serializable
+data class ProfileStats(
+    val friends: Int = 0,
+    val downloads: Int = 0,
+    val favorites: Int = 0,
+    val level: Int = 1,
+    @SerialName("xp_in_level") val xpInLevel: Int = 0,
+    @SerialName("xp_to_next") val xpToNext: Int = 100,
+    val streak: Int = 0,
+    @SerialName("daily_claimed") val dailyClaimed: Boolean = false,
+    @SerialName("daily_reward") val dailyReward: Int = 0,
+)
+
+@Immutable
 @Serializable
 data class AcTransaction(
     val id: Long = 0,
@@ -164,6 +202,7 @@ data class AcTransaction(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+@Immutable
 @Serializable
 data class AcTask(
     val id: String,
@@ -178,6 +217,7 @@ data class AcTask(
     @SerialName("sort_order") val sortOrder: Int = 0,
 )
 
+@Immutable
 @Serializable
 data class ChatChannel(
     val id: String,
@@ -191,6 +231,7 @@ data class ChatChannel(
     @SerialName("post_permission") val postPermission: String = "members",
 )
 
+@Immutable
 @Serializable
 data class ChatMessage(
     val id: Long,
@@ -213,6 +254,7 @@ data class ChatMessage(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+@Stable
 data class ChatMessageUi(
     val message: ChatMessage,
     val author: Profile?,
@@ -234,19 +276,31 @@ data class ChatMessageUi(
      * فوراً من الجهاز قبل أن يوقّع الخادم رابطها — فلا تبقى الصورة بيضاء.
      */
     val localPreview: String? = null,
-)
+) {
+    /**
+     * مفتاح اليوم (بالتوقيت المحلي) — يُحسب **مرة واحدة** عند أول عرض ويُخزَّن.
+     * تقارنه شاشة الشات نصّياً لرسم فاصل التاريخ، فلا يُحسب نصّ التاريخ مرّتين
+     * لكل رسالة في كل إطار (سبب تقطيع أثناء التمرير — انظر [TimeFormat.dayLabel]).
+     */
+    val dayKey: String by lazy(LazyThreadSafetyMode.NONE) {
+        com.addonstation.mobile.util.TimeFormat.localDayKey(message.createdAt)
+    }
+}
 
+@Immutable
 @Serializable
 data class ChatReport(
     val id: Long,
     @SerialName("message_id") val messageId: Long? = null,
     @SerialName("reporter_id") val reporterId: String = "",
+    @SerialName("target_user_id") val targetUserId: String? = null,
     val reason: String = "other",
     val note: String? = null,
     val status: String = "open",
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+@Immutable
 @Serializable
 data class ChatNotification(
     val id: Long,
@@ -256,6 +310,8 @@ data class ChatNotification(
     @SerialName("message_id") val messageId: Long? = null,
     @SerialName("channel_id") val channelId: String? = null,
     val body: String? = null,
+    /** Structured values used to localize the row; raw server body is never rendered. */
+    val meta: JsonObject = JsonObject(emptyMap()),
     @SerialName("is_read") val isRead: Boolean = false,
     @SerialName("created_at") val createdAt: String? = null,
 )
@@ -264,6 +320,7 @@ data class ChatNotification(
  * تفضيلات الإشعارات (صف واحد لكل مستخدم من `push_prefs`):
  * مفتاح رئيسي + خمسة أقسام + ساعات الهدوء + مدّة الغياب قبل التذكير.
  */
+@Immutable
 @Serializable
 data class PushPrefs(
     val master: Boolean = true,
@@ -283,12 +340,20 @@ data class PushPrefs(
 data class PushTestResult(val ok: Boolean = false, val message: String? = null)
 
 /** صف من جدول الحظر: من حظرتُه أنا (يُقرأ مرة لفلترة الرسائل فوراً في الواجهة). */
+@Immutable
 @Serializable
 data class BlockedUser(
     @SerialName("blocked_id") val blockedId: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+@Immutable
+@Serializable
+data class MutedUser(
+    @SerialName("muted_id") val mutedId: String? = null,
+)
+
+@Immutable
 @Serializable
 data class FriendEntry(
     val id: Long,
@@ -298,6 +363,7 @@ data class FriendEntry(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+@Immutable
 @Serializable
 data class CreatorApplication(
     val id: Long,
@@ -317,6 +383,7 @@ data class CreatorApplication(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+@Immutable
 @Serializable
 data class CreatorSubmission(
     val id: Long,
@@ -331,9 +398,11 @@ data class CreatorSubmission(
     @SerialName("file_path") val filePath: String? = null,
     val status: String = "pending",
     @SerialName("admin_note") val adminNote: String? = null,
+    @SerialName("content_item_id") val contentItemId: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+@Immutable
 @Serializable
 data class CreatorTip(
     val id: Long,
@@ -348,6 +417,7 @@ data class CreatorTip(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+@Immutable
 @Serializable
 data class FeaturedCreator(
     @SerialName("user_id") val userId: String,
@@ -355,6 +425,7 @@ data class FeaturedCreator(
     @SerialName("sort_order") val sortOrder: Int = 0,
 )
 
+@Immutable
 @Serializable
 data class StickerPack(
     val id: String,
@@ -364,6 +435,7 @@ data class StickerPack(
     @SerialName("sort_order") val sortOrder: Int = 0,
 )
 
+@Immutable
 @Serializable
 data class SiteAsset(
     val id: Long = 0,
@@ -381,6 +453,7 @@ data class SiteAsset(
 )
 
 /** مبدع في قائمة المبدعين (يُبنى من profiles + إحصاءات). */
+@Immutable
 data class CreatorCard(
     val profile: Profile,
     val downloads: Int = 0,
@@ -390,6 +463,7 @@ data class CreatorCard(
 )
 
 /** حالة الشات الخاصة بالمستخدم الحالي (من my_chat_status). */
+@Immutable
 data class MyChatStatus(
     val signedIn: Boolean = false,
     val muted: Boolean = false,
@@ -407,6 +481,7 @@ data class MyChatStatus(
     val moderatedChannels: List<String> = emptyList(),
 )
 
+@Immutable
 data class UnreadCount(val unread: Int = 0, val mentions: Int = 0)
 
 /**
@@ -415,11 +490,13 @@ data class UnreadCount(val unread: Int = 0, val mentions: Int = 0)
  * @param allRooms `true` ⇒ مشرف على كل الغرف (وكل غرفة تُضاف لاحقاً).
  * @param channels الغرف الممنوحة له حين لا يكون النطاق «كل الغرف».
  */
+@Immutable
 data class ModeratorScope(
     val allRooms: Boolean = false,
     val channels: List<String> = emptyList(),
 )
 
+@Immutable
 data class AdminStats(
     val users: Int = 0,
     val creators: Int = 0,
