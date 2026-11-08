@@ -1,17 +1,29 @@
 {
   "format_version": 2,
   "header": {
-    "name": "BedrockSkins Bedrock Edition | نسخة البيدروك",
-    "description": "Port of Bedrock Skins Java mod to Bedrock — Native Geometry, HD Textures & Emotes. §a8 سكنات HD + موديلات 3D + انميشن§r\nConverted from vae/Downloads.zip for Bedrock",
+    "name": "BedrockSkins LEGENDARY MUTATION | طفرة أسطورية",
+    "description": "§6LEGENDARY MUTATION §cBeyond Science & Imagination§r - 14 Skins HD + 8 Mythic Geometries with Wings/Horns/Gods! §aUpdated from vae",
     "uuid": "0a27c561-a218-4c16-ac3f-b0915d3d6c56",
-    "version": [2, 6, 3],
-    "min_engine_version": [1, 20, 0]
+    "version": [
+      3,
+      0,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      20,
+      0
+    ]
   },
   "modules": [
     {
       "type": "skin_pack",
       "uuid": "63e5c3e1-cdd6-467b-97c5-bcec08baf63f",
-      "version": [2, 6, 3]
+      "version": [
+        3,
+        0,
+        0
+      ]
     }
   ]
 }

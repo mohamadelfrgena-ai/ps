@@ -48,8 +48,44 @@
       "geometry": "geometry.humanoid.custom",
       "texture": "skins/sunny_hd.png",
       "type": "free"
+    },
+    {
+      "localization_name": "titan_legend",
+      "geometry": "geometry.titan_legend",
+      "texture": "skins/titan_legend.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "dragon_god_legend",
+      "geometry": "geometry.dragon_god_legend",
+      "texture": "skins/dragon_god_legend.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "void_god_legend",
+      "geometry": "geometry.void_god_legend",
+      "texture": "skins/void_god_legend.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "phoenix_legend",
+      "geometry": "geometry.phoenix_legend",
+      "texture": "skins/phoenix_legend.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "frost_overlord_legend",
+      "geometry": "geometry.frost_overlord_legend",
+      "texture": "skins/frost_overlord_legend.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "nether_emperor_legend",
+      "geometry": "geometry.nether_emperor_legend",
+      "texture": "skins/nether_emperor_legend.png",
+      "type": "free"
     }
   ],
-  "serialize_name": "BedrockSkins-Bedrock",
-  "localization_name": "BedrockSkins-Bedrock"
+  "serialize_name": "BedrockSkins-Legendary",
+  "localization_name": "BedrockSkins-Legendary"
 }
