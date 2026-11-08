@@ -4341,8 +4341,11 @@ void splashLoadingBox(UiEngine& e, const std::string& langCode, int elapsedMs, i
     const int tw = std::max(120, e.measureText(lt, 24, FontRole::Body, L.rtl));
     const int pw = std::max(50, e.measureText(pct, 22, FontRole::Pixel, L.rtl));
     int lx = 118;
-    drawLoadingBoxIcon(e, L.X(lx, 64), 898, a, elapsedMs);
-    lx += 64 + 16;
+    // v0.60 (user: «مكان الصندوق جنب الكلمة التحميل»): the CHEST (lower band of the
+    // 64x120 icon, centre ≈ +90) sits BESIDE the word — icon raised so both centres
+    // line up (was y=898: only the arrow was beside the text, the chest hung below).
+    drawLoadingBoxIcon(e, L.X(lx, 64), 938 + 15 - 90, a, elapsedMs);
+    lx += 64 + 12;
     e.drawText(lt, L.X(lx, tw), 938, 24,
                SDL_Color{A(236), A(236), A(236), A(255)}, FontRole::Body, false, false);
     lx += tw + 14;
