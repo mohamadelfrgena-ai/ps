@@ -1018,6 +1018,9 @@ CopyResult copyAddonFolder(const std::string& sourceFolder,
     return result;
 }
 
+// v0.62: public wrapper over the anon-ns scanner (download pre-check in main.cpp)
+std::string mountedMojangDir() { return findMountedMojangDir(std::string()); }
+
 CopyResult installOrQueueAddon(const std::string& sourceRawPath,
                                const std::string& addonFolderName,
                                const std::string& stageDir,
@@ -1105,36 +1108,16 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
         return result;
     }
 
-    // Minecraft is CLOSED: stage the .raw file into /data/AddonStation/installed/
-    if (!stageStreamToFile(inFp, stagedRawPath, err, onProgress)) {
-        std::fclose(inFp);
-        result.errorCode = err;
-        result.message = formatInstallPhaseLabel(InstallPhase::Failed, langCode);
-        return result;
-    }
+    // v0.62 (user spec: «نلغي فكرة التخزين المؤقت»): NO staging when the game is closed.
+    // The user launches Minecraft FIRST, then the app transfers the pack directly to the
+    // mounted com.mojang. errorCode -2 = «game not running» (main.cpp shows the hint).
     std::fclose(inFp);
-
-    if (onProgress) {
-        onProgress(InstallPhase::Installing, 50);
-    }
-
-    // Store targetCategory + langCode inside the .pending metadata file
-    const std::string metaLine = result.targetCategory + "|" + langCode;
-    const int flagFd = ::open(pendingFlagPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (flagFd >= 0) {
-        writeExact(flagFd, metaLine.data(), metaLine.size(), err);
-        ::close(flagFd);
-    }
-
-    result.ok = true;
-    result.queuedForMinecraft = true;
-    result.message = formatQueuedMessage(langCode);
-    // v0.13: إطلاق Minecraft تلقائياً اختياري — يُفعَّل من الإعدادات
-    // «تشغيل Minecraft تلقائياً بعد التثبيت» (الافتراضي: إيقاف). حتى مع
-    // الإيقاف يبقى الملف مؤجَّلاً في stageDir وتُكمله المزامنة التلقائية
-    // (syncPendingAddonsIfMounted) في أول ظهور لمجلد com.mojang، سواء
-    // شغّلت Minecraft بنفسك من △ في صفحة الإضافة أو يدوياً من القائمة.
-    result.launchedMinecraft = autoLaunchMinecraft && launchMinecraftOnPs4();
+    result.ok = false;
+    result.queuedForMinecraft = false;
+    result.errorCode = -2;
+    result.message.clear();
+    diagLine("game not mounted -> refusing (no staging, v0.62)");
+    return result;
     return result;
 }
 

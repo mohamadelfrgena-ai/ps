@@ -208,8 +208,11 @@ static void ensureFreshSession() {
     // فشل التحديث: نُبقي الجلسة كما هي (لا خروج قسري أبداً)
 }
 
+static std::atomic<unsigned> gSessGen{0};   // v0.62: bumped on sign-out — kills in-flight refreshes
 static void applyAccountFromSession() {
+    const unsigned gen0 = gSessGen.load();
     ensureFreshSession();
+    if (gen0 != gSessGen.load()) return;
     ProfileRow p = fetchProfile(gCfg, gSession.userId, gSession.accessToken);
     if (!p.ok && gSession.displayName.empty() && gSession.username.empty()) return;   // v0.42
     Account a;
@@ -224,6 +227,7 @@ static void applyAccountFromSession() {
     a.favorites = (int)p.favorites;
     for (const AddonItem& it : catalog())
         if (it.installed) a.installed += 1;
+    if (gen0 != gSessGen.load()) return;   // signed out while fetching — do NOT resurrect
     setAccount(a);
     A.dirty = true;   // v0.50: the AC balance chip repaints the moment it changes
 }
@@ -616,6 +620,7 @@ static void hookSignOut() {
         const std::string tok = gSession.accessToken;
         std::thread([tok]() { callConsoleUnlink(gCfg, tok); }).detach();
     }
+    gSessGen.fetch_add(1);   // v0.62: in-flight profile refreshes must not re-apply the account
     clearLinkSession();
     gSession = LinkSession{};
     setAccount(Account{});
@@ -633,8 +638,16 @@ static void startDownloadFlow(int catIdx) {
     A.notice.clear();
     A.dirty = true;
     const std::string lang = A.lang;
-    const bool autoLaunch = A.autoLaunch;
-    std::thread([it, lang, autoLaunch]() {
+    std::thread([it, lang]() {
+        // v0.62 (user spec): the game must be RUNNING first — no staging / temp storage.
+        if (mountedMojangDir().empty()) {
+            ui_sfx(Sfx::Error);
+            toast(tr("need_game_first", lang));
+            A.dl = (int)DemoState::Idle;
+            A.busyDownload = false;
+            A.dirty = true;
+            return;
+        }
 #ifdef AS_BUILD_2121
         DownloadGrant g = localGrantFrom(it.title, it.isWorld ? "world" : "addon", it.ps4RawUrl, it.packTargetsRaw);
 #else
@@ -692,7 +705,7 @@ static void startDownloadFlow(int catIdx) {
                         A.dirty = true;
                     }
                 },
-                autoLaunch && idx + 1 == npk);
+                false);   // v0.62: auto-launch cancelled («نلغي التشغيل التلقائي»)
             if (!r.ok) { allOk = false; break; }
             if (r.queuedForMinecraft) anyQueued = true;
         }
@@ -1019,7 +1032,7 @@ static void moveFocus(int dx, int dy) {
             break;
         }
         case Scr::Settings: {
-            const int rows = account().signedIn ? 6 : 5;
+            const int rows = 5;   // v0.62: auto-launch row removed («نلغي التشغيل التلقائي»)
             if (A.subFocus >= 0) {
                 const int n = A.focus == 0 ? 8 : 2, cols = 2;
                 if (dx > 0) A.subFocus = std::min(n - 1, A.subFocus + 1);
@@ -1066,15 +1079,11 @@ static void onSettingsCross() {
         return;
     }
     if (A.focus == 2 && !account().signedIn) { startSignIn(); return; }
-    if (A.focus == 3) {
-        A.autoLaunch = !A.autoLaunch;
-        saveAutoLaunchSetting(A.autoLaunch);
-        ui_sfx(Sfx::Toggle);
-        return;
-    }
-    if (A.focus == 5 && account().signedIn) {
+    if (A.focus == 4) {
+        // v0.62: sign-out row is ALWAYS here and ALWAYS works (was focus 5 + gated on
+        // account().signedIn — a ghost-guest session made the button do nothing)
         A.confirmSignOut = true;
-        A.confirmFocus = 1;
+        A.confirmFocus = 0;   // v0.62: «تسجيل الخروج» pre-selected (was Cancel -> looked broken)
     }
 }
 
@@ -1464,18 +1473,8 @@ int main(int, char**) {
         }
     }).detach();
 
-    // ---- syncWatcher: staged .raw installs complete when Minecraft mounts ----
-    std::thread([]() {
-        for (;;) {
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-            CopyResult r = syncPendingAddonsIfMounted(kStageDir, "", A.lang);
-            if (r.ok && !r.lastAddonName.empty()) {
-                ui_sfx(Sfx::DownloadDone);
-                toast(formatEnjoyNotification(r.lastAddonName, A.lang));
-            }
-        }
-    }).detach();
-
+    // v0.62: the staged-install syncWatcher is GONE («نلغي التخزين المؤقت») — installs are
+    // direct-only while the game is mounted («شغّل ماينكرفت أولاً ثم التطبيق ينقل الإضافة»).
     // ---- main loop: redraw only when something changes (dirty flag) ----
     std::time_t lastSec = std::time(nullptr);
     bool running = true;

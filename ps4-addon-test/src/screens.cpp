@@ -112,6 +112,7 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
                          {"ru", "Запустите Minecraft, нажмите PS и вернитесь — установится само"},
                          {"pt", "Inicie Minecraft, aperte PS e volte aqui — instala sozinho"},
                          {"zh", "启动 Minecraft，按 PS 键回到这里 — 自动安装"}}},
+        {"need_game_first", {{"en", "Launch Minecraft first, then come back and press Download."}, {"ar", "\u0634\u063a\u0651\u0644 \u0645\u0627\u064a\u0646\u0643\u0631\u0641\u062a \u0623\u0648\u0644\u0627\u064b \u062b\u0645 \u0627\u0631\u062c\u0639 \u0648\u0627\u0636\u063a\u0637 \u062a\u0646\u0632\u064a\u0644."}, {"fr", "Lancez Minecraft d'abord, puis revenez et appuyez sur T\xC3\xA9l\xC3\xA9charger."}, {"tr", "\xC3\x96nce Minecraft\u2019\u0131 ba\u015Flat\u0131n, sonra geri d\xC3\xB6n\xC3\xBCp \u0130ndir'e bas\u0131n."}, {"es", "Inicia Minecraft primero, luego vuelve y pulsa Descargar."}, {"ru", "\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 Minecraft, \u0437\u0430\u0442\u0435\u043C \u0432\u0435\u0440\u043D\u0438\u0442\u0435\u0441\u044C \u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u00AB\u0421\u043A\u0430\u0447\u0430\u0442\u044C\u00BB."}, {"pt", "Inicie o Minecraft primeiro, depois volte e pressione Baixar."}, {"zh", "\u8BF7\u5148\u542F\u52A8 Minecraft\uFF0C\u7136\u540E\u8FD4\u56DE\u5E76\u6309\u300C\u4E0B\u8F7D\u300D\u3002"}}},
         {"installing", {{"en", "Installing..."}, {"ar", "جارٍ التثبيت..."}, {"fr", "Installation..."},
                         {"tr", "Yükleniyor..."}, {"es", "Instalando..."}, {"ru", "Установка..."},
                         {"pt", "Instalando..."}, {"zh", "安装中..."}}},
@@ -4090,30 +4091,30 @@ void drawSettings(UiEngine& e, int focus, int subFocus, bool autoLaunchOn, const
     backdrop(e);
     pageTitle(e, L, tr("nav_settings", lang), kCL + 20, 44);
     const bool guest = !gAcc.signedIn;
-    const int rows = guest ? 5 : 6;
+    const int rows = 5;   // v0.62: auto-launch row removed — {lang, theme, account, about, signout}
     const int listX = kCL + 20, listW = 760, rowH = 104, pitch = 116, top = 150;
     const int panX = listX + listW + 40, panW = kCR - panX, panY = top, panH = 5 * pitch + rowH;
     const int f = std::max(0, std::min(rows - 1, focus));
     // line icons (lineIconTile): 0 globe, 1 contrast, 2 user, 3 gamepad, 4 info, 5 log-out — saturated accents
-    static const int kKinds[6] = {0, 1, 2, 3, 4, 5};
-    static const SDL_Color kAccD[6] = {{88, 156, 255, 255}, {176, 132, 255, 255}, {250, 196, 64, 255},
-                                       {52, 211, 125, 255}, {160, 170, 188, 255}, {255, 96, 112, 255}};
-    static const SDL_Color kAccL[6] = {{29, 104, 222, 255}, {124, 74, 222, 255}, {184, 128, 8, 255},
-                                       {12, 150, 80, 255}, {92, 101, 114, 255}, {214, 40, 64, 255}};
+    static const int kKinds[5] = {0, 1, 2, 4, 5};
+    static const SDL_Color kAccD[5] = {{88, 156, 255, 255}, {176, 132, 255, 255}, {250, 196, 64, 255},
+                                       {160, 170, 188, 255}, {255, 96, 112, 255}};
+    static const SDL_Color kAccL[5] = {{29, 104, 222, 255}, {124, 74, 222, 255}, {184, 128, 8, 255},
+                                       {92, 101, 114, 255}, {214, 40, 64, 255}};
     const SDL_Color* kAcc = gLight ? kAccL : kAccD;
-    const std::string labels[6] = {tr("settings_language", lang), tr("settings_appearance", lang), tr("settings_account", lang),
-                                   tr("autolaunch", lang), tr("settings_about", lang), tr("settings_signout", lang)};
+    const std::string labels[5] = {tr("settings_language", lang), tr("settings_appearance", lang), tr("settings_account", lang),
+                                   tr("settings_about", lang), tr("settings_signout", lang)};
     static const char* kLangNative[8] = {"English", "\xD8\xA7\xD9\x84\xD8\xB9\xD8\xB1\xD8\xA8\xD9\x8A\xD8\xA9", "Fran\xC3\xA7\x61is",
         "T\xC3\xBC" "rk\xC3\xA7" "e", "Espa\xC3\xB1ol", "\xD0\xA0\xD1\x83\xD1\x81\xD1\x81\xD0\xBA\xD0\xB8\xD0\xB9",
         "Portugu\xC3\xAAs", "\xE4\xB8\xAD\xE6\x96\x87"};
     const int curLang = langIndexOf(lang);
     const std::string nm = gAcc.displayName.empty() ? gAcc.username : gAcc.displayName;
-    const std::string values[6] = {kLangNative[curLang], tr(gLight ? "theme_light" : "theme_dark", lang),
-                                   guest ? tr("acct_guest_v", lang) : nm, "", gAppVersion.empty() ? "" : "v" + gAppVersion, ""};
+    const std::string values[5] = {kLangNative[curLang], tr(gLight ? "theme_light" : "theme_dark", lang),
+                                   guest ? tr("acct_guest_v", lang) : nm, gAppVersion.empty() ? "" : "v" + gAppVersion, ""};
     for (int i = 0; i < rows; ++i) {
         const int y = top + i * pitch;
         const int rx = L.X(listX, listW);
-        const bool foc = (i == f), danger = (i == 5);
+        const bool foc = (i == f), danger = (i == 4);   // v0.62: signout is row 4
         if (danger && !foc) {
             e.drawRoundRect(rx, y, listW, rowH, 22, SDL_Color{251, 76, 110, static_cast<Uint8>(gLight ? 18 : 30)});
             e.drawRoundBorder(rx, y, listW, rowH, 22, 2, SDL_Color{251, 76, 110, 90});
@@ -4128,7 +4129,7 @@ void drawSettings(UiEngine& e, int focus, int subFocus, bool autoLaunchOn, const
         if (i == 3) switchCtl(e, L.X(listX + listW - 28 - 88, 88), y + (rowH - 46) / 2, autoLaunchOn, L.rtl);
         else {
             if (!values[i].empty()) endText(e, L, values[i], listX, listW - 62, y + (rowH - 28) / 2, 24, kMU);
-            if (i != 4) chevron(e, L.X(listX + listW - 34, 12), y + rowH / 2 - 9, 9, !L.rtl, 3, danger ? kERT : kMU);
+            if (i != 3) chevron(e, L.X(listX + listW - 34, 12), y + rowH / 2 - 9, 9, !L.rtl, 3, danger ? kERT : kMU);
         }
         if (foc && subFocus < 0) focusRing(e, rx, y, listW, rowH, 22, false);   // v0.35: row, frame only
     }

@@ -78,6 +78,8 @@ bool saveAutoLaunchSetting(bool enabled, const std::string& configPath = "/data/
 // نفسه منذ v0.13 — بل فقط من فعل المستخدم «فتح Minecraft» (△ في صفحة الإضافة).
 bool launchMinecraftOnPs4();
 
+// v0.62: exported for the download pre-check (is any Minecraft com.mojang mounted?)
+std::string mountedMojangDir();
 CopyResult syncPendingAddonsIfMounted(
     const std::string& stageDir = "/data/AddonStation/installed",
     const std::string& preferredMojangDir = "",
