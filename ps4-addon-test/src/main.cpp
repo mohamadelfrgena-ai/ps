@@ -999,7 +999,7 @@ static void clampScroll() {
     else if (A.scr == Scr::Deals) { idx = A.focus - 5; view = View::Deals; }
     else if (A.scr == Scr::Store) { idx = A.focus; view = View::Store; }
     else if (A.scr == Scr::Search) { idx = A.focus - 4; view = View::Search; win = 5; }  // single-row render
-    else if (A.scr == Scr::Mine)   { idx = A.focus;  view = View::Mine;  win = 8; cols = 1; }   // v0.65c: 8 rows, no button
+    else if (A.scr == Scr::Mine)   { idx = A.focus;  view = View::Mine;  win = 7; cols = 1; }   // v0.65c: rows 0..N-1 (no check button)
     if (idx < 0) return;
     int first = (std::max(0, scrollOf(view)) / cols) * cols;
     if (idx < first) first = (idx / cols) * cols;

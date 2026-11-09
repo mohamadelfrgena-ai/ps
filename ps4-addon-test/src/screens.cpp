@@ -158,8 +158,7 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
         {"up_to_50", {{"en", "50% off all addons and worlds"}, {"ar", "خصم 50٪ على كل الإضافات والعوالم"}, {"fr", "-50% sur tous les addons et mondes"}, {"tr", "Tüm eklenti ve dünyalarda %50 indirim"}, {"es", "50% de descuento en todos los addons y mundos"}, {"ru", "Скидка 50% на все аддоны и миры"}, {"pt", "50% de desconto em todos os addons e mundos"}, {"zh", "所有附加包和世界五折优惠"}}},
         {"nav_search", {{"en", "Search"}, {"ar", "\u0628\u062d\u062b"}, {"fr", "Recherche"}, {"tr", "Ara"},
                          {"es", "Buscar"}, {"ru", "\u041f\u043e\u0438\u0441\u043a"}, {"pt", "Pesquisar"}, {"zh", "\u641c\u7d22"}}},
-        {"mine_title", {{"en", "Updates & downloads"}, {"ar", "\u0627\u0644\u062a\u062d\u062f\u064a\u062b\u0627\u062a \u0648\u0627\u0644\u062a\u0646\u0632\u064a\u0644\u0627\u062a"}, {"fr", "Mises \u00e0 jour et t\u00e9l\u00e9chargements"}, {"tr", "G\u00fcncellemeler ve indirmeler"},
-                       {"es", "Actualizaciones y descargas"}, {"ru", "\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u0438 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438"}, {"pt", "Atualiza\u00e7\u00f5es e downloads"}, {"zh", "\u66f4\u65b0\u4e0e\u4e0b\u8f7d"}}},
+        {"mine_title", {{"en", "Downloads"}, {"ar", "\u0627\u0644\u062a\u0646\u0632\u064a\u0644\u0627\u062a"}, {"fr", "T\u00e9l\u00e9chargements"}, {"tr", "\u0130ndirmeler"}, {"es", "Descargas"}, {"ru", "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0438"}, {"pt", "Downloads"}, {"zh", "\u4e0b\u8f7d"}}},
         {"mine_sub", {{"en", "Every addon installed on this console \u2014 with its own pack icon"},
                       {"ar", "\u0643\u0644 \u0627\u0644\u0625\u0636\u0627\u0641\u0627\u062a \u0627\u0644\u0645\u062b\u0628\u062a\u0629 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u062c\u0647\u0627\u0632 \u2014 \u0628\u0623\u064a\u0642\u0648\u0646\u062a\u0647\u0627 \u0627\u0644\u0623\u0635\u0644\u064a\u0629"},
                       {"fr", "Tous les addons install\u00e9s sur cette console \u2014 avec leur propre ic\u00f4ne"},
@@ -3803,16 +3802,17 @@ void drawMine(UiEngine& e, int focus, const std::string& langCode) {
     backdrop(e);
     drawTopNav(e, 6, langCode);
     const int cx = kCL + 20, cw = kCR - cx;
-    // v0.65c («التي في الدوائر الزرقاء تحذفها»): NO page title, NO subtitle,
-    // NO «Check for updates» button — the list starts clean at the top.
+    // v0.65c («التي في الدوائر الزرقاء تحذفها» + «DOWNLOADS بس ذي خليها»):
+    // the title stays but says ONLY «Downloads» — no subtitle, no «Check for updates».
+    pageTitle(e, L, tr("mine_title", lang), cx, 36);
     // section label
     e.drawText(tr("mine_recent", lang), L.X(cx, e.measureText(tr("mine_recent", lang), 26, FontRole::Body, L.rtl)),
-               48, 26, kTX, FontRole::Body, L.rtl);
+               118, 26, kTX, FontRole::Body, L.rtl);
 
     const std::vector<int> items = viewItems(View::Mine, 0);
-    const int rowH = 100, pitch = 110, top = 88;
+    const int rowH = 100, pitch = 110, top = 168;
     const int scroll = scrollOf(View::Mine);
-    const int visible = 8;
+    const int visible = 7;
     if (items.empty()) {
         emptyState(e, L, cx, top, cw, 964 - top, 12, tr("mine_empty_t", lang), tr("mine_empty_s", lang));
         drawLegendBar(e, {{"\xE2\x9C\x95", "select"}, {"\xE2\x97\x8B", "back"}}, langCode);
