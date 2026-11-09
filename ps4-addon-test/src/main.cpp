@@ -93,11 +93,25 @@ static std::string basenameOf(const std::string& url) {
 // ---------------------------------------------------------------- app state -
 enum class Scr { SignIn, Home, Deals, Store, Plans, Profile, Settings, Search, Detail, Mine };
 
+// v0.69: content_type -> FILE TYPE filter kind (0 addon, 1 skin, 2 world, 3 texture pack)
+static int ftypeOf(const std::string& ct) {
+    std::string s;
+    for (char c : ct) s += (c >= 'A' && c <= 'Z') ? static_cast<char>(c + 32) : c;
+    if (s.find("skin") != std::string::npos) return 1;
+    if (s.find("world") != std::string::npos) return 2;
+    if (s.find("texture") != std::string::npos) return 3;
+    return 0;
+}
+
 struct App {
     Scr scr = Scr::Home;            // v5: guest Home (no welcome page)
     Scr back = Scr::Home;
     std::string lang = "en";
     int focus = 0, filter = 0, hero = 0, subFocus = -1;
+    int storeType = 0, storePlan = 0;   // v0.69: Store filter drawer (FILE TYPE + Subscription Plan)
+    bool filterOpen = false, filterAnim = false;
+    float filterT = 0.f, filterAnimFrom = 0.f, filterAnimTo = 0.f;
+    Uint32 filterAnimAt = 0;
     int detailIdx = -1;
     bool askSignIn = false;
     int askFocus = 0;
@@ -117,6 +131,16 @@ struct App {
     std::atomic<bool> dirty{true};
 };
 static App A;
+static int storeF() { return A.storeType * 4 + A.storePlan; }   // v0.69: drawer code for viewItems(Store)
+static void startFilterAnim(bool open) {
+    A.filterOpen = open;
+    A.filterAnim = true;
+    A.filterAnimFrom = A.filterT;
+    A.filterAnimTo = open ? 1.f : 0.f;
+    A.filterAnimAt = SDL_GetTicks();
+    if (!open && A.focus >= 11 && A.focus <= 19) A.focus = 10;
+    A.dirty = true;
+}
 
 static SupabaseConfig gCfg;
 static LinkSession gSession;
@@ -341,6 +365,7 @@ static AddonItem toItem(const ItemData& d) {
     it.description = d.description;
     it.category = d.category.empty() ? d.contentType : d.category;
     it.isWorld = (d.contentType == "world");
+    it.ftype = ftypeOf(d.contentType);
     it.tier = tierFromPlan(d.plan);
     it.acPrice = (int)(d.saleAcPrice >= 0 ? d.saleAcPrice : d.acPrice);
     it.acPriceOld = (d.saleAcPrice >= 0) ? (int)d.acPrice : 0;
@@ -1039,7 +1064,7 @@ static int focusedCard() {
             break;
         }
         case Scr::Deals:  v = viewItems(View::Deals, A.filter); first = scrollOf(View::Deals); idx = A.focus - 5; break;
-        case Scr::Store:  v = viewItems(View::Store, A.filter); first = scrollOf(View::Store); idx = A.focus; break;
+        case Scr::Store:  v = viewItems(View::Store, storeF()); first = scrollOf(View::Store); idx = A.focus; break;
         case Scr::Search: v = viewItems(View::Search, A.filter, A.query); first = scrollOf(View::Search); idx = A.focus - 4; break;
         case Scr::Mine:   v = viewItems(View::Mine, 0);  first = scrollOf(View::Mine);  idx = A.focus; break;
         default: return -1;
@@ -1177,33 +1202,36 @@ static void moveFocus(int dx, int dy) {
             break;
         }
         case Scr::Store: {
-            // v0.36: grid 0-9 (5-wide x2 rows) | banner 10 | categories 11-17 | sort pill 18
-            const std::vector<int> v = viewItems(View::Store, A.filter);
+            // v0.69: grid 0-9 (6-wide closed / 5-wide open x2 rows) | banner 10 | filter drawer rows 11-19 | sort pill 20
+            const std::vector<int> v = viewItems(View::Store, storeF());
             const int gridN = (int)std::min<std::size_t>(10, v.size());
+            const int colsN = A.filterOpen ? 5 : 6;
+            const int selRow = A.storeType > 0 ? A.storeType : (A.storePlan > 0 ? 5 + A.storePlan : 0);
             if (A.focus <= 9) {
                 if (v.empty()) A.focus = 10;
-                else if (dy < 0 && A.focus < 5 && scrollOf(View::Store) == 0) A.focus = 10;
-                else if (dy > 0 && A.focus >= 5 && scrollOf(View::Store) + 10 >= (int)v.size()) A.focus = 10;
-                else moveGridCard(View::Store, 0, 5, 10, dx, dy);
+                else if (dy < 0 && A.focus < colsN && scrollOf(View::Store) == 0) A.focus = 10;
+                else if (dy > 0 && A.focus >= colsN && scrollOf(View::Store) + 10 >= (int)v.size()) A.focus = 10;
+                else moveGridCard(View::Store, 0, colsN, 10, dx, dy);
             } else if (A.focus == 10) {
-                if (dy > 0) A.focus = 11 + std::min(A.filter, 6);
-                else if (dy < 0) A.focus = gridN > 0 ? 9 : 11 + std::min(A.filter, 6);
-            } else if (A.focus <= 17) {
-                if (dy < 0) A.focus = 10;
-                else if (dy > 0) A.focus = 18;
+                if (dy > 0) A.focus = A.filterOpen ? 11 + selRow : 20;
+                else if (dy < 0) A.focus = gridN > 0 ? gridN - 1 : (A.filterOpen ? 11 + selRow : 20);
+            } else if (A.focus <= 19) {
+                if (!A.filterOpen) A.focus = 20;
+                else if (dy < 0) A.focus = (A.focus == 11) ? 10 : A.focus - 1;
+                else if (dy > 0) A.focus = (A.focus == 19) ? 20 : A.focus + 1;
                 else {
-                    int f = A.focus - 11 + dx;
-                    if (f < 0) f = 6;
-                    if (f > 6) f = 0;
-                    A.focus = 11 + f;
+                    int r = A.focus - 11 + dx;
+                    if (r < 0) r = 8;
+                    if (r > 8) r = 0;
+                    A.focus = 11 + r;
                 }
             } else {
-                if (dy < 0) A.focus = 11 + std::min(A.filter, 6);
+                if (dy < 0) A.focus = A.filterOpen ? 11 + selRow : (gridN > 0 ? gridN - 1 : 10);
                 else if (dx != 0) setStoreSort((storeSort() + (dx > 0 ? 1 : 2)) % 3);
             }
             break;
         }
-        case Scr::Search: {
+                case Scr::Search: {
             const std::vector<int> v = viewItems(View::Search, A.filter, A.query);
             const int cardN = (int)std::min<std::size_t>(5, v.size());
             if (A.focus == 0) {
@@ -1337,6 +1365,12 @@ static void handle(Btn b) {
     // ---- global: △ = Search (no triangle menu in v5) ----
     if (b == Btn::Triangle && A.scr != Scr::SignIn && A.scr != Scr::Search) {
         pushScr(Scr::Search);
+        return;
+    }
+    // ---- v0.69 (user): the OPTIONS button opens the Store filter drawer («وزر OPTION هوالذي يظههرا») ----
+    if (b == Btn::Options && A.scr == Scr::Store) {
+        startFilterAnim(!A.filterOpen);
+        ui_sfx(Sfx::Toggle);
         return;
     }
     // ---- v0.54: the sidebar rail cycles on EVERY screen (was missing on
@@ -1488,15 +1522,18 @@ static void handle(Btn b) {
                     setScroll(View::Deals, 0);
                     break;
                 }
-                if (A.scr == Scr::Store && A.focus == 18) {
+                if (A.scr == Scr::Store && A.focus == 20) {
                     setStoreSort((storeSort() + 1) % 3);
                     setScroll(View::Store, 0);
                     ui_sfx(Sfx::Toggle);
                     break;
                 }
-                if (A.scr == Scr::Store && A.focus >= 11 && A.focus <= 17) {
-                    A.filter = A.focus - 9;
+                if (A.scr == Scr::Store && A.focus >= 11 && A.focus <= 19) {
+                    const int row = A.focus - 11;
+                    if (row < 5) A.storeType = row;
+                    else A.storePlan = row - 5;
                     setScroll(View::Store, 0);
+                    ui_sfx(Sfx::Toggle);
                     break;
                 }
                 if (A.scr == Scr::Store && A.focus == 10) {
@@ -1513,6 +1550,7 @@ static void handle(Btn b) {
                 openItem(focusedCard());
             } else if (b == Btn::Circle) {
                 if (A.scr == Scr::Home) break;          // never exits the app
+                if (A.scr == Scr::Store && A.filterOpen) { startFilterAnim(false); break; }
                 go(Scr::Home);
             } else if (b == Btn::Up) moveFocus(0, -1);
             else if (b == Btn::Down) moveFocus(0, 1);
@@ -1544,7 +1582,7 @@ static void drawFrame(UiEngine& e) {
         case Scr::SignIn:   drawSignIn(e, A.focus, A.code, A.codeSecs, A.codeStatus, L, A.back != Scr::Home, A.qrView); break;
         case Scr::Home:     drawHome(e, A.focus, A.hero, A.filter, L); break;
         case Scr::Deals:    drawDeals(e, A.focus, A.filter, L); break;
-        case Scr::Store:    drawStore(e, A.focus, A.filter, L); break;
+        case Scr::Store:    drawStore(e, A.focus, storeF(), L, A.filterT); break;
         case Scr::Plans:    drawPlans(e, -1, L); break;
         case Scr::Profile:  drawProfile(e, A.focus, L); break;
         case Scr::Settings: drawSettings(e, A.focus, A.subFocus, A.autoLaunch, L); break;
@@ -1737,6 +1775,7 @@ int main(int, char**) {
                 else if (b == 5) mapped = Btn::R1;
                 else if (b == 6 || b == 18) mapped = Btn::L2;
                 else if (b == 7 || b == 19) mapped = Btn::R2;
+                else if (b == 8 || b == 9) mapped = Btn::Options;   // v0.69: OPTIONS = filter drawer
                 if (mapped != Btn::None) markHeld(mapped, ev.type == SDL_JOYBUTTONDOWN);
             } else if (ev.type == SDL_KEYDOWN) {
                 const SDL_Keycode k = ev.key.keysym.sym;
@@ -1748,6 +1787,7 @@ int main(int, char**) {
                 else if (k == SDLK_BACKSPACE || k == SDLK_ESCAPE) pushBtn(Btn::Circle);
                 else if (k == SDLK_t) pushBtn(Btn::Triangle);
                 else if (k == SDLK_s) pushBtn(Btn::Square);
+                else if (k == SDLK_o) pushBtn(Btn::Options);
                 else if (k == SDLK_LEFTBRACKET) pushBtn(Btn::L2);
                 else if (k == SDLK_RIGHTBRACKET) pushBtn(Btn::R2);
                 else if (k == SDLK_COMMA) pushBtn(Btn::L1);
@@ -1804,6 +1844,14 @@ int main(int, char**) {
 
         if (bakedFadeActive()) { bakedFadeReset(); A.dirty = true; }   // v0.38: banner glide ticks per frame
         const Uint32 nowMs = SDL_GetTicks();
+        if (A.filterAnim) {   // v0.69: the drawer slide («وكانه تدفع البطاقات») ticks per frame
+            const Uint32 el = nowMs - A.filterAnimAt;
+            const float p = el >= 280u ? 1.f : static_cast<float>(el) / 280.f;
+            const float s = p * p * (3.f - 2.f * p);
+            A.filterT = A.filterAnimFrom + (A.filterAnimTo - A.filterAnimFrom) * s;
+            if (p >= 1.f) { A.filterT = A.filterAnimTo; A.filterAnim = false; }
+            A.dirty = true;
+        }
         if (A.dirty.exchange(false)) {
             animReset();
             drawFrame(engine);

@@ -56,6 +56,7 @@ struct AddonItem {
     std::string description;     // content_items.description
     std::string category;        // content_items.category
     bool isWorld = false;        // content_type == "world"
+    int ftype = 0;               // content_type kind: 0 addon, 1 skin, 2 world, 3 texture pack
     Tier tier = Tier::Free;      // content_items.plan
     int acPrice = 0;             // effective_item_ac_price(id)  (sale applied). 0 = no AC unlock offered
     int acPriceOld = 0;          // content_items.ac_price when a sale price is active (else 0)
@@ -208,7 +209,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
 // Deals focus: 0-4 tabs, 5-9 cards (items with a sale price, or every paid item while a sale banner is active)
 void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langCode);
 // Store focus: 0-7 cards (2 rows x 4), 8 banner, 9-11 categories
-void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langCode);
+void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langCode, float panelT);
 // Addon page. focus 0 main button, 1 "Unlock for X AC" (only when acUnlockOffered). notice = optional server message
 enum class DemoState { Idle = 0, Downloading = 1, Installing = 2, Installed = 3, Queued = 4 };   // v0.41: staged, waiting for Minecraft
 void drawAddonDetail(UiEngine& e, int focus, int catalogIndex, DemoState state, int percent,

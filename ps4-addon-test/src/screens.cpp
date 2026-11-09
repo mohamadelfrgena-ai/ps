@@ -342,6 +342,12 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
         {"chip_epic", {{"en", "Epic"}, {"ar", "Epic"}, {"fr", "Epic"}, {"tr", "Epic"}, {"es", "Epic"}, {"ru", "Epic"}, {"pt", "Épico"}, {"zh", "史诗"}}},
         {"chip_legendary", {{"en", "Legendary"}, {"ar", "Legendary"}, {"fr", "Legendary"}, {"tr", "Legendary"}, {"es", "Legendary"}, {"ru", "Legendary"}, {"pt", "Lendário"}, {"zh", "传奇"}}},
         {"chip_new", {{"en", "New"}, {"ar", "جديد"}, {"fr", "Nouveau"}, {"tr", "Yeni"}, {"es", "Nuevo"}, {"ru", "Новое"}, {"pt", "Novo"}, {"zh", "新"}}},
+        {"ft_head", {{"en", "FILE TYPE"}, {"ar", "FILE TYPE"}, {"fr", "FILE TYPE"}, {"tr", "FILE TYPE"}, {"es", "FILE TYPE"}, {"ru", "FILE TYPE"}, {"pt", "FILE TYPE"}, {"zh", "FILE TYPE"}}},
+        {"pl_head", {{"en", "Subscription Plan"}, {"ar", "Subscription Plan"}, {"fr", "Subscription Plan"}, {"tr", "Subscription Plan"}, {"es", "Subscription Plan"}, {"ru", "Subscription Plan"}, {"pt", "Subscription Plan"}, {"zh", "Subscription Plan"}}},
+        {"ft_skin", {{"en", "Skin"}, {"ar", "سكين"}, {"fr", "Skin"}, {"tr", "Skin"}, {"es", "Skin"}, {"ru", "Скин"}, {"pt", "Skin"}, {"zh", "皮肤"}}},
+        {"ft_addon", {{"en", "Addon"}, {"ar", "إضافة"}, {"fr", "Addon"}, {"tr", "Eklenti"}, {"es", "Complemento"}, {"ru", "Аддон"}, {"pt", "Addon"}, {"zh", "插件"}}},
+        {"ft_world", {{"en", "World"}, {"ar", "عالم"}, {"fr", "Monde"}, {"tr", "Dünya"}, {"es", "Mundo"}, {"ru", "Мир"}, {"pt", "Mundo"}, {"zh", "世界"}}},
+        {"ft_texture", {{"en", "Texture Pack"}, {"ar", "حزمة قوام"}, {"fr", "Pack de textures"}, {"tr", "Doku paketi"}, {"es", "Pack de texturas"}, {"ru", "Текстур-пак"}, {"pt", "Pacote de texturas"}, {"zh", "材质包"}}},
         {"chip_under100", {{"en", "Under 100 AC"}, {"ar", "أقل من 100 AC"}, {"fr", "Moins de 100 AC"}, {"tr", "100 AC altı"}, {"es", "Menos de 100 AC"}, {"ru", "До 100 AC"}, {"pt", "Menos de 100 AC"}, {"zh", "低于 100 AC"}}},
         {"chip_biggest", {{"en", "Biggest discount"}, {"ar", "أكبر خصم"}, {"fr", "Plus grosse remise"}, {"tr", "En büyük indirim"}, {"es", "Mayor descuento"}, {"ru", "Максимальная скидка"}, {"pt", "Maior desconto"}, {"zh", "最大折扣"}}},
         {"chip_newest", {{"en", "Newest"}, {"ar", "الأحدث"}, {"fr", "Plus récent"}, {"tr", "En yeni"}, {"es", "Más reciente"}, {"ru", "Новейшие"}, {"pt", "Mais recente"}, {"zh", "最新"}}},
@@ -2040,15 +2046,22 @@ std::vector<int> viewItems(View v, int filter, const std::string& query) {
             if (keep && filter == 3) keep = it.acPrice < 100;
         } else if (v == View::Mine) {
             keep = it.installed;
-        } else {   // Store: 0 All, 1 Addons, 2 Worlds, 3 Free, 4 Epic, 5 Legendary, 6 New
-            switch (filter) {
-                case 1: keep = !it.isWorld; break;
-                case 2: keep = it.isWorld; break;
-                case 3: keep = it.tier == Tier::Free; break;
-                case 4: keep = it.tier == Tier::Epic; break;
-                case 5: keep = it.tier == Tier::Legendary; break;
-                case 6: keep = isNewItem(it); break;
+        } else {   // v0.69 Store drawer: code = type*4 + plan (type 0 any/1 skin/2 addon/3 world/4 texture; plan 0 any/1 free/2 epic/3 legendary)
+            const int ftyp = filter / 4, fplan = filter % 4;
+            switch (ftyp) {
+                case 1: keep = it.ftype == 1; break;
+                case 2: keep = it.ftype == 0; break;
+                case 3: keep = it.ftype == 2; break;
+                case 4: keep = it.ftype == 3; break;
                 default: break;
+            }
+            if (keep) {
+                switch (fplan) {
+                    case 1: keep = it.tier == Tier::Free; break;
+                    case 2: keep = it.tier == Tier::Epic; break;
+                    case 3: keep = it.tier == Tier::Legendary; break;
+                    default: break;
+                }
             }
         }
         if (keep) out.push_back(static_cast<int>(i));
@@ -3384,15 +3397,60 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
 // ============================================================================
 //  Store — sort pill, banner, 7 categories, 2x4 grid (no app/QR tile)
 // ============================================================================
-void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langCode) {
+void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langCode, float panelT) {
     Lay L; L.rtl = (langCode == "ar");
     const std::string& lang = langCode;
     backdrop(e);
-    drawTopNav(e, 2, langCode);
     const bool sale = saleActive();
     const int cx = kCL + 20, cw = kCR - cx;
-    pageTitle(e, L, tr("nav_store", lang), cx, 44);
-    {   // ---- sort pill (focus 16): Popular / Newest / Top rated — ✕ cycles it (setStoreSort) ----
+    // ---- v0.69 (user): the filter list is HIDDEN and slides out from behind the side rail
+    // («تكون مخفية لازم وتطلع ... وكانه تدفع البطاقات عندما تظهر») — the OPTIONS button opens
+    // it, named Filter/تصفية. FILE TYPE + Subscription Plan with independent selections, an
+    // "All" row in each group, underline-only marks and NO counts. Cards: 6 wide closed / 5 open. ----
+    const float panT = panelT < 0.f ? 0.f : (panelT > 1.f ? 1.f : panelT);
+    const int catW = 270, catGap = 32, gap = 26;
+    int bnY = 132, bnH = 0;
+    if (sale) { if (!stripArt(e).empty()) bnH = 128; }
+    else if (!gCat.empty()) bnH = 128;
+    const int catY = bnH > 0 ? bnY + bnH + 34 : 150;
+    const int gwAll = kCR - cx;
+    const int gcw6 = (gwAll - gap * 5) / 6;
+    const int gw1 = gwAll - (catW + catGap);
+    const int gcw5 = (gw1 - gap * 4) / 5;
+    const int selType = filterIndex / 4, selPlan = filterIndex % 4;
+    auto lerpI = [](int a, int b, float u) {
+        const float v = static_cast<float>(b - a) * u;
+        return a + static_cast<int>(v + (v >= 0.f ? 0.5f : -0.5f));
+    };
+    if (panT > 0.004f) {
+        const int pxl = cx - lerpI(0, catW + catGap, 1.f - panT);
+        const int rxp = L.X(pxl, catW);
+        const int panelH = 620;
+        e.drawRoundRect(rxp, catY, catW, panelH, 22, kSF);
+        e.drawRoundBorder(rxp, catY, catW, panelH, 22, 2, ink(26));
+        auto head = [&](const std::string& s, int y) {
+            boxText(e, L, s, pxl + 22, catW - 44, y, 19, kGD);
+            e.drawRoundRect(L.X(pxl + 22, catW - 44), y + 30, catW - 44, 3, 2, SDL_Color{255, 214, 90, 140});
+        };
+        auto row = [&](int idx, const std::string& s, int y, int val, int selVal) {
+            const bool on = val == selVal;
+            const bool foc = focus == 11 + idx;
+            boxText(e, L, s, pxl + 22, catW - 44, y + 12, 22, on || foc ? kTX : kCHIPTX);
+            if (foc) e.drawRoundRect(L.X(pxl + 18, catW - 36), y + 46, catW - 36, 6, 3, SDL_Color{255, 214, 90, 255});
+            else if (on) e.drawRoundRect(L.X(pxl + 18, catW - 36), y + 47, catW - 36, 4, 2, kBLl);
+        };
+        int yy = catY + 16;
+        head(tr("ft_head", lang), yy); yy += 46;
+        const std::string typeKeys[5] = {tr("chip_all", lang), tr("ft_skin", lang), tr("ft_addon", lang), tr("ft_world", lang), tr("ft_texture", lang)};
+        for (int i = 0; i < 5; ++i) { row(i, typeKeys[i], yy, i, selType); yy += 52; }
+        yy += 16;
+        head(tr("pl_head", lang), yy); yy += 46;
+        const std::string planKeys[4] = {tr("chip_all", lang), tr("chip_free", lang), tr("chip_epic", lang), tr("chip_legendary", lang)};
+        for (int i = 0; i < 4; ++i) { row(5 + i, planKeys[i], yy, i, selPlan); yy += 52; }
+    }
+    drawTopNav(e, 2, langCode);
+        pageTitle(e, L, tr("nav_store", lang), cx, 44);
+    {   // ---- sort pill (focus 20): Popular / Newest / Top rated — ✕ cycles it (setStoreSort) ----
         static const char* kSortKeys[3] = {"sort_popular", "sort_newest", "sort_rating"};
         const std::string lab = tr("sort_by", lang) + ":  " + tr(kSortKeys[storeSort()], lang);
         // v6.7: label + chevron centred together, equal padding on both sides
@@ -3406,11 +3464,10 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
         e.drawRoundRect(srx, sy, sw, sh, sh / 2, ink(gLight ? 8 : 12));
         e.drawRoundBorder(srx, sy, sw, sh, sh / 2, 2, ink(gLight ? 30 : 34));
         drawGroupCentered(e, L, g, srx + sw / 2, sy + sh / 2);
-        if (focus == 18) focusRing(e, srx, sy, sw, sh, sh / 2);
+        if (focus == 20) focusRing(e, srx, sy, sw, sh, sh / 2);
     }
 
-    // ---- banner (focus 8): sale strip (art as backdrop of the strip) or the newest item ----
-    int bnY = 132, bnH = 0;
+    // ---- banner (focus 10): sale strip (art as backdrop of the strip) or the newest item ----
     if (sale) {
         const std::string art = stripArt(e);
         if (!art.empty()) {
@@ -3447,44 +3504,28 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
     }
     if (bnH > 0 && focus == 10) focusRing(e, L.X(cx, cw), bnY, cw, bnH, 22, false);   // v0.35: frame only
 
-    // ---- categories (focus 9-15) with real counts: All Addons Worlds Free Epic Legendary New ----
-    const int catX = cx, catW = 270, catY = bnH > 0 ? bnY + bnH + 34 : 150;
-    const std::string cats[7] = {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang), tr("chip_free", lang),
-                                 tr("chip_epic", lang), tr("chip_legendary", lang), tr("chip_new", lang)};
-    for (int i = 0; i < 7; ++i) {
-        const int y = catY + i * 68;
-        const bool on = i == filterIndex;
-        const bool foc = focus == 11 + i;
-        boxText(e, L, cats[i], catX + 22, catW - 90, y + 16, 22, on || foc ? kTX : kCHIPTX);
-        const int n = static_cast<int>(viewItems(View::Store, i).size());
-        endText(e, L, num(n), catX, catW - 20, y + 18, 19, on || foc ? kTX : kMU);
-        // v0.30: category tags are marked with an underline bar only (no selection frame)
-        if (foc) e.drawRoundRect(L.X(catX + 18, catW - 36), y + 50, catW - 36, 6, 3, SDL_Color{255, 214, 90, 255});
-        else if (on) e.drawRoundRect(L.X(catX + 18, catW - 36), y + 51, catW - 36, 4, 2, kBLl);
-    }
-
-    // ---- grid 2 x 5 (focus 0-9) — v0.36 five whole cards per row ----
-    const int gx = cx + catW + 32, gw = kCR - gx, gap = 26, cols = 5;
-    const int gcw = (gw - gap * (cols - 1)) / cols, ih = gcw * 9 / 16;
-    const int ch = vcardHeight(ih, true);
-    const std::vector<int> items = viewItems(View::Store, filterIndex);
-    const int first = std::max(0, std::min(scrollOf(View::Store), std::max(0, static_cast<int>(items.size()) - 1)));
-    const int shown = std::min(10, static_cast<int>(items.size()) - first);
-    if (items.empty()) {
-        emptyState(e, L, gx, catY, gw, std::min(560, 960 - catY), 12, tr(gCat.empty() ? "home_empty_t" : "empty_t", lang),
-                   tr(gCat.empty() ? "home_empty_s" : "empty_s", lang));
-    } else {
-        const int gyMax = catY + (ch + gap) + ch / 2;   // v0.58: full row + soft-faded half peek
-        for (int i = 0; i < shown; ++i) {
-            const int col = i % cols, row = i / cols;
-            const int ry = catY + row * (ch + gap);
-            if (ry >= gyMax) break;
-            const AddonItem& it = gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])];
-            vcard(e, L, gx + col * (gcw + gap), ry, gcw, ih, it, focus == i, lang, true, true, sale);
+    // ---- v0.69 cards: 6 wide filling the width while the drawer is hidden, 5 when it is
+    // open — every card interpolates between the two layouts so the drawer visibly PUSHES them ----
+    {
+        const std::vector<int> items = viewItems(View::Store, filterIndex);
+        const int first = std::max(0, std::min(scrollOf(View::Store), std::max(0, static_cast<int>(items.size()) - 1)));
+        const int shown = std::min(10, static_cast<int>(items.size()) - first);
+        const int gxL = cx + lerpI(0, catW + catGap, panT);
+        if (items.empty()) {
+            emptyState(e, L, gxL, catY, kCR - gxL, std::min(560, 960 - catY), 12, tr(gCat.empty() ? "home_empty_t" : "empty_t", lang),
+                       tr(gCat.empty() ? "home_empty_s" : "empty_s", lang));
+        } else {
+            const int ch6 = vcardHeight(gcw6 * 9 / 16, true), ch5 = vcardHeight(gcw5 * 9 / 16, true);
+            for (int i = 0; i < shown; ++i) {
+                const int xC = cx + (i % 6) * (gcw6 + gap), yC = catY + (i / 6) * (ch6 + gap);
+                const int xO = cx + catW + catGap + (i % 5) * (gcw5 + gap), yO = catY + (i / 5) * (ch5 + gap);
+                const int gcw = lerpI(gcw6, gcw5, panT);
+                const AddonItem& it = gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])];
+                vcard(e, L, lerpI(xC, xO, panT), lerpI(yC, yO, panT), gcw, gcw * 9 / 16, it, focus == i, lang, true, true, sale);
+            }
         }
-        // v0.65d («شوف هذا الظل الغيه الذي مخرب البطاقات»): NO dark fade box — cards show fully
     }
-    drawLegendBar(e, {{"\xE2\x9C\x95", "open"}, {"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}}, langCode);
+        drawLegendBar(e, {{"\xE2\x9C\x95", "open"}, {"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}, {"\xE2\x98\xB0", "filter"}}, langCode);
 }
 
 // ============================================================================
