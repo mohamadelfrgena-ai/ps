@@ -1684,50 +1684,31 @@ void sectionTitle(UiEngine& e, const Lay& L, const std::string& s, int x, int w,
 // 1px light rim and a darker bottom edge — same size/position as before, so layouts don't move.
 void button(UiEngine& e, const Lay& L, int xl, int y, int w, int h, const std::string& label,
             int style, int px = 30, int radius = 20) {
+    // Flat design (same as the "View addon" button): solid fill, 12px corners, bold-looking white label.
+    // 0 blue | 1 neutral | 2 gold | 3 blue outline (status) | 4 red outline (danger)
     const int rx = L.X(xl, w);
-    const int r = std::min(radius, 20);
-    // glass highlight (top half) + light rim, shared by the filled styles
-    auto glass = [&](Uint8 top) {
-        if (w > 2 * r + 8 && h > 16)
-            e.drawRoundGradV(rx + 2, y + 2, w - 4, h / 2 - 1, std::max(2, r - 2), SDL_Color{255, 255, 255, top}, SDL_Color{255, 255, 255, 0});
-    };
-    auto rim = [&](Uint8 a) {
-        e.drawRoundBorder(rx, y, w, h, r, 1, SDL_Color{255, 255, 255, a});
-        if (w > 2 * r + 8) e.fillRect(rx + r, y + h - 3, w - 2 * r, 2, SDL_Color{0, 0, 0, static_cast<Uint8>(gLight ? 22 : 46)});
-    };
-    // coloured under-glow (two soft expanded layers, drawn before the button)
-    auto under = [&](SDL_Color c, Uint8 a1, Uint8 a2) {
-        e.drawRoundRect(rx - 3, y + 3, w + 6, h + 6, r + 4, SDL_Color{c.r, c.g, c.b, a2});
-        e.drawRoundRect(rx - 7, y + 6, w + 14, h + 12, r + 8, SDL_Color{c.r, c.g, c.b, a1});
-    };
-    if (style == 0) {
-        e.dropShadow(rx, y + 4, w, h, r, 14, gLight ? 70 : 120);
-        under(SDL_Color{74, 168, 255, 255}, gLight ? 16 : 14, gLight ? 26 : 24);
-        e.drawRoundGradD(rx, y, w, h, r, SDL_Color{74, 168, 255, 255}, SDL_Color{8, 86, 190, 255});   // v0.40 Sony blue
-        glass(gLight ? 90 : 78); rim(gLight ? 120 : 90);
-    } else if (style == 2) {
-        e.dropShadow(rx, y + 4, w, h, r, 14, gLight ? 70 : 110);
-        under(SDL_Color{255, 190, 60, 255}, gLight ? 16 : 14, gLight ? 26 : 24);
-        e.drawRoundGradD(rx, y, w, h, r, SDL_Color{255, 226, 130, 255}, SDL_Color{238, 150, 30, 255});
-        glass(gLight ? 90 : 80); rim(gLight ? 120 : 90);
-    } else if (style == 3) {
-        e.drawRoundGradV(rx, y, w, h, r, SDL_Color{74, 168, 255, 56}, SDL_Color{74, 168, 255, 20});
-        e.drawRoundBorder(rx, y, w, h, r, 2, SDL_Color{74, 168, 255, 230});
-        glass(gLight ? 40 : 22);
-    } else if (style == 4) {
-        e.drawRoundGradV(rx, y, w, h, r, SDL_Color{251, 76, 110, 54}, SDL_Color{251, 76, 110, 18});
-        e.drawRoundBorder(rx, y, w, h, r, 2, SDL_Color{251, 76, 110, 230});
-        glass(gLight ? 40 : 22);
-    } else {
-        e.dropShadow(rx, y + 3, w, h, r, 10, gLight ? 36 : 70);
-        if (gLight) e.drawRoundGradV(rx, y, w, h, r, SDL_Color{255, 255, 255, 255}, SDL_Color{238, 242, 247, 255});
-        else        e.drawRoundGradV(rx, y, w, h, r, ink(40), ink(14));
-        e.drawRoundBorder(rx, y, w, h, r, 2, ink(gLight ? 44 : 72));
-        glass(gLight ? 60 : 30);
+    const int r = std::min(radius, 12);
+    SDL_Color txt = SDL_Color{255, 255, 255, 255};
+    if (style == 0) {                                   // primary #1a6fd6
+        e.drawRoundRect(rx, y, w, h, r, SDL_Color{26, 111, 214, 255});
+    } else if (style == 2) {                            // gold #FFC940
+        e.drawRoundRect(rx, y, w, h, r, SDL_Color{255, 201, 64, 255});
+        txt = SDL_Color{44, 26, 2, 255};
+    } else if (style == 3) {                            // status: light blue wash + 2px border
+        e.drawRoundRect(rx, y, w, h, r, SDL_Color{74, 168, 255, 40});
+        e.drawRoundBorder(rx, y, w, h, r, 2, SDL_Color{74, 168, 255, 255});
+        txt = gLight ? SDL_Color{24, 95, 165, 255} : kGRN2;
+    } else if (style == 4) {                            // danger: light red wash + 2px border
+        e.drawRoundRect(rx, y, w, h, r, SDL_Color{251, 76, 110, 40});
+        e.drawRoundBorder(rx, y, w, h, r, 2, SDL_Color{251, 76, 110, 255});
+        txt = gLight ? SDL_Color{163, 45, 45, 255} : kERT;
+    } else {                                            // secondary / neutral
+        e.drawRoundRect(rx, y, w, h, r, gLight ? SDL_Color{230, 237, 247, 255} : SDL_Color{43, 50, 56, 255});
+        txt = gLight ? SDL_Color{20, 32, 46, 255} : kTX;
     }
-    const SDL_Color ink = style == 0 ? SDL_Color{255, 255, 255, 255} : style == 2 ? SDL_Color{44, 26, 2, 255} : (style == 3 ? kGRN2 : (style == 4 ? kERT : kTX));
-    e.drawTextCentered(label, rx + w / 2, y + h / 2, px, ink, FontRole::Body, L.rtl);
+    e.drawTextCentered(label, rx + w / 2, y + h / 2, px, txt, FontRole::Body, L.rtl);
 }
+
 
 
 
@@ -2600,7 +2581,17 @@ void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const Addo
     }
     // ---- title (pixel — v0.30: names always in Minecraft F77) ----
     const int ty = y + imgH + 12;
-    boxText(e, L, it.title, xl + 16, w - 32, ty, 21, kTX, FontRole::Pixel);
+    {   // flat design: cut long names with "..." instead of mid-letter
+        std::string tt = it.title;
+        const int maxW = w - 32;
+        if (e.measureText(tt, 21, FontRole::Pixel, L.rtl) > maxW) {
+            while (tt.size() > 1 && e.measureText(tt + "...", 21, FontRole::Pixel, L.rtl) > maxW) {
+                do { tt.pop_back(); } while (!tt.empty() && (static_cast<unsigned char>(tt.back()) & 0xC0) == 0x80);   // UTF-8 safe
+            }
+            tt += "...";
+        }
+        boxText(e, L, tt, xl + 16, w - 32, ty, 21, kTX, FontRole::Pixel);
+    }
     // ---- tier pill under the title (v0.65 mockup card) ----
     tierChip(e, L, xl + 16, y + imgH + 46, it.tier, lang, 28);
     if (focused) focusRing(e, rx, y, w, h, r, false);   // v0.35: card = list item, frame only
@@ -2833,6 +2824,17 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
     static const It items[7] = {{10, "nav_home"}, {11, "nav_deals"}, {12, "nav_store"}, {14, "nav_mine"},
                                 {7, "nav_plans"}, {1, "rail_profile"}, {9, "nav_settings"}};
     const int bw = 72, bh = 60, itemH = bh + 7 + 18, gap = 14;   // v0.56: 7 rail items (Search removed)
+    static const char* kRailIcon[7] = {"home", "deals", "store", "my_addons", "plans", "profile", "settings"};
+    static int railIcons = 0;   // v0.70: 0 = not tried, 1 = PNG icons ready, -1 = missing -> vector fallback
+    if (railIcons == 0) {
+        railIcons = 1;
+        for (int i = 0; i < 7; ++i) {
+            const std::string n = kRailIcon[i];
+            if (!e.loadImageFile("rail_w_" + n, "assets/sidebar-icons/png_white/" + n + ".png", 64, 64) ||
+                !e.loadImageFile("rail_m_" + n, "assets/sidebar-icons/png_mist/" + n + ".png", 64, 64) ||
+                !e.loadImageFile("rail_g_" + n, "assets/sidebar-icons/png_gray/" + n + ".png", 64, 64)) railIcons = -1;
+        }
+    }
     auto item = [&](int i, int y) {
         const bool on = (i == railIdx);
         const int bx = cx - bw / 2;
@@ -2847,6 +2849,11 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
             int iw = 0, ih = 0;
             if (e.imageSize(gAcc.avatar, iw, ih)) e.drawImageRounded(gAcc.avatar, cx - 17, y + (bh - 34) / 2, 34, 34, 17);
             else glyph(e, items[i].kind, cx - is / 2, y + (bh - is) / 2, is, in, in, false);
+        } else if (railIcons == 1) {
+            // v0.70: real PNG sidebar icons — white on the inverted tile (light theme),
+            // gray on the white tile (dark theme), mist when idle
+            const std::string nm = std::string("rail_") + (on ? (gLight ? "w_" : "g_") : (gLight ? "g_" : "m_")) + kRailIcon[i];
+            e.drawImage(nm, cx - is / 2, y + (bh - is) / 2, is, is);
         } else {
             glyph(e, items[i].kind, cx - is / 2, y + (bh - is) / 2, is, in, in, false);
         }
@@ -3150,19 +3157,18 @@ void cardGrid(UiEngine& e, const Lay& L, const std::vector<int>& items, int scro
 // it. The 10 cards scroll behind the row, one tile at a time («يتمشى يسار ويمين»).
 static void cardStrip(UiEngine& e, const Lay& L, const std::vector<int>& items, int scroll, int fb,
                       int focus, int xl, int yTop, const std::string& lang) {
-    const int gap = 24;
-    const int cw = 284;
+    const int gap = 20;
+    const int cw = (kCR - xl - 5 * gap) / 6;   // 5 cards + the View more tile, all inside the row
     const int ih = cw * 9 / 16;
     const int ch = vcardHeight(ih, false);
     const int nCards = (int)std::min<std::size_t>(10, items.size());
-    const int vmw = 284, vmx = kCR - vmw;   // the rectangle sits at the row end
     const int first = std::max(0, std::min(scroll, std::max(0, nCards - 1)));
-    for (int i = 0; i < 5 && first + i < nCards; ++i) {   // 4 full cards + a half-peek (runs under the rectangle)
+    for (int i = 0; i < 5 && first + i < nCards; ++i) {
         const int x = xl + i * (cw + gap);
         const AddonItem& it = gCat[(std::size_t)items[(std::size_t)(first + i)]];
         vcard(e, L, x, yTop, cw, ih, it, focus == fb + i, lang, false, false, saleActive());
     }
-    viewMoreTile(e, L, vmx, yTop, vmw, ch, focus == fb + nCards, lang);   // drawn last = covers the peek
+    viewMoreTile(e, L, xl + 5 * (cw + gap), yTop, cw, ch, focus == fb + nCards, lang);
 }
 } // namespace
 
@@ -3284,8 +3290,8 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
         const int bh = 64;
         const int w0 = std::max(250, textW(e, L, b0, 24) + 110);
         if (hero) {   // v6.7: play icon + label centred together in the button
-            const SDL_Color dk{6, 24, 14, 255};
-            button(e, L, cx, ctaY, w0, bh, "", 0, 24, 20);
+            const SDL_Color dk{255, 255, 255, 255};   // flat blue button: white icon + label
+            button(e, L, cx, ctaY, w0, bh, "", 0, 24, 8);
             std::vector<GPiece> g;
             g.push_back(gIcon(13, 26, [&](int gx, int gy) { playIcon(e, gx - 7, gy, 26, dk); }, 14));
             g.push_back(gText(e, b0, 24, dk, L.rtl));
