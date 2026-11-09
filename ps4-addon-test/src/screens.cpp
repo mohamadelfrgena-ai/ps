@@ -2542,6 +2542,26 @@ void lineIconTile(UiEngine& e, int kind, int x, int y, int s, SDL_Color acc, boo
 
 // v5 card: cover (16:9), title, optional creator, tier chip (+ rating / downloads). No AC price on cards.
 // v0.65 («نفس ذا»): the mockup card = cover + badges + title + tier pill (rating/stats live on the detail page).
+// v0.71 (user): cards must NOT show "by sliver fox" after the name — strip the suffix
+// (case-insensitive, spaced and unspaced variants) before drawing/truncating the title.
+static std::string cardTitleText(const std::string& s) {
+    std::string t = s;
+    std::string lo = t;
+    for (char& c : lo) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c + 32);
+    static const char* kSfx[] = {" by sliver fox", " by silver fox", " by silverfoxstudio", " by silverfox",
+                                 " bysliverfox", " bysilverfox", " - sliver fox", " - silver fox",
+                                 "bysliverfox", "bysilverfox"};
+    for (const char* sfx : kSfx) {
+        const std::string k(sfx);
+        if (lo.size() > k.size() && lo.compare(lo.size() - k.size(), k.size(), k) == 0) {
+            t = t.substr(0, t.size() - k.size());
+            break;
+        }
+    }
+    while (!t.empty() && (t.back() == ' ' || t.back() == '-' || t.back() == '|' || t.back() == ',' || t.back() == ':'))
+        t.pop_back();
+    return t.empty() ? std::string(" ") : t;
+}
 int vcardHeight(int imgH, bool creator) { (void)creator; return imgH + 12 + 26 + 34 + 12; }
 void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const AddonItem& it, bool focused,
            const std::string& lang, bool creator, bool stats, bool dealBadge) {
@@ -2582,7 +2602,7 @@ void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const Addo
     // ---- title (pixel — v0.30: names always in Minecraft F77) ----
     const int ty = y + imgH + 12;
     {   // flat design: cut long names with "..." instead of mid-letter
-        std::string tt = it.title;
+        std::string tt = cardTitleText(it.title);   // v0.71: no "by sliver fox" on cards
         const int maxW = w - 32;
         if (e.measureText(tt, 21, FontRole::Pixel, L.rtl) > maxW) {
             while (tt.size() > 1 && e.measureText(tt + "...", 21, FontRole::Pixel, L.rtl) > maxW) {

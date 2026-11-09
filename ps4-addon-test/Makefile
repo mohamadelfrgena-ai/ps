@@ -1,4 +1,4 @@
-# pkg addon test — v0.70 both-states install + autolaunch toggle restored — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
+# pkg addon test — v0.71 both-states install + autolaunch toggle restored — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
 # v0.64 (2026-11-08): addon page w/o side rail + studio fox avatar (also: grid peek + cover bleed)
 TITLE       := pkg addon test
 # AddonStation PS4 — v0.23 (UI v7.3 final)
