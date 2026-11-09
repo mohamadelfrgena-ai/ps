@@ -980,7 +980,7 @@ static int focusedCard() {
         case Scr::Deals:  v = viewItems(View::Deals, A.filter); first = scrollOf(View::Deals); idx = A.focus - 5; break;
         case Scr::Store:  v = viewItems(View::Store, A.filter); first = scrollOf(View::Store); idx = A.focus; break;
         case Scr::Search: v = viewItems(View::Search, A.filter, A.query); first = scrollOf(View::Search); idx = A.focus - 4; break;
-        case Scr::Mine:   v = viewItems(View::Mine, 0);  first = scrollOf(View::Mine);  idx = A.focus - 1; break;
+        case Scr::Mine:   v = viewItems(View::Mine, 0);  first = scrollOf(View::Mine);  idx = A.focus; break;
         default: return -1;
     }
     const int k = first + idx;
@@ -999,7 +999,7 @@ static void clampScroll() {
     else if (A.scr == Scr::Deals) { idx = A.focus - 5; view = View::Deals; }
     else if (A.scr == Scr::Store) { idx = A.focus; view = View::Store; }
     else if (A.scr == Scr::Search) { idx = A.focus - 4; view = View::Search; win = 5; }  // single-row render
-    else if (A.scr == Scr::Mine)   { idx = A.focus - 1;  view = View::Mine;  win = 7; cols = 1; }
+    else if (A.scr == Scr::Mine)   { idx = A.focus;  view = View::Mine;  win = 8; cols = 1; }   // v0.65c: 8 rows, no button
     if (idx < 0) return;
     int first = (std::max(0, scrollOf(view)) / cols) * cols;
     if (idx < first) first = (idx / cols) * cols;
@@ -1195,10 +1195,10 @@ static void moveFocus(int dx, int dy) {
             break;
         }
         case Scr::Mine: {
-            // 0 = «فحص التحديثات» button | 1..N = list rows (vertical)
+            // v0.65c: 0..N-1 = list rows (vertical) — the check button is gone
             const int n = (int)viewItems(View::Mine, 0).size();
             if (n == 0) { A.focus = 0; break; }
-            A.focus = clampInto(A.focus + dy, 0, n);
+            A.focus = clampInto(A.focus + dy, 0, n - 1);
             break;
         }
         case Scr::Plans:
@@ -1232,7 +1232,7 @@ static void onSettingsCross() {
     }
 }
 
-static std::atomic<bool> gMineCheckReq{false};
+// v0.65c: gMineCheckReq removed with the «Check for updates» button
 
 static void handle(Btn b) {
     if (b == Btn::None) return;
@@ -1408,11 +1408,7 @@ static void handle(Btn b) {
                     else startSignIn();
                     break;
                 }
-                if (A.scr == Scr::Mine && A.focus == 0) {
-                    gMineCheckReq = true;   // «فحص التحديثات» — background check + toast
-                    ui_sfx(Sfx::Toggle);
-                    break;
-                }
+                // v0.65c: the «Check for updates» button is gone — rows start at focus 0
                 if (A.scr == Scr::Home && A.focus >= 5 && A.focus <= 11) {
                     A.filter = A.focus - 5;
                     setScroll(View::Home, 0);
@@ -1628,10 +1624,7 @@ int main(int, char**) {
             std::this_thread::sleep_for(std::chrono::seconds(5));
             ++cycle;
             syncCatalogLive();
-            if (gMineCheckReq.exchange(false)) {   // v0.57: «فحص التحديثات» button
-                syncCatalogLive();
-                toast(tr("mine_checked", A.lang));
-            }
+            // v0.65c: «فحص التحديثات» button removed (user request) — no manual check toast
             if (cycle % 6 == 0) loadBannerNow();       // 30s: sale banner goes live at once
             if (cycle % 60 == 0) loadPlansNow();       // 5min: plan changes
             // v0.50: LIVE currency — the AC balance moves BOTH ways in the same

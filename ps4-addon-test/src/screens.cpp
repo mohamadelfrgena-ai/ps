@@ -3803,30 +3803,16 @@ void drawMine(UiEngine& e, int focus, const std::string& langCode) {
     backdrop(e);
     drawTopNav(e, 6, langCode);
     const int cx = kCL + 20, cw = kCR - cx;
-    pageTitle(e, L, tr("mine_title", lang), cx, 40);
-    {
-        const int tw = e.measureText(tr("mine_sub", lang), 21, FontRole::Body, L.rtl);
-        e.drawText(tr("mine_sub", lang), L.X(cx, tw), 102, 21, kMU, FontRole::Body, L.rtl);
-    }
-    // «فحص التحديثات» button (top-right) — focus zone 0
-    {
-        const int bw = 300, bh = 64, bx = kCR - bw, by = 42;
-        const int brx = L.X(bx, bw);
-        surface(e, brx, by, bw, bh, 18, focus == 0 ? 3 : 1);
-        const std::string lab = tr("mine_check", lang);
-        const int tw = e.measureText(lab, 23, FontRole::Body, L.rtl);
-        e.drawText(lab, brx + (bw - tw) / 2, by + (bh - 26) / 2, 23,
-                   focus == 0 ? kTX : kMU, FontRole::Body, L.rtl);
-        if (focus == 0) focusRing(e, brx, by, bw, bh, 18);
-    }
+    // v0.65c («التي في الدوائر الزرقاء تحذفها»): NO page title, NO subtitle,
+    // NO «Check for updates» button — the list starts clean at the top.
     // section label
     e.drawText(tr("mine_recent", lang), L.X(cx, e.measureText(tr("mine_recent", lang), 26, FontRole::Body, L.rtl)),
-               158, 26, kTX, FontRole::Body, L.rtl);
+               48, 26, kTX, FontRole::Body, L.rtl);
 
     const std::vector<int> items = viewItems(View::Mine, 0);
-    const int rowH = 100, pitch = 110, top = 212;
+    const int rowH = 100, pitch = 110, top = 88;
     const int scroll = scrollOf(View::Mine);
-    const int visible = 7;
+    const int visible = 8;
     if (items.empty()) {
         emptyState(e, L, cx, top, cw, 964 - top, 12, tr("mine_empty_t", lang), tr("mine_empty_s", lang));
         drawLegendBar(e, {{"\xE2\x9C\x95", "select"}, {"\xE2\x97\x8B", "back"}}, langCode);
@@ -3838,7 +3824,7 @@ void drawMine(UiEngine& e, int focus, const std::string& langCode) {
         const AddonItem& it = gCat[(std::size_t)items[(std::size_t)k]];
         const int y = top + r * pitch;
         const int rx = L.X(cx, cw);
-        const bool foc = (focus == k + 1);
+        const bool foc = (focus == k);   // v0.65c: rows start at focus 0 (no check button)
         surface(e, rx, y, cw, rowH, 20, foc ? 3 : 0);
         // --- pack icon (the addon's own art), fallback = studio tile ---
         // icon slug = dest_folder from pack_targets minus its _uuid8 suffix —
