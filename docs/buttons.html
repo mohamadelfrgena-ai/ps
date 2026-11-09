@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>ملف الأزرار — AddonStation Buttons v0.69</title>
+<style>
+  body { background:#08131A; color:#F3F5F7; font-family:"Segoe UI",Tahoma,Arial,sans-serif; margin:0; padding:40px 60px 80px; }
+  h1 { font-size:34px; margin:0 0 6px; }
+  h2 { font-size:24px; margin:46px 0 8px; color:#FFD65A; }
+  .sub { color:#86A9B5; font-size:18px; margin-bottom:30px; }
+  .row { display:flex; flex-wrap:wrap; gap:26px; align-items:center; background:#121B24; border:1px solid #22303B; border-radius:18px; padding:26px 30px; margin:14px 0; }
+  .meta { min-width:260px; }
+  .meta b { font-size:19px; }
+  .meta .use { color:#98A2B3; font-size:15px; margin-top:4px; }
+  .hexes { display:flex; gap:14px; margin-top:10px; flex-wrap:wrap; }
+  .hex { display:flex; align-items:center; gap:8px; font-size:13px; color:#AAB4C2; direction:ltr; }
+  .sw { width:22px; height:22px; border-radius:6px; border:1px solid rgba(255,255,255,.35); }
+  .btn { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:12px;
+         min-width:230px; height:66px; padding:0 34px; border-radius:20px; border:1px solid rgba(255,255,255,.33);
+         font-size:22px; font-weight:700; cursor:pointer; overflow:hidden; transition:transform .12s ease; }
+  .btn:hover { transform:translateY(-2px); }
+  .btn::before { content:""; position:absolute; left:3px; right:3px; top:3px; height:45%;
+                 background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,0)); border-radius:17px 17px 40% 40%; }
+  .btn::after  { content:""; position:absolute; left:20px; right:20px; bottom:3px; height:2px; background:rgba(0,0,0,.35); }
+  .b0 { background:linear-gradient(180deg,#4AA8FF,#0856BE); color:#fff;
+        box-shadow:0 16px 26px rgba(0,0,0,.5), 0 0 30px rgba(74,168,255,.32), 0 0 12px rgba(74,168,255,.22); }
+  .b1 { background:linear-gradient(180deg,#2B3238,#151B21); color:#F3F5F7;
+        box-shadow:0 12px 22px rgba(0,0,0,.45); border-color:rgba(255,255,255,.30); }
+  .b2 { background:linear-gradient(180deg,#FFE282,#EE961E); color:#2C1A02;
+        box-shadow:0 16px 26px rgba(0,0,0,.5), 0 0 30px rgba(255,190,60,.35), 0 0 12px rgba(255,190,60,.22); }
+  .b3 { background:linear-gradient(180deg,rgba(74,168,255,.22),rgba(74,168,255,.08)); color:#96CDFF;
+        border:2px solid rgba(74,168,255,.90); box-shadow:none; }
+  .b4 { background:linear-gradient(180deg,rgba(251,76,110,.21),rgba(251,76,110,.07)); color:#FF8096;
+        border:2px solid rgba(251,76,110,.90); box-shadow:none; }
+  .lbl-ar { display:block; font-size:15px; opacity:.85; margin-top:2px; }
+  .accents { display:flex; gap:36px; margin-top:16px; }
+  .foot { color:#86A9B5; margin-top:50px; font-size:16px; line-height:2; }
+  .tag { display:inline-block; background:#1B2732; border:1px solid #2A3947; color:#9FD3FF; border-radius:8px; padding:2px 12px; font-size:14px; margin-inline-start:10px; direction:ltr; }
+</style>
+</head>
+<body>
+<h1>📦 ملف الأزرار — AddonStation <span class="tag">v0.69</span></h1>
+<div class="sub">كل أزرار التطبيق بأنماطها وألوانها الحقيقية — مثل زر «View addon» — من كود screens.cpp (دالة button)</div>
+
+<h2>⭐ النمط 0 — الأساسي (أزرق سوني) <span class="tag">style 0</span></h2>
+<div class="row"><div class="meta"><b>زر View addon / عرض الإضافة</b><div class="use">بانر «Just released» في المتجر + زر الهيرو الرئيسي</div>
+<div class="hexes"><span class="hex"><span class="sw" style="background:#4AA8FF"></span>#4AA8FF</span><span class="hex"><span class="sw" style="background:#0856BE"></span>#0856BE</span><span class="hex"><span class="sw" style="background:#FFFFFF"></span>نص #FFFFFF</span></div></div>
+<button class="btn b0">View addon</button></div>
+
+<div class="row"><div class="meta"><b>تنزيل / Download</b><div class="use">صفحة الإضافة — السهم + النص داخل الزر</div>
+<div class="hexes"><span class="hex"><span class="sw" style="background:#4AA8FF"></span>#4AA8FF</span><span class="hex"><span class="sw" style="background:#0856BE"></span>#0856BE</span></div></div>
+<button class="btn b0">⤓&nbsp; Download</button></div>
+
+<div class="row"><div class="meta"><b>جارٍ التنزيل... 45%</b><div class="use">حالة التحميل (نفس الزر الأزرق مع النسبة)</div>
+<div class="hexes"><span class="hex"><span class="sw" style="background:#4AA8FF"></span>#4AA8FF</span><span class="hex"><span class="sw" style="background:#0856BE"></span>#0856BE</span></div></div>
+<button class="btn b0">Downloading... 45%</button></div>
+
+<div class="row"><div class="meta"><b>الحصول على رمز / متابعة / تسجيل الدخول بالرمز</b><div class="use">شاشة ربط الكونسول + صفحة الدخول</div>
+<div class="hexes"><span class="hex"><span class="sw" style="background:#4AA8FF"></span>#4AA8FF</span><span class="hex"><span class="sw" style="background:#0856BE"></span>#0856BE</span></div></div>
+<button class="btn b0">Get a code</button><button class="btn b0">Continue</button><button class="btn b0">Sign in with code</button></div>
+
+<div class="row"><div class="meta"><b>سجّل الدخول للتنزيل / اشترك في %s</b><div class="use">صفحة الإضافة للضيف + زر الاشتراك (غير Legendary)</div>
+<div class="hexes"><span class="hex"><span class="sw" style="background:#4AA8FF"></span>#4AA8FF</span><span class="hex"><span class="sw" style="background:#0856BE"></span>#0856BE</span></div></div>
+<button class="btn b0">Sign in to download</button><button class="btn b0">Get Epic on your phone</button></div>
+
+<h2>النمط 1 — الثانوي (نيوترال) <span class="tag">style 1</span></h2>
+<div class="row"><div class="meta"><b>ليس الآن / ليس لديك التطبيق؟</b><div class="use">صفحة الدخول + زر الهيرو الثانوي + «رمز جديد» (خامل)</div>
+<div class="hexes"><span class="hex"><span class="sw" style="background:#2B3238"></span>#2B3238</span><span class="hex"><span class="sw" style="background:#151B21"></span>#151B21</span><span class="hex"><span class="sw" style="background:#F3F5F7"></span>نص #F3F5F7</span></div></div>
+<button class="btn b1">Not now</button><button class="btn b1">Don't have the app? Get it now</button></div>
+
+<h2>النمط 2 — الذهبي (خاص / Legendary) <span class="tag">style 2</span></h2>
+<div class="row"><div class="meta"><b>اشترك في Legendary / جارٍ التثبيت...</b><div class="use">زر الاشتراك للـ Legendary + حالة التثبيت</div>
+<div class="hexes"><span class="hex"><span class="sw" style="background:#FFE282"></span>#FFE282</span><span class="hex"><span class="sw" style="background:#EE961E"></span>#EE961E</span><span class="hex"><span class="sw" style="background:#2C1A02"></span>نص #2C1A02</span></div></div>
+<button class="btn b2">Get Legendary on your phone</button><button class="btn b2">Installing...</button></div>
+
+<h2>النمط 3 — أزرق شفاف (حالات) <span class="tag">style 3</span></h2>
+<div class="row"><div class="meta"><b>بانتظار Minecraft / تم التثبيت ✓</b><div class="use">حالة الانتظار بعد التنزيل + حالة مكتملة</div>
+<div class="hexes"><span class="hex"><span class="sw" style="background:rgba(74,168,255,.5)"></span>rgba(74,168,255,.22→.08)</span><span class="hex"><span class="sw" style="background:#4AA8FF"></span>حد #4AA8FF</span><span class="hex"><span class="sw" style="background:#96CDFF"></span>نص #96CDFF</span></div></div>
+<button class="btn b3">Waiting for Minecraft</button><button class="btn b3">Installed ✓</button></div>
+
+<h2>النمط 4 — أحمر شفاف (خطر) <span class="tag">style 4</span></h2>
+<div class="row"><div class="meta"><b>إجراءات الحذف / الإنهاء</b><div class="use">محجوز للإجراءات الخطيرة (danger)</div>
+<div class="hexes"><span class="hex"><span class="sw" style="background:rgba(251,76,110,.5)"></span>rgba(251,76,110,.21→.07)</span><span class="hex"><span class="sw" style="background:#FB4C6E"></span>حد #FB4C6E</span><span class="hex"><span class="sw" style="background:#FF8096"></span>نص #FF8096</span></div></div>
+<button class="btn b4">Delete / حذف</button></div>
+
+<h2>اللمسات المشتركة + ألوان مساعدة</h2>
+<div class="accents">
+  <div class="hex"><span class="sw" style="background:#FFD65A"></span>إطار التركيز #FFD65A</div>
+  <div class="hex"><span class="sw" style="background:#FFC940"></span>ذهبي التمييز #FFC940</div>
+  <div class="hex"><span class="sw" style="background:#E05252"></span>دائرة الخطأ #E05252</div>
+  <div class="hex"><span class="sw" style="background:#86A9B5"></span>نص ثانوي #86A9B5</div>
+</div>
+<div class="foot">
+  ✦ لمعة بيضاء (glass) في نصف الزر العلوي &nbsp;·&nbsp; حافة بيضاء 1px + خط غامق 2px تحت الزر &nbsp;·&nbsp; توهج ملوّن تحت الزر (طبقتان) &nbsp;·&nbsp; ظل ناعم<br>
+  ✦ الكود الكامل: <span class="tag">docs/button_code.cpp</span> &nbsp;·&nbsp; المصدر: ps4-addon-test/src/screens.cpp — دالة button()
+</div>
+</body>
+</html>
