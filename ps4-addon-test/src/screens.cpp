@@ -3103,15 +3103,7 @@ namespace {
 // v0.58 (user pick «أ: نصف + بهتة ناعمة»): the bottom cut of a grid window always peeks the
 // next row — half a card fading softly into the background («باهت»), never a hard edge. When
 // focus walks down, the peeked row scrolls fully into view (win = one full row in main.cpp).
-void gridFade(UiEngine& e, int x, int yMax, int w) {
-    const int fadeH = 56;
-    for (int j = 0; j < fadeH; ++j) {
-        const float t = (float)(j + 1) / (float)fadeH;
-        const Uint8 a = (Uint8)std::min(255.f, 255.f * t * t * 1.35f);
-        e.fillRect(x, yMax - fadeH + j, w, 1, SDL_Color{kBG.r, kBG.g, kBG.b, a});
-    }
-    e.fillRect(x, yMax, w, 1080 - yMax, kBG);   // hard-erase the overflow (legend bar redraws after)
-}
+// v0.65d: gridFade removed — the dark erase box was ruining the cards (user request)
 
 void cardGrid(UiEngine& e, const Lay& L, const std::vector<int>& items, int scroll, int fb, int focus,
               int xl, int yTop, int w, int yMax, const std::string& lang, bool dealBadge) {
@@ -3135,7 +3127,7 @@ void cardGrid(UiEngine& e, const Lay& L, const std::vector<int>& items, int scro
         const AddonItem& it = gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])];
         vcard(e, L, x, ry, cw, ih, it, focus == fb + i, lang, false, false, dealBadge);
     }
-    gridFade(e, L.X(xl, w), yMax, w);   // v0.58: soft peek cut + overflow erase
+    // v0.65d: no dark fade box («الغيه الذي مخرب البطاقات»)
 }
 
 // v0.65 («شريط واحد يعرض اخر عشر بطاقات»): ONE horizontal strip = the 10 newest
@@ -3490,7 +3482,7 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
             const AddonItem& it = gCat[static_cast<std::size_t>(items[static_cast<std::size_t>(first + i)])];
             vcard(e, L, gx + col * (gcw + gap), ry, gcw, ih, it, focus == i, lang, true, true, sale);
         }
-        gridFade(e, gx, gyMax, gw);
+        // v0.65d («شوف هذا الظل الغيه الذي مخرب البطاقات»): NO dark fade box — cards show fully
     }
     drawLegendBar(e, {{"\xE2\x9C\x95", "open"}, {"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}}, langCode);
 }
