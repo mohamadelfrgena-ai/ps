@@ -805,15 +805,9 @@ static void startDownloadFlow(int catIdx) {
     A.dirty = true;
     const std::string lang = A.lang;
     std::thread([it, lang]() {
-        // v0.62 (user spec): the game must be RUNNING first — no staging / temp storage.
-        if (mountedMojangDir().empty()) {
-            ui_sfx(Sfx::Error);
-            toast(tr("need_game_first", lang), 4200, 2);   // info: guidance, not a failure
-            A.dl = (int)DemoState::Idle;
-            A.busyDownload = false;
-            A.dirty = true;
-            return;
-        }
+        // v0.67 («النظام عندما تكون اللعبة مغلق او مفتوح»): NO early refusal — the
+        // installer transfers directly when the game is open, or stages in the hidden
+        // /data staging and syncs when the game opens.
 #ifdef AS_BUILD_2121
         DownloadGrant g = localGrantFrom(it.title, it.isWorld ? "world" : "addon", it.ps4RawUrl, it.packTargetsRaw);
 #else
@@ -878,7 +872,7 @@ static void startDownloadFlow(int catIdx) {
                         A.dirty = true;
                     }
                 },
-                false);   // v0.62: auto-launch cancelled («نلغي التشغيل التلقائي»)
+                loadAutoLaunchSetting());   // v0.67 («والخيار الذي في الاعداات ارجعه»)
             if (!r.ok) { allOk = false; break; }
             if (r.queuedForMinecraft) anyQueued = true;
         }
@@ -1244,7 +1238,7 @@ static void moveFocus(int dx, int dy) {
             break;
         }
         case Scr::Settings: {
-            const int rows = 5;   // v0.62: auto-launch row removed («نلغي التشغيل التلقائي»)
+            const int rows = 6;   // v0.67 («والخيار الذي في الاعداات ارجعه»): {lang, theme, account, autolaunch, about, signout}
             if (A.subFocus >= 0) {
                 const int n = A.focus == 0 ? 8 : 2, cols = 2;
                 if (dx > 0) A.subFocus = std::min(n - 1, A.subFocus + 1);
@@ -1291,7 +1285,15 @@ static void onSettingsCross() {
         return;
     }
     if (A.focus == 2 && !account().signedIn) { startSignIn(); return; }
-    if (A.focus == 4) {
+    if (A.focus == 3) {
+        // v0.67 («والخيار الذي في الاعداات ارجعه»): the «Auto-launch Minecraft after install» toggle
+        A.autoLaunch = !A.autoLaunch;
+        saveAutoLaunchSetting(A.autoLaunch);
+        ui_sfx(Sfx::Toggle);
+        A.dirty = true;
+        return;
+    }
+    if (A.focus == 5) {
         // v0.62: sign-out row is ALWAYS here and ALWAYS works (was focus 5 + gated on
         // account().signedIn — a ghost-guest session made the button do nothing)
         A.confirmSignOut = true;

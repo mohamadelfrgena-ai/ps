@@ -102,19 +102,21 @@ int main() {
 
     const std::string stageDir = root + "/data_stage";
 
-    // 4. Mode 1: Minecraft is CLOSED -> v0.62 REFUSES (no staging, no temp storage).
-    //    The user launches Minecraft first; only then the app transfers the pack.
+    // 4. Mode 1: Minecraft is CLOSED -> v0.67 BOTH-STATES («النظام عندما تكون اللعبة
+    //    مغلق او مفتوح» + «ونظام التخزين ... ينقلها لملف اللعبة»): the pack is STAGED in
+    //    the hidden /data staging and syncPendingAddonsIfMounted() transfers it into the
+    //    game folder when the game opens.
     {
         const std::string closedMojangDir =
             root + "/closed_mc/CUSA00744/user123456789/games/com.mojang";
 
-        const pkgtest::CopyResult refusedRes = pkgtest::installOrQueueAddon(
+        const pkgtest::CopyResult queuedRes = pkgtest::installOrQueueAddon(
             testRaw, "My Pack 1.0", stageDir, closedMojangDir, "resource_packs", "ar");
-        assert(!refusedRes.ok);                 // v0.62: refused...
-        assert(!refusedRes.queuedForMinecraft); // ...NOT queued for later
-        assert(refusedRes.errorCode == -2);     // errorCode -2 = game not running
-        assert(!fileExists(stageDir + "/My Pack 1.0.raw"));      // nothing staged
-        assert(!fileExists(stageDir + "/My Pack 1.0.pending"));
+        assert(queuedRes.ok);                   // saved...
+        assert(queuedRes.queuedForMinecraft);   // ...and queued for the game
+        assert(queuedRes.errorCode == 0);
+        assert(fileExists(stageDir + "/My Pack 1.0.raw"));       // staged raw (hidden)
+        assert(fileExists(stageDir + "/My Pack 1.0.pending"));   // pending flag
 
         // legacy back-compat: a pack staged by an OLD app version still completes
         // once the game is mounted (syncPendingAddonsIfMounted keeps working).
@@ -163,10 +165,10 @@ int main() {
         assert(!fileExists(downloadedRaw));
     }
 
-    // 6. Auto-launch setting round-trip (the setting row is GONE from Settings in
-    //    v0.62, but the helper stays for compatibility). Launching the game is now
-    //    always the user's job, so a not-mounted install is refused even with
-    //    autoLaunch=true and never launches anything.
+    // 6. Auto-launch setting round-trip («والخيار الذي في الاعداات ارجعه»): the
+    //    Settings toggle is back. With the game closed both cases QUEUE (v0.67
+    //    both-states); autoLaunch=true additionally launches Minecraft so the staged
+    //    pack transfers at once.
     {
         const std::string cfg = root + "/autolaunch.cfg";
         assert(!pkgtest::loadAutoLaunchSetting(cfg));                 // default OFF
@@ -179,15 +181,15 @@ int main() {
             root + "/auto_mc/CUSA00265/user497444003/games/com.mojang";
         const pkgtest::CopyResult autoRes = pkgtest::installOrQueueAddon(
             testRaw, "My Pack 1.0", stageDir, autoMojangDir, "resource_packs", "en", nullptr, true);
-        assert(!autoRes.ok);                  // v0.62: refused regardless of autoLaunch
-        assert(autoRes.errorCode == -2);
-        assert(!autoRes.queuedForMinecraft);
-        assert(!autoRes.launchedMinecraft);   // nothing ever launches the game now
+        assert(autoRes.ok);                   // staged + queued
+        assert(autoRes.queuedForMinecraft);
+        assert(autoRes.launchedMinecraft);    // autoLaunch=true -> Minecraft opens (host stub = true)
 
         const pkgtest::CopyResult noAutoRes = pkgtest::installOrQueueAddon(
             testRaw, "My Pack 1.0", stageDir, autoMojangDir, "resource_packs", "en");
-        assert(!noAutoRes.ok);
-        assert(noAutoRes.errorCode == -2);
+        assert(noAutoRes.ok);
+        assert(noAutoRes.queuedForMinecraft);
+        assert(!noAutoRes.launchedMinecraft); // default OFF -> the user opens the game
     }
 
     // 7. Supabase JSON helpers + array splitting (content pipeline parsing)

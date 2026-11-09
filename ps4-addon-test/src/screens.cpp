@@ -4107,30 +4107,31 @@ void drawSettings(UiEngine& e, int focus, int subFocus, bool autoLaunchOn, const
     backdrop(e);
     pageTitle(e, L, tr("nav_settings", lang), kCL + 20, 44);
     const bool guest = !gAcc.signedIn;
-    const int rows = 5;   // v0.62: auto-launch row removed — {lang, theme, account, about, signout}
+    const int rows = 6;   // v0.67 («والخيار الذي في الاعداات ارجعه»): {lang, theme, account, autolaunch, about, signout}
     const int listX = kCL + 20, listW = 760, rowH = 104, pitch = 116, top = 150;
-    const int panX = listX + listW + 40, panW = kCR - panX, panY = top, panH = 5 * pitch + rowH;
+    const int panX = listX + listW + 40, panW = kCR - panX, panY = top, panH = 6 * pitch + rowH - 12;
     const int f = std::max(0, std::min(rows - 1, focus));
     // line icons (lineIconTile): 0 globe, 1 contrast, 2 user, 3 gamepad, 4 info, 5 log-out — saturated accents
-    static const int kKinds[5] = {0, 1, 2, 4, 5};
-    static const SDL_Color kAccD[5] = {{88, 156, 255, 255}, {176, 132, 255, 255}, {250, 196, 64, 255},
-                                       {160, 170, 188, 255}, {255, 96, 112, 255}};
-    static const SDL_Color kAccL[5] = {{29, 104, 222, 255}, {124, 74, 222, 255}, {184, 128, 8, 255},
-                                       {92, 101, 114, 255}, {214, 40, 64, 255}};
+    static const int kKinds[6] = {0, 1, 2, 3, 4, 5};
+    static const SDL_Color kAccD[6] = {{88, 156, 255, 255}, {176, 132, 255, 255}, {250, 196, 64, 255},
+                                       {76, 214, 124, 255}, {160, 170, 188, 255}, {255, 96, 112, 255}};
+    static const SDL_Color kAccL[6] = {{29, 104, 222, 255}, {124, 74, 222, 255}, {184, 128, 8, 255},
+                                       {22, 150, 78, 255}, {92, 101, 114, 255}, {214, 40, 64, 255}};
     const SDL_Color* kAcc = gLight ? kAccL : kAccD;
-    const std::string labels[5] = {tr("settings_language", lang), tr("settings_appearance", lang), tr("settings_account", lang),
-                                   tr("settings_about", lang), tr("settings_signout", lang)};
+    const std::string labels[6] = {tr("settings_language", lang), tr("settings_appearance", lang), tr("settings_account", lang),
+                                   tr("autolaunch", lang), tr("settings_about", lang), tr("settings_signout", lang)};
     static const char* kLangNative[8] = {"English", "\xD8\xA7\xD9\x84\xD8\xB9\xD8\xB1\xD8\xA8\xD9\x8A\xD8\xA9", "Fran\xC3\xA7\x61is",
         "T\xC3\xBC" "rk\xC3\xA7" "e", "Espa\xC3\xB1ol", "\xD0\xA0\xD1\x83\xD1\x81\xD1\x81\xD0\xBA\xD0\xB8\xD0\xB9",
         "Portugu\xC3\xAAs", "\xE4\xB8\xAD\xE6\x96\x87"};
     const int curLang = langIndexOf(lang);
     const std::string nm = gAcc.displayName.empty() ? gAcc.username : gAcc.displayName;
-    const std::string values[5] = {kLangNative[curLang], tr(gLight ? "theme_light" : "theme_dark", lang),
-                                   guest ? tr("acct_guest_v", lang) : nm, gAppVersion.empty() ? "" : "v" + gAppVersion, ""};
+    const std::string values[6] = {kLangNative[curLang], tr(gLight ? "theme_light" : "theme_dark", lang),
+                                   guest ? tr("acct_guest_v", lang) : nm, "",
+                                   gAppVersion.empty() ? "" : "v" + gAppVersion, ""};
     for (int i = 0; i < rows; ++i) {
         const int y = top + i * pitch;
         const int rx = L.X(listX, listW);
-        const bool foc = (i == f), danger = (i == 4);   // v0.62: signout is row 4
+        const bool foc = (i == f), danger = (i == 5);   // v0.67: signout is row 5 again
         if (danger && !foc) {
             e.drawRoundRect(rx, y, listW, rowH, 22, SDL_Color{251, 76, 110, static_cast<Uint8>(gLight ? 18 : 30)});
             e.drawRoundBorder(rx, y, listW, rowH, 22, 2, SDL_Color{251, 76, 110, 90});

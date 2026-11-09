@@ -1006,6 +1006,25 @@ CopyResult copyAddonFolder(const std::string& sourceFolder,
 // v0.62: public wrapper over the anon-ns scanner (download pre-check in main.cpp)
 std::string mountedMojangDir() { return findMountedMojangDir(std::string()); }
 
+// v0.67 («النظام عندما تكون اللعبة مغلق او مفتوح»): staging helper restored —
+// writes the open download stream into the hidden /data staging («ونظام التخزين ... مخفي»).
+static bool stageStreamToFile(std::FILE* inFp, const std::string& dstPath, int& outErrno) {
+    std::FILE* out = std::fopen(dstPath.c_str(), "wb");
+    if (!out) { outErrno = errno; return false; }
+    char buf[65536];
+    std::size_t n = 0;
+    while ((n = std::fread(buf, 1, sizeof(buf), inFp)) > 0) {
+        if (std::fwrite(buf, 1, n, out) != n) {
+            outErrno = errno ? errno : EIO;
+            std::fclose(out);
+            return false;
+        }
+    }
+    std::fclose(out);
+    outErrno = 0;
+    return true;
+}
+
 CopyResult installOrQueueAddon(const std::string& sourceRawPath,
                                const std::string& addonFolderName,
                                const std::string& stageDir,
@@ -1014,9 +1033,9 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
                                const std::string& langCode,
                                ProgressCallback onProgress,
                                bool autoLaunchMinecraft) {
-    // v0.62: auto-launch is cancelled (user launches the game first);
-    // the parameter stays for API compatibility with older callers.
-    static_cast<void>(autoLaunchMinecraft);
+    // v0.67 («والخيار الذي في الاعداات ارجعه»): the Settings toggle is back —
+    // when ON and the game is closed, Minecraft launches so the staged pack
+    // transfers immediately.
     CopyResult result;
     result.targetCategory = sanitizeTargetCategory(targetCategory);
 
@@ -1096,15 +1115,39 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
         return result;
     }
 
-    // v0.62 (user spec: «نلغي فكرة التخزين المؤقت»): NO staging when the game is closed.
-    // The user launches Minecraft FIRST, then the app transfers the pack directly to the
-    // mounted com.mojang. errorCode -2 = «game not running» (main.cpp shows the hint).
+    // v0.67 («النظام عندما تكون اللعبة مغلق او مفتوح» + «ونظام التخزين ... ينقلها
+    // لملف اللعبة»): the game is CLOSED -> stage the pack in the hidden /data staging
+    // and mark it pending. syncPendingAddonsIfMounted() transfers it into the game
+    // folder the moment Minecraft opens — no user action needed.
+    if (sourceRawPath != stagedRawPath && !isRegularFile(stagedRawPath)) {
+        if (!stageStreamToFile(inFp, stagedRawPath, err)) {
+            std::fclose(inFp);
+            result.errorCode = err;
+            result.message = formatInstallPhaseLabel(InstallPhase::Failed, langCode);
+            return result;
+        }
+    }
     std::fclose(inFp);
-    result.ok = false;
-    result.queuedForMinecraft = false;
-    result.errorCode = -2;
-    result.message.clear();
-    diagLine("game not mounted -> refusing (no staging, v0.62)");
+    // free the HDD copy of the download when it lives in stageDir under another name
+    if (sourceRawPath.rfind(stageDir + "/", 0) == 0 && sourceRawPath != stagedRawPath) {
+        ::unlink(sourceRawPath.c_str());
+    }
+    {
+        const std::string meta = result.targetCategory + "|" + langCode;
+        const int flagFd = ::open(pendingFlagPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (flagFd >= 0) {
+            writeExact(flagFd, meta.c_str(), meta.size(), err);
+            ::close(flagFd);
+        }
+    }
+    result.ok = true;
+    result.queuedForMinecraft = true;
+    result.launchedMinecraft = autoLaunchMinecraft ? launchMinecraftOnPs4() : false;
+    result.message = formatQueuedMessage(langCode);
+    if (onProgress) {
+        onProgress(InstallPhase::Installed, 100);
+    }
+    diagLine("game not mounted -> staged + queued (v0.67 both-states)");
     return result;
 }
 
