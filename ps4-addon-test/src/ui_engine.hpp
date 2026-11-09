@@ -72,7 +72,7 @@ public:
     void fadeToBlack(Uint8 keep);   // v5.5: every pixel *= keep/255 (splash fade, ~1 ms per frame)
 private:
     struct FontData;
-    struct ImageData { int w = 0, h = 0; std::vector<std::uint8_t> rgba; };
+    struct ImageData { int w = 0, h = 0; std::vector<std::uint8_t> rgba; std::string key; };
     struct ScaledImage { int w = 0, h = 0; std::vector<std::uint32_t> px; std::uint64_t used = 0; bool opaque = false; };
     struct TextBitmap {
         int w = 0, h = 0; std::vector<std::uint32_t> px; std::uint64_t used = 0;
@@ -93,6 +93,9 @@ private:
     std::vector<std::uint32_t> fb_;
     FontData* fonts_ = nullptr;
     bool fontsLoaded_ = false, fallbackReady_ = false;
+    // v0.65f («صور البروفايل المختارة متحركة»): animated GIF frames per image
+    struct GifAnim { int frames = 1; std::vector<int> delays; int cur = 0; int acc = 0; unsigned last = 0; };
+    std::map<std::string, GifAnim> gifs_;
     std::map<std::string, ImageData> images_;
     std::map<std::string, ScaledImage> scaledCache_;
     std::map<std::string, TextBitmap> textCache_;

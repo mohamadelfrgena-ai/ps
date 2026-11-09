@@ -915,7 +915,7 @@ void UiEngine::drawImageCropped(const std::string& name,
     const ImageData& img = (*ip);
 
     // Cache key: source crop + target size (zoom is quantized by the caller)
-    const std::string key = name + "|" + std::to_string(sx0) + "," + std::to_string(sy0) +
+    const std::string key = img.key + "|" + std::to_string(sx0) + "," + std::to_string(sy0) +
                             "," + std::to_string(sw) + "," + std::to_string(sh) +
                             "|" + std::to_string(w) + "x" + std::to_string(h);
     auto sc = scaledCache_.find(key);
@@ -1427,7 +1427,61 @@ int UiEngine::drawTextCentered(const std::string& utf8,
 // ---------------------------------------------------------------------------
 // v5: runtime images + lazy decoding + LRU caches
 // ---------------------------------------------------------------------------
+// v0.65f («وايضا ربما تكون صور البرفايل المختارة متحركة»): animated GIF support.
+// Cheap header walk — frame count + logical screen size WITHOUT decoding.
+static bool gifProbe(const unsigned char* d, std::size_t n, int& w, int& h, int& frames) {
+    if (n < 13 || d[0] != 'G' || d[1] != 'I' || d[2] != 'F') return false;
+    w = d[6] | (d[7] << 8);
+    h = d[8] | (d[9] << 8);
+    const unsigned char packed = d[10];
+    std::size_t p = 13;
+    if (packed & 0x80) p += 3u * (1u << ((packed & 7) + 1));
+    frames = 0;
+    auto skipSubs = [&](std::size_t& q) {
+        while (q < n) {
+            unsigned len = d[q++];
+            q += len;
+            if (!len) return true;
+        }
+        return false;
+    };
+    while (p < n) {
+        unsigned char b = d[p++];
+        if (b == 0x3B) break;
+        if (b == 0x21) {
+            if (p >= n) break;
+            p++;
+            if (!skipSubs(p)) break;
+        } else if (b == 0x2C) {
+            frames++;
+            if (p + 9 > n) break;
+            unsigned char ip = d[p + 8];
+            p += 9;
+            if (ip & 0x80) p += 3u * (1u << ((ip & 7) + 1));
+            if (p >= n) break;
+            p++;   // LZW minimum code size
+            if (!skipSubs(p)) break;
+        } else break;
+    }
+    return frames > 0 && w >= 4 && h >= 4;
+}
+
 UiEngine::ImageData* UiEngine::findImage(const std::string& name) {
+    auto gi = gifs_.find(name);
+    if (gi != gifs_.end() && gi->second.frames > 1) {
+        GifAnim& st = gi->second;
+        const Uint32 now = SDL_GetTicks();
+        st.acc += static_cast<int>(now - st.last);
+        st.last = now;
+        int guard = 0;
+        while (st.acc >= st.delays[st.cur] && guard++ < st.frames) {
+            st.acc -= st.delays[st.cur];
+            st.cur = (st.cur + 1) % st.frames;
+        }
+        const std::string fk = name + "#G" + std::to_string(st.cur);
+        auto fit = images_.find(fk);
+        if (fit != images_.end()) return &fit->second;
+    }
     auto it = images_.find(name);
     if (it != images_.end()) return &it->second;
     auto pk = packed_.find(name);
@@ -1437,6 +1491,7 @@ UiEngine::ImageData* UiEngine::findImage(const std::string& name) {
     if (!px) { packed_.erase(pk); return nullptr; }
     ImageData img;
     img.w = w; img.h = h;
+    img.key = name;
     img.rgba.assign(px, px + static_cast<std::size_t>(w) * h * 4);
     stbi_image_free(px);
     imageBytes_ += img.rgba.size();
@@ -1479,6 +1534,7 @@ bool UiEngine::storeImage(const std::string& name, int w, int h, const std::uint
         img.rgba.assign(rgba, rgba + static_cast<std::size_t>(w) * h * 4);
     }
     unloadImage(name);
+    img.key = name;
     imageBytes_ += img.rgba.size();
     images_[name] = std::move(img);
     return true;
@@ -1486,9 +1542,44 @@ bool UiEngine::storeImage(const std::string& name, int w, int h, const std::uint
 
 bool UiEngine::loadImageMemory(const std::string& name, const void* data, std::size_t size, int maxW, int maxH) {
     if (!data || size == 0) return false;
+    const unsigned char* d = static_cast<const unsigned char*>(data);
+    // ---- animated GIF («صور البرفايل المختارة متحركة»): decode every frame, play
+    // them from findImage() with the GIF's own delays. Hard bounds so a giant GIF
+    // can never flood memory: <=150 frames and <=36MB of decoded frame data.
+    int gw = 0, gh = 0, gframes = 0;
+    if (gifProbe(d, size, gw, gh, gframes) && gframes > 1) {
+        const std::size_t frameBytes = static_cast<std::size_t>(gw) * gh * 4;
+        if (frameBytes && gframes <= 150 && frameBytes * static_cast<std::size_t>(gframes) <= 36u * 1024 * 1024) {
+            int w = 0, h = 0, z = 0, comp = 0;
+            int* delays = nullptr;
+            unsigned char* px = stbi_load_gif_from_memory(d, static_cast<int>(size), &delays, &w, &h, &z, &comp, 4);
+            if (px && z > 1 && w > 0 && h > 0) {
+                GifAnim st;
+                st.frames = z;
+                st.delays.resize(static_cast<std::size_t>(z));
+                for (int i = 0; i < z; ++i) {
+                    const int ms = delays ? delays[i] : 0;
+                    st.delays[static_cast<std::size_t>(i)] = ms < 20 ? 100 : (ms > 5000 ? 5000 : ms);
+                }
+                st.last = SDL_GetTicks();
+                unloadImage(name);
+                bool ok = true;
+                for (int i = 0; i < z && ok; ++i) {
+                    ok = storeImage(name + "#G" + std::to_string(i), w, h,
+                                    px + static_cast<std::size_t>(i) * w * h * 4, maxW, maxH);
+                }
+                stbi_image_free(px);
+                stbi_image_free(delays);
+                if (ok) { gifs_[name] = std::move(st); return true; }
+                for (int i = 0; i < z; ++i) unloadImage(name + "#G" + std::to_string(i));
+                return false;
+            }
+            if (px) stbi_image_free(px);
+            if (delays) stbi_image_free(delays);
+        }
+    }
     int w = 0, h = 0, comp = 0;
-    unsigned char* px = stbi_load_from_memory(static_cast<const unsigned char*>(data),
-                                              static_cast<int>(size), &w, &h, &comp, 4);
+    unsigned char* px = stbi_load_from_memory(d, static_cast<int>(size), &w, &h, &comp, 4);
     if (!px) return false;
     const bool ok = storeImage(name, w, h, px, maxW, maxH);
     stbi_image_free(px);
@@ -1536,6 +1627,19 @@ bool UiEngine::addImageRGBA(const std::string& name, int w, int h, const std::ui
 }
 
 void UiEngine::unloadImage(const std::string& name) {
+    auto g = gifs_.find(name);
+    if (g != gifs_.end()) {
+        for (int i = 0; i < g->second.frames; ++i) {
+            const std::string fk = name + "#G" + std::to_string(i);
+            auto fit = images_.find(fk);
+            if (fit != images_.end()) {
+                imageBytes_ -= std::min(imageBytes_, fit->second.rgba.size());
+                images_.erase(fit);
+            }
+            dropScaled(fk);
+        }
+        gifs_.erase(g);
+    }
     auto it = images_.find(name);
     if (it == images_.end()) return;
     imageBytes_ -= std::min(imageBytes_, it->second.rgba.size());
