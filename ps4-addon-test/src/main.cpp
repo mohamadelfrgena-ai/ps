@@ -1073,59 +1073,87 @@ static int focusedCard() {
     return (idx >= 0 && k < (int)v.size()) ? v[(std::size_t)k] : -1;
 }
 
-static void clampScroll() {
-    if (A.scr == Scr::Home) return;   // v0.65: the strip scroll is owned by moveFocus (one-tile scroll + wrap)
-    // v0.58: window = ONE full row (5) — the half-peeked row scrolls fully into view on Down.
-    // v0.61: windows are ROW-ALIGNED — the old clamp could start mid-row (first = idx - win + 1)
-    // which visually shuffled the cards («البطاقات عشوائية»). Mine = 7-row list (cols 1).
-    // v0.63: window = the VISIBLE 2 rows (10) — focus walks the visible cards without jumps.
-    int win = 10, idx = -1, cols = 5;
-    View view = View::Home;
-    if (A.scr == Scr::Home) { idx = A.focus - 12; view = View::Home; }
-    else if (A.scr == Scr::Deals) { idx = A.focus - 5; view = View::Deals; }
-    else if (A.scr == Scr::Store) { idx = A.focus; view = View::Store; }
-    else if (A.scr == Scr::Search) { idx = A.focus - 4; view = View::Search; win = 5; }  // single-row render
-    else if (A.scr == Scr::Mine)   { idx = A.focus;  view = View::Mine;  win = 7; cols = 1; }   // v0.65c: rows 0..N-1 (no check button)
-    if (idx < 0) return;
-    int first = (std::max(0, scrollOf(view)) / cols) * cols;
-    if (idx < first) first = (idx / cols) * cols;
-    else if (idx > first + win - 1) first = ((idx - win + 1 + cols - 1) / cols) * cols;
-    if (first < 0) first = 0;
-    if (first != scrollOf(view)) setScroll(view, first);
-}
+// ============================================================================
+// v0.72 unified grid navigation (user spec: «اجمع منطق التنقل في دالة واحدة»).
+// Every card area is a (row, col) grid:
+//   - Left/Right = col ± 1 INSIDE the same row only — at a row edge the focus
+//     simply STOPS (the Home strip's last slot is the "View more" tile, so that
+//     IS the logical neighbour; no jump to another row, no list wrap-around).
+//   - Up/Down = row ± 1 keeping the COLUMN: the remembered column of a visited
+//     row wins, otherwise the nearest column on short rows.
+//   - RTL (Arabic) flips Left/Right only.
+//   - Returns false when the move leaves the grid vertically — the caller hops
+//     to the logically adjacent zone (banner / chips / tabs).
+// ============================================================================
+struct NavMem { int col[64]; NavMem() { for (int& c : col) c = -1; } void clear() { for (int& c : col) c = -1; } };
+static NavMem gNav[5];
 
-// v0.36 grid navigation: the focused card walks the WHOLE list with wrap-around («التقليب عبر
-// البطاقات» — never bounces back mid-list), and the visible window follows it (row-aligned).
-// v0.63 («التنقل بالبطاقات غير صحيح»): the window is the VISIBLE 2 rows — Left/Right walk to
-// the neighbouring card with NO scroll-jump (the old 1-row window teleported the highlight to
-// the far side on every row change), and vertical wrap keeps the COLUMN (down at the end goes
-// to the top of the same column — the old mod-wrap landed mid-list at a random card).
-static void moveGridCard(View view, int fb, int cols, int win, int dx, int dy) {
-    const std::vector<int> v = viewItems(view, A.filter);
-    const int n = (int)v.size();
-    if (n == 0) return;
+static int navIdx(View v) {
+    switch (v) {
+        case View::Home: return 0;
+        case View::Deals: return 1;
+        case View::Store: return 2;
+        case View::Search: return 3;
+        default: return 4;
+    }
+}
+static void navReset(View v) { gNav[navIdx(v)].clear(); }
+
+static bool navigate(View view, int dx, int dy) {
+    // one geometry table for every screen's card area (was duplicated per screen)
+    int fb = 0, cols = 5, win = 10, extra = 0, filt = A.filter;
+    bool strip = false;
+    if (view == View::Home)        { fb = 12; cols = 1; win = 4; extra = 1; strip = true; }
+    else if (view == View::Deals)  { fb = 5;  cols = 5; win = 10; }
+    else if (view == View::Store)  { fb = 0;  cols = A.filterOpen ? 5 : 6; win = 10; filt = storeF(); }
+    else if (view == View::Search) { fb = 4;  cols = 5; win = 5; }
+    else if (view == View::Mine)   { fb = 0;  cols = 1; win = 7; }
+
+    const std::vector<int> v = viewItems(view, filt, view == View::Search ? A.query : std::string());
+    int n = (int)v.size();
+    if (view == View::Home) n = std::min(10, n);   // the strip shows the 10 newest only
+    n += extra;                                    // Home: + the "View more" tile
+    if (n == 0) return true;
+    NavMem& mem = gNav[navIdx(view)];
     int first = scrollOf(view);
     int abs = first + (A.focus - fb);
     if (abs < 0) abs = 0;
     if (abs >= n) abs = n - 1;
-    if (dx != 0) {
-        abs += dx;
-        if (abs < 0) abs += n;
-        if (abs >= n) abs -= n;
-    }
-    if (dy != 0) {
+
+    if (A.lang == "ar") dx = -dx;                  // RTL: Left/Right swap only
+
+    if (strip) {   // ONE horizontal row — the last slot is the "View more" tile
+        const int colN = abs + dx;
+        if (dx != 0 && colN >= 0 && colN < n) abs = colN;   // edges STOP
+    } else {
         const int rows = (n + cols - 1) / cols;
-        const int col = abs % cols;
-        int row = abs / cols + dy;
-        while (row < 0) row += rows;
-        while (row >= rows) row -= rows;
-        abs = std::min(row * cols + col, n - 1);
+        int row = abs / cols, col = abs % cols;
+        if (dx != 0) {
+            const int rowLen = std::min(cols, n - row * cols);
+            const int colN = col + dx;
+            if (colN >= 0 && colN < rowLen) abs = row * cols + colN;   // same row only; edge = stop
+        } else if (dy != 0) {
+            const int rowN = row + dy;
+            if (rowN < 0 || rowN >= rows) return false;                // leave the grid (zone hop)
+            const int rowLen = std::min(cols, n - rowN * cols);
+            const int want = mem.col[rowN] >= 0 ? mem.col[rowN] : col; // remembered column wins
+            col = std::max(0, std::min(rowLen - 1, want));             // nearest column on short rows
+            abs = rowN * cols + col;
+        }
+        if (abs / cols < 64) mem.col[abs / cols] = abs % cols;         // remember the column per row
     }
-    // minimal row-aligned scroll: the focused row becomes the full top row (peek below)
-    if (abs < first || abs >= first + win) first = (abs / cols) * cols;
+
+    // window follows the focus: grids snap to row starts, the strip slides one tile
+    if (strip) {
+        if (abs < first) first = abs;
+        else if (abs > first + win - 1) first = abs - (win - 1);
+    } else {
+        if (abs < first || abs >= first + win) first = (abs / cols) * cols;
+    }
     if (first < 0) first = 0;
     if (first != scrollOf(view)) setScroll(view, first);
     A.focus = fb + (abs - first);
+    return true;
 }
 
 // focus zones per screen (linear stepping inside a zone; Up/Down crosses zones)
@@ -1157,29 +1185,7 @@ static void moveFocus(int dx, int dy) {
                 }
             } else {
                 if (dy < 0) A.focus = 5 + std::min(A.filter, 6);
-                else if (dx != 0) {
-                    // v0.65: strip walk with wrap-around. 4 full card slots scroll one tile
-                    // at a time; the "View more" rectangle is the last focus tile (pinned at
-                    // the row end after the peek card — «بس المستطيل العرض بعد آخر بطاقة»).
-                    const int nCards = (int)std::min<std::size_t>(10, v.size());
-                    int first = scrollOf(View::Home);
-                    int tt = (A.focus - 12 >= nCards) ? nCards : first + (A.focus - 12);
-                    if (tt < 0) tt = 0;
-                    if (tt >= nTiles) tt = nTiles - 1;
-                    tt += dx;
-                    if (tt < 0) tt += nTiles;
-                    if (tt >= nTiles) tt -= nTiles;
-                    if (tt >= nCards) {
-                        A.focus = 12 + nCards;   // the View-more tile (window unchanged)
-                    } else {
-                        if (tt < first) first = tt;
-                        else if (tt > first + 3) first = tt - 3;
-                        if (first < 0) first = 0;
-                        if (first > tt) first = tt;
-                        if (first != scrollOf(View::Home)) setScroll(View::Home, first);
-                        A.focus = 12 + (tt - first);
-                    }
-                }
+                else if (dx != 0) navigate(View::Home, dx, 0);   // v0.72: one row, ends STOP after «View more»
             }
             break;
         }
@@ -1196,8 +1202,9 @@ static void moveFocus(int dx, int dy) {
                 }
             } else {
                 if (v.empty()) A.focus = std::min(A.filter, 4);
-                else if (dy < 0 && A.focus < 10 && scrollOf(View::Deals) == 0) A.focus = std::min(A.filter, 4);
-                else moveGridCard(View::Deals, 5, 5, 10, dx, dy);
+                else if (!navigate(View::Deals, dx, dy)) {   // v0.72 grid: vertical edge -> chips
+                    if (dy < 0 && scrollOf(View::Deals) == 0) A.focus = std::min(A.filter, 4);
+                }
             }
             break;
         }
@@ -1205,13 +1212,12 @@ static void moveFocus(int dx, int dy) {
             // v0.69: grid 0-9 (6-wide closed / 5-wide open x2 rows) | banner 10 | filter drawer rows 11-19 | sort pill 20
             const std::vector<int> v = viewItems(View::Store, storeF());
             const int gridN = (int)std::min<std::size_t>(10, v.size());
-            const int colsN = A.filterOpen ? 5 : 6;
             const int selRow = A.storeType > 0 ? A.storeType : (A.storePlan > 0 ? 5 + A.storePlan : 0);
             if (A.focus <= 9) {
                 if (v.empty()) A.focus = 10;
-                else if (dy < 0 && A.focus < colsN && scrollOf(View::Store) == 0) A.focus = 10;
-                else if (dy > 0 && A.focus >= colsN && scrollOf(View::Store) + 10 >= (int)v.size()) A.focus = 10;
-                else moveGridCard(View::Store, 0, colsN, 10, dx, dy);
+                else if (!navigate(View::Store, dx, dy)) {   // v0.72 grid: vertical edge -> banner
+                    if (dy != 0) A.focus = 10;
+                }
             } else if (A.focus == 10) {
                 if (dy > 0) A.focus = A.filterOpen ? 11 + selRow : 20;
                 else if (dy < 0) A.focus = gridN > 0 ? gridN - 1 : (A.filterOpen ? 11 + selRow : 20);
@@ -1246,10 +1252,9 @@ static void moveFocus(int dx, int dy) {
                     A.focus = 1 + f;
                 }
             } else {
-                // v0.63: the result row scrolls like every grid (results 6+ were UNREACHABLE —
-                // the old code wrapped inside the first five only).
-                if (dy < 0 && scrollOf(View::Search) == 0) A.focus = 1 + std::min(A.filter, 2);
-                else moveGridCard(View::Search, 4, 5, 5, dx, dy);
+                if (!navigate(View::Search, dx, dy)) {   // v0.72 grid: vertical edge -> tabs
+                    if (dy < 0 && scrollOf(View::Search) == 0) A.focus = 1 + std::min(A.filter, 2);
+                }
             }
             break;
         }
@@ -1284,16 +1289,13 @@ static void moveFocus(int dx, int dy) {
             break;
         }
         case Scr::Mine: {
-            // v0.65c: 0..N-1 = list rows (vertical) — the check button is gone
-            const int n = (int)viewItems(View::Mine, 0).size();
-            if (n == 0) { A.focus = 0; break; }
-            A.focus = clampInto(A.focus + dy, 0, n - 1);
+            // v0.72: the list is a one-column grid through navigate() (ends stop)
+            navigate(View::Mine, dx, dy);
             break;
         }
         case Scr::Plans:
             break;   // v6.6 view-only
     }
-    clampScroll();
     A.dirty = true;
 }
 
@@ -1429,6 +1431,7 @@ static void handle(Btn b) {
             } else if (b == Btn::Cross && A.focus >= 1 && A.focus <= 3) {
                 A.filter = A.focus - 1;
                 setScroll(View::Search, 0);
+                navReset(View::Search);
             } else if (b == Btn::Cross) {
                 openItem(focusedCard());
             } else if (b == Btn::Circle) {
@@ -1515,16 +1518,19 @@ static void handle(Btn b) {
                 if (A.scr == Scr::Home && A.focus >= 5 && A.focus <= 11) {
                     A.filter = A.focus - 5;
                     setScroll(View::Home, 0);
+                    navReset(View::Home);
                     break;
                 }
                 if (A.scr == Scr::Deals && A.focus <= 4) {
                     A.filter = A.focus;
                     setScroll(View::Deals, 0);
+                    navReset(View::Deals);
                     break;
                 }
                 if (A.scr == Scr::Store && A.focus == 20) {
                     setStoreSort((storeSort() + 1) % 3);
                     setScroll(View::Store, 0);
+                    navReset(View::Store);
                     ui_sfx(Sfx::Toggle);
                     break;
                 }
@@ -1533,6 +1539,7 @@ static void handle(Btn b) {
                     if (row < 5) A.storeType = row;
                     else A.storePlan = row - 5;
                     setScroll(View::Store, 0);
+                    navReset(View::Store);
                     ui_sfx(Sfx::Toggle);
                     break;
                 }
