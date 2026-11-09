@@ -2874,9 +2874,9 @@ static void drawStatusRow(UiEngine& e, const Lay& L) {
     // v6.7: coin + amount + "AC" centred as one group, same padding on both sides; "AC" sits on the digits' baseline
     std::vector<GPiece> g;
     g.push_back(gIcon(28, 28, [&](int gx, int gy) { e.drawImage("icon_coin", gx, gy, 28, 28); }, 10));
-    g.push_back(gText(e, bal, 23, kGD, false, 8));
-    GPiece ac = gText(e, "AC", 16, kMU, false);
-    ac.dy = (e.inkCapHeight(bal, 23) - e.inkCapHeight("AC", 16) + 1) / 2;
+    g.push_back(gText(e, bal, 23, kGD, false, 8, FontRole::Pixel));
+    GPiece ac = gText(e, "AC", 16, kMU, false, 0, FontRole::Pixel);
+    ac.dy = (e.inkCapHeight(bal, 23, FontRole::Pixel) - e.inkCapHeight("AC", 16, FontRole::Pixel) + 1) / 2;
     g.push_back(ac);
     const int pillH = 52, pillW = 18 + groupW(g) + 20;
     const int pillX = x - pillW, py = top + (av - pillH) / 2;
@@ -3679,9 +3679,9 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
         g.push_back(gText(e, lab, 26, kGD, L.rtl, 14));
         if (it.acPriceOld > it.acPrice) {
             const std::string old = formatAC(it.acPriceOld);
-            const int ow = e.inkWidth(old, 20), cyy = yy + ah / 2;
+            const int ow = e.inkWidth(old, 20, FontRole::Pixel), cyy = yy + ah / 2;
             g.push_back(gIcon(ow, 22, [&, old, ow, cyy](int gx, int) {
-                e.drawTextCentered(old, gx + ow / 2, cyy, 20, kMU, FontRole::Body, false);
+                e.drawTextCentered(old, gx + ow / 2, cyy, 20, kMU, FontRole::Pixel, false);
                 e.fillRect(gx, cyy, ow, 2, kMU);
             }));
         }

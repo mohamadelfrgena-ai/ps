@@ -1197,6 +1197,53 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
     const bool hasArabic = containsArabicScript(cps);
     if (hasArabic) cps = shapeAndOrderArabic(cps);
 
+    // v0.68 (user): every AC currency token — the word "AC" plus any amount written next to
+    // it ("450 AC", "+500 AC", "AC Wallet", «رصيد AC غير كافٍ») — renders in the Minecraft F77
+    // font in EVERY language and every text style. Only those tokens switch font; the rest of
+    // the string keeps exactly the font it has today. Runs are detected on the final visual
+    // codepoints, so the amount sits on either side of "AC" (LTR and RTL both work).
+    std::vector<unsigned char> acMark(cps.size(), 0);
+    {
+        auto isLetterOrDigit = [](std::uint32_t cp) {
+            return (cp >= '0' && cp <= '9') || (cp >= 'A' && cp <= 'Z') || (cp >= 'a' && cp <= 'z');
+        };
+        auto isAmountCh = [](std::uint32_t cp) {
+            return (cp >= '0' && cp <= '9') || cp == '.' || cp == ',' || cp == '+' || cp == '-';
+        };
+        auto isDigit = [](std::uint32_t cp) { return cp >= '0' && cp <= '9'; };
+        const int n = static_cast<int>(cps.size());
+        for (int i = 0; i + 1 < n; ++i) {
+            const std::uint32_t a = cps[static_cast<std::size_t>(i)];
+            const std::uint32_t c = cps[static_cast<std::size_t>(i + 1)];
+            if (!((a == 'A' || a == 'a') && (c == 'C' || c == 'c'))) continue;
+            if ((i > 0 && isLetterOrDigit(cps[static_cast<std::size_t>(i - 1)])) ||
+                (i + 2 < n && isLetterOrDigit(cps[static_cast<std::size_t>(i + 2)])))
+                continue;   // part of a bigger word (e.g. "ACCOUNT") — not the currency
+            acMark[static_cast<std::size_t>(i)] = 1;
+            acMark[static_cast<std::size_t>(i + 1)] = 1;
+            for (int dir = -1; dir <= 1; dir += 2) {
+                int k = (dir < 0) ? i - 1 : i + 2;
+                if (k >= 0 && k < n && cps[static_cast<std::size_t>(k)] == ' ') {
+                    const int kk = k + dir;
+                    if (kk >= 0 && kk < n && isAmountCh(cps[static_cast<std::size_t>(kk)])) {
+                        acMark[static_cast<std::size_t>(k)] = 1;   // the single bridge space
+                        k = kk;
+                    }
+                }
+                if (k < 0 || k >= n || !isAmountCh(cps[static_cast<std::size_t>(k)])) continue;
+                const std::uint32_t lead = cps[static_cast<std::size_t>(k)];
+                const bool runOk = isDigit(lead) ||
+                                   ((lead == '+' || lead == '-') && k + dir >= 0 && k + dir < n &&
+                                    isDigit(cps[static_cast<std::size_t>(k + dir)]));
+                if (!runOk) continue;
+                while (k >= 0 && k < n && isAmountCh(cps[static_cast<std::size_t>(k)])) {
+                    acMark[static_cast<std::size_t>(k)] = 1;
+                    k += dir;
+                }
+            }
+        }
+    }
+
     stbtt_fontinfo* primaryFont = &fonts_->bodyInfo;
     if (hasArabic || role == FontRole::Arabic) {
         primaryFont = &fonts_->arInfo;
@@ -1211,7 +1258,12 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
     int ascent = 0, descent = 0, lineGap = 0;
     stbtt_GetFontVMetrics(primaryFont, &ascent, &descent, &lineGap);
 
-    auto pickFontForCp = [&](std::uint32_t cp, float& outScale) -> stbtt_fontinfo* {
+    const float scaleF77 = stbtt_ScaleForPixelHeight(&fonts_->f77Info, static_cast<float>(pxSize));
+    auto pickFontForCp = [&](std::uint32_t cp, float& outScale, bool acToken = false) -> stbtt_fontinfo* {
+        if (acToken && fonts_->f77Valid && stbtt_FindGlyphIndex(&fonts_->f77Info, static_cast<int>(cp)) != 0) {
+            outScale = scaleF77;
+            return &fonts_->f77Info;
+        }
         if (stbtt_FindGlyphIndex(primaryFont, static_cast<int>(cp)) != 0) {
             outScale = scalePrimary;
             return primaryFont;
@@ -1238,7 +1290,7 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
     bool firstBox = true;
     for (std::size_t i = 0; i < cps.size(); ++i) {
         float sc = scalePrimary;
-        stbtt_fontinfo* fn = pickFontForCp(cps[i], sc);
+        stbtt_fontinfo* fn = pickFontForCp(cps[i], sc, acMark[i] != 0);
         int adv = 0, lsb = 0;
         stbtt_GetCodepointHMetrics(fn, static_cast<int>(cps[i]), &adv, &lsb);
         int bx0 = 0, by0 = 0, bx1 = 0, by1 = 0;
@@ -1275,7 +1327,7 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
     penX = 2.0f;
     for (std::size_t i = 0; i < cps.size(); ++i) {
         float sc = scalePrimary;
-        stbtt_fontinfo* fn = pickFontForCp(cps[i], sc);
+        stbtt_fontinfo* fn = pickFontForCp(cps[i], sc, acMark[i] != 0);
         int adv = 0, lsb = 0;
         stbtt_GetCodepointHMetrics(fn, static_cast<int>(cps[i]), &adv, &lsb);
 
