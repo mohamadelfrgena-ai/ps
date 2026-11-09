@@ -226,6 +226,7 @@ static void ensureFreshSession() {
 }
 
 static std::atomic<unsigned> gSessGen{0};   // v0.62: bumped on sign-out — kills in-flight refreshes
+static void requestAvatarAsync(const std::string& url);   // v0.65e: defined with the cover worker
 static void applyAccountFromSession() {
     const unsigned gen0 = gSessGen.load();
     ensureFreshSession();
@@ -238,6 +239,7 @@ static void applyAccountFromSession() {
     if (a.displayName.empty()) a.displayName = gSession.username;
     a.username = p.ok ? p.username : gSession.username;
     a.avatar = p.ok ? p.avatarUrl : gSession.avatarUrl;   // v0.48: the picture was never assigned
+    requestAvatarAsync(a.avatar);   // v0.65e («صورة البروفايل لا تظهر»): download the image too
     a.plan = tierFromPlan(p.ok ? p.plan : gSession.plan);
     a.acBalance = p.ok ? p.acBalance : (int)gSession.acBalance;
     a.downloads = (int)p.downloads;
@@ -462,7 +464,7 @@ static void loadPlansNow() {
 
 // covers: ONE serial worker downloads (never floods the HTTP pool), decode on the UI thread.
 // The cover URL travels on the item — no network refetch per cover.
-struct CoverJob { std::string name; std::string url; };
+struct CoverJob { std::string name; std::string url; std::string file; };   // v0.65e: file = safe cache name
 static std::deque<CoverJob> gCoverJobs;
 static std::mutex gCoverJobMx;
 static bool gCoverWorkerOn = false;
@@ -475,7 +477,7 @@ static void requestCoverAsync(const AddonItem& it) {
         gCoverRequested[it.cover] = true;
     }
     std::lock_guard<std::mutex> jk(gCoverJobMx);
-    gCoverJobs.push_back(CoverJob{it.cover, it.coverUrl});
+    gCoverJobs.push_back(CoverJob{it.cover, it.coverUrl, it.cover});
     if (gCoverWorkerOn) return;
     gCoverWorkerOn = true;
     std::thread([]() {
@@ -491,7 +493,7 @@ static void requestCoverAsync(const AddonItem& it) {
             // The old flow wrote every cover to a shared tmp inside the install dir —
             // if that dir was missing the fopen failed and the cover was lost forever
             // («صور الاضافات لم تظهر»), and every launch redownloaded everything.
-            const std::string cache = std::string(kCoverDir) + "/" + job.name + ".img";
+            const std::string cache = std::string(kCoverDir) + "/" + (job.file.empty() ? job.name : job.file) + ".img";
             CoverBlob blob;
             blob.name = job.name;
             auto readAll = [&blob](const std::string& path) {
@@ -519,6 +521,71 @@ static void requestCoverAsync(const AddonItem& it) {
                 }
                 if (!got) {
                     // bounded retry on the next frame — never lose a cover to one failure
+                    std::lock_guard<std::mutex> lk(gCoverMx);
+                    if (++gCoverTries[job.name] < 3) gCoverRequested[job.name] = false;
+                    continue;
+                }
+            }
+            {
+                std::lock_guard<std::mutex> lk(gCoverMx);
+                gCoverQ.push_back(std::move(blob));
+                A.dirty = true;
+            }
+        }
+    }).detach();
+}
+
+// v0.65e («صورة البروفايل لا تظهر»): the account avatar URL was stored but its
+// image was NEVER downloaded — the person glyph always showed. Queue it through
+// the same cover worker; the engine key stays the URL (screens look it up there),
+// the disk cache uses a safe hashed name.
+static void requestAvatarAsync(const std::string& url) {
+    if (url.empty()) return;
+    unsigned long long h = 1469598103934665603ULL;   // FNV-1a -> safe cache name
+    for (unsigned char c : url) { h ^= c; h *= 1099511628211ULL; }
+    char hb[24]; std::snprintf(hb, sizeof hb, "acc_%016llx", h);
+    {
+        std::lock_guard<std::mutex> lk(gCoverMx);
+        if (gCoverRequested[url]) return;
+        gCoverRequested[url] = true;
+    }
+    std::lock_guard<std::mutex> jk(gCoverJobMx);
+    gCoverJobs.push_back(CoverJob{url, url, hb});
+    if (gCoverWorkerOn) return;
+    gCoverWorkerOn = true;
+    std::thread([]() {
+        for (;;) {
+            CoverJob job;
+            {
+                std::lock_guard<std::mutex> lk(gCoverJobMx);
+                if (gCoverJobs.empty()) { gCoverWorkerOn = false; return; }
+                job = gCoverJobs.front();
+                gCoverJobs.pop_front();
+            }
+            const std::string cache = std::string(kCoverDir) + "/" + job.file + ".img";
+            CoverBlob blob;
+            blob.name = job.name;
+            auto readAll = [&blob](const std::string& path) {
+                FILE* f = std::fopen(path.c_str(), "rb");
+                if (!f) return false;
+                std::fseek(f, 0, SEEK_END);
+                long sz = std::ftell(f);
+                std::fseek(f, 0, SEEK_SET);
+                blob.data.resize((std::size_t)(sz > 0 ? sz : 0));
+                if (!blob.data.empty()) std::fread(blob.data.data(), 1, blob.data.size(), f);
+                std::fclose(f);
+                return !blob.data.empty();
+            };
+            if (!readAll(cache)) {
+                ::mkdir("/data", 0777);
+                ::mkdir("/data/AddonStation", 0777);
+                ::mkdir(kCoverDir, 0777);
+                const std::string tmp = cache + ".tmp";
+                DownloadResult r = downloadToFile(job.url, tmp, nullptr);
+                bool got = r.ok && readAll(tmp);
+                if (got) ::rename(tmp.c_str(), cache.c_str());
+                else ::remove(tmp.c_str());
+                if (!got) {
                     std::lock_guard<std::mutex> lk(gCoverMx);
                     if (++gCoverTries[job.name] < 3) gCoverRequested[job.name] = false;
                     continue;
@@ -1632,6 +1699,7 @@ int main(int, char**) {
             // appear within seconds). Also keeps plan/streak state fresh.
             if (gSession.valid && gSession.accessToken.size() > 20) {
                 if (cycle % 3 == 0) applyAccountFromSession();   // ~15s
+                requestAvatarAsync(gSession.avatarUrl);   // v0.65e: keep the avatar image loaded
                 if (cycle % 6 == 0) loadWalletHistory();         // ~30s
             }
         }
