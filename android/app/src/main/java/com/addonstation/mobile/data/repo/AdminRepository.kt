@@ -433,6 +433,26 @@ class AdminRepository(private val supabase: SupabaseClient) {
         }
     }
 
+    /**
+     * ينشئ كود حملة لصانع محتوى. يبدأ الكود بـ CR ويبقى من 8 خانات،
+     * ويستطيع كل مستخدم مسجّل استبداله مرة واحدة فقط.
+     */
+    suspend fun acCreateCreatorCode(channelName: String, amount: Int): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val outcome = supabase.rpc(
+                    "ac_admin_create_creator_code",
+                    mapOf(
+                        "p_channel_name" to JsonPrimitive(channelName.trim()),
+                        "p_amount" to JsonPrimitive(amount),
+                    ),
+                ).asOutcome().requireOk()
+                outcome.data["code"]?.asString()
+                    ?.takeIf { it.isNotBlank() }
+                    ?: error("creator_code_missing")
+            }
+        }
+
     /** كل الأكواد المولَّدة (لإدارتها من اللوحة). */
     suspend fun acCodes(limit: Int = 100): List<Map<String, JsonElement>> = runCatching {
         supabase.decodeList<Map<String, JsonElement>>(

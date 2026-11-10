@@ -539,10 +539,10 @@
     <string name="admin_codes_amount">Code value (AC)</string>
     <string name="admin_codes_count">Number of codes</string>
     <string name="admin_codes_summary">%1$s codes × %2$s AC = %3$s AC total</string>
-    <string name="admin_codes_bad_amount">Enter at least 100 AC.</string>
+    <string name="admin_codes_bad_amount">Enter a value between 100 and 10,000,000 AC.</string>
     <string name="admin_codes_generate">Generate codes</string>
     <string name="admin_codes_created">Generated %1$s codes — copy them now:</string>
-    <string name="admin_codes_hint">Copy the codes and send them to whoever you want. Each code works once per member.</string>
+    <string name="admin_codes_hint">Generate private batch codes. Each code can be redeemed by one user only.</string>
     <string name="admin_codes_latest">Latest codes</string>
     <string name="admin_adjustment">Admin Adjustment</string>
     <string name="admin_no_permission">You do not have permission for this action</string>

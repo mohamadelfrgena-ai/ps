@@ -524,10 +524,10 @@
     <string name="admin_codes_amount">Kod değeri (AC)</string>
     <string name="admin_codes_count">Kod sayısı</string>
     <string name="admin_codes_summary">%1$s kod × %2$s AC = toplam %3$s AC</string>
-    <string name="admin_codes_bad_amount">En az 100 AC gir.</string>
+    <string name="admin_codes_bad_amount">100 ile 10.000.000 AC arasında bir değer gir.</string>
     <string name="admin_codes_generate">Kod üret</string>
     <string name="admin_codes_created">%1$s kod üretildi — şimdi kopyala:</string>
-    <string name="admin_codes_hint">Kodları kopyala ve istediğin kişiye gönder. Her kod üye başına bir kez çalışır.</string>
+    <string name="admin_codes_hint">Özel bir kod grubu oluştur. Her kodu yalnızca bir kullanıcı kullanabilir.</string>
     <string name="admin_codes_latest">Son kodlar</string>
     <string name="admin_adjustment">Yönetici düzeltmesi</string>
     <string name="admin_no_permission">Bu işlem için yetkin yok</string>

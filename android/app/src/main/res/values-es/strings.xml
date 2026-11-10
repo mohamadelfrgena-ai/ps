@@ -524,10 +524,10 @@
     <string name="admin_codes_amount">Valor del código (AC)</string>
     <string name="admin_codes_count">Cantidad de códigos</string>
     <string name="admin_codes_summary">%1$s códigos × %2$s AC = %3$s AC en total</string>
-    <string name="admin_codes_bad_amount">Introduce al menos 100 AC.</string>
+    <string name="admin_codes_bad_amount">Introduce un valor entre 100 y 10.000.000 AC.</string>
     <string name="admin_codes_generate">Generar códigos</string>
     <string name="admin_codes_created">Se generaron %1$s códigos — cópialos ahora:</string>
-    <string name="admin_codes_hint">Copia los códigos y envíalos a quien quieras. Cada código se usa una vez por miembro.</string>
+    <string name="admin_codes_hint">Genera un lote privado de códigos. Cada código solo puede canjearlo un usuario.</string>
     <string name="admin_codes_latest">Últimos códigos</string>
     <string name="admin_adjustment">Ajuste administrativo</string>
     <string name="admin_no_permission">No tienes permiso para esta acción</string>

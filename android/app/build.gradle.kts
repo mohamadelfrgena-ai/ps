@@ -55,8 +55,8 @@ android {
         targetSdk = 35
         // 1.4: تمرير كسول للمتجر · جمع حالة مرتبط بدورة الحياة · سياسة صور
         //      متكيّفة مع RAM · بحث مؤجّل · Baseline Profile للإقلاع والتمرير
-        versionCode = 5
-        versionName = "1.4"          // AddonStation Mobile v1.4
+        versionCode = 6
+        versionName = "1.5"          // AddonStation Mobile v1.5
 
         resourceConfigurations += listOf("en", "ar", "pt", "es", "ru", "zh", "fr", "tr")
 

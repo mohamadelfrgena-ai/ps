@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="admin_codes_save_txt">Save as TXT</string>
+    <string name="admin_codes_file_saved">TXT file saved.</string>
+    <string name="admin_codes_file_failed">Could not save the TXT file.</string>
+    <string name="admin_codes_bad_count">Enter between 1 and 100 codes.</string>
+    <string name="admin_creator_code_title">Creator campaign code</string>
+    <string name="admin_creator_code_hint">The code starts with CR and every signed-in user can redeem it once.</string>
+    <string name="admin_creator_channel">Creator channel name</string>
+    <string name="admin_creator_code_generate">Generate creator code</string>
+    <string name="admin_creator_code_result">Creator code</string>
+    <string name="admin_creator_code_copy">Copy code</string>
+    <string name="admin_creator_code_copied">Code copied.</string>
+    <string name="admin_creator_code_bad_channel">Enter a channel name between 2 and 80 characters.</string>
+    <string name="admin_creator_code_bad_amount">Enter a value between 100 and 10,000,000 AC.</string>
+</resources>

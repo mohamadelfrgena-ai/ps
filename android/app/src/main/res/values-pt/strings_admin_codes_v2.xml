@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="admin_codes_save_txt">Salvar como TXT</string>
+    <string name="admin_codes_file_saved">Arquivo TXT salvo.</string>
+    <string name="admin_codes_file_failed">Não foi possível salvar o arquivo TXT.</string>
+    <string name="admin_codes_bad_count">Informe entre 1 e 100 códigos.</string>
+    <string name="admin_creator_code_title">Código de campanha de criador</string>
+    <string name="admin_creator_code_hint">O código começa com CR e cada usuário conectado pode usá-lo uma vez.</string>
+    <string name="admin_creator_channel">Nome do canal do criador</string>
+    <string name="admin_creator_code_generate">Gerar código do criador</string>
+    <string name="admin_creator_code_result">Código do criador</string>
+    <string name="admin_creator_code_copy">Copiar código</string>
+    <string name="admin_creator_code_copied">Código copiado.</string>
+    <string name="admin_creator_code_bad_channel">Informe um nome de canal com 2 a 80 caracteres.</string>
+    <string name="admin_creator_code_bad_amount">Informe um valor entre 100 e 10.000.000 AC.</string>
+</resources>

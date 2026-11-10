@@ -524,10 +524,10 @@
     <string name="admin_codes_amount">Номинал кода (AC)</string>
     <string name="admin_codes_count">Количество кодов</string>
     <string name="admin_codes_summary">%1$s кодов × %2$s AC = %3$s AC всего</string>
-    <string name="admin_codes_bad_amount">Введите не меньше 100 AC.</string>
+    <string name="admin_codes_bad_amount">Введите значение от 100 до 10 000 000 AC.</string>
     <string name="admin_codes_generate">Создать коды</string>
     <string name="admin_codes_created">Создано кодов: %1$s — скопируйте сейчас:</string>
-    <string name="admin_codes_hint">Скопируйте коды и отправьте кому нужно. Каждый код работает один раз на участника.</string>
+    <string name="admin_codes_hint">Создайте закрытую партию кодов. Каждый код может использовать только один пользователь.</string>
     <string name="admin_codes_latest">Последние коды</string>
     <string name="admin_adjustment">Корректировка администратора</string>
     <string name="admin_no_permission">У вас нет прав на это действие</string>

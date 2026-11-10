@@ -524,10 +524,10 @@
     <string name="admin_codes_amount">قيمة الكود (AC)</string>
     <string name="admin_codes_count">عدد الأكواد</string>
     <string name="admin_codes_summary">%1$s كود × %2$s AC = %3$s AC إجمالاً</string>
-    <string name="admin_codes_bad_amount">أدخل قيمة 100 AC على الأقل.</string>
+    <string name="admin_codes_bad_amount">أدخل قيمة من 100 إلى 10,000,000 AC.</string>
     <string name="admin_codes_generate">توليد الأكواد</string>
     <string name="admin_codes_created">تم توليد %1$s كوداً — انسخها الآن:</string>
-    <string name="admin_codes_hint">انسخ الأكواد وأرسلها لمن تريد. كل كود يُستخدم مرة واحدة لكل مستخدم.</string>
+    <string name="admin_codes_hint">ولّد دفعة أكواد خاصة واحفظها في ملف. كل كود يستخدمه مستخدم واحد فقط.</string>
     <string name="admin_codes_latest">أحدث الأكواد</string>
     <string name="admin_adjustment">تعديل إداري</string>
     <string name="admin_no_permission">لا تملك صلاحية هذا الإجراء</string>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="admin_codes_save_txt">TXT olarak kaydet</string>
+    <string name="admin_codes_file_saved">TXT dosyası kaydedildi.</string>
+    <string name="admin_codes_file_failed">TXT dosyası kaydedilemedi.</string>
+    <string name="admin_codes_bad_count">1 ile 100 arasında kod gir.</string>
+    <string name="admin_creator_code_title">İçerik üreticisi kampanya kodu</string>
+    <string name="admin_creator_code_hint">Kod CR ile başlar ve giriş yapan her kullanıcı bir kez kullanabilir.</string>
+    <string name="admin_creator_channel">İçerik üreticisinin kanal adı</string>
+    <string name="admin_creator_code_generate">Üretici kodu oluştur</string>
+    <string name="admin_creator_code_result">Üretici kodu</string>
+    <string name="admin_creator_code_copy">Kodu kopyala</string>
+    <string name="admin_creator_code_copied">Kod kopyalandı.</string>
+    <string name="admin_creator_code_bad_channel">2 ile 80 karakter arasında bir kanal adı gir.</string>
+    <string name="admin_creator_code_bad_amount">100 ile 10.000.000 AC arasında bir değer gir.</string>
+</resources>

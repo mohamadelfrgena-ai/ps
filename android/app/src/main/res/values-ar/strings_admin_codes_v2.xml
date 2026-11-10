@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="admin_codes_save_txt">حفظ كملف TXT</string>
+    <string name="admin_codes_file_saved">تم حفظ ملف TXT.</string>
+    <string name="admin_codes_file_failed">تعذّر حفظ ملف TXT.</string>
+    <string name="admin_codes_bad_count">أدخل عدداً من 1 إلى 100 كود.</string>
+    <string name="admin_creator_code_title">كود حملة صانع محتوى</string>
+    <string name="admin_creator_code_hint">يبدأ الكود بـ CR ويمكن لكل مستخدم مسجّل استخدامه مرة واحدة.</string>
+    <string name="admin_creator_channel">اسم قناة صانع المحتوى</string>
+    <string name="admin_creator_code_generate">توليد كود صانع المحتوى</string>
+    <string name="admin_creator_code_result">كود صانع المحتوى</string>
+    <string name="admin_creator_code_copy">نسخ الكود</string>
+    <string name="admin_creator_code_copied">تم نسخ الكود.</string>
+    <string name="admin_creator_code_bad_channel">أدخل اسم قناة من حرفين إلى 80 حرفاً.</string>
+    <string name="admin_creator_code_bad_amount">أدخل قيمة من 100 إلى 10,000,000 AC.</string>
+</resources>

@@ -3,7 +3,7 @@
 """
 يولّد **`supabase/99_VERIFY_ALL.sql`** — فاحص القاعدة الكامل (قراءة فقط).
 
-ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 46) نُفِّذت
+ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 51) نُفِّذت
 كما نريد، ويطبع جدولاً: ✅/❌ + التفاصيل (وما هو المفقود بالاسم). يلصقه المالك
 في Supabase → SQL Editor مرة واحدة.
 
@@ -322,6 +322,17 @@ missing_list("14_redeem_codes", "سياسات أكواد الشحن",
              "not exists (select 1 from pg_policies pol where pol.schemaname = 'public' "
              "and pol.tablename = split_part(t, ':', 2) and pol.policyname = split_part(t, ':', 1))",
              "2/2 موجودة")
+
+missing_list("51_admin_creator_codes", "Creator campaign code functions",
+             ["ac_random_creator_code", "ac_admin_create_creator_code"],
+             "not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+             "where n.nspname = 'public' and p.proname = t)", "2/2 present")
+add("51_admin_creator_codes", "Code type and channel name columns exist",
+    q_ok("select (count(*) = 2)::text from information_schema.columns where table_schema = 'public' "
+         "and table_name = 'ac_redeem_codes' and column_name in ('code_kind', 'channel_name')", "true"),
+    qdet("select string_agg(column_name || ':' || data_type, ' · ' order by ordinal_position) "
+         "from information_schema.columns where table_schema = 'public' and table_name = 'ac_redeem_codes' "
+         "and column_name in ('code_kind', 'channel_name')", "missing"))
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  15_assets_v2 (+16_fix_asset_paths) + 21_banners + 27_admin_only_assets
@@ -1004,7 +1015,7 @@ HEAD = r'''-- ==================================================================
 --  AddonStation Mobile — ٩٩) فاحص القاعدة: «هل نُفِّذ كل SQL كما نريد؟»
 -- ============================================================================
 --
---  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 50) بنداً بنداً، ويطبع
+--  ماذا يفعل؟ يفحص **كل ملف SQL سلّمناه لك** (01 → 51) بنداً بنداً، ويطبع
 --  جدولاً واحداً: كل صف = بند · العمود «الحالة» ✅ أو ❌ · والعمود «التفاصيل»
 --  يقول لك ما هو الناقص بالاسم بالضبط.
 --
@@ -1086,7 +1097,7 @@ select 999999,
 
 -- ---------------------------------------------------------------------------
 --  ماذا بعد؟
---   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 41).
+--   • كل الصفوف ✅ ⇒ القاعدة مطابقة تماماً لكل ملفات SQL (01 → 51).
 --   • الصف الأخير (المجموع) يسرد أسماء الملفات التي فيها بند ❌ — لا يعني أن
 --     الملفات نفسها ناقصة، بل أن بنداً واحداً فيها لم يتحقّق: راجع عموده.
 --   • ظهر ❌ في ملف معيّن ⇒ نفّذ ذلك الملف من `supabase/` في SQL Editor
