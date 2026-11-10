@@ -739,6 +739,7 @@ std::string btnIconName(const std::string& key) {
     if (key.find("\xE2\x97\x8B") == 0) return "btn_circle";
     if (key.find("\xE2\x96\xA1") == 0) return "btn_square";
     if (key.find("\xE2\x96\xB3") == 0) return "btn_triangle";
+    if (key.find("\xE2\x98\xB0") == 0) return "btn_options";   // v0.72: U+2630 legend key = OPTIONS button icon
     if (key == "L1") return "btn_l1";
     if (key == "R1") return "btn_r1";
     if (key == "L2") return "btn_l2";
