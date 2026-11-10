@@ -1,5 +1,5 @@
 # pkg addon test — v0.72 D-pad nav grid + OPTIONS filter icon + both-states install — PS4 Design UI + Dynamic Addon/World Installer (content from GitHub Releases)
-# v0.72 (2026-11-09): unified navigate(view,dx,dy) row/col focus (row memory, RTL flip, no wrap) + «تصفية» OPTIONS icon wired; v0.71 card names; v0.70 flat design
+# v0.72 (2026-11-09): unified navigate(view,dx,dy) row/col focus (row memory, RTL flip, no wrap) + «تصفية» OPTIONS icon wired; v0.71 card names; v0.70 flat design — pkg build 2026-11-10
 TITLE       := pkg addon test
 # AddonStation PS4 — v0.23 (UI v7.3 final)
 VERSION     := 0.34
