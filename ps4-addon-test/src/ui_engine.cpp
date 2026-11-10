@@ -1,8 +1,15 @@
 #include "ui_engine.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_JPEG
-#define STBI_ONLY_PNG
+// v0.72 pkg fix: STBI_ONLY_JPEG/PNG made stb_image define STBI_NO_GIF, so
+// stbi_load_gif_from_memory (animated avatars) had a declaration but no
+// definition -> ld.lld undefined symbol. Keep JPEG+PNG+GIF, drop the rest.
+#define STBI_NO_BMP
+#define STBI_NO_PSD
+#define STBI_NO_TGA
+#define STBI_NO_HDR
+#define STBI_NO_PIC
+#define STBI_NO_PNM
 #include "stb_image.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
