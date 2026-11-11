@@ -528,6 +528,24 @@ static std::deque<CoverJob> gCoverJobs;
 static std::mutex gCoverJobMx;
 static bool gCoverWorkerOn = false;
 
+// v0.77 («صور الاغلفة بطاقات لاتظهر»): alternate cover sources when the primary URL
+// fails — the device cannot fetch github release assets, so try the release folder in
+// the public site-assets bucket, then the same path in content-files (signed, the
+// phone's route). One candidate per index keeps the retry loop bounded.
+static std::string coverAltUrl(const std::string& url, int idx) {
+    std::string path;
+    std::size_t p = url.find("/releases/download/");
+    if (p != std::string::npos) path = url.substr(p + 19);
+    else {
+        p = url.find("/object/public/site-assets/");
+        if (p != std::string::npos) path = url.substr(p + 27);
+    }
+    while (!path.empty() && path[0] == '/') path.erase(0, 1);
+    if (path.empty()) return std::string();
+    if (idx == 0) return resolveAssetUrl(path);
+    return callSignedStorageUrl(gCfg, "content-files", path, gSession.accessToken, 1800);
+}
+
 static void requestCoverAsync(const AddonItem& it) {
     if (it.cover.empty() || it.coverUrl.empty()) return;
     {
@@ -572,6 +590,11 @@ static void requestCoverAsync(const AddonItem& it) {
                 ::mkdir(kCoverDir, 0777);
                 const std::string tmp = cache + ".tmp";
                 DownloadResult r = downloadToFile(job.url, tmp, nullptr);
+                for (int alt = 0; !r.ok && alt < 2; ++alt) {   // v0.77: storage-route fallbacks
+                    const std::string u = coverAltUrl(job.url, alt);
+                    if (u.empty() || u == job.url) break;
+                    r = downloadToFile(u, tmp, nullptr);
+                }
                 bool got = r.ok && readAll(tmp);
                 if (got) {
                     ::rename(tmp.c_str(), cache.c_str());   // atomic-ish cache write
@@ -871,8 +894,17 @@ static void startDownloadFlow(int catIdx) {
         DownloadGrant g = localGrantFrom(it.title, it.isWorld ? "world" : "addon", it.ps4RawUrl, it.packTargetsRaw);
 #else
         DownloadGrant g = callRecordContentDownload(gCfg, it.id, gSession.accessToken);
+        // v0.77: if the RPC failed at TRANSPORT level (never a server refusal), fall
+        // back to the catalog URLs so the download can still proceed.
+        if (!g.ok && (g.message.empty() || g.message.find("FAILED") != std::string::npos ||
+                      g.message.find("HTTP") != std::string::npos)) {
+            DownloadGrant lg = localGrantFrom(it.title, it.isWorld ? "world" : "addon", it.ps4RawUrl, it.packTargetsRaw);
+            if (lg.ok) g = lg;
+        }
 #endif
-        if (!g.ok || g.ps4RawUrl.empty()) {
+        // v0.77: an empty ps4_raw_url is NOT fatal — the storage route (bucket/path,
+        // the phone's route) still delivers the packs.
+        if (!g.ok || (g.ps4RawUrl.empty() && g.path.empty())) {
             ui_sfx(Sfx::Error);
             toast(netErrText(g.message, lang), 4200, 1);
             A.dl = (int)DemoState::Idle;
@@ -889,28 +921,63 @@ static void startDownloadFlow(int catIdx) {
         if (packs.empty()) {
             PackTarget one;
             one.ps4RawUrl = g.ps4RawUrl;
+            one.rawFile = basenameOf(g.path);   // v0.77: storage-route file name
             one.target = it.isWorld ? "minecraftWorlds" : "resource_packs";
             one.destFolder = displayName;
             packs.push_back(one);
         }
+        // v0.77 («لما اثبت الاضافة يقولي خطأ في الاتصال»): the staging dir must EXIST
+        // before the first download writes into it — a missing dir made fopen fail with
+        // "OPEN FAILED" which mapped to the generic «Network error — try again».
+        ::mkdir("/data", 0777);
+        ::mkdir("/data/AddonStation", 0777);
+        ::mkdir(kStageDir, 0777);
+        // v0.77: storage signed route (the phone's) — used when a pack has no ps4_raw_url
+        // or when its URL fails (the device cannot fetch github release assets).
+        const std::string gdir = g.path.substr(0, g.path.find_last_of('/'));
+        auto storageUrl = [&](const std::string& rawFile) -> std::string {
+            if (g.path.empty()) return std::string();
+            std::string path;
+            if (rawFile.empty() || rawFile == basenameOf(g.path)) path = g.path;
+            else path = (gdir.empty() || gdir == g.path) ? rawFile : gdir + "/" + rawFile;
+            return callSignedStorageUrl(gCfg, g.bucket, path, gSession.accessToken, 1800);
+        };
         bool allOk = true;
         bool anyQueued = false;
         CopyResult r;
         const int npk = static_cast<int>(packs.size());
         for (int idx = 0; idx < npk; ++idx) {
             const PackTarget& pk = packs[static_cast<std::size_t>(idx)];
-            if (pk.ps4RawUrl.empty()) continue;
-            const std::string rawPath = std::string(kStageDir) + "/" + basenameOf(pk.ps4RawUrl);
+            if (pk.ps4RawUrl.empty() && g.path.empty()) continue;   // v0.77: no URL source at all
+            // v0.77: stable staging name even when the URL is empty (raw_file, then path).
+            std::string base = basenameOf(pk.ps4RawUrl);
+            if (base.empty()) base = basenameOf(pk.rawFile);
+            if (base.empty()) base = basenameOf(g.path);
+            if (base.empty()) base = "pack_" + std::to_string(idx) + ".raw";
+            const std::string rawPath = std::string(kStageDir) + "/" + base;
             // v0.64: flaky networks (0x80431068 = connection/timeout) must not kill the
             // download — three attempts with a short pause between them.
+            // v0.77: primary URL first; the storage signed route (the phone's) serves the
+            // pack when there is no primary or it fails.
+            const std::string primary = resolveAssetUrl(pk.ps4RawUrl);
+            const std::string firstUrl = primary.empty() ? storageUrl(pk.rawFile) : primary;
             DownloadResult dr;
             for (int attempt = 0; attempt < 3; ++attempt) {
-                dr = downloadToFile(resolveAssetUrl(pk.ps4RawUrl), rawPath, [idx, npk](int p) {
+                dr = downloadToFile(firstUrl, rawPath, [idx, npk](int p) {
                     A.dlPct = (idx * 100 + p) / std::max(1, npk);
                     A.dirty = true;
                 });
                 if (dr.ok) break;
                 std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+            }
+            if (!dr.ok && !primary.empty()) {   // v0.77: storage route after the primary fails
+                const std::string alt = storageUrl(pk.rawFile);
+                if (!alt.empty()) {
+                    dr = downloadToFile(alt, rawPath, [idx, npk](int p) {
+                        A.dlPct = (idx * 100 + p) / std::max(1, npk);
+                        A.dirty = true;
+                    });
+                }
             }
             if (!dr.ok) {
                 allOk = false;
