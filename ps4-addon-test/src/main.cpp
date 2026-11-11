@@ -1093,7 +1093,7 @@ static int focusedCard() {
         case Scr::Home: {
             v = viewItems(View::Home, A.filter);  first = scrollOf(View::Home);  idx = A.focus - 12;
             const int nCards = (int)std::min<std::size_t>(10, v.size());
-            if (idx < 0 || idx >= nCards) return -1;   // v0.65: the "View more" tile is not an item
+            if (idx < 0 || idx > 4 || idx >= nCards) return -1;   // v0.75: slots 0-4 cards; slot 5 = the "View more" tile
             break;
         }
         case Scr::Deals:  v = viewItems(View::Deals, A.filter); first = scrollOf(View::Deals); idx = A.focus - 5; break;
@@ -1136,9 +1136,9 @@ static bool navigate(View view, int dx, int dy) {
     // one geometry table for every screen's card area (was duplicated per screen)
     int fb = 0, cols = 5, win = 10, extra = 0, filt = A.filter;
     bool strip = false;
-    if (view == View::Home)        { fb = 12; cols = 1; win = 4; extra = 1; strip = true; }
-    else if (view == View::Deals)  { fb = 5;  cols = 5; win = 10; }
-    else if (view == View::Store)  { fb = 0;  cols = A.filterOpen ? 5 : 6; win = 10; filt = storeF(); }
+    if (view == View::Home)        { fb = 12; cols = 1; win = 5; extra = 1; strip = true; }   // v0.75: 5 visible cards (slot 5 = the fixed tile)
+    else if (view == View::Deals)  { fb = 5;  cols = 5; win = 5; }   // v0.75: one visible row (the 2nd row hides behind the command bar)
+    else if (view == View::Store)  { fb = 0;  cols = A.filterOpen ? 5 : 6; win = cols * 2; filt = storeF(); }   // v0.75: two FULL rows (was 10 = ragged 6+4)
     else if (view == View::Search) { fb = 4;  cols = 5; win = 5; }
     else if (view == View::Mine)   { fb = 0;  cols = 1; win = 7; }
 
@@ -1158,6 +1158,7 @@ static bool navigate(View view, int dx, int dy) {
     if (strip) {   // ONE horizontal row — the last slot is the "View more" tile
         const int colN = abs + dx;
         if (dx != 0 && colN >= 0 && colN < n) abs = colN;   // edges STOP
+        if (extra && abs == n - 1) { A.focus = fb + 5; return true; }   // v0.75: the tile = fixed slot 5, never scrolls
     } else {
         const int rows = (n + cols - 1) / cols;
         int row = abs / cols, col = abs % cols;
@@ -1176,14 +1177,14 @@ static bool navigate(View view, int dx, int dy) {
         if (abs / cols < 64) mem.col[abs / cols] = abs % cols;         // remember the column per row
     }
 
-    // window follows the focus: grids snap to row starts, the strip slides one tile
-    if (strip) {
-        if (abs < first) first = abs;
-        else if (abs > first + win - 1) first = abs - (win - 1);
-    } else {
-        if (abs < first || abs >= first + win) first = (abs / cols) * cols;
-    }
+    // v0.75 rebuild («مفروض تنقل واحدة بعدها التي جنبها»): the window scrolls MINIMALLY —
+    // one row/card at a time — so the ring always lands on the neighbouring card. The old
+    // model snapped the focus row to the top (whole rows jumped) and the strip window was
+    // 4 slots wide over 5 visible cards (the ring stuck while the cards slid).
+    if (abs < first) first = (abs / cols) * cols;
+    else if (abs >= first + win) first = ((abs / cols) - (win / cols) + 1) * cols;
     if (first < 0) first = 0;
+    if (strip && first > n - 1 - win) first = std::max(0, n - 1 - win);   // keep 5 cards + the tile on screen
     if (first != scrollOf(view)) setScroll(view, first);
     A.focus = fb + (abs - first);
     return true;
@@ -1201,9 +1202,7 @@ static void moveFocus(int dx, int dy) {
         case Scr::Home: {
             // v0.65 («نفس ذا»): hero 0-1 | chips 5-11 | ONE strip 12.. = the 10 newest
             // cards + the gold "View more" tile at the end («شريط واحد يعرض اخر عشر بطاقات»).
-            const std::vector<int> v = viewItems(View::Home, A.filter);
-            const int nTiles = (int)std::min<std::size_t>(10, v.size()) + 1;
-            if (A.focus >= 12 && A.focus - 12 >= nTiles) A.focus = 12 + std::max(0, nTiles - 1);
+            if (A.focus >= 12 && A.focus - 12 > 5) A.focus = 12 + 5;   // v0.75: strip slots 0-5 (slot 5 = the tile)
             if (A.focus <= 1) {
                 if (dy > 0) A.focus = 5 + std::min(A.filter, 6);
                 else A.focus = clampInto(A.focus + dx, 0, 1);
@@ -1593,11 +1592,11 @@ static void handle(Btn b) {
                     else if (!catalog().empty()) openItem(0);
                     break;
                 }
-                if (A.scr == Scr::Home && A.focus >= 12) {
+                if (A.scr == Scr::Home && A.focus == 12 + 5) {
                     // v0.65 («واذا اختاره يشيل للمتجر»): the "View more" tile opens the Store
-                    const std::vector<int> v = viewItems(View::Home, A.filter);
-                    const int nCards = (int)std::min<std::size_t>(10, v.size());
-                    if (scrollOf(View::Home) + (A.focus - 12) >= nCards) { go(Scr::Store); break; }
+                    // v0.75: the tile is always strip slot 5 (focus 12+5)
+                    go(Scr::Store);
+                    break;
                 }
                 openItem(focusedCard());
             } else if (b == Btn::Circle) {

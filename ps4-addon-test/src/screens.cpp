@@ -3221,7 +3221,7 @@ static void cardStrip(UiEngine& e, const Lay& L, const std::vector<int>& items, 
         const AddonItem& it = gCat[(std::size_t)items[(std::size_t)(first + i)]];
         vcard(e, L, x, yTop, cw, ih, it, focus == fb + i, lang, false, false, saleActive());
     }
-    viewMoreTile(e, L, xl + 5 * (cw + gap), yTop, cw, ch, focus == fb + nCards, lang);
+    viewMoreTile(e, L, xl + 5 * (cw + gap), yTop, cw, ch, focus == fb + 5, lang);   // v0.75: the tile = fixed slot 5
 }
 } // namespace
 
@@ -3246,8 +3246,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
         // scrolled (it read focus-12 as an absolute index into the full list).
         const std::size_t gi = static_cast<std::size_t>(scrollOf(View::Home)) +
                                static_cast<std::size_t>(focus - 12);
-        const int nCards = (int)std::min<std::size_t>(10, homeItems.size());
-        if (gi < homeItems.size() && focus - 12 < nCards) sFollow = homeItems[gi];   // v0.65: not the View-more tile
+        if (gi < homeItems.size() && focus != 12 + 5) sFollow = homeItems[gi];   // v0.75: never the View-more tile (slot 5)
     } else if (focus >= 2 && focus <= 11) {
         sFollow = -1;
     }
@@ -3568,7 +3567,7 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
     {
         const std::vector<int> items = viewItems(View::Store, filterIndex);
         const int first = std::max(0, std::min(scrollOf(View::Store), std::max(0, static_cast<int>(items.size()) - 1)));
-        const int shown = std::min(10, static_cast<int>(items.size()) - first);
+        const int shown = std::min(12, static_cast<int>(items.size()) - first);   // v0.75: two full rows
         const int gxL = cx + lerpI(0, catW + catGap, panT);
         if (items.empty()) {
             emptyState(e, L, gxL, catY, kCR - gxL, std::min(560, 960 - catY), 12, tr(gCat.empty() ? "home_empty_t" : "empty_t", lang),
