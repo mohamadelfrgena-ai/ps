@@ -132,13 +132,29 @@ struct App {
 };
 static App A;
 static int storeF() { return A.storeType * 4 + A.storePlan; }   // v0.69: drawer code for viewItems(Store)
+static int gStoreGridFocus = 0, gStoreGridScroll = 0;   // v0.73: grid position remembered across the drawer
 static void startFilterAnim(bool open) {
     A.filterOpen = open;
     A.filterAnim = true;
     A.filterAnimFrom = A.filterT;
     A.filterAnimTo = open ? 1.f : 0.f;
     A.filterAnimAt = SDL_GetTicks();
-    if (!open && A.focus >= 11 && A.focus <= 19) A.focus = 10;
+    if (open) {
+        // v0.73 («اريد الازرار تتنقل له»): opening moves focus INTO the drawer,
+        // always starting at the FILE TYPE section («اولا نوع الملف»)
+        if (A.focus <= 9) { gStoreGridFocus = A.focus; gStoreGridScroll = scrollOf(View::Store); }
+        A.focus = 11 + std::max(0, std::min(4, static_cast<int>(A.storeType)));
+    } else if (A.focus >= 11 && A.focus <= 19) {
+        // v0.73 («ويرجع التحكم للمتجر»): closing hands control back to the store grid,
+        // clamped to the filtered list (closed grid = 6 columns)
+        const int n = static_cast<int>(viewItems(View::Store, storeF()).size());
+        int abs = gStoreGridScroll + gStoreGridFocus;
+        if (abs > n - 1) abs = n > 0 ? n - 1 : 0;
+        if (abs < 0) abs = 0;
+        const int first = (abs / 6) * 6;
+        setScroll(View::Store, first);
+        A.focus = abs - first;
+    }
     A.dirty = true;
 }
 
@@ -1224,7 +1240,8 @@ static void moveFocus(int dx, int dy) {
             } else if (A.focus <= 19) {
                 if (!A.filterOpen) A.focus = 20;
                 else if (dy < 0) A.focus = (A.focus == 11) ? 10 : A.focus - 1;
-                else if (dy > 0) A.focus = (A.focus == 19) ? 20 : A.focus + 1;
+                else if (dy > 0 && A.focus == 19) startFilterAnim(false);   // v0.73: past the plan list -> filter + back to the store
+                else if (dy > 0) A.focus = A.focus + 1;
                 else {
                     int r = A.focus - 11 + dx;
                     if (r < 0) r = 8;
@@ -1536,8 +1553,19 @@ static void handle(Btn b) {
                 }
                 if (A.scr == Scr::Store && A.focus >= 11 && A.focus <= 19) {
                     const int row = A.focus - 11;
-                    if (row < 5) A.storeType = row;
-                    else A.storePlan = row - 5;
+                    if (row < 5) {
+                        A.storeType = row;
+                        // v0.73: choosing a FILE TYPE moves on to the plan section by itself
+                        A.focus = 16 + std::max(0, std::min(3, static_cast<int>(A.storePlan)));
+                    } else {
+                        A.storePlan = row - 5;
+                        // v0.73 («وبعد نوع الخطة تفلتر ويرجع التحكم للمتجر»): choosing a PLAN
+                        // applies the filter and hands control back to the store grid
+                        navReset(View::Store);
+                        startFilterAnim(false);
+                        ui_sfx(Sfx::Toggle);
+                        break;
+                    }
                     setScroll(View::Store, 0);
                     navReset(View::Store);
                     ui_sfx(Sfx::Toggle);
@@ -1853,8 +1881,8 @@ int main(int, char**) {
         const Uint32 nowMs = SDL_GetTicks();
         if (A.filterAnim) {   // v0.69: the drawer slide («وكانه تدفع البطاقات») ticks per frame
             const Uint32 el = nowMs - A.filterAnimAt;
-            const float p = el >= 280u ? 1.f : static_cast<float>(el) / 280.f;
-            const float s = p * p * (3.f - 2.f * p);
+            const float p = el >= 150u ? 1.f : static_cast<float>(el) / 150.f;   // v0.73: 280 -> 150ms («سرعة ظهور قائمة الفلتر»)
+            const float s = 1.f - (1.f - p) * (1.f - p) * (1.f - p);            // ease-out: fast show, soft settle («سلاسة»)
             A.filterT = A.filterAnimFrom + (A.filterAnimTo - A.filterAnimFrom) * s;
             if (p >= 1.f) { A.filterT = A.filterAnimTo; A.filterAnim = false; }
             A.dirty = true;
