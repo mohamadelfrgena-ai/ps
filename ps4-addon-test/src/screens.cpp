@@ -799,24 +799,9 @@ void focusRing(UiEngine& e, int x, int y, int w, int h, int r, bool gleam = true
     e.drawRoundBorder(x, y, w, h, rr, 3, goldHi);
     e.drawRoundBorder(x + 3, y + 3, w - 6, h - 6, std::max(1, rr - 3), 1, goldLo);
 
-    // 2) THE gleam (buttons only): a soft white-gold light that catches the rim on arrival
-    if (gleam) {
-        static bool sInit = false;
-        static int sLX = 0, sLY = 0, sLW = 0, sLH = 0;
-        static Uint32 sGleamAt = 0;
-        if (!sInit || x != sLX || y != sLY || w != sLW || h != sLH) {
-            sInit = true; sLX = x; sLY = y; sLW = w; sLH = h;
-            sGleamAt = SDL_GetTicks();
-        }
-        float g = static_cast<float>(SDL_GetTicks() - sGleamAt) / 420.0f;
-        g = g < 0.0f ? 0.0f : (g > 1.0f ? 1.0f : g);
-        g = 1.0f - g;
-        g = g * g * (3.0f - 2.0f * g);          // 1 on arrival -> 0 at rest
-        if (g > 0.01f) {
-            const Uint8 a = static_cast<Uint8>(80.0f * g);
-            e.drawRoundBorder(x - 1, y - 1, w + 2, h + 2, rr + 1, 4, SDL_Color{255, 246, 214, a});
-        }
-    }
+    // 2) v0.76 («الحواف الازرق الزايدة نظف وازله»): the arrival gleam is REMOVED — the ring
+    // is one clean gold frame with no light halo around it.
+    (void)gleam;
 }
 
 [[maybe_unused]] void iconPhone(UiEngine& e, int x, int y, int s, SDL_Color c) {
@@ -1685,10 +1670,11 @@ void sectionTitle(UiEngine& e, const Lay& L, const std::string& s, int x, int w,
 // 1px light rim and a darker bottom edge — same size/position as before, so layouts don't move.
 void button(UiEngine& e, const Lay& L, int xl, int y, int w, int h, const std::string& label,
             int style, int px = 30, int radius = 20) {
-    // Flat design (same as the "View addon" button): solid fill, 12px corners, bold-looking white label.
+    // Flat design (same as the "View addon" button): solid fill, smooth corners, bold-looking white label.
+    // v0.76 («خلي التطبيق ذو حواف ناعمة»): radius cap 12 -> 20 so buttons match their r=20 gold focus ring exactly.
     // 0 blue | 1 neutral | 2 gold | 3 blue outline (status) | 4 red outline (danger)
     const int rx = L.X(xl, w);
-    const int r = std::min(radius, 12);
+    const int r = std::min(radius, 20);
     SDL_Color txt = SDL_Color{255, 255, 255, 255};
     if (style == 0) {                                   // primary #1a6fd6
         e.drawRoundRect(rx, y, w, h, r, SDL_Color{26, 111, 214, 255});
@@ -3343,7 +3329,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
         const int w0 = std::max(250, textW(e, L, b0, 24) + 110);
         if (hero) {   // v6.7: play icon + label centred together in the button
             const SDL_Color dk{255, 255, 255, 255};   // flat blue button: white icon + label
-            button(e, L, cx, ctaY, w0, bh, "", 0, 24, 8);
+            button(e, L, cx, ctaY, w0, bh, "", 0, 24, 20);   // v0.76: radius = focusRing radius (was 8)
             std::vector<GPiece> g;
             g.push_back(gIcon(13, 26, [&](int gx, int gy) { playIcon(e, gx - 7, gy, 26, dk); }, 14));
             g.push_back(gText(e, b0, 24, dk, L.rtl));
