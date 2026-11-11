@@ -147,11 +147,22 @@ struct DownloadGrant {
     std::string title;
     std::string contentType;
     std::string ps4RawUrl;
+    std::string bucket;   // v0.77: storage bucket from record_content_download (the phone's route)
+    std::string path;     // v0.77: relative storage path (content-files/<file_path>)
     std::vector<PackTarget> packs;
 };
 DownloadGrant callRecordContentDownload(const SupabaseConfig& cfg,
                                         const std::string& itemId,
                                         const std::string& userAccessToken);
+
+// v0.77 («لما اثبت الاضافة يقولي خطأ في الاتصال»): short-lived SIGNED storage URL —
+// the exact route the phone app uses (bucket/path -> signedUrl -> bytes). The device
+// cannot fetch github release assets, so content comes from the content-files bucket.
+std::string callSignedStorageUrl(const SupabaseConfig& cfg,
+                                 const std::string& bucket,
+                                 const std::string& path,
+                                 const std::string& userAccessToken,
+                                 int expiresInSeconds = 1800);
 
 // v0.36 2121: anonymous download grant built from catalog fields (no account)
 DownloadGrant localGrantFrom(const std::string& title,

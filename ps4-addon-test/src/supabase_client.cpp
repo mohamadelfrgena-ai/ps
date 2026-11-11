@@ -473,6 +473,8 @@ DownloadGrant callRecordContentDownload(const SupabaseConfig& cfg,
     out.title = jsonGetString(r.body, "title");
     out.contentType = jsonGetString(r.body, "content_type");
     out.ps4RawUrl = jsonGetString(r.body, "ps4_raw_url");
+    out.bucket = jsonGetString(r.body, "bucket");   // v0.77: phone route (content-files)
+    out.path = jsonGetString(r.body, "path");
     for (const std::string& p : splitJsonObjects(jsonGetRaw(r.body, "pack_targets"))) {
         PackTarget t;
         t.target = jsonGetString(p, "target");
@@ -483,6 +485,31 @@ DownloadGrant callRecordContentDownload(const SupabaseConfig& cfg,
         out.packs.push_back(t);
     }
     return out;
+}
+
+// v0.77: POST /storage/v1/object/sign/<bucket>/<path> -> {"signedURL": "/object/sign/..."}
+// Full URL = <cfg.url>/storage/v1 + signedURL — mirrors the phone's supabase.signedUrl().
+std::string callSignedStorageUrl(const SupabaseConfig& cfg,
+                                 const std::string& bucket,
+                                 const std::string& path,
+                                 const std::string& userAccessToken,
+                                 int expiresInSeconds) {
+    if (!cfg.ok() || path.empty()) return std::string();
+    const std::string b = bucket.empty() ? std::string("content-files") : bucket;
+    const std::string url = cfg.url + "/storage/v1/object/sign/" + b + "/" + path;
+    const std::string bearer = userAccessToken.empty() ? cfg.anonKey : userAccessToken;
+    const std::vector<std::pair<std::string, std::string>> headers = {
+        {"apikey", cfg.anonKey},
+        {"Authorization", "Bearer " + bearer},
+        {"Content-Type", "application/json"},
+        {"Accept", "application/json"},
+    };
+    const HttpPostResult http =
+        httpPostJson(url, headers, "{\"expiresIn\":" + std::to_string(expiresInSeconds) + "}");
+    if (!http.ok) return std::string();
+    const std::string rel = jsonGetString(http.body, "signedURL");
+    if (rel.empty()) return std::string();
+    return cfg.url + "/storage/v1" + rel;
 }
 
 // v0.61 («التطبيق يسجل خروج بنفسه»): ATOMIC save — a crash mid-write used to truncate
