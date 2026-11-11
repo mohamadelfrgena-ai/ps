@@ -159,6 +159,23 @@ static void startFilterAnim(bool open) {
 }
 
 static SupabaseConfig gCfg;
+
+// v0.74b («صورة البروفايل لم تعمل مع اني حولت كثيرا دون نفع»): profiles.avatar_url stores
+// a RELATIVE storage path (e.g. "profiles/pfp/x.png"). The phone app resolves it through
+// siteAssetUrl (public URL of the "site-assets" bucket) before showing it — the PS4 app
+// used the raw value as a download URL, so every avatar download failed and the default
+// person glyph showed no matter how often the picture changed. Resolve exactly like the
+// phone app: full http(s) URLs pass through untouched (idempotent).
+static std::string resolveAssetUrl(const std::string& raw) {
+    std::string u = raw;
+    while (!u.empty() && (u.front() == ' ' || u.front() == '\t' || u.front() == '\n' || u.front() == '\r')) u.erase(u.begin());
+    while (!u.empty() && (u.back() == ' ' || u.back() == '\t' || u.back() == '\n' || u.back() == '\r')) u.pop_back();
+    if (u.empty()) return u;
+    if (u.rfind("http://", 0) == 0 || u.rfind("https://", 0) == 0) return u;
+    while (!u.empty() && u.front() == '/') u.erase(u.begin());
+    if (gCfg.ok()) return gCfg.url + "/storage/v1/object/public/site-assets/" + u;
+    return u;
+}
 static LinkSession gSession;
 static std::mutex gSessionMx;
 static std::deque<Btn> gBtnQ;
@@ -278,7 +295,7 @@ static void applyAccountFromSession() {
     a.displayName = p.ok ? p.displayName : gSession.displayName;
     if (a.displayName.empty()) a.displayName = gSession.username;
     a.username = p.ok ? p.username : gSession.username;
-    a.avatar = p.ok ? p.avatarUrl : gSession.avatarUrl;   // v0.48: the picture was never assigned
+    a.avatar = resolveAssetUrl(p.ok ? p.avatarUrl : gSession.avatarUrl);   // v0.48: the picture was never assigned
     requestAvatarAsync(a.avatar);   // v0.65e («صورة البروفايل لا تظهر»): download the image too
     a.plan = tierFromPlan(p.ok ? p.plan : gSession.plan);
     a.acBalance = p.ok ? p.acBalance : (int)gSession.acBalance;
@@ -723,7 +740,7 @@ static int pollCodeOnce() {
                 if (A.linkedConsoleId.empty()) A.linkedConsoleId = jsonGetString(prof, "id");
                 A.linkedUsername = jsonGetString(prof, "username");
                 A.linkedDisplayName = jsonGetString(prof, "display_name");
-                A.linkedAvatar = jsonGetString(prof, "avatar_url");
+                A.linkedAvatar = resolveAssetUrl(jsonGetString(prof, "avatar_url"));
             }
             A.exchangeId.clear();
             return 1;
@@ -753,7 +770,7 @@ static int pollCodeOnce() {
                 if (A.linkedConsoleId.empty()) A.linkedConsoleId = jsonGetString(prof, "id");
                 if (A.linkedUsername.empty()) A.linkedUsername = jsonGetString(prof, "username");
                 if (A.linkedDisplayName.empty()) A.linkedDisplayName = jsonGetString(prof, "display_name");
-                if (A.linkedAvatar.empty()) A.linkedAvatar = jsonGetString(prof, "avatar_url");
+                if (A.linkedAvatar.empty()) A.linkedAvatar = resolveAssetUrl(jsonGetString(prof, "avatar_url"));
             }
         }
         if (st == "approved" || jsonGetBool(r.body, "approved", false) || jsonGetBool(r.body, "claimed", false))
