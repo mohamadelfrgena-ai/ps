@@ -13,7 +13,7 @@ values
   (
     'A Minecraft Movie by sliver fox',
     'a-minecraft-movie',
-    'A Minecraft Movie — by sliver fox (silverfoxstudio).',
+    'Step into a movie-inspired adventure with new characters, locations and surprises around every corner. Explore themed scenes and relive the story in your own world.',
     'addon', 'other', 'free', '1.0.0',
     'https://github.com/mohamadelfrgena-ai/ps/releases/download/content-a-minecraft-movie-1.0.0/a-minecraft-movie-cover.jpg',
     'content-a-minecraft-movie-1.0.0/a-minecraft-movie_4022586e.raw',
@@ -46,7 +46,7 @@ values
   (
     'Aether Moa by sliver fox',
     'aether-moa',
-    'Aether Moa — by sliver fox (silverfoxstudio).',
+    'Soar above the clouds on the back of a mighty Moa! Tame these giant birds, craft their saddles and glide across the Aether in style. A sky-high adventure awaits.',
     'addon', 'adventure', 'free', '1.0.0',
     'https://github.com/mohamadelfrgena-ai/ps/releases/download/content-aether-moa-1.0.0/aether-moa-cover.jpg',
     'content-aether-moa-1.0.0/aether-moa_fd53f531.raw',
@@ -79,7 +79,7 @@ values
   (
     'Backpacks and Jetpacks by sliver fox',
     'backpacks-and-jetpacks',
-    'Backpacks and Jetpacks — by sliver fox (silverfoxstudio).',
+    'Carry more and fly further! Craft roomy backpacks to hold all your loot, then strap on a jetpack and blast off over your world. The ultimate survival upgrade.',
     'addon', 'survival', 'free', '1.0.0',
     'https://github.com/mohamadelfrgena-ai/ps/releases/download/content-backpacks-and-jetpacks-1.0.0/backpacks-and-jetpacks-cover.jpg',
     'content-backpacks-and-jetpacks-1.0.0/backpacks-and-jetpacks_0e1fb703.raw',
@@ -112,7 +112,7 @@ values
   (
     'Block Furniture 1.0 by sliver fox',
     'block-furniture-1-0',
-    'Block Furniture 1.0 — by sliver fox (silverfoxstudio).',
+    'Furnish your dream home with dozens of new furniture blocks - sofas, tables, shelves, lamps and more. Every piece is craftable and fits right into your builds.',
     'addon', 'building', 'free', '1.0.0',
     'https://github.com/mohamadelfrgena-ai/ps/releases/download/content-block-furniture-1-0-1.0.0/block-furniture-1-0-cover.jpg',
     'content-block-furniture-1-0-1.0.0/block-furniture-1-0_91022fc4.raw',
@@ -145,7 +145,7 @@ values
   (
     'COMBINE ITEMS! Add-On by sliver fox',
     'combine-items-add-on',
-    'COMBINE ITEMS! Add-On — by sliver fox (silverfoxstudio).',
+    'Combine ordinary items into amazing new tools! Mix and match materials to unlock powerful weapons, handy gadgets and unique blocks. Find every hidden recipe.',
     'addon', 'other', 'free', '1.0.0',
     'https://github.com/mohamadelfrgena-ai/ps/releases/download/content-combine-items-add-on-1.0.0/combine-items-add-on-cover.jpg',
     'content-combine-items-add-on-1.0.0/combine-items-add-on_59a62de5.raw',
@@ -178,7 +178,7 @@ values
   (
     'Gravestones by sliver fox',
     'gravestones',
-    'Gravestones — by sliver fox (silverfoxstudio).',
+    'Never lose your gear again! When you fall, a gravestone keeps your items safe until you return. Find it, break it and reclaim everything you carried.',
     'addon', 'survival', 'free', '1.0.0',
     'https://github.com/mohamadelfrgena-ai/ps/releases/download/content-gravestones-1.0.0/gravestones-cover.jpg',
     'content-gravestones-1.0.0/gravestones_ecc614ca.raw',
@@ -211,7 +211,7 @@ values
   (
     'Owls by sliver fox',
     'owls',
-    'Owls — by sliver fox (silverfoxstudio).',
+    'Meet your new night companions! Tame adorable owls that follow you through the dark, perch on your shoulder and hoot you to sleep. Many colors to collect.',
     'addon', 'survival', 'free', '1.0.0',
     'https://github.com/mohamadelfrgena-ai/ps/releases/download/content-owls-1.0.0/owls-cover.jpg',
     'content-owls-1.0.0/owls_707d1b97.raw',
@@ -244,7 +244,7 @@ values
   (
     'Spark Pets by sliver fox',
     'spark-pets',
-    'Spark Pets — by sliver fox (silverfoxstudio).',
+    'Adopt a pack of cute, sparky pets that light up your world! Feed them, play with them and watch them grow. Each pet has its own personality and special trick.',
     'addon', 'survival', 'free', '1.0.0',
     'https://github.com/mohamadelfrgena-ai/ps/releases/download/content-spark-pets-1.0.0/spark-pets-cover.jpg',
     'content-spark-pets-1.0.0/spark-pets_4641073a.raw',
@@ -277,7 +277,7 @@ values
   (
     'Weapons Armors by sliver fox',
     'weapons-armors',
-    'Weapons Armors — by sliver fox (silverfoxstudio).',
+    'Gear up for battle with new weapons and armor sets - sharp blades, heavy hammers and strong shields. Everything you need to win the toughest fights.',
     'addon', 'pvp', 'free', '1.0.0',
     'https://github.com/mohamadelfrgena-ai/ps/releases/download/content-weapons-armors-1.0.0/weapons-armors-cover.jpg',
     'content-weapons-armors-1.0.0/weapons-armors_f1cd6f75.raw',
@@ -310,7 +310,7 @@ values
   (
     'Tiny Takeover Mini Mania by sliver fox',
     'tiny-takeover-mini-mania',
-    'Tiny Takeover Mini Mania — by sliver fox (silverfoxstudio).',
+    'Think small, fight big! Shrink down and battle in a tiny world of mini arenas, pocket-sized weapons and fast challenges. A mad little PvP party.',
     'addon', 'pvp', 'free', '1.0.0',
     'https://github.com/mohamadelfrgena-ai/ps/releases/download/content-tiny-takeover-mini-mania-1.0.0/tiny-takeover-mini-mania-cover.jpg',
     'content-tiny-takeover-mini-mania-1.0.0/tiny-takeover-mini-mania_65846f66.raw',
