@@ -403,12 +403,13 @@ static AddonItem toItem(const ItemData& d) {
     it.acPrice = (int)(d.saleAcPrice >= 0 ? d.saleAcPrice : d.acPrice);
     it.acPriceOld = (d.saleAcPrice >= 0) ? (int)d.acPrice : 0;
     it.cover = "cv_" + d.id;
-    it.coverUrl = d.coverUrl;
+    it.coverUrl = resolveAssetUrl(d.coverUrl);   // v0.76 («صور الاغلفة بطاقات لاتظهر»): cover_url lives as a
+    // relative site-assets path (the phone resolves it via siteAssetUrl) — resolve it here like the avatar.
     it.version = d.version;
     it.fileSize = d.fileSize;
     it.downloads = (int)d.downloads;
     it.views = (int)d.views;
-    it.ps4RawUrl = d.ps4RawUrl;
+    it.ps4RawUrl = resolveAssetUrl(d.ps4RawUrl);   // v0.76: same for install files (absolute URLs pass through)
     it.packTargetsRaw = d.packTargetsRaw;
     it.rating = (float)d.rating;
     it.ratingCount = (int)d.ratingCount;
@@ -904,7 +905,7 @@ static void startDownloadFlow(int catIdx) {
             // download — three attempts with a short pause between them.
             DownloadResult dr;
             for (int attempt = 0; attempt < 3; ++attempt) {
-                dr = downloadToFile(pk.ps4RawUrl, rawPath, [idx, npk](int p) {
+                dr = downloadToFile(resolveAssetUrl(pk.ps4RawUrl), rawPath, [idx, npk](int p) {
                     A.dlPct = (idx * 100 + p) / std::max(1, npk);
                     A.dirty = true;
                 });
