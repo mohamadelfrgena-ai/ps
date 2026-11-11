@@ -106,5 +106,33 @@ int main(int argc, char** argv) {
     itemCover(*gE, it, 100, 100, 640, 360, 18, true);
     exportCrop((outDir + "/card-no-cover/cover_slot_nocover.png").c_str(), 100, 100, 640, 360);
 
+    // ---- AS-IN-APP: settings tiles via the app's own lineIconTile (accent tile + white icon + halo)
+    for (int k = 0; k < 6; ++k) {
+        exportIcon((outDir + "/settings-tiles/tile_" + kNames[k] + ".png").c_str(), 800, 400, 300, 300,
+                   [&]{ lineIconTile(*gE, k, 822, 422, 256, kAccD[k], false); });
+        exportIcon((outDir + "/settings-tiles/tile_" + kNames[k] + "_focused.png").c_str(), 800, 400, 300, 300,
+                   [&]{ lineIconTile(*gE, k, 822, 422, 256, kAccD[k], true); });
+    }
+
+    // ---- AS-IN-APP: full store screen where EVERY card has no cover (real context)
+    std::vector<AddonItem> items;
+    for (int i = 0; i < 6; ++i) {
+        AddonItem n;
+        n.id = std::string("n") + char('0' + i);
+        n.title = "Gravestones and Item Elevators by sliver fox";
+        n.creator = "sliver fox"; n.tier = (i % 3 == 2) ? Tier::Legendary : (i % 3 == 1 ? Tier::Epic : Tier::Free);
+        n.cover = ""; n.rating = 4.7f; n.ratingCount = 128; n.downloads = 1200; n.views = 2400;
+        n.isWorld = (i == 3);
+        items.push_back(n);
+    }
+    setCatalog(items);
+    for (int theme = 0; theme < 2; ++theme) {
+        setThemeLight(theme == 1);
+        gE->fillRect(0, 0, 1920, 1080, SDL_Color{11, 17, 28, 255});
+        drawStore(*gE, 0, 0, "ar", 1.0f);
+        exportCrop((outDir + "/card-no-cover/store_nocover_" + (theme ? "light" : "dark") + ".png").c_str(), 0, 0, 1920, 1080);
+    }
+    setThemeLight(false);
+
     return 0;
 }
