@@ -2563,7 +2563,7 @@ static std::string cardTitleText(const std::string& s) {
         t.pop_back();
     return t.empty() ? std::string(" ") : t;
 }
-int vcardHeight(int imgH, bool creator) { (void)creator; return imgH + 12 + 26 + 34 + 12; }
+int vcardHeight(int imgH, bool creator) { (void)creator; return imgH + 8 + 26 + 2 + 26 + 2 + 32 + 12; }   // v0.74: title + stars + stats rows
 void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const AddonItem& it, bool focused,
            const std::string& lang, bool creator, bool stats, bool dealBadge) {
     (void)creator; (void)stats;
@@ -2588,20 +2588,22 @@ void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const Addo
         e.drawRoundRect(L.X(xl + w - 12 - bw, bw), y + 12, bw, 30, 8, SDL_Color{16, 185, 129, 255});
         e.drawTextCentered(b, L.X(xl + w - 12 - bw, bw) + bw / 2, y + 27, 15, kWHT, FontRole::Body, L.rtl);
     }
-    {   // yellow type tag on the cover (Add-On / World)
+    {   // v0.74 («اريد شكل البطاقات هكذا»): gold-outline type chip on the cover (Add-On / World)
         const std::string tg = tr(it.isWorld ? "type_world" : "type_addon", lang);
         const int tw = textW(e, L, tg, 15) + 22;
         const int tyy = y + imgH - 12 - 30;
-        e.drawRoundRect(L.X(xl + 12, tw), tyy, tw, 30, 8, kGD);
-        e.drawTextCentered(tg, L.X(xl + 12, tw) + tw / 2, tyy + 15, 15, SDL_Color{30, 22, 4, 255}, FontRole::Body, L.rtl);
+        const int tx = L.X(xl + 12, tw);
+        e.drawRoundRect(tx, tyy, tw, 30, 8, SDL_Color{10, 13, 18, 190});
+        e.drawRoundBorder(tx, tyy, tw, 30, 8, 2, kGD);
+        e.drawTextCentered(tg, tx + tw / 2, tyy + 15, 15, kGD, FontRole::Body, L.rtl);
     }
     if (it.installed) {
         const int s2 = 30, ix = L.X(xl + w - 12 - s2, s2), iy = y + imgH - 12 - 30;
         e.drawCircle(ix + s2 / 2, iy + s2 / 2, s2 / 2, kGRN);
         icCheck(e, ix + 7, iy + 7, 16, kWHT);
     }
-    // ---- title (pixel — v0.30: names always in Minecraft F77) ----
-    const int ty = y + imgH + 12;
+    // ---- title (pixel, centred — v0.30: names always in Minecraft F77) ----
+    const int ty = y + imgH + 8;
     {   // flat design: cut long names with "..." instead of mid-letter
         std::string tt = cardTitleText(it.title);   // v0.71: no "by sliver fox" on cards
         const int maxW = w - 32;
@@ -2611,10 +2613,40 @@ void vcard(UiEngine& e, const Lay& L, int xl, int y, int w, int imgH, const Addo
             }
             tt += "...";
         }
-        boxText(e, L, tt, xl + 16, w - 32, ty, 21, kTX, FontRole::Pixel);
+        e.drawTextCentered(tt, rx + w / 2, ty, 21, kTX, FontRole::Pixel, L.rtl);
     }
-    // ---- tier pill under the title (v0.65 mockup card) ----
-    tierChip(e, L, xl + 16, y + imgH + 46, it.tier, lang, 28);
+    // ---- v0.74 («اريد شكل البطاقات هكذا»): stars + rating, views + downloads, tier pill ----
+    if (it.ratingCount > 0) {
+        char nb[16]; std::snprintf(nb, sizeof nb, "%.1f", it.rating);
+        const int ss = 19, sg = 2;
+        const int numW = e.measureText(nb, 17, FontRole::Body, L.rtl);
+        int sx = rx + (w - (5 * ss + 4 * sg + 10 + numW)) / 2;
+        const int sy = y + imgH + 36 + 3;
+        for (int i = 0; i < 5; ++i) {
+            icStar(e, sx, sy, ss, it.rating >= i + 0.5f ? kGD : ink(70));
+            sx += ss + sg;
+        }
+        e.drawText(nb, sx + 10, sy + 1, 17, kTX, FontRole::Body, false, L.rtl);
+    }
+    {
+        const int sty = y + imgH + 64 + 7;
+        int sx = 16;
+        if (it.views > 0) {
+            const std::string vt = fmtCompact(it.views);
+            const int vw = e.measureText(vt, 15, FontRole::Body, L.rtl);
+            icEye(e, L.X(xl + sx, 17), sty, 17, kMU, focused ? kSF2 : kSF);
+            e.drawText(vt, L.X(xl + sx + 23, vw), sty + 1, 15, kMU, FontRole::Body, false, L.rtl);
+            sx += 23 + vw + 14;
+        }
+        if (it.downloads > 0) {
+            const std::string dt = fmtCompact(it.downloads);
+            const int dw = e.measureText(dt, 15, FontRole::Body, L.rtl);
+            icDownloadArrow(e, L.X(xl + sx, 17), sty, 17, kMU);
+            e.drawText(dt, L.X(xl + sx + 23, dw), sty + 1, 15, kMU, FontRole::Body, false, L.rtl);
+        }
+        const int twp = tierChip(e, L, 0, 0, it.tier, lang, 28, false);
+        tierChip(e, L, xl + w - 16 - twp, y + imgH + 64 + 2, it.tier, lang, 28);
+    }
     if (focused) focusRing(e, rx, y, w, h, r, false);   // v0.35: card = list item, frame only
 }
 
