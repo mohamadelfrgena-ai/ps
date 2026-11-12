@@ -1,33 +1,76 @@
 {
-  "status": "NOT RUN",
-  "note": "Agent did not launch Minecraft. Fill this in on the Windows PC.",
-  "date_tested": null,
-  "tester": null,
+  "status": "PARTIAL — IN PROGRESS",
+  "note": "First real client evidence received from the operator on Windows. Updated from screenshot only; conditions not visible in the evidence remain NOT RUN.",
+  "date_tested": "2026-11-12",
+  "tester": "operator (Windows PC)",
+  "evidence": [
+    {
+      "file": "evidence/01-dressing-room-pack-visible.png",
+      "sha256": "1b3049b25bc829d54fc1a0b168a75f4969c7e636b9fa2c1f344946af8e9f7fe3",
+      "resolution": "1920x1080",
+      "captured_local_time": "2026-11-12 23:20",
+      "shows": "Minecraft 'Classic Skins' screen; pack tile 'Azure Mechanic Skin Test' with four skins; info panel 'VIOLET NAVIGATOR', '4 Skins', '0 Texture Packs', '0 Worlds', 'Usable everywhere'; Equip button present; Dressing Room character preview wearing the violet skin."
+    }
+  ],
   "environment": {
-    "windows_version": null,
+    "windows_version": "Windows (taskbar visible; exact build not shown)",
     "minecraft_version_exact": null,
-    "edition": null,
+    "edition": "Bedrock (Classic Skins / Dressing Room UI confirmed)",
     "build_type": null,
-    "is_preview": null,
+    "is_preview": false,
     "signed_in_to_microsoft": null,
     "internet_connected": null,
     "com_mojang_path_used": null,
     "only_allow_trusted_skins_original": null,
-    "only_allow_trusted_skins_set_to_off": null
+    "only_allow_trusted_skins_set_to_off": null,
+    "note": "Version number and sign-in state are NOT visible in the screenshot and must still be supplied."
   },
-  "track_tested": null,
-  "pack_file": null,
+  "track_tested": "Track A — windows-skin-test-azure.mcpack",
+  "pack_file": "windows-skin-test-azure.mcpack",
   "pack_sha256_verified": null,
   "backup": {
-    "com_mojang_backed_up": false,
+    "com_mojang_backed_up": null,
     "backup_location": null
   },
   "results": {
-    "W1_import": { "result": "NOT RUN", "method": null, "exact_message": null, "evidence": null },
-    "W2_four_skins_in_dressing_room": { "result": "NOT RUN", "pack_tile_name": null, "skin_names_seen": [], "evidence": null },
-    "W3_select_and_equip": { "result": "NOT RUN", "skin_selected": null, "signin_prompt": null, "evidence": null },
-    "W4_real_player_changed_in_world": { "result": "NOT RUN", "view_mode": null, "chest_marker_matches": null, "evidence": null },
-    "W5_restart_persistence": { "result": "NOT RUN", "fully_closed": null, "still_equipped": null, "evidence": null },
+    "W1_import": {
+      "result": "PASS",
+      "method": "not stated by operator",
+      "exact_message": "not captured",
+      "evidence": "evidence/01-dressing-room-pack-visible.png",
+      "basis": "The pack tile 'Azure Mechanic Skin Test' is present in the live client under Classic Skins. A pack cannot appear there unless the client parsed and registered it."
+    },
+    "W2_four_skins_in_dressing_room": {
+      "result": "PASS",
+      "pack_tile_name": "Azure Mechanic Skin Test",
+      "skin_names_seen": ["Azure Mechanic (blue)", "Ember Explorer (orange)", "Moss Gardener (green)", "Violet Navigator (purple)"],
+      "info_panel_skin_count": "4 Skins",
+      "evidence": "evidence/01-dressing-room-pack-visible.png",
+      "basis": "Four skin thumbnails render in the pack row and the info panel independently reports '4 Skins'. Names inferred from texture colours; only 'VIOLET NAVIGATOR' is shown as text."
+    },
+    "W3_select_and_equip": {
+      "result": "PARTIAL",
+      "skin_selected": "Violet Navigator",
+      "requested_skin_was": "Azure Mechanic",
+      "selection_confirmed": true,
+      "equip_confirmed": false,
+      "signin_prompt": "none visible",
+      "evidence": "evidence/01-dressing-room-pack-visible.png",
+      "basis": "Violet Navigator is highlighted with a green selection border and the Dressing Room preview wears it, so selection works. The 'Equip' button is still displayed and no post-equip confirmation was captured, so equipping is NOT confirmed. The operator selected Violet Navigator, not the requested Azure Mechanic."
+    },
+    "W4_real_player_changed_in_world": {
+      "result": "NOT RUN",
+      "view_mode": null,
+      "chest_marker_matches": null,
+      "evidence": null,
+      "basis": "The character shown is the Dressing Room preview pane, not an in-world player. No HUD, hotbar, or crosshair is present. A Dressing Room preview is explicitly excluded as evidence of real skin application."
+    },
+    "W5_restart_persistence": {
+      "result": "NOT RUN",
+      "fully_closed": null,
+      "still_equipped": null,
+      "evidence": null
+    },
     "W6_offline_no_signin": {
       "result": "NOT RUN",
       "W6a_launches_offline": "NOT RUN",
@@ -36,10 +79,23 @@
       "W6d_equips_no_prompt": "NOT RUN",
       "W6e_real_player_offline": "NOT RUN",
       "W6f_persists_offline": "NOT RUN",
-      "blocker_text": null
+      "blocker_text": null,
+      "note": "No sign-in prompt is visible and the coin balance reads 0, but neither proves an offline or signed-out state. Insufficient evidence."
     }
   },
-  "overall": "NOT RUN",
-  "overall_rule": "PASS requires W1 AND W2 AND W3 AND W4 AND W5. Dressing Room preview alone is not W4.",
-  "excluded_as_evidence": ["mannequin", "Dressing Room preview alone", "menu thumbnail", "browser render", "file presence on disk"]
+  "corroborated_findings": [
+    "The pack is recognised by a real Windows Bedrock client as a skin pack, confirming the structural audit.",
+    "Info panel reports '0 Texture Packs' and '0 Worlds', consistent with a pure skin_pack module and not a resource pack.",
+    "'Usable everywhere' is shown with a green check, indicating no usage restriction was applied to the pack.",
+    "All four skins render as distinct thumbnails, matching the four distinct textures validated locally."
+  ],
+  "overall": "NOT PASS — main criterion W4 unproven",
+  "overall_rule": "PASS requires W1 AND W2 AND W3 AND W4 AND W5. W1 and W2 pass; W3 partial; W4 and W5 not run.",
+  "excluded_as_evidence": ["mannequin", "Dressing Room preview alone", "menu thumbnail", "browser render", "file presence on disk"],
+  "next_required_from_operator": [
+    "Exact Minecraft version number (title screen bottom corner).",
+    "Whether signed in to a Microsoft/Xbox account.",
+    "Click Equip, enter a world, press F5, screenshot the real player.",
+    "Fully close and relaunch Minecraft, re-enter the world, screenshot again."
+  ]
 }

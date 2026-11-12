@@ -1,12 +1,16 @@
 # Validation results — Windows Bedrock skin test
 
 Date: 2026-11-12
-Agent environment: Linux sandbox, Node v22.22.3, Python 3. **No Minecraft client, no Windows, no game launch.**
+Agent environment: Linux sandbox, Node v22.22.3, Python 3. **The agent did not launch Minecraft.**
+Client evidence: an operator-run Windows session, supplied as a screenshot.
 
 ## Headline
 
-**The Minecraft client was NOT launched. No Windows Bedrock test passed.**
-Everything below labelled PASS is a file-level check performed in this sandbox. Every in-client behaviour is **NOT RUN**.
+**Update 2026-11-12 23:20:** the operator ran the pack on a real Windows Bedrock client and supplied a screenshot. **W1 (import) and W2 (four skins in the Dressing Room) now PASS on observed evidence.** W3 is PARTIAL, and **W4/W5 remain NOT RUN**, so the overall verdict is still **NOT PASS**.
+
+See `reports/observed-results.md` for the evidence analysis and `evidence/01-dressing-room-pack-visible.png` for the screenshot.
+
+Everything labelled PASS in section 2 below is a file-level check performed in this sandbox, not a client behaviour.
 
 ---
 
@@ -57,18 +61,22 @@ They say nothing about whether Minecraft actually imports the pack, lists it, le
 
 ---
 
-## 3. Required client tests — all NOT RUN
+## 3. Required client tests — operator evidence received
 
-| ID | Condition | Result | Why |
+Evidence: `evidence/01-dressing-room-pack-visible.png`, operator Windows session, 2026-11-12 23:20.
+
+| ID | Condition | Result | Basis |
 |---|---|---|---|
-| W1 | Import into Minecraft Bedrock for Windows | **NOT RUN** | No Minecraft client available to the agent |
-| W2 | Four skins found in the real Dressing Room | **NOT RUN** | Requires the running client |
-| W3 | Select **Azure Mechanic** and equip | **NOT RUN** | Requires the running client |
-| W4 | **Real local player model changed in a world** | **NOT RUN** | Requires the running client — main criterion |
-| W5 | Persists after restarting Minecraft | **NOT RUN** | Requires the running client |
-| W6 | Works signed out / offline | **NOT RUN** | Requires the running client |
+| W1 | Import into Minecraft Bedrock for Windows | **PASS** | Pack tile "Azure Mechanic Skin Test" is listed in the live client's Classic Skins screen |
+| W2 | Four skins found in the real Dressing Room | **PASS** | Four thumbnails render; info panel independently reports "4 Skins" |
+| W3 | Select **Azure Mechanic** and equip | **PARTIAL** | Selection confirmed, but the operator selected **Violet Navigator**, and **Equip was not confirmed** |
+| W4 | **Real local player model changed in a world** | **NOT RUN** | Only the Dressing Room preview pane is visible — no HUD/hotbar. Preview is excluded |
+| W5 | Persists after restarting Minecraft | **NOT RUN** | No restart in the evidence |
+| W6 | Works signed out / offline | **NOT RUN** | Sign-in and network state not established by the screenshot |
 
-**Overall Windows verdict: NOT RUN — unproven.**
+**Overall Windows verdict: NOT PASS — main criterion W4 unproven.**
+
+Corroborated by the client itself: the pack registers as a skin pack, reports **0 Texture Packs / 0 Worlds** (so it is not a resource pack), and shows **✔ Usable everywhere**. The pack-format question is settled for Windows; the equip-and-apply question is not.
 
 Explicitly excluded as evidence: the Dressing Room preview on its own, menu thumbnails, the Tier B mannequin, browser renders, and the mere presence of files on disk.
 
