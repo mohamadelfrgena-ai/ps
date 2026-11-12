@@ -40,7 +40,7 @@ using namespace pkgtest;
 // ---------------------------------------------------------------- config ----
 static const char* kStageDir = "/data/AddonStation/installed";
 static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
-static const char* kAppVersion = "0.35";
+static const char* kAppVersion = "0.78";
 static const char* kBrandSuffix = " by sliver fox";
 
 static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
@@ -1839,7 +1839,7 @@ int main(int, char**) {
     // (user request 2026-10-28: never with the boot/legal splash). Same intent as the
     // Sfx::AppStart comment ("عند ظهور المنزل بعد الإسبلاش").
     ui_sfx(Sfx::AppStart);
-    setAppVersion(std::string(kAppVersion) + " (2026-11-01)");  // ختم البناء في الإعدادات ← تمييز هذه النسخة
+    setAppVersion(std::string(kAppVersion) + " (2026-11-11)");  // ختم البناء في الإعدادات ← تمييز هذه النسخة
     if (!gSession.valid) setAccount(Account{});
     setCoverRequestHandler([](const AddonItem& it) { requestCoverAsync(it); });
 
