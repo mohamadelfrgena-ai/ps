@@ -1,0 +1,781 @@
+{
+  "scope": "Structural/archive/image validation only. Minecraft client was NOT launched. Import, Dressing Room, equip, in-world appearance and persistence are NOT RUN.",
+  "result": "STRUCTURAL_PASS",
+  "checkCount": 108,
+  "passCount": 108,
+  "failures": [],
+  "packs": [
+    {
+      "track": "tier_c_windows",
+      "file": "windows-skin-test.mcpack",
+      "bytes": 14655,
+      "sha256": "b0fbcd6f6f125780e3a467edd6cc905cd95ae1611b081bf67b707b195edafc5e",
+      "entries": [
+        "c1.png",
+        "c2.png",
+        "c3.png",
+        "c4.png",
+        "manifest.json",
+        "pack_icon.png",
+        "README.txt",
+        "skins.json",
+        "texts/en_US.lang",
+        "texts/languages.json"
+      ],
+      "equip_target": "C1 Signal Red",
+      "decoded_chest_colors": [
+        {
+          "id": "c1",
+          "opaque": 1632,
+          "chest": [
+            248,
+            217,
+            121,
+            255
+          ]
+        },
+        {
+          "id": "c2",
+          "opaque": 1632,
+          "chest": [
+            212,
+            247,
+            152,
+            255
+          ]
+        },
+        {
+          "id": "c3",
+          "opaque": 1632,
+          "chest": [
+            152,
+            216,
+            247,
+            255
+          ]
+        },
+        {
+          "id": "c4",
+          "opaque": 1632,
+          "chest": [
+            79,
+            55,
+            127,
+            255
+          ]
+        }
+      ]
+    },
+    {
+      "track": "tier_b_azure_windows",
+      "file": "windows-skin-test-azure.mcpack",
+      "bytes": 14639,
+      "sha256": "85c5ef3470f5bed5b796865fb776079cece767d61c8b1b53f122d2487712d19a",
+      "entries": [
+        "azure.png",
+        "ember.png",
+        "manifest.json",
+        "moss.png",
+        "pack_icon.png",
+        "README.txt",
+        "skins.json",
+        "texts/en_US.lang",
+        "texts/languages.json",
+        "violet.png"
+      ],
+      "equip_target": "Azure Mechanic",
+      "decoded_chest_colors": [
+        {
+          "id": "azure",
+          "opaque": 1632,
+          "chest": [
+            21,
+            121,
+            165,
+            255
+          ]
+        },
+        {
+          "id": "ember",
+          "opaque": 1632,
+          "chest": [
+            187,
+            73,
+            34,
+            255
+          ]
+        },
+        {
+          "id": "moss",
+          "opaque": 1632,
+          "chest": [
+            60,
+            123,
+            72,
+            255
+          ]
+        },
+        {
+          "id": "violet",
+          "opaque": 1632,
+          "chest": [
+            112,
+            63,
+            155,
+            255
+          ]
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "pack": "tier_c_windows",
+      "name": "archive sha256 matches build manifest",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "all ZIP entry CRCs valid",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "all ZIP declared sizes match",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "manifest.json at archive root (no wrapper folder)",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "no absolute/traversal/backslash entry paths",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "UTF-8 filename flag set",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "archive matches unpacked folder byte-for-byte",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "manifest format_version 2",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "exactly one module, type skin_pack",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "not a resource/behavior/data pack",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "header+module UUIDs valid v4",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "header and module UUIDs differ",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "UUIDs unused by any frozen tier pack",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "UUIDs unique across the two new packs",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "version triples present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "pack has a display name",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "exactly four skins",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "serialize_name matches localization_name",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "localization keys are punctuation-free",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "pack localization key present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "languages.json lists en_US",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c1: classic geometry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c1: type free",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c1: texture at pack root",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c1: localization present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c1: decodes to 64x64 8-bit RGBA",
+      "result": "PASS",
+      "detail": "64x64 depth=8 color=6"
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c1: has visible opaque pixels",
+      "result": "PASS",
+      "detail": "1632 opaque"
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c1: head+torso regions painted",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c2: classic geometry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c2: type free",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c2: texture at pack root",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c2: localization present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c2: decodes to 64x64 8-bit RGBA",
+      "result": "PASS",
+      "detail": "64x64 depth=8 color=6"
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c2: has visible opaque pixels",
+      "result": "PASS",
+      "detail": "1632 opaque"
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c2: head+torso regions painted",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c3: classic geometry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c3: type free",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c3: texture at pack root",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c3: localization present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c3: decodes to 64x64 8-bit RGBA",
+      "result": "PASS",
+      "detail": "64x64 depth=8 color=6"
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c3: has visible opaque pixels",
+      "result": "PASS",
+      "detail": "1632 opaque"
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c3: head+torso regions painted",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c4: classic geometry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c4: type free",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c4: texture at pack root",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c4: localization present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c4: decodes to 64x64 8-bit RGBA",
+      "result": "PASS",
+      "detail": "64x64 depth=8 color=6"
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c4: has visible opaque pixels",
+      "result": "PASS",
+      "detail": "1632 opaque"
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "skin c4: head+torso regions painted",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "four skins are visually distinguishable",
+      "result": "PASS",
+      "detail": "4 distinct chest colors"
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "pack_icon decodes",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "no mannequin/entity/render-controller/script content",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "no executable/save/world payload",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_c_windows",
+      "name": "equip target exists in pack",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "archive sha256 matches build manifest",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "all ZIP entry CRCs valid",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "all ZIP declared sizes match",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "manifest.json at archive root (no wrapper folder)",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "no absolute/traversal/backslash entry paths",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "UTF-8 filename flag set",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "archive matches unpacked folder byte-for-byte",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "manifest format_version 2",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "exactly one module, type skin_pack",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "not a resource/behavior/data pack",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "header+module UUIDs valid v4",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "header and module UUIDs differ",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "UUIDs unused by any frozen tier pack",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "UUIDs unique across the two new packs",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "version triples present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "pack has a display name",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "exactly four skins",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "serialize_name matches localization_name",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "localization keys are punctuation-free",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "pack localization key present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "languages.json lists en_US",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin azure: classic geometry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin azure: type free",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin azure: texture at pack root",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin azure: localization present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin azure: decodes to 64x64 8-bit RGBA",
+      "result": "PASS",
+      "detail": "64x64 depth=8 color=6"
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin azure: has visible opaque pixels",
+      "result": "PASS",
+      "detail": "1632 opaque"
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin azure: head+torso regions painted",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin ember: classic geometry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin ember: type free",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin ember: texture at pack root",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin ember: localization present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin ember: decodes to 64x64 8-bit RGBA",
+      "result": "PASS",
+      "detail": "64x64 depth=8 color=6"
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin ember: has visible opaque pixels",
+      "result": "PASS",
+      "detail": "1632 opaque"
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin ember: head+torso regions painted",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin moss: classic geometry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin moss: type free",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin moss: texture at pack root",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin moss: localization present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin moss: decodes to 64x64 8-bit RGBA",
+      "result": "PASS",
+      "detail": "64x64 depth=8 color=6"
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin moss: has visible opaque pixels",
+      "result": "PASS",
+      "detail": "1632 opaque"
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin moss: head+torso regions painted",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin violet: classic geometry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin violet: type free",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin violet: texture at pack root",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin violet: localization present",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin violet: decodes to 64x64 8-bit RGBA",
+      "result": "PASS",
+      "detail": "64x64 depth=8 color=6"
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin violet: has visible opaque pixels",
+      "result": "PASS",
+      "detail": "1632 opaque"
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "skin violet: head+torso regions painted",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "four skins are visually distinguishable",
+      "result": "PASS",
+      "detail": "4 distinct chest colors"
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "pack_icon decodes",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "no mannequin/entity/render-controller/script content",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "no executable/save/world payload",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "pack": "tier_b_azure_windows",
+      "name": "equip target exists in pack",
+      "result": "PASS",
+      "detail": ""
+    }
+  ]
+}

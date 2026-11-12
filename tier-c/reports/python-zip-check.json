@@ -1,0 +1,18 @@
+{
+  "file": "tier-c-local-probe.mcpack",
+  "python_zipfile_testzip": "PASS",
+  "entries": [
+    "c1.png",
+    "c2.png",
+    "c3.png",
+    "c4.png",
+    "manifest.json",
+    "pack_icon.png",
+    "README.txt",
+    "skins.json",
+    "texts/en_US.lang",
+    "texts/languages.json"
+  ],
+  "sha256": "d4b35dc2544c6abb2086d96ca12f973010feb08435bcff36ced9012143b976f2",
+  "scope": "Independent archive CRC check only; not PS4 recognition"
+}

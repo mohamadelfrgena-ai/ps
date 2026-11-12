@@ -1,0 +1,45 @@
+{
+  "scope": "Independent archive check only; not a Minecraft client test",
+  "archives": [
+    {
+      "file": "windows-skin-test.mcpack",
+      "python_zipfile_testzip": "PASS",
+      "entries": [
+        "c1.png",
+        "c2.png",
+        "c3.png",
+        "c4.png",
+        "manifest.json",
+        "pack_icon.png",
+        "README.txt",
+        "skins.json",
+        "texts/en_US.lang",
+        "texts/languages.json"
+      ],
+      "manifest_at_root": true,
+      "module_type": "skin_pack",
+      "bytes": 14655,
+      "sha256": "b0fbcd6f6f125780e3a467edd6cc905cd95ae1611b081bf67b707b195edafc5e"
+    },
+    {
+      "file": "windows-skin-test-azure.mcpack",
+      "python_zipfile_testzip": "PASS",
+      "entries": [
+        "azure.png",
+        "ember.png",
+        "manifest.json",
+        "moss.png",
+        "pack_icon.png",
+        "README.txt",
+        "skins.json",
+        "texts/en_US.lang",
+        "texts/languages.json",
+        "violet.png"
+      ],
+      "manifest_at_root": true,
+      "module_type": "skin_pack",
+      "bytes": 14639,
+      "sha256": "85c5ef3470f5bed5b796865fb776079cece767d61c8b1b53f122d2487712d19a"
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "pinned_commit": "1cc5523d5f9b2d15b2a78f3fc2a38d74d7c265cb",
+  "archive_sha256": "07c7699909ed7593019200c823586cce483b13e6f413d4137ec3bb231bc133dc",
+  "files": 1060,
+  "bytes": 6708415,
+  "production_java_files": 144,
+  "production_java_lines": 16824,
+  "test_java_files": 5,
+  "build_helper_java_files": 2,
+  "build_helper_java_lines": 252,
+  "json_files": 137,
+  "json_syntax_errors": 0,
+  "png_files": 388,
+  "valid_png_headers": 388,
+  "tga_files": 20,
+  "lang_files": 337,
+  "persona_metadata_files": 62,
+  "skin_pack_metadata_files": 14,
+  "skin_entries": 287,
+  "packs": [
+    {
+      "pack": "battleandbeasts",
+      "entries": 45
+    },
+    {
+      "pack": "battleandbeasts2",
+      "entries": 45
+    },
+    {
+      "pack": "biomesettlers3_strangers",
+      "entries": 25
+    },
+    {
+      "pack": "campfiretales",
+      "entries": 16
+    },
+    {
+      "pack": "dungeons_ii_skins",
+      "entries": 21
+    },
+    {
+      "pack": "favorites",
+      "entries": 0
+    },
+    {
+      "pack": "imports",
+      "entries": 1
+    },
+    {
+      "pack": "legacy",
+      "entries": 18
+    },
+    {
+      "pack": "packstorymode",
+      "entries": 27
+    },
+    {
+      "pack": "skinsbiomesettlers1",
+      "entries": 24
+    },
+    {
+      "pack": "skinsbiomesettlers2",
+      "entries": 24
+    },
+    {
+      "pack": "skinsredstonespecialists",
+      "entries": 15
+    },
+    {
+      "pack": "vanilla",
+      "entries": 9
+    },
+    {
+      "pack": "villains",
+      "entries": 17
+    }
+  ],
+  "method": "Static inventory, JSON parsing, PNG header checks, declaration/import/reference scan, and detailed reading of core paths. No Java execution."
+}

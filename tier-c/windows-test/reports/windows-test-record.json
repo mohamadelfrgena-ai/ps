@@ -1,0 +1,45 @@
+{
+  "status": "NOT RUN",
+  "note": "Agent did not launch Minecraft. Fill this in on the Windows PC.",
+  "date_tested": null,
+  "tester": null,
+  "environment": {
+    "windows_version": null,
+    "minecraft_version_exact": null,
+    "edition": null,
+    "build_type": null,
+    "is_preview": null,
+    "signed_in_to_microsoft": null,
+    "internet_connected": null,
+    "com_mojang_path_used": null,
+    "only_allow_trusted_skins_original": null,
+    "only_allow_trusted_skins_set_to_off": null
+  },
+  "track_tested": null,
+  "pack_file": null,
+  "pack_sha256_verified": null,
+  "backup": {
+    "com_mojang_backed_up": false,
+    "backup_location": null
+  },
+  "results": {
+    "W1_import": { "result": "NOT RUN", "method": null, "exact_message": null, "evidence": null },
+    "W2_four_skins_in_dressing_room": { "result": "NOT RUN", "pack_tile_name": null, "skin_names_seen": [], "evidence": null },
+    "W3_select_and_equip": { "result": "NOT RUN", "skin_selected": null, "signin_prompt": null, "evidence": null },
+    "W4_real_player_changed_in_world": { "result": "NOT RUN", "view_mode": null, "chest_marker_matches": null, "evidence": null },
+    "W5_restart_persistence": { "result": "NOT RUN", "fully_closed": null, "still_equipped": null, "evidence": null },
+    "W6_offline_no_signin": {
+      "result": "NOT RUN",
+      "W6a_launches_offline": "NOT RUN",
+      "W6b_imports_signed_out": "NOT RUN",
+      "W6c_visible_signed_out": "NOT RUN",
+      "W6d_equips_no_prompt": "NOT RUN",
+      "W6e_real_player_offline": "NOT RUN",
+      "W6f_persists_offline": "NOT RUN",
+      "blocker_text": null
+    }
+  },
+  "overall": "NOT RUN",
+  "overall_rule": "PASS requires W1 AND W2 AND W3 AND W4 AND W5. Dressing Room preview alone is not W4.",
+  "excluded_as_evidence": ["mannequin", "Dressing Room preview alone", "menu thumbnail", "browser render", "file presence on disk"]
+}

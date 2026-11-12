@@ -1,0 +1,16 @@
+{
+  "name": "skin-lab-tier-c",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PS4 local skin-pack loading investigation. Research artifact; no PS4 compatibility claim.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "build": "node tools/build-pack.mjs",
+    "validate": "node tools/validate-pack.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs && npm run validate",
+    "hash-tree": "node tools/hash-tree.mjs",
+    "verify-backup": "node tools/verify-backup.mjs"
+  }
+}

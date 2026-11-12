@@ -1,0 +1,23 @@
+{
+  "audited_file": "tier-b/PS4-FTP.md",
+  "modified": false,
+  "retained": [
+    "NOT RUN labeling",
+    "GoldHEN FTP port 2121",
+    "dynamic CUSA/user discovery",
+    "no broad scans or symlink following",
+    "transfer versus runtime separation",
+    "no executable/auth/DRM/account bypass"
+  ],
+  "gaps_for_tier_c": [
+    "complete verified backup gate missing",
+    "RP/BP routing instead of skin_packs/skin_pack",
+    "no existing skin_packs inventory requirement",
+    "no offline UI selection criterion",
+    "no real local-player application criterion",
+    "no restart persistence criterion",
+    "no per-file uploaded hash read-back",
+    "no exact firmware/GoldHEN/client/Title ID record requirement"
+  ],
+  "tier_c_result": "CORRECTED_IN_NEW_DIRECTORY"
+}

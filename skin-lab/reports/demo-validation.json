@@ -1,0 +1,35 @@
+
+> skin-lab@0.1.0 validate
+> node tools/validate-pack.js examples/skin-lab-demo.mcpack
+
+{
+  "file": "/home/user/ps/skin-lab/examples/skin-lab-demo.mcpack",
+  "bytes": 8004,
+  "sha256": "ad007c7e39236fcc4525cce388de387e47e312a166f36368f061009a7506c12f",
+  "pack": {
+    "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    "name": "Skin Lab Original Demo",
+    "skins": 2
+  },
+  "skins": [
+    {
+      "name": "Signal Scout",
+      "model": "classic",
+      "texture": "skin_001.png",
+      "bytes": 3179,
+      "width": 64,
+      "height": 64
+    },
+    {
+      "name": "Lunar Courier",
+      "model": "slim",
+      "texture": "skin_002.png",
+      "bytes": 3155,
+      "width": 64,
+      "height": 64
+    }
+  ],
+  "warnings": [],
+  "result": "STRUCTURAL_PASS",
+  "note": "Structural validation only. Not a Minecraft import, equip, Realms, or PS4 compatibility test."
+}

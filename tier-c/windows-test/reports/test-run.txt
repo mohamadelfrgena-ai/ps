@@ -1,0 +1,73 @@
+
+> tier-c-windows-skin-test@1.0.0 test
+> npm run build && node --test tests/*.test.mjs && npm run validate
+
+
+> tier-c-windows-skin-test@1.0.0 build
+> node tools/build-windows-pack.mjs
+
+Built windows-skin-test.mcpack: 10 files, 14655 bytes, equip target "C1 Signal Red"
+Built windows-skin-test-azure.mcpack: 10 files, 14639 bytes, equip target "Azure Mechanic"
+TAP version 13
+# Subtest: both Windows packs exist and match SHA256SUMS
+ok 1 - both Windows packs exist and match SHA256SUMS
+  ---
+  duration_ms: 1.25486
+  type: 'test'
+  ...
+# Subtest: each pack declares skin_pack, never resources/data
+ok 2 - each pack declares skin_pack, never resources/data
+  ---
+  duration_ms: 0.304269
+  type: 'test'
+  ...
+# Subtest: every pack has exactly four free classic skins
+ok 3 - every pack has exactly four free classic skins
+  ---
+  duration_ms: 0.309781
+  type: 'test'
+  ...
+# Subtest: textures are byte-identical to the frozen sources
+ok 4 - textures are byte-identical to the frozen sources
+  ---
+  duration_ms: 0.88961
+  type: 'test'
+  ...
+# Subtest: Azure Mechanic is present and is the equip target of the azure pack
+ok 5 - Azure Mechanic is present and is the equip target of the azure pack
+  ---
+  duration_ms: 0.303136
+  type: 'test'
+  ...
+# Subtest: no mannequin, entity, script or executable payload in either pack
+ok 6 - no mannequin, entity, script or executable payload in either pack
+  ---
+  duration_ms: 0.41563
+  type: 'test'
+  ...
+# Subtest: rebuild is deterministic
+ok 7 - rebuild is deterministic
+  ---
+  duration_ms: 54.715181
+  type: 'test'
+  ...
+# Subtest: all frozen Tier A/B/C files are unchanged
+ok 8 - all frozen Tier A/B/C files are unchanged
+  ---
+  duration_ms: 5.011002
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 120.239192
+
+> tier-c-windows-skin-test@1.0.0 validate
+> node tools/validate-windows-pack.mjs
+
+STRUCTURAL_PASS: 108/108

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skin Lab — offline Bedrock skin companion</title>
+  <meta name="description" content="Offline library, preview, and skin-pack export companion. Not a PS4 skin installer.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Skin Lab</h1>
+      <p class="subtitle">Offline Bedrock skin companion · library / preview / export</p>
+    </div>
+    <div class="badge" role="note">Preview &amp; export only — not a PS4 skin installer</div>
+  </header>
+
+  <section class="notice" aria-label="Platform limitation">
+    <strong>Important:</strong> selecting a skin here changes only this preview. It does not equip a Minecraft player skin.
+    Custom PNG import/equip is not a documented PS4 feature. Test exported packs on Windows/mobile first; see <a href="FEASIBILITY.md">FEASIBILITY.md</a>.
+  </section>
+
+  <main class="layout">
+    <section class="panel controls" aria-labelledby="import-heading">
+      <h2 id="import-heading">1. Add owned content</h2>
+      <p class="hint">Files stay in this browser. No account, upload, or network service is used. Re-import after a reload; favorites and last preview are saved locally when storage is available.</p>
+      <div class="control-grid">
+        <label class="file-button">Import .mcpack<input id="import-pack" type="file" accept=".mcpack,.zip" multiple></label>
+        <label class="file-button">Import skin folder<input id="import-folder" type="file" webkitdirectory directory multiple></label>
+        <label class="file-button">Import PNG skins<input id="import-png" type="file" accept="image/png" multiple></label>
+        <label class="inline">Loose PNG model
+          <select id="png-model"><option value="classic">Classic / wide</option><option value="slim">Slim</option></select>
+        </label>
+      </div>
+      <div class="row">
+        <button id="load-demo" type="button">Load original demo</button>
+        <button id="clear-library" type="button" class="secondary">Clear library</button>
+      </div>
+      <p id="import-status" class="status" role="status" aria-live="polite"></p>
+
+      <h2>2. Browse</h2>
+      <div class="control-grid">
+        <label>Search<input id="search" type="search" placeholder="Skin or pack name"></label>
+        <label>Pack<select id="pack-filter"><option value="">All packs</option></select></label>
+        <label class="inline"><input id="favorites-only" type="checkbox"> Favorites only</label>
+      </div>
+      <div class="row">
+        <button id="select-visible" type="button" class="secondary">Select visible</button>
+        <button id="clear-selection" type="button" class="secondary">Clear selection</button>
+        <span id="counts" class="hint"></span>
+      </div>
+      <div id="gallery" class="gallery" aria-label="Skin library"></div>
+    </section>
+
+    <aside class="panel preview" aria-labelledby="preview-heading">
+      <h2 id="preview-heading">3. Preview</h2>
+      <div id="preview-empty" class="hint">Select a skin to preview its atlas and humanoid model.</div>
+      <div id="preview-body" hidden>
+        <div class="preview-title">
+          <strong id="preview-name"></strong>
+          <span id="preview-meta" class="hint"></span>
+        </div>
+        <canvas id="model-canvas" width="320" height="380" aria-label="Rotatable humanoid skin preview"></canvas>
+        <div class="row">
+          <label class="inline grow">Yaw<input id="yaw" type="range" min="-180" max="180" value="-25"></label>
+          <label class="inline"><input id="auto-rotate" type="checkbox"> Spin</label>
+          <button id="reset-view" type="button" class="secondary">Reset</button>
+        </div>
+        <div class="row">
+          <button id="favorite-toggle" type="button" class="secondary">☆ Favorite</button>
+          <label class="inline"><input id="preview-selected" type="checkbox"> Include in export</label>
+        </div>
+        <h3>Texture atlas</h3>
+        <canvas id="atlas-canvas" width="256" height="256" aria-label="64 by 64 skin texture atlas"></canvas>
+      </div>
+
+      <h2>4. Export selected</h2>
+      <label>Pack name<input id="export-name" type="text" value="My Skin Lab Pack" maxlength="80"></label>
+      <button id="export-pack" type="button">Download .mcpack</button>
+      <p class="hint">Exports a conventional skin pack with fresh UUIDs. This does not publish to Marketplace, grant rights, or install/equip on PS4.</p>
+      <p id="export-status" class="status" role="status" aria-live="polite"></p>
+    </aside>
+  </main>
+
+  <footer>
+    <p>Independent prototype inspired by the interface ideas of BrandonItaly/Bedrock-Skins; no upstream code or artwork is included. Use only content you own or have permission to redistribute.</p>
+  </footer>
+
+  <script src="src/pack-core.js"></script>
+  <script src="examples/demo-data.js"></script>
+  <script src="src/preview.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "serialize_name": "tier_c_local_probe",
+  "localization_name": "tier_c_local_probe",
+  "skins": [
+    {
+      "localization_name": "c1",
+      "geometry": "geometry.humanoid.custom",
+      "texture": "c1.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "c2",
+      "geometry": "geometry.humanoid.custom",
+      "texture": "c2.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "c3",
+      "geometry": "geometry.humanoid.custom",
+      "texture": "c3.png",
+      "type": "free"
+    },
+    {
+      "localization_name": "c4",
+      "geometry": "geometry.humanoid.custom",
+      "texture": "c4.png",
+      "type": "free"
+    }
+  ]
+}

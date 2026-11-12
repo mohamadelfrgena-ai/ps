@@ -1,0 +1,142 @@
+
+> skin-lab-tier-b@0.1.0 test
+> npm run build && node --test tests/*.test.mjs && npm run validate
+
+
+> skin-lab-tier-b@0.1.0 build
+> npm run build:assets && npm run build:scripts && npm run package
+
+
+> skin-lab-tier-b@0.1.0 build:assets
+> node tools/build-assets.mjs
+
+Built 4 original 64x64 skins, icons, and catalog constants.
+
+> skin-lab-tier-b@0.1.0 build:scripts
+> tsc -p tsconfig.json
+
+
+> skin-lab-tier-b@0.1.0 package
+> node tools/package.mjs
+
+tier-b-preview-rp.mcpack: 17060 bytes
+tier-b-preview-bp.mcpack: 10368 bytes
+tier-b-manual-skins-CONTROL.mcpack: 15087 bytes
+tier-b-preview.mcaddon: 27698 bytes
+TAP version 13
+# Subtest: menu has exactly four skin buttons plus remove, with preview-only wording
+ok 1 - menu has exactly four skin buttons plus remove, with preview-only wording
+  ---
+  duration_ms: 6.039077
+  type: 'test'
+  ...
+# Subtest: selection spawns only the custom preview entity and triggers its variant event
+ok 2 - selection spawns only the custom preview entity and triggers its variant event
+  ---
+  duration_ms: 2.273218
+  type: 'test'
+  ...
+# Subtest: all four selections map to variants zero through three
+ok 3 - all four selections map to variants zero through three
+  ---
+  duration_ms: 1.487539
+  type: 'test'
+  ...
+# Subtest: changing selection removes the previous owned preview
+ok 4 - changing selection removes the previous owned preview
+  ---
+  duration_ms: 1.590693
+  type: 'test'
+  ...
+# Subtest: remove button deletes only the tracked preview and clears tracking
+ok 5 - remove button deletes only the tracked preview and clears tracking
+  ---
+  duration_ms: 0.833717
+  type: 'test'
+  ...
+# Subtest: cancel and busy responses do not spawn anything
+ok 6 - cancel and busy responses do not spawn anything
+  ---
+  duration_ms: 0.725369
+  type: 'test'
+  ...
+# Subtest: invalid and missing selections do not spawn anything
+ok 7 - invalid and missing selections do not spawn anything
+  ---
+  duration_ms: 2.154938
+  type: 'test'
+  ...
+# Subtest: unrelated script events and non-player sources are ignored
+ok 8 - unrelated script events and non-player sources are ignored
+  ---
+  duration_ms: 0.201771
+  type: 'test'
+  ...
+# Subtest: blocked placement reports an error and does not remove an existing preview
+ok 9 - blocked placement reports an error and does not remove an existing preview
+  ---
+  duration_ms: 1.877569
+  type: 'test'
+  ...
+# Subtest: player leaving removes the tracked preview
+ok 10 - player leaving removes the tracked preview
+  ---
+  duration_ms: 1.878617
+  type: 'test'
+  ...
+# Subtest: invalid player after form close cannot spawn a preview
+ok 11 - invalid player after form close cannot spawn a preview
+  ---
+  duration_ms: 0.657299
+  type: 'test'
+  ...
+# Subtest: form rejection is contained and reported without touching a player skin
+ok 12 - form rejection is contained and reported without touching a player skin
+  ---
+  duration_ms: 0.74078
+  type: 'test'
+  ...
+# Subtest: ownership mismatch is never removed
+ok 13 - ownership mismatch is never removed
+  ---
+  duration_ms: 0.449047
+  type: 'test'
+  ...
+# Subtest: stored ZIP round-trips exact bytes and CRC
+ok 14 - stored ZIP round-trips exact bytes and CRC
+  ---
+  duration_ms: 1.855465
+  type: 'test'
+  ...
+# Subtest: unsafe paths and duplicate paths are rejected
+ok 15 - unsafe paths and duplicate paths are rejected
+  ---
+  duration_ms: 0.57775
+  type: 'test'
+  ...
+# Subtest: corrupted CRC is rejected
+ok 16 - corrupted CRC is rejected
+  ---
+  duration_ms: 0.392532
+  type: 'test'
+  ...
+# Subtest: all shipped archives parse with the independent Node reader
+ok 17 - all shipped archives parse with the independent Node reader
+  ---
+  duration_ms: 5.057111
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 132.202169
+
+> skin-lab-tier-b@0.1.0 validate
+> node tools/validate.mjs
+
+STRUCTURAL_PASS: 58/58 checks

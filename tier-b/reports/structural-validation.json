@@ -1,0 +1,319 @@
+{
+  "scope": "Structural validation only; Minecraft import, rendering, script execution and PS4 deployment are NOT RUN.",
+  "result": "STRUCTURAL_PASS",
+  "checkCount": 58,
+  "passCount": 58,
+  "failures": [],
+  "checks": [
+    {
+      "name": "tier-b-preview-rp.mcpack: safe regular-file entries",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: format_version",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: header",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: module types",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: UUID uniqueness",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: entity identifier",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: geometry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: render controller reference",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: texture keys",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: texture path azure",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: texture path ember",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: texture path moss",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: texture path violet",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: variant array",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: variant indexing",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "RP: controller geometry/material",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "tier-b-preview-bp.mcpack: safe regular-file entries",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: format_version",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: header",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: module types",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: UUID uniqueness",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: RP dependency",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: stable server dependency",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: stable UI dependency",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: no beta/internal dependencies",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: no experimental capabilities",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: script entry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: script present scripts/main.js",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: script present scripts/controller.js",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: script present scripts/catalog.js",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: no player-skin setter/network/executable hooks",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: custom entity identifier",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: not naturally spawnable",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: four variant groups",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: four selection events",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: preview is stationary/noncolliding",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "BP: preview label protected",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "tier-b-manual-skins-CONTROL.mcpack: safe regular-file entries",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "skins: format_version",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "skins: header",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "skins: module types",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "skins: UUID uniqueness",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: exactly four",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: localization root",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: languages list",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: pack localization",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: azure entry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: azure localization",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: ember entry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: ember localization",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: moss entry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: moss localization",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: violet entry",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Skins: violet localization",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "MCADDON: exactly RP then BP",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "MCADDON: embedded RP bytes",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "MCADDON: embedded BP bytes",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Catalog: seven unique UUIDs",
+      "result": "PASS",
+      "detail": ""
+    }
+  ],
+  "artifacts": [
+    {
+      "file": "tier-b-preview-rp.mcpack",
+      "bytes": 17060,
+      "sha256": "a1c8858f5b5611580ed65d98eec63b4f917fc06d32f6cf84c47c716ca945572e",
+      "entries": 12
+    },
+    {
+      "file": "tier-b-preview-bp.mcpack",
+      "bytes": 10368,
+      "sha256": "6d5b5a2451174bcb18c8afe23ea3a566ae2f1aa568677736a86f2dc6392a4b75",
+      "entries": 6
+    },
+    {
+      "file": "tier-b-manual-skins-CONTROL.mcpack",
+      "bytes": 15087,
+      "sha256": "f9a748ef7d4f806ee30c5d57282cd741423020e123a8dde6d391058f92a698f5",
+      "entries": 9
+    }
+  ]
+}

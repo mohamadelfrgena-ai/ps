@@ -1,0 +1,91 @@
+{
+  "scope": "Headless browser UI only; not Minecraft Bedrock, Android OS, Windows OS, or PS4 hardware.",
+  "base": "http://127.0.0.1:4174/",
+  "checks": [
+    {
+      "name": "four skin cards",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "initial selection",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "boundary visible",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "actual-player boundary",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "selection updates",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "pressed state",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "canvas changes with skin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "yaw changes render",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "rotate left button",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "all atlas images decoded",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "download tier-b-preview.mcaddon",
+      "result": "PASS",
+      "detail": "27698 bytes"
+    },
+    {
+      "name": "download tier-b-preview-rp.mcpack",
+      "result": "PASS",
+      "detail": "17060 bytes"
+    },
+    {
+      "name": "download tier-b-preview-bp.mcpack",
+      "result": "PASS",
+      "detail": "10368 bytes"
+    },
+    {
+      "name": "download tier-b-manual-skins-CONTROL.mcpack",
+      "result": "PASS",
+      "detail": "15087 bytes"
+    },
+    {
+      "name": "mobile no horizontal overflow",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "file:// offline interface",
+      "result": "PASS",
+      "detail": ""
+    }
+  ],
+  "errors": [],
+  "errorCount": 0,
+  "passCount": 16,
+  "checkCount": 16,
+  "result": "PASS"
+}

@@ -1,0 +1,112 @@
+TAP version 13
+# Subtest: menu has exactly four skin buttons plus remove, with preview-only wording
+ok 1 - menu has exactly four skin buttons plus remove, with preview-only wording
+  ---
+  duration_ms: 6.623321
+  type: 'test'
+  ...
+# Subtest: selection spawns only the custom preview entity and triggers its variant event
+ok 2 - selection spawns only the custom preview entity and triggers its variant event
+  ---
+  duration_ms: 0.93256
+  type: 'test'
+  ...
+# Subtest: all four selections map to variants zero through three
+ok 3 - all four selections map to variants zero through three
+  ---
+  duration_ms: 2.870885
+  type: 'test'
+  ...
+# Subtest: changing selection removes the previous owned preview
+ok 4 - changing selection removes the previous owned preview
+  ---
+  duration_ms: 0.837448
+  type: 'test'
+  ...
+# Subtest: remove button deletes only the tracked preview and clears tracking
+ok 5 - remove button deletes only the tracked preview and clears tracking
+  ---
+  duration_ms: 1.001947
+  type: 'test'
+  ...
+# Subtest: cancel and busy responses do not spawn anything
+ok 6 - cancel and busy responses do not spawn anything
+  ---
+  duration_ms: 0.723096
+  type: 'test'
+  ...
+# Subtest: invalid and missing selections do not spawn anything
+ok 7 - invalid and missing selections do not spawn anything
+  ---
+  duration_ms: 0.987254
+  type: 'test'
+  ...
+# Subtest: unrelated script events and non-player sources are ignored
+ok 8 - unrelated script events and non-player sources are ignored
+  ---
+  duration_ms: 0.224837
+  type: 'test'
+  ...
+# Subtest: blocked placement reports an error and does not remove an existing preview
+ok 9 - blocked placement reports an error and does not remove an existing preview
+  ---
+  duration_ms: 1.275218
+  type: 'test'
+  ...
+# Subtest: player leaving removes the tracked preview
+ok 10 - player leaving removes the tracked preview
+  ---
+  duration_ms: 1.0069
+  type: 'test'
+  ...
+# Subtest: invalid player after form close cannot spawn a preview
+ok 11 - invalid player after form close cannot spawn a preview
+  ---
+  duration_ms: 2.460247
+  type: 'test'
+  ...
+# Subtest: form rejection is contained and reported without touching a player skin
+ok 12 - form rejection is contained and reported without touching a player skin
+  ---
+  duration_ms: 0.729584
+  type: 'test'
+  ...
+# Subtest: ownership mismatch is never removed
+ok 13 - ownership mismatch is never removed
+  ---
+  duration_ms: 0.479009
+  type: 'test'
+  ...
+# Subtest: stored ZIP round-trips exact bytes and CRC
+ok 14 - stored ZIP round-trips exact bytes and CRC
+  ---
+  duration_ms: 1.880556
+  type: 'test'
+  ...
+# Subtest: unsafe paths and duplicate paths are rejected
+ok 15 - unsafe paths and duplicate paths are rejected
+  ---
+  duration_ms: 2.348025
+  type: 'test'
+  ...
+# Subtest: corrupted CRC is rejected
+ok 16 - corrupted CRC is rejected
+  ---
+  duration_ms: 0.447162
+  type: 'test'
+  ...
+# Subtest: all shipped archives parse with the independent Node reader
+ok 17 - all shipped archives parse with the independent Node reader
+  ---
+  duration_ms: 5.291708
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 134.38026

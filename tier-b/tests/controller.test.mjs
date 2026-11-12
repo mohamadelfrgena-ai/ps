@@ -1,0 +1,35 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { installPreviewAddon } from '../packs/tier_b_behavior/scripts/controller.js';
+import { SKINS, PREVIEW_ENTITY, PREVIEW_TAG } from '../packs/tier_b_behavior/scripts/catalog.js';
+
+class Form {
+  static response = { canceled:false, selection:0 };
+  static calls = [];
+  title(v){this.titleText=v;return this;} body(v){this.bodyText=v;return this;} button(v,icon){(this.buttons??=[]).push({v,icon});return this;}
+  async show(player){Form.calls.push(this); if(Form.response instanceof Error) throw Form.response; return Form.response;}
+}
+const Reasons={UserBusy:'UserBusy',UserClosed:'UserClosed'};
+function harness({air=true}={}) {
+  const props=new Map(); const entities=new Map(); const messages=[]; const scheduled=[]; let nextId=1; let scriptHandler,leaveHandler;
+  const player={id:'player-1',typeId:'minecraft:player',valid:true,location:{x:0.5,y:64,z:0.5},isValid(){return this.valid;},getViewDirection(){return {x:0,y:0,z:1};},sendMessage(m){messages.push(m);},dimension:{getBlock(){return {isAir:air};},spawnEntity(type,loc){const e={id:'entity-'+nextId++,typeId:type,location:loc,valid:true,props:new Map(),tags:new Set(),events:[],isValid(){return this.valid;},setDynamicProperty(k,v){this.props.set(k,v);},getDynamicProperty(k){return this.props.get(k);},addTag(t){this.tags.add(t);},hasTag(t){return this.tags.has(t);},triggerEvent(e){this.events.push(e);},setRotation(r){this.rotation=r;},remove(){this.valid=false;entities.delete(this.id);}};entities.set(e.id,e);return e;}}};
+  // Intentionally no skin-related method exists on this player mock.
+  const world={getDynamicProperty:k=>props.get(k),setDynamicProperty(k,v){if(v===undefined)props.delete(k);else props.set(k,v);},getEntity:id=>entities.get(id),afterEvents:{playerLeave:{subscribe(fn){leaveHandler=fn;}}}};
+  const system={afterEvents:{scriptEventReceive:{subscribe(fn){scriptHandler=fn;}}},run(fn){scheduled.push(fn);}};
+  installPreviewAddon({world,system,ActionFormData:Form,FormCancelationReason:Reasons});
+  async function command(id='tierb:preview',source=player){scriptHandler({id,sourceEntity:source});if(!scheduled.length)return false;const fn=scheduled.shift();fn();await new Promise(r=>setImmediate(r));return true;}
+  return {player,world,props,entities,messages,command,leave:id=>leaveHandler({playerId:id})};
+}
+test('menu has exactly four skin buttons plus remove, with preview-only wording',async()=>{Form.calls=[];Form.response={canceled:false,selection:0};const h=harness();await h.command();assert.equal(Form.calls.length,1);const f=Form.calls[0];assert.equal(f.buttons.length,5);assert.deepEqual(f.buttons.slice(0,4).map(b=>b.v),SKINS.map(s=>s.name));assert.equal(f.buttons[4].v,'Remove preview');assert.match(f.titleText,/PREVIEW ONLY/);assert.match(f.bodyText,/does NOT equip/);assert.deepEqual(f.buttons.slice(0,4).map(b=>b.icon),SKINS.map(s=>s.icon));});
+test('selection spawns only the custom preview entity and triggers its variant event',async()=>{Form.response={canceled:false,selection:2};const h=harness();await h.command();assert.equal(h.entities.size,1);const e=[...h.entities.values()][0];assert.equal(e.typeId,PREVIEW_ENTITY);assert.equal(e.events[0],SKINS[2].event);assert.equal(e.tags.has(PREVIEW_TAG),true);assert.equal(e.getDynamicProperty('tierb:owner'),h.player.id);assert.match(e.nameTag,/PREVIEW ONLY/);assert.equal(h.props.get('tierb:preview.player-1'),e.id);assert.match(h.messages.at(-1),/NOT your player skin/);assert.deepEqual(e.location,{x:0.5,y:64,z:2.5,dx:0,dz:-2});});
+test('all four selections map to variants zero through three',async()=>{for(let i=0;i<4;i++){Form.response={canceled:false,selection:i};const h=harness();await h.command();assert.equal([...h.entities.values()][0].events[0],`tierb:select_${i}`);}});
+test('changing selection removes the previous owned preview',async()=>{Form.response={canceled:false,selection:0};const h=harness();await h.command();const first=[...h.entities.values()][0];Form.response={canceled:false,selection:3};await h.command();assert.equal(first.isValid(),false);assert.equal(h.entities.size,1);assert.equal([...h.entities.values()][0].events[0],'tierb:select_3');});
+test('remove button deletes only the tracked preview and clears tracking',async()=>{Form.response={canceled:false,selection:1};const h=harness();await h.command();Form.response={canceled:false,selection:4};await h.command();assert.equal(h.entities.size,0);assert.equal(h.props.has('tierb:preview.player-1'),false);assert.match(h.messages.at(-1),/player skin was not changed/);});
+test('cancel and busy responses do not spawn anything',async()=>{for(const response of [{canceled:true,cancelationReason:Reasons.UserClosed},{canceled:true,cancelationReason:Reasons.UserBusy}]){Form.response=response;const h=harness();await h.command();assert.equal(h.entities.size,0);} });
+test('invalid and missing selections do not spawn anything',async()=>{for(const selection of [undefined,-1,5,1.5,NaN]){Form.response={canceled:false,selection};const h=harness();await h.command();assert.equal(h.entities.size,0);} });
+test('unrelated script events and non-player sources are ignored',async()=>{Form.calls=[];const h=harness();assert.equal(await h.command('other:preview'),false);assert.equal(Form.calls.length,0);assert.equal(await h.command('tierb:preview',{typeId:'minecraft:command_block'}),false);assert.equal(Form.calls.length,0);});
+test('blocked placement reports an error and does not remove an existing preview',async()=>{Form.response={canceled:false,selection:0};const h=harness();await h.command();const existing=[...h.entities.values()][0];const originalGetBlock=h.player.dimension.getBlock;h.player.dimension.getBlock=()=>({isAir:false});Form.response={canceled:false,selection:1};await h.command();assert.equal(h.entities.size,1);assert.equal([...h.entities.values()][0],existing);assert.match(h.messages.at(-1),/clear area/);h.player.dimension.getBlock=originalGetBlock;});
+test('player leaving removes the tracked preview',async()=>{Form.response={canceled:false,selection:0};const h=harness();await h.command();h.leave('player-1');assert.equal(h.entities.size,0);assert.equal(h.props.has('tierb:preview.player-1'),false);});
+test('invalid player after form close cannot spawn a preview',async()=>{Form.response={canceled:false,selection:0};const h=harness();h.player.valid=false;await h.command();assert.equal(h.entities.size,0);});
+test('form rejection is contained and reported without touching a player skin',async()=>{Form.response=new Error('mock rejection');const h=harness();await h.command();assert.equal(h.entities.size,0);assert.match(h.messages.at(-1),/mock rejection/);});
+test('ownership mismatch is never removed',async()=>{Form.response={canceled:false,selection:0};const h=harness();await h.command();const e=[...h.entities.values()][0];e.props.set('tierb:owner','someone-else');h.leave('player-1');assert.equal(e.isValid(),true);assert.equal(h.props.has('tierb:preview.player-1'),false);});

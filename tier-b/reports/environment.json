@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-12",
+  "sandbox_os": "linux 6.1.158+",
+  "node": "v22.22.3",
+  "npm": "10.9.8",
+  "minecraft_client": "not installed",
+  "windows_bedrock": "NOT RUN",
+  "android_bedrock": "NOT RUN",
+  "ps4_hardware": "NOT RUN",
+  "realms": "not used",
+  "signin": "not used"
+}

@@ -1,0 +1,19 @@
+{
+  "format_version": 1,
+  "header": {
+    "name": "Tier B Manual Skins (Windows/Android control)",
+    "description": "Optional Dressing Room equip control. Not the RP+BP preview and not a PS4 compatibility claim.",
+    "uuid": "60a3702b-8154-4ad2-8a9d-bcb72cb4a006",
+    "version": [0, 1, 0],
+    "min_engine_version": [1, 21, 60]
+  },
+  "modules": [
+    {
+      "type": "skin_pack",
+      "description": "Four original skins for manual Dressing Room selection",
+      "uuid": "60a3702b-8154-4ad2-8a9d-bcb72cb4a007",
+      "version": [0, 1, 0]
+    }
+  ],
+  "metadata": { "authors": ["Skin Lab contributors"], "license": "MIT" }
+}

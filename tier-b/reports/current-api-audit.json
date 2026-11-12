@@ -1,0 +1,66 @@
+{
+  "scope": "Static declarations only; not a runtime compatibility test",
+  "packages": [
+    "@minecraft/server@2.11.0",
+    "@minecraft/server-ui@2.3.0"
+  ],
+  "results": [
+    {
+      "declaration": "minecraft-server-2.11.0/package/index.d.ts",
+      "skinMentions": [
+        {
+          "line": 1178,
+          "text": "* Skin Id value. Can be used to differentiate skins, such as"
+        },
+        {
+          "line": 1179,
+          "text": "* base skins for villagers."
+        },
+        {
+          "line": 1182,
+          "text": "SkinId = 'minecraft:skin_id',"
+        },
+        {
+          "line": 3208,
+          "text": "'minecraft:skin_id': EntitySkinIdComponent;"
+        },
+        {
+          "line": 3241,
+          "text": "skin_id: EntitySkinIdComponent;"
+        },
+        {
+          "line": 7786,
+          "text": "* Block at the specified location, or 'undefined' if asking"
+        },
+        {
+          "line": 12780,
+          "text": "* Skin Id value. Can be used to differentiate skins, such as"
+        },
+        {
+          "line": 12781,
+          "text": "* base skins for villagers."
+        },
+        {
+          "line": 12784,
+          "text": "export class EntitySkinIdComponent extends EntityComponent {"
+        },
+        {
+          "line": 12788,
+          "text": "* Returns the value of the skin Id identifier of the entity."
+        },
+        {
+          "line": 12793,
+          "text": "static readonly componentId = 'minecraft:skin_id';"
+        }
+      ],
+      "playerClassFound": true,
+      "playerClassSkinSetter": false
+    },
+    {
+      "declaration": "minecraft-server-ui-2.3.0/package/index.d.ts",
+      "skinMentions": [],
+      "playerClassFound": false,
+      "playerClassSkinSetter": false
+    }
+  ]
+}

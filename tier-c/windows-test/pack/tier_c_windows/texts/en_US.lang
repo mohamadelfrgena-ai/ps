@@ -1,0 +1,6 @@
+skinpack.tier_c_windows=Tier C Windows Skin Test
+skinpack.tier_c_windows.by=Skin Lab contributors
+skin.tier_c_windows.c1=C1 Signal Red
+skin.tier_c_windows.c2=C2 Beacon Green
+skin.tier_c_windows.c3=C3 Relay Blue
+skin.tier_c_windows.c4=C4 Marker Yellow

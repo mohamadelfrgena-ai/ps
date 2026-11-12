@@ -1,0 +1,1 @@
+Tier C local skin probe. Unpacked folder is the FTP test artifact. The .mcpack is a ZIP container for reference/PC-mobile import only; do not assume PS4 recognizes .mcpack over FTP. No scripts, behavior pack, resource pack, save edits, or executable edits.

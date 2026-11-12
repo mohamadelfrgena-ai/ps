@@ -1,0 +1,10 @@
+{
+  "serialize_name": "tier_b_four",
+  "localization_name": "tier_b_four",
+  "skins": [
+    { "localization_name": "azure", "geometry": "geometry.humanoid.custom", "texture": "azure.png", "type": "free" },
+    { "localization_name": "ember", "geometry": "geometry.humanoid.custom", "texture": "ember.png", "type": "free" },
+    { "localization_name": "moss", "geometry": "geometry.humanoid.custom", "texture": "moss.png", "type": "free" },
+    { "localization_name": "violet", "geometry": "geometry.humanoid.custom", "texture": "violet.png", "type": "free" }
+  ]
+}

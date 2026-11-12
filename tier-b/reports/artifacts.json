@@ -1,0 +1,30 @@
+{
+  "generated_by": "tools/package.mjs",
+  "note": "Structural artifacts only. No Minecraft client or PS4 hardware test is implied.",
+  "artifacts": [
+    {
+      "name": "tier-b-preview-rp.mcpack",
+      "bytes": 17060,
+      "sha256": "a1c8858f5b5611580ed65d98eec63b4f917fc06d32f6cf84c47c716ca945572e",
+      "entries": 12
+    },
+    {
+      "name": "tier-b-preview-bp.mcpack",
+      "bytes": 10368,
+      "sha256": "6d5b5a2451174bcb18c8afe23ea3a566ae2f1aa568677736a86f2dc6392a4b75",
+      "entries": 6
+    },
+    {
+      "name": "tier-b-manual-skins-CONTROL.mcpack",
+      "bytes": 15087,
+      "sha256": "f9a748ef7d4f806ee30c5d57282cd741423020e123a8dde6d391058f92a698f5",
+      "entries": 9
+    },
+    {
+      "name": "tier-b-preview.mcaddon",
+      "bytes": 27698,
+      "sha256": "6f4a499f1933263ac6d03203da5a331a3f876a2624550c14978f4870317f9aa0",
+      "entries": 2
+    }
+  ]
+}

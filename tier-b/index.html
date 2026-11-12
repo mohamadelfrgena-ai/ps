@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tier B | Four-skin preview experiment</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="eyebrow">SKIN LAB / TIER B / STRICTLY LIMITED EXPERIMENT</div>
+    <h1>Four skins. One clear boundary.</h1>
+    <p class="lede">Inspect original textures here, then test the paired Bedrock packs in a local world.</p>
+    <div class="boundary"><strong>PREVIEW ≠ EQUIP</strong><span>The browser and the in-game mannequin display a texture. Neither changes your actual player skin.</span></div>
+  </header>
+  <main>
+    <section class="panel viewer" aria-labelledby="viewer-title">
+      <div class="panel-head"><h2 id="viewer-title">Browser preview</h2><span class="tag">Software render · not Minecraft</span></div>
+      <div class="stage"><canvas id="model" width="420" height="440" aria-label="Rotatable humanoid skin preview"></canvas><div class="stage-caption" id="model-caption">PREVIEW ONLY</div></div>
+      <div class="controls"><button id="left" type="button">Rotate left</button><label for="yaw">Yaw <input id="yaw" type="range" min="-180" max="180" value="25"></label><button id="right" type="button">Rotate right</button></div>
+      <div class="atlas-row"><canvas id="atlas" width="128" height="128" aria-label="64 by 64 skin texture atlas"></canvas><div><h3 id="selected-name">Azure Mechanic</h3><p>64 × 64 RGBA PNG · classic geometry</p><p id="selected-id" class="mono"></p></div></div>
+    </section>
+    <section class="panel" aria-labelledby="library-title">
+      <div class="panel-head"><h2 id="library-title">Four-skin library</h2><span class="tag">Original synthetic artwork</span></div>
+      <div id="skins" class="skin-grid"></div>
+      <div class="notice"><strong>Actual player skin: unchanged by this prototype.</strong><p>The BP opens an ActionForm and spawns <code>tierb:skin_preview</code>. The RP textures that separate entity. It never calls a player-skin setter.</p></div>
+      <h3>Downloads</h3>
+      <div class="downloads">
+        <a href="dist/tier-b-preview.mcaddon" download>Paired preview RP + BP <small>.mcaddon</small></a>
+        <a href="dist/tier-b-preview-rp.mcpack" download>Resource pack only <small>.mcpack</small></a>
+        <a href="dist/tier-b-preview-bp.mcpack" download>Behavior pack only <small>.mcpack</small></a>
+        <a href="dist/tier-b-manual-skins-CONTROL.mcpack" download>Optional manual-equip control <small>Windows/Android test only · not PS4</small></a>
+      </div>
+      <p class="fine">The optional control is a separate <code>skin_pack</code>, not part of the RP+BP. It tests manual Dressing Room selection where custom skin import is documented. It does not prove console support.</p>
+    </section>
+    <section class="panel wide" aria-labelledby="game-title">
+      <div class="panel-head"><h2 id="game-title">In-game test route</h2><span class="tag warn">Client tests NOT RUN here</span></div>
+      <ol class="steps"><li><strong>Install both packs.</strong> Use the paired <code>.mcaddon</code>, or copy the development folders. See <a href="INSTALL.md">exact installation instructions</a>.</li><li><strong>Create a disposable local world.</strong> Activate both packs. Enable cheats for the script command. No Realms, multiplayer, Microsoft sign-in, or PSN sign-in is part of this test.</li><li><strong>Run the preview command.</strong> <code>/scriptevent tierb:preview</code></li><li><strong>Choose a button.</strong> A separate mannequin appears two blocks ahead in a clear space. Its label says <code>PREVIEW ONLY</code>.</li><li><strong>Check the boundary.</strong> Compare the mannequin with your player in third person. The player skin must remain unchanged. Use “Remove preview” to clean up.</li></ol>
+      <div class="status-grid"><div><span>Windows Bedrock</span><strong>NOT RUN</strong></div><div><span>Android Bedrock</span><strong>NOT RUN</strong></div><div><span>PS4 hardware</span><strong>NOT RUN</strong></div><div><span>Local player skin setter</span><strong>No documented API found</strong></div></div>
+      <p class="fine">Structural checks and mocked script tests can pass without Minecraft ever loading the packs. See <a href="TEST-RESULTS.md">test results</a>, <a href="RESEARCH.md">documented-feature investigation</a>, and <a href="PS4-FTP.md">GoldHEN FTP deployment investigation</a>.</p>
+    </section>
+  </main>
+  <footer>Tier B is isolated from the accepted Tier A project. No executable modification, authentication bypass, DRM bypass, or account-restriction bypass.</footer>
+  <script src="assets/catalog.js"></script>
+  <script src="src/preview.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

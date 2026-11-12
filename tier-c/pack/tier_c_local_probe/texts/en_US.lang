@@ -1,0 +1,6 @@
+skinpack.tier_c_local_probe=Tier C Local Skin Probe
+skinpack.tier_c_local_probe.by=Skin Lab contributors
+skin.tier_c_local_probe.c1=C1 Signal Red
+skin.tier_c_local_probe.c2=C2 Beacon Green
+skin.tier_c_local_probe.c3=C3 Relay Blue
+skin.tier_c_local_probe.c4=C4 Marker Yellow

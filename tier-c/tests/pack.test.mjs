@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');const dir=path.join(root,'pack','tier_c_local_probe');
+test('minimal pack has exactly four classic free skins',()=>{const s=JSON.parse(fs.readFileSync(path.join(dir,'skins.json'),'utf8'));assert.equal(s.skins.length,4);for(const e of s.skins){assert.equal(e.geometry,'geometry.humanoid.custom');assert.equal(e.type,'free');assert.ok(fs.existsSync(path.join(dir,e.texture)));}});
+test('manifest is skin_pack only with distinct UUIDs',()=>{const m=JSON.parse(fs.readFileSync(path.join(dir,'manifest.json'),'utf8'));assert.equal(m.format_version,2);assert.equal(m.modules.length,1);assert.equal(m.modules[0].type,'skin_pack');assert.notEqual(m.header.uuid,m.modules[0].uuid);});
+test('localization keys match skins.json',()=>{const s=JSON.parse(fs.readFileSync(path.join(dir,'skins.json'),'utf8'));const lang=fs.readFileSync(path.join(dir,'texts/en_US.lang'),'utf8');assert.ok(lang.includes(`skinpack.${s.localization_name}=`));for(const e of s.skins)assert.ok(lang.includes(`skin.${s.localization_name}.${e.localization_name}=`));});
+test('no mannequin/script/save/executable payload',()=>{const files=[];function walk(d,p=''){for(const e of fs.readdirSync(d,{withFileTypes:true})){const rel=p?p+'/'+e.name:e.name;if(e.isDirectory())walk(path.join(d,e.name),rel);else files.push(rel);}}walk(dir);assert.ok(files.every(f=>!/(scripts?\/|entities\/|render_controllers\/|minecraftWorlds|eboot|\.bin$|\.self$|\.sprx$)/i.test(f)));});
+test('reference mcpack exists and hash file matches',async()=>{const b=fs.readFileSync(path.join(root,'dist/tier-c-local-probe.mcpack'));const sums=fs.readFileSync(path.join(root,'dist/SHA256SUMS.txt'),'utf8');const crypto=await import('node:crypto');assert.ok(sums.includes(crypto.createHash('sha256').update(b).digest('hex')));});

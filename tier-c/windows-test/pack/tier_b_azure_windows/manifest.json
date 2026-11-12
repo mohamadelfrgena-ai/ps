@@ -1,0 +1,31 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Azure Mechanic Skin Test",
+    "description": "Four original Tier B skins including Azure Mechanic, for a real Windows Bedrock equip test.",
+    "uuid": "3f7b1d20-9a4c-4e6b-8d15-7c2a9e0b5f03",
+    "version": [
+      1,
+      0,
+      0
+    ]
+  },
+  "modules": [
+    {
+      "type": "skin_pack",
+      "description": "Classic skins for Dressing Room selection",
+      "uuid": "3f7b1d20-9a4c-4e6b-8d15-7c2a9e0b5f04",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "authors": [
+      "Skin Lab contributors"
+    ],
+    "license": "MIT"
+  }
+}

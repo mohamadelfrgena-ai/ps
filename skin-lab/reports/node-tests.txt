@@ -1,0 +1,68 @@
+
+> skin-lab@0.1.0 test
+> node --test tests/*.test.js
+
+TAP version 13
+# Subtest: safePath rejects traversal, absolute, backslash, drive, control, and empty segments
+ok 1 - safePath rejects traversal, absolute, backslash, drive, control, and empty segments
+  ---
+  duration_ms: 0.985367
+  type: 'test'
+  ...
+# Subtest: makeZip/readZip round-trips stored entries and validatePack accepts generated pack
+ok 2 - makeZip/readZip round-trips stored entries and validatePack accepts generated pack
+  ---
+  duration_ms: 7.371188
+  type: 'test'
+  ...
+# Subtest: readZip accepts deflate entries
+ok 3 - readZip accepts deflate entries
+  ---
+  duration_ms: 9.661099
+  type: 'test'
+  ...
+# Subtest: makeZip rejects duplicate and unsafe paths
+ok 4 - makeZip rejects duplicate and unsafe paths
+  ---
+  duration_ms: 0.459718
+  type: 'test'
+  ...
+# Subtest: readZip rejects traversal, duplicate, encrypted, symlink, and CRC mismatch
+ok 5 - readZip rejects traversal, duplicate, encrypted, symlink, and CRC mismatch
+  ---
+  duration_ms: 0.939072
+  type: 'test'
+  ...
+# Subtest: inspectPng accepts demo textures and rejects wrong dimensions/truncation
+ok 6 - inspectPng accepts demo textures and rejects wrong dimensions/truncation
+  ---
+  duration_ms: 0.428542
+  type: 'test'
+  ...
+# Subtest: validatePack rejects missing files, unsupported geometry, and script modules
+ok 7 - validatePack rejects missing files, unsupported geometry, and script modules
+  ---
+  duration_ms: 0.772816
+  type: 'test'
+  ...
+# Subtest: buildPack creates fresh UUIDs and rejects empty/oversized/invalid input
+ok 8 - buildPack creates fresh UUIDs and rejects empty/oversized/invalid input
+  ---
+  duration_ms: 0.953529
+  type: 'test'
+  ...
+# Subtest: demo .mcpack passes structural validation
+ok 9 - demo .mcpack passes structural validation
+  ---
+  duration_ms: 0.633181
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 74.81723

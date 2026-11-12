@@ -1,0 +1,28 @@
+{
+  "status": "NOT RUN",
+  "ps4_model": null,
+  "ps4_firmware_exact": null,
+  "goldhen_payload_version_exact": null,
+  "goldhen_ftp_port": 2121,
+  "cheats_patches_plugins_disabled": null,
+  "minecraft_edition": "Bedrock-era PS4 client required; legacy 4J Console Edition out of scope",
+  "minecraft_client_version_exact": null,
+  "title_id_exact": null,
+  "region_release_evidence": null,
+  "observed_app_root": null,
+  "observed_title_directory": null,
+  "observed_user_directory": null,
+  "confirmed_com_mojang_path": null,
+  "skin_packs_exists": null,
+  "local_profile": null,
+  "network_state": "Offline from Microsoft/PSN/Realms; trusted LAN FTP only",
+  "baseline_skin_evidence": null,
+  "criteria": {
+    "C1_pack_recognition": "FAIL — NOT RUN",
+    "C2_actual_selection_ui": "FAIL — NOT RUN",
+    "C3_selection_without_signin": "FAIL — NOT RUN",
+    "C4_real_local_player_application": "FAIL — NOT RUN",
+    "C5_restart_persistence": "FAIL — NOT RUN"
+  },
+  "overall": "FAIL — not demonstrated"
+}

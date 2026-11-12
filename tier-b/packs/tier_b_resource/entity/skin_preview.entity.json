@@ -1,0 +1,17 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "tierb:skin_preview",
+      "materials": { "default": "entity_alphatest" },
+      "textures": {
+        "azure": "textures/tierb/skins/azure",
+        "ember": "textures/tierb/skins/ember",
+        "moss": "textures/tierb/skins/moss",
+        "violet": "textures/tierb/skins/violet"
+      },
+      "geometry": { "default": "geometry.humanoid.custom" },
+      "render_controllers": ["controller.render.tierb_preview"]
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "tier": "C",
+  "date": "2026-11-12",
+  "hardware_test": "NOT RUN",
+  "overall": "FAIL",
+  "overall_reason": "Success criteria not demonstrated on PS4 hardware",
+  "criteria": [
+    {
+      "id": "C1",
+      "name": "Minecraft recognizes the local skin pack",
+      "result": "FAIL",
+      "status": "NOT RUN",
+      "evidence": null
+    },
+    {
+      "id": "C2",
+      "name": "Pack appears in actual in-game selection interface",
+      "result": "FAIL",
+      "status": "NOT RUN",
+      "evidence": null
+    },
+    {
+      "id": "C3",
+      "name": "Skin can be selected without account sign-in",
+      "result": "FAIL",
+      "status": "NOT RUN",
+      "evidence": null
+    },
+    {
+      "id": "C4",
+      "name": "Selected skin visibly applied to real local player",
+      "result": "FAIL",
+      "status": "NOT RUN",
+      "evidence": null
+    },
+    {
+      "id": "C5",
+      "name": "Result persists after restarting Minecraft",
+      "result": "FAIL",
+      "status": "NOT RUN",
+      "evidence": null
+    }
+  ],
+  "gates": {
+    "filesystem_access": {
+      "result": "FAIL",
+      "status": "NOT RUN"
+    },
+    "complete_backup_before_write": {
+      "result": "FAIL",
+      "status": "NOT RUN"
+    }
+  },
+  "test_results_doc": "TEST-RESULTS.md",
+  "local_structural_checks": {
+    "node_tests": "9/9 PASS",
+    "structural_validation": "23/23 STRUCTURAL_PASS",
+    "python_zip_crc": "PASS",
+    "meaning": "Standard Bedrock skin_pack candidate structure only; not PS4 recognition or compatibility",
+    "final_run": "reports/final-test-run.txt",
+    "backup_helper_tests": "4/4 PASS (included in 9/9)"
+  },
+  "excluded_as_success": [
+    "mannequin preview",
+    "browser preview",
+    "FTP file existence alone",
+    "resource/behavior pack activation",
+    "Dressing Room listing without real-player application"
+  ],
+  "tier_a_b_modified": false,
+  "tier_ab_preservation": "reports/tier-ab-after.json"
+}

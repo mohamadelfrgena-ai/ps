@@ -1,0 +1,42 @@
+{
+  "result": "FAIL",
+  "reason": "NOT RUN — complete this gate before any Minecraft data write",
+  "operator": null,
+  "timestamp_utc": null,
+  "ps4": {
+    "model": null,
+    "firmware": null,
+    "goldhen_version": null,
+    "minecraft_version": null,
+    "title_id": null,
+    "region_release": null,
+    "local_user_directory": null,
+    "offline_no_microsoft_psn_realms": null
+  },
+  "native_savedata_backup": {
+    "completed": false,
+    "usb_or_external_location": null,
+    "evidence": null
+  },
+  "ftp_mojang_mirror": {
+    "completed": false,
+    "confirmed_com_mojang_path": null,
+    "pc_backup_directory": null,
+    "transfer_log": null,
+    "failed_files": null,
+    "skipped_files": null,
+    "zero_failure_attestation": false
+  },
+  "hash_verification": {
+    "manifest": "tier-c/reports/backup-manifest.json",
+    "command_result": null,
+    "file_count": null,
+    "total_bytes": null
+  },
+  "write_target": {
+    "skin_packs_exists": false,
+    "probe_folder_absent": false,
+    "exact_remote_probe_path": null
+  },
+  "attestation": "I confirm the above backups are complete and verified, the target identity is exact, and no save/original game file will be modified."
+}

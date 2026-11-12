@@ -1,0 +1,2 @@
+b0fbcd6f6f125780e3a467edd6cc905cd95ae1611b081bf67b707b195edafc5e  windows-skin-test.mcpack
+85c5ef3470f5bed5b796865fb776079cece767d61c8b1b53f122d2487712d19a  windows-skin-test-azure.mcpack

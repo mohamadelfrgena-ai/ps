@@ -1,0 +1,72 @@
+{
+  "url": "http://127.0.0.1:4173/",
+  "checks": [
+    {
+      "name": "Demo gallery renders",
+      "result": "PASS",
+      "detail": "2"
+    },
+    {
+      "name": "Preview visible",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "First demo skin selected",
+      "result": "PASS",
+      "detail": "Signal Scout"
+    },
+    {
+      "name": "Select slim skin",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Slim meta",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Favorite toggles",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Favorites filter",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Search filter",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Select visible count",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Export downloads .mcpack",
+      "result": "PASS",
+      "detail": "my_skin_lab_pack.mcpack 7968"
+    },
+    {
+      "name": "Export status is preview-only",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Reset view",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "file:// demo renders",
+      "result": "PASS",
+      "detail": ""
+    }
+  ],
+  "errors": [],
+  "errorCount": 0
+}

@@ -1,0 +1,114 @@
+{
+  "date": "2026-11-12",
+  "scope": "Static/reference checks only. No generated Bedrock prototype, Minecraft client launch, PS4 import, or PS4 hardware test.",
+  "reference_source": {
+    "repo": "microsoft/minecraft-samples",
+    "path": "skinpack/skins.mcpack",
+    "git_blob_sha": "deed1636153ff597bbe264698013c82ade6b4de0",
+    "sha256": "789a47607d9e1d58122b81d7800c361fd0ff740dfb9bf3e8d7efdfe4f735f3ea",
+    "bytes": 1267
+  },
+  "upstream_archive_sha256": "07c7699909ed7593019200c823586cce483b13e6f413d4137ec3bb231bc133dc",
+  "checks": [
+    {
+      "check": "Reference ZIP CRC",
+      "result": "PASS",
+      "detail": "All archive members passed CRC."
+    },
+    {
+      "check": "Reference archive root",
+      "result": "PASS",
+      "detail": "Both required JSON files are at archive root."
+    },
+    {
+      "check": "Reference safe archive paths",
+      "result": "PASS",
+      "detail": "4 members; no absolute paths, traversal, or backslashes."
+    },
+    {
+      "check": "Reference no duplicate members",
+      "result": "PASS",
+      "detail": "4 members."
+    },
+    {
+      "check": "Reference manifest format",
+      "result": "PASS",
+      "detail": "format_version = 2."
+    },
+    {
+      "check": "Reference UUID identity",
+      "result": "PASS",
+      "detail": "Header/module UUIDs are distinct UUIDv4 values."
+    },
+    {
+      "check": "Reference skin module",
+      "result": "PASS",
+      "detail": "Exactly one skin_pack module."
+    },
+    {
+      "check": "Reference skin metadata",
+      "result": "PASS",
+      "detail": "One skin with required pack metadata."
+    },
+    {
+      "check": "Reference supported model/type",
+      "result": "PASS",
+      "detail": "Classic/wide model; free skin."
+    },
+    {
+      "check": "Reference texture exists at root",
+      "result": "PASS",
+      "detail": "skin_example.png"
+    },
+    {
+      "check": "Reference PNG signature/dimensions",
+      "result": "PASS",
+      "detail": "PNG IHDR dimensions 64x64."
+    },
+    {
+      "check": "Reference pack localization",
+      "result": "PASS",
+      "detail": "skinpack.Sample"
+    },
+    {
+      "check": "Reference per-skin localization key",
+      "result": "WARN",
+      "detail": "Expected 'skin.Sample.Sample Skin' under the packaging reference; sample contains ['skin.Sample.skin_example', 'skinpack.Sample', 'skinpack.Sample.by']. Engine acceptance not tested."
+    },
+    {
+      "check": "Reference languages.json",
+      "result": "WARN",
+      "detail": "Absent in the minimal official sample; the packaging guide describes a languages.json file. Include it in the future prototype and verify in-game."
+    },
+    {
+      "check": "Upstream snapshot inventory",
+      "result": "PASS",
+      "detail": "1060 files; 6,708,415 bytes; pinned commit 1cc5523d5f9b2d15b2a78f3fc2a38d74d7c265cb."
+    },
+    {
+      "check": "Upstream JSON syntax",
+      "result": "PASS",
+      "detail": "137 JSON files parsed; 0 syntax errors. This does not validate Minecraft schemas."
+    },
+    {
+      "check": "Upstream Java source inventory",
+      "result": "PASS",
+      "detail": "144 production Java files; 16,824 lines. Declaration/import/reference scan; selected core execution paths read."
+    },
+    {
+      "check": "Candidate stable form API",
+      "result": "PASS",
+      "detail": "Official @minecraft/server-ui 1.3.0 declarations include buttons, resource-pack icons, and player forms."
+    },
+    {
+      "check": "Candidate stable persistence/event API",
+      "result": "PASS",
+      "detail": "Official @minecraft/server 1.17.0 declarations include dynamic properties, script events, and entity spawning."
+    },
+    {
+      "check": "No player skin setter in inspected API",
+      "result": "PASS",
+      "detail": "No such methods in the inspected Player declaration; not a proof about undocumented engine internals."
+    }
+  ]
+}

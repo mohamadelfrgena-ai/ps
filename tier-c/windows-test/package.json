@@ -1,0 +1,14 @@
+{
+  "name": "tier-c-windows-skin-test",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Clean Windows Bedrock skin packs for a real Dressing Room equip test. No client test results are claimed.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "build": "node tools/build-windows-pack.mjs",
+    "validate": "node tools/validate-windows-pack.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs && npm run validate"
+  }
+}

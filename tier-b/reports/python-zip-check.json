@@ -1,0 +1,70 @@
+{
+  "scope": "Independent Python zipfile CRC/archive check; not a Minecraft test",
+  "results": [
+    {
+      "file": "tier-b-manual-skins-CONTROL.mcpack",
+      "python_zipfile_testzip": "PASS",
+      "entries": 9,
+      "unsafe_entries": [],
+      "external_attrs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "sha256": "f9a748ef7d4f806ee30c5d57282cd741423020e123a8dde6d391058f92a698f5"
+    },
+    {
+      "file": "tier-b-preview-bp.mcpack",
+      "python_zipfile_testzip": "PASS",
+      "entries": 6,
+      "unsafe_entries": [],
+      "external_attrs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "sha256": "6d5b5a2451174bcb18c8afe23ea3a566ae2f1aa568677736a86f2dc6392a4b75"
+    },
+    {
+      "file": "tier-b-preview-rp.mcpack",
+      "python_zipfile_testzip": "PASS",
+      "entries": 12,
+      "unsafe_entries": [],
+      "external_attrs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "sha256": "a1c8858f5b5611580ed65d98eec63b4f917fc06d32f6cf84c47c716ca945572e"
+    },
+    {
+      "file": "tier-b-preview.mcaddon",
+      "python_zipfile_testzip": "PASS",
+      "entries": 2,
+      "unsafe_entries": [],
+      "external_attrs": [
+        0,
+        0
+      ],
+      "sha256": "6f4a499f1933263ac6d03203da5a331a3f876a2624550c14978f4870317f9aa0"
+    }
+  ]
+}

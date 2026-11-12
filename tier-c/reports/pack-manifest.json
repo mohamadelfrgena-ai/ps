@@ -1,0 +1,85 @@
+{
+  "pack": "tier_c_local_probe",
+  "uuids": {
+    "header": "8f3c2a10-6c2e-4f3b-9b7a-2d1e5c9a4c01",
+    "module": "8f3c2a10-6c2e-4f3b-9b7a-2d1e5c9a4c02"
+  },
+  "skins": [
+    {
+      "id": "c1",
+      "name": "C1 Signal Red",
+      "texture": "c1.png"
+    },
+    {
+      "id": "c2",
+      "name": "C2 Beacon Green",
+      "texture": "c2.png"
+    },
+    {
+      "id": "c3",
+      "name": "C3 Relay Blue",
+      "texture": "c3.png"
+    },
+    {
+      "id": "c4",
+      "name": "C4 Marker Yellow",
+      "texture": "c4.png"
+    }
+  ],
+  "files": [
+    {
+      "path": "c1.png",
+      "bytes": 3031,
+      "sha256": "9694fe53633dcca3401f5c97b7b9cd7892d9c848d005cd179228f3dbbcd9204f"
+    },
+    {
+      "path": "c2.png",
+      "bytes": 3160,
+      "sha256": "1e76ecd481de17f0aff59e784200245b50cf566798bc85fb4ba9dd454d89ddfa"
+    },
+    {
+      "path": "c3.png",
+      "bytes": 3155,
+      "sha256": "188f766b66769aebc0428683097b189d9aa3ae50670e0f283c21f23c8631c7ad"
+    },
+    {
+      "path": "c4.png",
+      "bytes": 3067,
+      "sha256": "1095d9724c249fe7304221b1db20567115fb2bdd0b86cc84e955a45fc35f938f"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 626,
+      "sha256": "5d4d6a712b5f62c57ecd04eab190f24b07458d088c68e4ef6c2a00d0b581f6ce"
+    },
+    {
+      "path": "pack_icon.png",
+      "bytes": 413,
+      "sha256": "a801471bb86f98b3ed5fb45ec3d27f12a86ae2fce916111caa446d8069f52671"
+    },
+    {
+      "path": "README.txt",
+      "bytes": 257,
+      "sha256": "343e2706e802a72022cc930f4362a4e817a1fd877933d442e6719745dc029ca0"
+    },
+    {
+      "path": "skins.json",
+      "bytes": 667,
+      "sha256": "5751a7d852861c8f02ba2ae4024a5afb8d51ebfa2136a81726e3aa215e91fc79"
+    },
+    {
+      "path": "texts/en_US.lang",
+      "bytes": 274,
+      "sha256": "60d15d95bb93069d5dcf1a1552f7dd66fb73a232467088dc6992e4aca329e41d"
+    },
+    {
+      "path": "texts/languages.json",
+      "bytes": 14,
+      "sha256": "7dd56a66f8899af87bd2fc690fe0d6387a64c2a28e774287d0774a8b1804f432"
+    }
+  ],
+  "mcpack": {
+    "bytes": 15658,
+    "sha256": "d4b35dc2544c6abb2086d96ca12f973010feb08435bcff36ced9012143b976f2"
+  }
+}
