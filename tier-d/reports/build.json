@@ -1,17 +1,17 @@
 {
-  "vanillaBase": "latest",
+  "vanillaBase": "stable",
   "vanillaSources": [
     {
       "file": "player.behavior.json",
-      "sha256": "91d833706b33477293053921af7604c29c687b33e7064130342b37e3b6614434"
+      "sha256": "04643d4bfd689ac130813e5dd4f2f2f6334b05bf7dc3accab35e93709dc4873a"
     },
     {
       "file": "player.entity.json",
-      "sha256": "7e520d872fc72be266223b3db2883c2818742a9a450330753a6de4d2ad813608"
+      "sha256": "04b8024fdd91e1602949ca57c300d0379f292df51204eeeb5488eeb9cf93e7af"
     },
     {
       "file": "player.render_controllers.json",
-      "sha256": "9fdcf008895fcefcaa5f0bb948728b8d4513007b200c19b717c70908d026299a"
+      "sha256": "84257065d39b6ecdcfc689213eb195a775132057c995593156ce3f252c3797a6"
     }
   ],
   "property": "skinmenu:look",
@@ -72,18 +72,18 @@
   "artifacts": [
     {
       "name": "skin-menu.mcaddon",
-      "bytes": 21101,
-      "sha256": "c063b20f1b02be872d84c35836b4f921faf5d2aec247be09728218fe5a393a4c"
+      "bytes": 20528,
+      "sha256": "586c04474fb9f0b556fca133b565470afcfd1bb40aa0d7b881a2d4244c28534e"
     },
     {
       "name": "skinmenu-behavior.mcpack",
-      "bytes": 5108,
-      "sha256": "87a42a73f8b9e220385e2e17acfff4fa241c1a1615f20ddceb6944622afcbdef"
+      "bytes": 4905,
+      "sha256": "9f71499c4d23c1d3495f0d938b3d387a8ab1b36d2647d227234c5fbd10323527"
     },
     {
       "name": "skinmenu-resource.mcpack",
-      "bytes": 17857,
-      "sha256": "377f5e8ea61ab063dac16e2292f77513412f245771da39c2861d1f20bf174535"
+      "bytes": 17486,
+      "sha256": "1eb5847bb6def2c95e0327b01b9c4c3f94561027e17ceb5b94179200bc779fb4"
     }
   ]
 }

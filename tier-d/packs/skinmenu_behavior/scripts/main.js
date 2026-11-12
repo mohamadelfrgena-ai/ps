@@ -120,20 +120,24 @@ world.afterEvents.playerSpawn.subscribe((ev) => {
   }, 20);
 });
 
-// Trigger 4 — a real slash command where supported. Numeric enum values avoid
-// importing enums that may not exist on older clients. No cheats required.
-system.beforeEvents.startup.subscribe((ev) => {
-  try {
-    ev.customCommandRegistry.registerCommand({
-      name: "skinmenu:open",
-      description: "Open the in-world skin menu",
-      permissionLevel: 0,
-      cheatsRequired: false
-    }, (origin) => {
-      const player = origin.sourceEntity;
-      if (!player || player.typeId !== "minecraft:player") return { status: 1, message: "Run this as a player." };
-      system.run(() => openMenu(player));
-      return { status: 0 };
-    });
-  } catch { /* older client: chat and the remote still work */ }
-});
+// Trigger 4 — a real slash command where supported. The entire subscription is
+// guarded: on clients without this API the property access itself would throw at
+// module load and kill every other trigger. Numeric enum values avoid imports.
+try {
+  const startup = system.beforeEvents && system.beforeEvents.startup;
+  if (startup && typeof startup.subscribe === "function") startup.subscribe((ev) => {
+    try {
+      ev.customCommandRegistry.registerCommand({
+        name: "skinmenu:open",
+        description: "Open the in-world skin menu",
+        permissionLevel: 0,
+        cheatsRequired: false
+      }, (origin) => {
+        const player = origin.sourceEntity;
+        if (!player || player.typeId !== "minecraft:player") return { status: 1, message: "Run this as a player." };
+        system.run(() => openMenu(player));
+        return { status: 0 };
+      });
+    } catch { /* command API present but registration refused */ }
+  });
+} catch { /* no command API on this client: chat, item and sneak still work */ }

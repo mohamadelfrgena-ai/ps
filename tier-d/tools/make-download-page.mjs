@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const files = [
-  { name: 'skin-menu.mcaddon', label: 'الحزمة الكاملة (موصى بها)', hint: 'استيراد واحد يعطيك الحزمتين' },
+  { name: 'skinmenu-probe.mcpack', label: '١ — حزمة الفحص الصغيرة', hint: 'ابدأ بهذه: سلوك فقط، بلا حزمة موارد. تكتب !skin لتعرف هل السكربت يعمل' },
+  { name: 'skin-menu.mcaddon', label: '٢ — الحزمة الكاملة (نسخة مُصلَحة)', hint: 'بعد نجاح الفحص. استيراد واحد يعطيك الحزمتين' },
   { name: 'skinmenu-behavior.mcpack', label: 'حزمة السلوك وحدها', hint: 'للتثبيت اليدوي' },
   { name: 'skinmenu-resource.mcpack', label: 'حزمة الموارد وحدها', hint: 'للتثبيت اليدوي' }
 ];

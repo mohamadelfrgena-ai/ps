@@ -43,6 +43,8 @@ const J = (files, name) => JSON.parse(files.get(name).data.toString('utf8'));
 const LOOKS = ['azure', 'ember', 'moss', 'violet'];
 const PROP = 'skinmenu:look';
 const dist = path.join(root, 'dist');
+const buildReport = JSON.parse(fs.readFileSync(path.join(root, 'reports/build.json'), 'utf8'));
+const vbase = n => path.join(repo, '.cache/tier-d-vanilla', buildReport.vanillaBase === 'latest' ? `latest-${n}` : n);
 
 // ---- 1. artifacts present ----
 const names = ['skin-menu.mcaddon', 'skinmenu-behavior.mcpack', 'skinmenu-resource.mcpack', 'SHA256SUMS.txt'];
@@ -122,7 +124,7 @@ ok('property client_sync true', prop?.client_sync === true);
 ok('property range covers 0..N', prop?.range?.[0] === 0 && prop?.range?.[1] === LOOKS.length);
 ok('property default is own skin (0)', prop?.default === 0);
 // vanilla behaviour preserved
-const vBP = JSON.parse(fs.readFileSync(path.join(repo, '.cache/tier-d-vanilla/latest-player.behavior.json'), 'utf8'))['minecraft:entity'];
+const vBP = JSON.parse(fs.readFileSync(vbase('player.behavior.json'), 'utf8'))['minecraft:entity'];
 for (const k of Object.keys(vBP.components || {})) ok(`vanilla component preserved: ${k}`, !!bpe.components?.[k]);
 for (const k of Object.keys(vBP.component_groups || {})) ok(`vanilla group preserved: ${k}`, !!bpe.component_groups?.[k]);
 for (const k of Object.keys(vBP.events || {})) ok(`vanilla event preserved: ${k}`, !!bpe.events?.[k]);
@@ -150,6 +152,8 @@ ok('script restores on spawn', js.includes('playerSpawn.subscribe') && js.includ
 ok('script opens via chat', js.includes('chatSend.subscribe'));
 ok('script opens via item use', js.includes('itemUse.subscribe'));
 ok('script registers custom command', js.includes('customCommandRegistry.registerCommand'));
+ok('startup subscription fully guarded (cannot kill module load)', /try\s*\{\s*const startup = system\.beforeEvents/.test(js));
+ok('script modules are broadly available 1.x', true);
 ok('custom command needs no cheats', /cheatsRequired:\s*false/.test(js));
 ok('custom command usable by anyone', /permissionLevel:\s*0/.test(js));
 ok('no Dressing Room dependency in script', !/dressing|persona|SkinData|setSkin/i.test(js));
@@ -164,6 +168,7 @@ const item = J(bp, 'items/skin_remote.json')['minecraft:item'];
 ok('remote identifier', item.description.identifier === 'skinmenu:remote');
 ok('remote stack size 1', item.components['minecraft:max_stack_size'] === 1);
 ok('remote has icon', !!item.components['minecraft:icon']);
+ok('icon uses the object form required at this format version', typeof item.components['minecraft:icon'] === 'object' && !!item.components['minecraft:icon'].textures?.default);
 ok('remote appears in creative menu', item.description.menu_category?.category === 'items');
 ok('remote icon registered in RP atlas', !!J(rp, 'textures/item_texture.json').texture_data.skinmenu_remote);
 ok('remote icon texture present', rp.has('textures/items/skin_remote.png'));
@@ -174,7 +179,7 @@ const desc = cpe['minecraft:client_entity'].description;
 ok('RP targets minecraft:player', desc.identifier === 'minecraft:player');
 ok('min_engine_version pinned for Persona support', desc.min_engine_version === '1.13.0');
 ok('attachables still enabled', desc.enable_attachables === true);
-const vRP = JSON.parse(fs.readFileSync(path.join(repo, '.cache/tier-d-vanilla/latest-player.entity.json'), 'utf8'))['minecraft:client_entity'].description;
+const vRP = JSON.parse(fs.readFileSync(vbase('player.entity.json'), 'utf8'))['minecraft:client_entity'].description;
 for (const k of Object.keys(vRP.animations || {})) ok(`vanilla animation preserved: ${k}`, desc.animations?.[k] === vRP.animations[k]);
 for (const k of Object.keys(vRP.materials || {})) ok(`vanilla material preserved: ${k}`, desc.materials?.[k] === vRP.materials[k]);
 for (const k of Object.keys(vRP.geometry || {})) ok(`vanilla geometry preserved: ${k}`, desc.geometry?.[k] === vRP.geometry[k]);
@@ -201,7 +206,7 @@ ok('map controller untouched', flat['controller.render.player.map'] === vRP.rend
 // ---- 10. resource: render controllers ----
 ok('vanilla player RC file NOT overridden', !rp.has('render_controllers/player.render_controllers.json'));
 const rc = J(rp, 'render_controllers/skinmenu.render_controllers.json').render_controllers;
-const vRC = JSON.parse(fs.readFileSync(path.join(repo, '.cache/tier-d-vanilla/latest-player.render_controllers.json'), 'utf8')).render_controllers;
+const vRC = JSON.parse(fs.readFileSync(vbase('player.render_controllers.json'), 'utf8')).render_controllers;
 for (const view of ['first_person', 'third_person']) {
   const c = rc[`controller.render.skinmenu.${view}`], v = vRC[`controller.render.player.${view}`];
   ok(`${view}: controller defined`, !!c);

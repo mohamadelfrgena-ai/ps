@@ -28,7 +28,7 @@ function harness(opts = {}) {
   };
   const system = {
     currentTick: 100,
-    beforeEvents: { startup: { subscribe: f => subs.startup.push(f) } },
+    beforeEvents: opts.noStartup ? undefined : { startup: { subscribe: f => subs.startup.push(f) } },
     run: f => runQueue.push(f),
     runTimeout: f => timeouts.push(f),
     runInterval: f => intervals.push(f)
@@ -48,6 +48,9 @@ function harness(opts = {}) {
     }
   }
 
+  if (opts.startupThrows) {
+    system.beforeEvents = { get startup() { throw new Error('API unavailable'); } };
+  }
   const stripped = source
     .replace(/^import .*?;\s*$/gms, '')
     .replace(/^\/\/.*$/gm, '');
@@ -271,4 +274,25 @@ test('sneak gesture opens once per press, not every tick', () => {
   p.isSneaking = false; tick(); h.flush();
   p.isSneaking = true; tick(); h.flush();
   assert.ok(h.captured.form, 'a fresh sneak press opens again');
+});
+
+
+test('client without system.beforeEvents still loads and keeps chat working', () => {
+  const h = harness({ noStartup: true });
+  const p = h.makePlayer();
+  h.subs.chatSend[0]({ message: '!skin', sender: p, cancel: false });
+  h.flush();
+  assert.equal(h.captured.player, p, 'menu still opens without the command API');
+  assert.equal(h.captured.form.buttons.length, 5);
+});
+
+test('a throwing startup getter cannot kill the module or the other triggers', () => {
+  const h = harness({ startupThrows: true });
+  const p = h.makePlayer();
+  h.subs.chatSend[0]({ message: '!skin', sender: p, cancel: false });
+  h.flush();
+  assert.equal(h.captured.player, p);
+  h.subs.itemUse[0]({ itemStack: { typeId: 'skinmenu:remote' }, source: p });
+  h.flush();
+  assert.equal(h.captured.player, p);
 });

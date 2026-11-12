@@ -18,13 +18,13 @@ const repo = path.resolve(root, '..');
 const vanillaDir = path.join(repo, '.cache', 'tier-d-vanilla');
 const skinSrc = path.join(repo, 'tier-b', 'packs', 'tier_b_skins');
 
-const VANILLA = process.argv.includes('--vanilla=stable') ? 'stable' : 'latest';
+const VANILLA = process.argv.includes('--vanilla=latest') ? 'latest' : 'stable';
 const vfile = n => path.join(vanillaDir, VANILLA === 'latest' ? `latest-${n}` : n);
 
 const NS = 'skinmenu';
 const PROP = `${NS}:look`;
 const UUID = n => `5c1f8a30-2b64-4d19-9e77-1a3f6b8d0e0${n}`;
-const ENGINE = [1, 21, 90];
+const ENGINE = [1, 20, 0];
 
 const LOOKS = [
   { key: 'azure',  name: 'Azure Mechanic',   label: '\u00a7bAzure Mechanic' },
@@ -59,8 +59,8 @@ w(bpDir, 'manifest.json', {
   ],
   dependencies: [
     { uuid: UUID(3), version: [1, 0, 0] },
-    { module_name: '@minecraft/server', version: '2.0.0' },
-    { module_name: '@minecraft/server-ui', version: '2.0.0' }
+    { module_name: '@minecraft/server', version: '1.17.0' },
+    { module_name: '@minecraft/server-ui', version: '1.3.0' }
   ]
 });
 
@@ -86,13 +86,13 @@ for (let i = 0; i <= N; i++) {
 w(bpDir, 'entities/player.json', bpPlayer);
 
 w(bpDir, 'items/skin_remote.json', {
-  format_version: '1.21.60',
+  format_version: '1.20.60',
   'minecraft:item': {
     description: { identifier: `${NS}:remote`, menu_category: { category: 'items' } },
     components: {
       'minecraft:display_name': { value: 'Skin Menu Remote' },
       'minecraft:max_stack_size': 1,
-      'minecraft:icon': 'skinmenu_remote',
+      'minecraft:icon': { textures: { default: 'skinmenu_remote' } },
       'minecraft:hand_equipped': false,
       'minecraft:glint': true
     }
@@ -221,23 +221,27 @@ world.afterEvents.playerSpawn.subscribe((ev) => {
   }, 20);
 });
 
-// Trigger 4 — a real slash command where supported. Numeric enum values avoid
-// importing enums that may not exist on older clients. No cheats required.
-system.beforeEvents.startup.subscribe((ev) => {
-  try {
-    ev.customCommandRegistry.registerCommand({
-      name: "${NS}:open",
-      description: "Open the in-world skin menu",
-      permissionLevel: 0,
-      cheatsRequired: false
-    }, (origin) => {
-      const player = origin.sourceEntity;
-      if (!player || player.typeId !== "minecraft:player") return { status: 1, message: "Run this as a player." };
-      system.run(() => openMenu(player));
-      return { status: 0 };
-    });
-  } catch { /* older client: chat and the remote still work */ }
-});
+// Trigger 4 — a real slash command where supported. The entire subscription is
+// guarded: on clients without this API the property access itself would throw at
+// module load and kill every other trigger. Numeric enum values avoid imports.
+try {
+  const startup = system.beforeEvents && system.beforeEvents.startup;
+  if (startup && typeof startup.subscribe === "function") startup.subscribe((ev) => {
+    try {
+      ev.customCommandRegistry.registerCommand({
+        name: "${NS}:open",
+        description: "Open the in-world skin menu",
+        permissionLevel: 0,
+        cheatsRequired: false
+      }, (origin) => {
+        const player = origin.sourceEntity;
+        if (!player || player.typeId !== "minecraft:player") return { status: 1, message: "Run this as a player." };
+        system.run(() => openMenu(player));
+        return { status: 0 };
+      });
+    } catch { /* command API present but registration refused */ }
+  });
+} catch { /* no command API on this client: chat, item and sneak still work */ }
 `);
 
 // ================= Resource pack =================

@@ -1,13 +1,12 @@
 {
-  "format_version": "1.26.0",
+  "format_version": "1.10.0",
   "minecraft:client_entity": {
     "description": {
       "identifier": "minecraft:player",
       "materials": {
         "default": "entity_alphatest",
         "cape": "entity_alphatest",
-        "animated": "player_animated",
-        "spectator": "player_spectator"
+        "animated": "player_animated"
       },
       "textures": {
         "default": "textures/entity/steve",
@@ -30,7 +29,7 @@
           "variable.hand_bob = 0.0;"
         ],
         "pre_animation": [
-          "variable.helmet_layer_visible = !query.has_head_gear;",
+          "variable.helmet_layer_visible = 1.0;",
           "variable.leg_layer_visible = 1.0;",
           "variable.boot_layer_visible = 1.0;",
           "variable.chest_layer_visible = 1.0;",
@@ -39,21 +38,11 @@
           "variable.first_person_rotation_factor = math.sin((1 - variable.attack_time) * 180.0);",
           "variable.hand_bob = query.life_time < 0.01 ? 0.0 : variable.hand_bob + ((query.is_on_ground && query.is_alive ? math.clamp(math.sqrt(math.pow(query.position_delta(0), 2.0) + math.pow(query.position_delta(2), 2.0)), 0.0, 0.1) : 0.0) - variable.hand_bob) * 0.02;",
           "variable.map_angle = math.clamp(1 - variable.player_x_rotation / 45.1, 0.0, 1.0);",
-          "variable.item_use_normalized = query.main_hand_item_use_duration / query.main_hand_item_max_duration;",
-          "variable.riding_y_offset = query.is_riding_any_entity_of_type('minecraft:minecart', 'minecraft:boat', 'minecraft:chest_boat', 'minecraft:strider') ? -3.0 : 0.0;"
+          "variable.item_use_normalized = query.main_hand_item_use_duration / query.main_hand_item_max_duration;"
         ],
         "animate": [
           "root"
-        ],
-        "variables": {
-          "variable.fp_melee_spear_use_attachable_rotation_z": "public",
-          "variable.tp_melee_spear_use_attachable_rotation_z": "public",
-          "variable.fp_melee_spear_attack_attachable_rotation_z": "public",
-          "variable.tp_melee_spear_attack_attachable_position_z": "public",
-          "variable.attack_time": "public",
-          "variable.item_use_normalized": "public"
-        },
-        "should_update_effects_offscreen": "1.0"
+        ]
       },
       "animations": {
         "root": "controller.animation.player.root",
@@ -75,6 +64,7 @@
         "riding.legs": "animation.player.riding.legs",
         "holding": "animation.player.holding",
         "brandish_spear": "animation.humanoid.brandish_spear",
+        "holding_spyglass": "animation.humanoid.holding_spyglass",
         "charging": "animation.humanoid.charging",
         "attack.positions": "animation.player.attack.positions",
         "attack.rotations": "animation.player.attack.rotations",
@@ -88,9 +78,9 @@
         "first_person_base_pose": "animation.player.first_person.base_pose",
         "first_person_empty_hand": "animation.player.first_person.empty_hand",
         "first_person_swap_item": "animation.player.first_person.swap_item",
+        "first_person_shield_block": "animation.player.first_person.shield_block",
         "first_person_attack_controller": "controller.animation.player.first_person_attack",
         "first_person_attack_rotation": "animation.player.first_person.attack_rotation",
-        "first_person_attack_rotation_item": "animation.player.first_person.attack_rotation_item",
         "first_person_vr_attack_rotation": "animation.player.first_person.vr_attack_rotation",
         "first_person_walk": "animation.player.first_person.walk",
         "first_person_map_controller": "controller.animation.player.first_person_map",
@@ -99,8 +89,6 @@
         "first_person_map_hold_off_hand": "animation.player.first_person.map_hold_off_hand",
         "first_person_map_hold_main_hand": "animation.player.first_person.map_hold_main_hand",
         "first_person_crossbow_equipped": "animation.player.first_person.crossbow_equipped",
-        "first_person_crossbow_hold": "animation.player.first_person.crossbow_hold",
-        "first_person_breathing_bob": "animation.player.first_person.breathing_bob",
         "third_person_crossbow_equipped": "animation.player.crossbow_equipped",
         "third_person_bow_equipped": "animation.player.bow_equipped",
         "crossbow_hold": "animation.player.crossbow_hold",
@@ -108,45 +96,20 @@
         "shield_block_main_hand": "animation.player.shield_block_main_hand",
         "shield_block_off_hand": "animation.player.shield_block_off_hand",
         "blink": "controller.animation.persona.blink",
-        "fishing_rod": "animation.humanoid.fishing_rod",
-        "holding_spyglass": "animation.humanoid.holding_spyglass",
-        "first_person_shield_block": "animation.player.first_person.shield_block",
-        "tooting_goat_horn": "animation.humanoid.tooting_goat_horn",
-        "holding_brush": "animation.humanoid.holding_brush",
-        "brushing": "animation.humanoid.brushing",
-        "crawling": "animation.player.crawl",
-        "crawling.legs": "animation.player.crawl.legs",
-        "swimming.no_right_arm": "animation.player.swim.no_right_arm",
-        "crawling.no_right_arm": "animation.player.crawl.no_right_arm",
-        "riding.root": "animation.player.riding.root",
-        "holding_heavy_core": "animation.player.holding_heavy_core",
-        "first_person_melee_spear_use": "animation.player.first_person.melee_spear_use",
-        "first_person_melee_spear_hold": "animation.player.first_person.melee_spear_hold",
-        "first_person_melee_spear_attack": "animation.player.first_person.melee_spear_attack",
-        "first_person_melee_spear_controller": "controller.animation.player.first_person_melee_spear",
-        "third_person_melee_spear_use": "animation.humanoid.melee_spear_use",
-        "third_person_melee_spear_hold": "animation.humanoid.melee_spear_hold",
-        "third_person_melee_spear_attack": "animation.player.melee_spear_attack",
-        "third_person_melee_spear_controller": "controller.animation.player.melee_spear"
+        "tooting_goat_horn": "animation.humanoid.tooting_goat_horn"
       },
       "render_controllers": [
         {
-          "controller.render.player.first_person_spectator": "variable.is_first_person && query.is_spectator"
+          "controller.render.player.first_person": "(variable.is_first_person) && (math.max(query.property('skinmenu:look'), query.mark_variant) == 0)"
         },
         {
-          "controller.render.player.third_person_spectator": "!variable.is_first_person && !variable.map_face_icon && query.is_spectator"
+          "controller.render.skinmenu.first_person": "(variable.is_first_person) && (math.max(query.property('skinmenu:look'), query.mark_variant) > 0)"
         },
         {
-          "controller.render.player.first_person": "(variable.is_first_person && !query.is_spectator) && (math.max(query.property('skinmenu:look'), query.mark_variant) == 0)"
+          "controller.render.player.third_person": "(!variable.is_first_person && !variable.map_face_icon) && (math.max(query.property('skinmenu:look'), query.mark_variant) == 0)"
         },
         {
-          "controller.render.skinmenu.first_person": "(variable.is_first_person && !query.is_spectator) && (math.max(query.property('skinmenu:look'), query.mark_variant) > 0)"
-        },
-        {
-          "controller.render.player.third_person": "(!variable.is_first_person && !variable.map_face_icon && !query.is_spectator) && (math.max(query.property('skinmenu:look'), query.mark_variant) == 0)"
-        },
-        {
-          "controller.render.skinmenu.third_person": "(!variable.is_first_person && !variable.map_face_icon && !query.is_spectator) && (math.max(query.property('skinmenu:look'), query.mark_variant) > 0)"
+          "controller.render.skinmenu.third_person": "(!variable.is_first_person && !variable.map_face_icon) && (math.max(query.property('skinmenu:look'), query.mark_variant) > 0)"
         },
         {
           "controller.render.player.map": "variable.map_face_icon"
