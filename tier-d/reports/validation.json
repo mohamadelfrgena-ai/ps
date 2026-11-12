@@ -1,0 +1,46 @@
+{
+  "schema": "skin-menu-validation/1",
+  "run_utc": "2026-11-12",
+  "scope": "Static structure and menu logic only. No Minecraft client was launched.",
+  "structural": {
+    "result": "PASS",
+    "passed": 387,
+    "total": 387
+  },
+  "menu_logic": {
+    "result": "PASS",
+    "passed": 17,
+    "total": 17
+  },
+  "freeze": {
+    "result": "PASS",
+    "detail": [
+      "FREEZE_UNCHANGED 738/738"
+    ]
+  },
+  "artifacts": [
+    {
+      "name": "skin-menu.mcaddon",
+      "bytes": 21101,
+      "sha256": "c063b20f1b02be872d84c35836b4f921faf5d2aec247be09728218fe5a393a4c"
+    },
+    {
+      "name": "skinmenu-behavior.mcpack",
+      "bytes": 5108,
+      "sha256": "87a42a73f8b9e220385e2e17acfff4fa241c1a1615f20ddceb6944622afcbdef"
+    },
+    {
+      "name": "skinmenu-resource.mcpack",
+      "bytes": 17857,
+      "sha256": "377f5e8ea61ab063dac16e2292f77513412f245771da39c2861d1f20bf174535"
+    }
+  ],
+  "not_verified": [
+    "In-game menu display",
+    "Real player appearance change",
+    "Signed-out operation",
+    "Offline operation",
+    "Persistence across relaunch",
+    "Armour and animation compatibility"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Skin Menu — In-World Selector",
+    "description": "Open a menu inside the world and change your look. No Dressing Room, no account.",
+    "uuid": "5c1f8a30-2b64-4d19-9e77-1a3f6b8d0e01",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      21,
+      90
+    ]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "5c1f8a30-2b64-4d19-9e77-1a3f6b8d0e02",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "type": "script",
+      "language": "javascript",
+      "uuid": "5c1f8a30-2b64-4d19-9e77-1a3f6b8d0e05",
+      "version": [
+        1,
+        0,
+        0
+      ],
+      "entry": "scripts/main.js"
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "5c1f8a30-2b64-4d19-9e77-1a3f6b8d0e03",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "module_name": "@minecraft/server",
+      "version": "2.0.0"
+    },
+    {
+      "module_name": "@minecraft/server-ui",
+      "version": "2.0.0"
+    }
+  ]
+}

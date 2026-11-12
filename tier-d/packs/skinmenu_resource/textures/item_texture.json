@@ -1,0 +1,9 @@
+{
+  "resource_pack_name": "skinmenu",
+  "texture_name": "atlas.items",
+  "texture_data": {
+    "skinmenu_remote": {
+      "textures": "textures/items/skin_remote"
+    }
+  }
+}

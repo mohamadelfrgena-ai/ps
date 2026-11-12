@@ -1,0 +1,102 @@
+{
+  "format_version": "1.10.0",
+  "render_controllers": {
+    "controller.render.skinmenu.first_person": {
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Array.looks[math.clamp(math.max(query.property('skinmenu:look'), query.mark_variant) - 1, 0, 3)]"
+      ],
+      "part_visibility": [
+        {
+          "*": false
+        },
+        {
+          "rightArm": "query.get_equipped_item_name(0, 1) == '' || query.get_equipped_item_name(0, 1) == 'filled_map'"
+        },
+        {
+          "rightSleeve": "query.get_equipped_item_name(0, 1) == '' || query.get_equipped_item_name(0, 1) == 'filled_map'"
+        },
+        {
+          "leftArm": "(query.get_equipped_item_name(0, 1) == 'filled_map' && query.get_equipped_item_name('off_hand') != 'shield') || (query.get_equipped_item_name('off_hand') == 'filled_map' && !query.item_is_charged) || (!query.item_is_charged && (variable.item_use_normalized > 0 && variable.item_use_normalized < 1.0))"
+        },
+        {
+          "leftSleeve": "(query.get_equipped_item_name(0, 1) == 'filled_map' && query.get_equipped_item_name('off_hand') != 'shield') || (query.get_equipped_item_name('off_hand') == 'filled_map' && !query.item_is_charged) || (!query.item_is_charged && (variable.item_use_normalized > 0 && variable.item_use_normalized < 1.0))"
+        }
+      ],
+      "arrays": {
+        "textures": {
+          "Array.looks": [
+            "Texture.look_azure",
+            "Texture.look_ember",
+            "Texture.look_moss",
+            "Texture.look_violet"
+          ]
+        }
+      }
+    },
+    "controller.render.skinmenu.third_person": {
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Array.looks[math.clamp(math.max(query.property('skinmenu:look'), query.mark_variant) - 1, 0, 3)]"
+      ],
+      "part_visibility": [
+        {
+          "*": true
+        },
+        {
+          "helmet": "variable.helmet_layer_visible"
+        },
+        {
+          "leftLegging": "variable.leg_layer_visible"
+        },
+        {
+          "rightLegging": "variable.leg_layer_visible"
+        },
+        {
+          "leftBoot": "variable.boot_layer_visible"
+        },
+        {
+          "rightBoot": "variable.boot_layer_visible"
+        },
+        {
+          "leftSock": "variable.boot_layer_visible && variable.leg_layer_visible"
+        },
+        {
+          "rightSock": "variable.boot_layer_visible && variable.leg_layer_visible"
+        },
+        {
+          "bodyArmor": "variable.chest_layer_visible"
+        },
+        {
+          "leftArmArmor": "variable.chest_layer_visible"
+        },
+        {
+          "rightArmArmor": "variable.chest_layer_visible"
+        },
+        {
+          "belt": "variable.chest_layer_visible && variable.leg_layer_visible"
+        }
+      ],
+      "arrays": {
+        "textures": {
+          "Array.looks": [
+            "Texture.look_azure",
+            "Texture.look_ember",
+            "Texture.look_moss",
+            "Texture.look_violet"
+          ]
+        }
+      }
+    }
+  }
+}
