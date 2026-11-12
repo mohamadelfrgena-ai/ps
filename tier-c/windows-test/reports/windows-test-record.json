@@ -15,15 +15,17 @@
   "environment": {
     "windows_version": "Windows (taskbar visible; exact build not shown)",
     "minecraft_version_exact": null,
+    "minecraft_version_reported": "operator states 'latest version'; exact build number not supplied",
     "edition": "Bedrock (Classic Skins / Dressing Room UI confirmed)",
-    "build_type": null,
+    "build_type": "GDK assumed if on a current release (1.21.120+); not confirmed",
     "is_preview": false,
-    "signed_in_to_microsoft": null,
-    "internet_connected": null,
+    "signed_in_to_microsoft": true,
+    "signed_in_source": "operator confirmed in chat, 2026-11-12",
+    "internet_connected": "presumed online (signed in); not explicitly confirmed",
     "com_mojang_path_used": null,
     "only_allow_trusted_skins_original": null,
     "only_allow_trusted_skins_set_to_off": null,
-    "note": "Version number and sign-in state are NOT visible in the screenshot and must still be supplied."
+    "note": "Signed-in state is confirmed by the operator. The exact version number is still required: 'latest' is not a recordable build identifier. Read it from the title-screen corner or Settings > Profile."
   },
   "track_tested": "Track A — windows-skin-test-azure.mcpack",
   "pack_file": "windows-skin-test-azure.mcpack",
@@ -80,7 +82,7 @@
       "W6e_real_player_offline": "NOT RUN",
       "W6f_persists_offline": "NOT RUN",
       "blocker_text": null,
-      "note": "No sign-in prompt is visible and the coin balance reads 0, but neither proves an offline or signed-out state. Insufficient evidence."
+      "note": "Operator confirmed they ARE signed in to a Microsoft account. The observed W1/W2 passes therefore apply to a SIGNED-IN session only and say nothing about offline behaviour. W6 requires a separate run after signing out and disconnecting from the internet."
     }
   },
   "corroborated_findings": [
@@ -93,9 +95,10 @@
   "overall_rule": "PASS requires W1 AND W2 AND W3 AND W4 AND W5. W1 and W2 pass; W3 partial; W4 and W5 not run.",
   "excluded_as_evidence": ["mannequin", "Dressing Room preview alone", "menu thumbnail", "browser render", "file presence on disk"],
   "next_required_from_operator": [
-    "Exact Minecraft version number (title screen bottom corner).",
-    "Whether signed in to a Microsoft/Xbox account.",
-    "Click Equip, enter a world, press F5, screenshot the real player.",
-    "Fully close and relaunch Minecraft, re-enter the world, screenshot again."
-  ]
+    "Exact Minecraft version number (title screen bottom corner, or Settings > Profile). 'Latest' is not sufficient for the record.",
+    "Click Equip, enter a world, press F5, screenshot the real player with the HUD visible. (W4 - main criterion)",
+    "Fully close and relaunch Minecraft, re-enter the world, screenshot again without re-selecting the skin. (W5)",
+    "Optional but requested originally: sign out and disconnect internet, then repeat, to settle W6."
+  ],
+  "scope_limit": "All current passes are from a SIGNED-IN, presumably online session. No offline claim is made."
 }

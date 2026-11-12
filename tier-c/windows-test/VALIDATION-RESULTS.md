@@ -72,9 +72,11 @@ Evidence: `evidence/01-dressing-room-pack-visible.png`, operator Windows session
 | W3 | Select **Azure Mechanic** and equip | **PARTIAL** | Selection confirmed, but the operator selected **Violet Navigator**, and **Equip was not confirmed** |
 | W4 | **Real local player model changed in a world** | **NOT RUN** | Only the Dressing Room preview pane is visible — no HUD/hotbar. Preview is excluded |
 | W5 | Persists after restarting Minecraft | **NOT RUN** | No restart in the evidence |
-| W6 | Works signed out / offline | **NOT RUN** | Sign-in and network state not established by the screenshot |
+| W6 | Works signed out / offline | **NOT RUN** | Operator confirmed they **are signed in**, so this session cannot answer the offline question |
 
 **Overall Windows verdict: NOT PASS — main criterion W4 unproven.**
+
+**Session scope:** the operator confirmed a **signed-in Microsoft account** and describes the client as the "latest" version (exact build number not yet supplied). All observed passes therefore apply to a **signed-in session only**; no offline or no-account claim is made. The exact version number is still outstanding.
 
 Corroborated by the client itself: the pack registers as a skin pack, reports **0 Texture Packs / 0 Worlds** (so it is not a resource pack), and shows **✔ Usable everywhere**. The pack-format question is settled for Windows; the equip-and-apply question is not.
 

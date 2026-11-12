@@ -4,6 +4,18 @@ Date: 2026-11-12, 23:20 local (from the Windows taskbar in the screenshot)
 Source: operator screenshot `evidence/01-dressing-room-pack-visible.png` (1920×1080)
 Track: **A** — `windows-skin-test-azure.mcpack`
 
+## Session conditions (confirmed by operator in chat)
+
+| Field | Value |
+|---|---|
+| Signed in to Microsoft account | **Yes** — confirmed by operator |
+| Minecraft version | Operator says "latest"; **exact build number still not supplied** |
+| Network | Presumed online (signed in); not explicitly confirmed |
+
+**Important consequence:** because the session is signed in, the W1/W2 passes below apply to a **signed-in session only**. They are **not** evidence that the pack works offline or without an account. W6 remains a separate, unrun test.
+
+"Latest" is not a recordable version identifier — Bedrock ships frequent point releases and the Windows data path changed at 1.21.120. The exact number is still needed (title-screen corner, or Settings → Profile).
+
 ## What the screenshot actually shows
 
 - Minecraft window titled **Minecraft**, screen header **Classic Skins**.
@@ -24,7 +36,7 @@ Track: **A** — `windows-skin-test-azure.mcpack`
 | W3 | Select and equip | **PARTIAL** | Selection is confirmed (green border + preview wears it). **Equip is not confirmed** — the button is still shown and no post-equip state was captured. |
 | W4 | **Real player changed in a world** | **NOT RUN** | The figure shown is the Dressing Room preview pane. No HUD, hotbar, hearts, or crosshair. Preview is explicitly excluded. |
 | W5 | Persists after restart | **NOT RUN** | No restart performed in the evidence. |
-| W6 | Offline / no sign-in | **NOT RUN** | No sign-in prompt visible and coin balance is 0, but neither establishes a signed-out or offline state. |
+| W6 | Offline / no sign-in | **NOT RUN** | Operator confirmed they **are signed in**. This session cannot answer the offline question; a signed-out, disconnected run is required. |
 
 **Overall: NOT PASS.** The main criterion (W4) is still unproven.
 
@@ -47,9 +59,10 @@ So the earlier concern that a custom pack might not surface at all on this platf
 
 ## Still needed
 
-1. Exact **Minecraft version number** (bottom corner of the title screen).
-2. Whether you are **signed in** to a Microsoft/Xbox account.
-3. Click **Equip**, enter a world, press **F5**, and screenshot the **real player** with the HUD visible.
-4. Fully close Minecraft, relaunch, re-enter the world, and screenshot again **without re-selecting** the skin.
+1. ~~Whether you are signed in~~ — **answered: yes, signed in.**
+2. Exact **Minecraft version number** (bottom corner of the title screen, or Settings → Profile). "Latest" cannot be recorded.
+3. Click **Equip**, enter a world, press **F5**, and screenshot the **real player** with the HUD visible. → settles **W4**
+4. Fully close Minecraft, relaunch, re-enter the world, and screenshot again **without re-selecting** the skin. → settles **W5**
+5. Only if you want the offline answer: sign out (Settings → Profile → Sign out), disconnect the internet, and repeat steps 3–4. → settles **W6**
 
-Steps 3 and 4 are the only things that can turn this into a PASS.
+Steps 3 and 4 are the only things that can turn the overall verdict into a PASS. Step 5 answers the separate offline requirement from the original Tier C scope.
