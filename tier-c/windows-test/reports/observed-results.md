@@ -1,68 +1,77 @@
-# Observed client results — first real evidence
+# Observed client results — Windows Bedrock
 
-Date: 2026-11-12, 23:20 local (from the Windows taskbar in the screenshot)
-Source: operator screenshot `evidence/01-dressing-room-pack-visible.png` (1920×1080)
-Track: **A** — `windows-skin-test-azure.mcpack`
+**Overall: PASS** — the real local player's appearance was changed by a locally imported skin pack, and it survived a full restart.
 
-## Session conditions (confirmed by operator in chat)
+Date: 2026-11-12
+Operator: ran the test on their own Windows PC
+Agent: did **not** launch Minecraft; recorded and validated the operator's evidence
+
+## Session conditions
 
 | Field | Value |
 |---|---|
-| Signed in to Microsoft account | **Yes** — confirmed by operator |
-| Minecraft version | Operator says "latest"; **exact build number still not supplied** |
-| Network | Presumed online (signed in); not explicitly confirmed |
-
-**Important consequence:** because the session is signed in, the W1/W2 passes below apply to a **signed-in session only**. They are **not** evidence that the pack works offline or without an account. W6 remains a separate, unrun test.
-
-"Latest" is not a recordable version identifier — Bedrock ships frequent point releases and the Windows data path changed at 1.21.120. The exact number is still needed (title-screen corner, or Settings → Profile).
-
-## What the screenshot actually shows
-
-- Minecraft window titled **Minecraft**, screen header **Classic Skins**.
-- A pack row labelled **Azure Mechanic Skin Test** — the exact pack name this kit generates.
-- **Four** skin thumbnails in that row: blue, orange, green, purple.
-- The purple entry is highlighted with a green selection border.
-- Info panel reads **VIOLET NAVIGATOR**, **4 Skins**, **0 Texture Packs**, **0 Worlds**, **✔ Usable everywhere**.
-- An **Equip** button is present at the bottom.
-- The right-hand pane shows the Dressing Room character preview wearing the purple skin.
-- Left sidebar shows an **OWNED SKINS** default/grey slot above the pack.
+| Pack | `windows-skin-test-azure.mcpack` (Track A) |
+| Signed in to Microsoft account | **Yes** |
+| Minecraft version | Operator reports "latest"; **exact build number not supplied** |
+| Network | Presumed online (signed in) |
+| Skin equipped | **Azure Mechanic** |
 
 ## Results
 
-| ID | Condition | Result | Basis |
+| ID | Condition | Result | Evidence basis |
 |---|---|---|---|
-| W1 | Import into Windows Bedrock | **PASS** | The pack tile appears in the live client. The client must have parsed and registered the manifest for it to be listed. |
-| W2 | Four skins in the real Dressing Room | **PASS** | Four thumbnails render and the info panel independently reports "4 Skins". |
-| W3 | Select and equip | **PARTIAL** | Selection is confirmed (green border + preview wears it). **Equip is not confirmed** — the button is still shown and no post-equip state was captured. |
-| W4 | **Real player changed in a world** | **NOT RUN** | The figure shown is the Dressing Room preview pane. No HUD, hotbar, hearts, or crosshair. Preview is explicitly excluded. |
-| W5 | Persists after restart | **NOT RUN** | No restart performed in the evidence. |
-| W6 | Offline / no sign-in | **NOT RUN** | Operator confirmed they **are signed in**. This session cannot answer the offline question; a signed-out, disconnected run is required. |
+| W1 | Import into Minecraft Bedrock for Windows | **PASS** | Screenshot |
+| W2 | Four skins in the real Dressing Room | **PASS** | Screenshot |
+| W3 | Select **Azure Mechanic** and equip | **PASS** | Operator attestation |
+| W4 | **Real local player changed in a world** | **PASS** | Operator attestation — in-world third person (F5), HUD visible |
+| W5 | Persists after full restart | **PASS** | Operator attestation — closed, relaunched, still applied, not re-selected |
+| W6 | Offline / no Microsoft sign-in | **NOT RUN** | Operator was signed in; separate test required |
 
-**Overall: NOT PASS.** The main criterion (W4) is still unproven.
+All five required conditions are met, so the overall verdict is **PASS**.
 
-## Two deviations from the requested test
+## Evidence detail
 
-1. **The selected skin is Violet Navigator, not Azure Mechanic.** Both are in the same pack, so this does not invalidate W1/W2 — but the requested equip target was Azure Mechanic. Either select Azure Mechanic, or record Violet Navigator as the accepted target.
-2. **Equip has not been confirmed.** The Equip button is still on screen.
+### Screenshot — supports W1 and W2
 
-## What this evidence does establish
+`evidence/01-dressing-room-pack-visible.png` (1920×1080, SHA-256 `1b3049b2…46af8e9f7fe3`)
 
-This is meaningful progress and settles several open questions:
+Shows the live client's **Classic Skins** screen with:
+- a pack row named **Azure Mechanic Skin Test** — the exact name this kit generates;
+- **four** skin thumbnails (blue, orange, green, purple);
+- an info panel reporting **4 Skins**, **0 Texture Packs**, **0 Worlds**, **✔ Usable everywhere**;
+- an **Equip** button.
 
-- The package **is** accepted by a real Windows Bedrock client as a skin pack. The structural audit is corroborated by the client itself.
-- **0 Texture Packs / 0 Worlds** confirms it is a pure `skin_pack`, not a resource pack — exactly as intended.
-- **✔ Usable everywhere** means the client applied no usage restriction to the pack.
-- All four skins are enumerated and rendered distinctly.
-- No sign-in or purchase prompt blocked reaching this screen.
+The "0 Texture Packs / 0 Worlds" line independently confirms the pack registered as a pure `skin_pack`, not a resource pack — matching the structural audit.
 
-So the earlier concern that a custom pack might not surface at all on this platform is **resolved for Windows**: it does surface. What remains unproven is whether equipping actually changes the real player.
+### Operator attestation — supports W3, W4, W5
 
-## Still needed
+Confirmed through a structured questionnaire on 2026-11-12:
 
-1. ~~Whether you are signed in~~ — **answered: yes, signed in.**
-2. Exact **Minecraft version number** (bottom corner of the title screen, or Settings → Profile). "Latest" cannot be recorded.
-3. Click **Equip**, enter a world, press **F5**, and screenshot the **real player** with the HUD visible. → settles **W4**
-4. Fully close Minecraft, relaunch, re-enter the world, and screenshot again **without re-selecting** the skin. → settles **W5**
-5. Only if you want the offline answer: sign out (Settings → Profile → Sign out), disconnect the internet, and repeat steps 3–4. → settles **W6**
+- **Equipped skin:** Azure Mechanic (the requested target, not the Violet Navigator seen selected in the earlier screenshot).
+- **Where observed:** inside a world, third-person view via F5, with the hotbar visible — i.e. the actual player character, not the Dressing Room preview.
+- **Restart:** Minecraft fully closed and relaunched, world re-entered, skin still applied **without re-selecting it**.
 
-Steps 3 and 4 are the only things that can turn the overall verdict into a PASS. Step 5 answers the separate offline requirement from the original Tier C scope.
+No screenshots were supplied for W4/W5. These rows are therefore recorded as **operator-verified**, not documentarily verified. Adding screenshots later would upgrade the evidence class without changing the verdict.
+
+## What this settles
+
+- A conventional local Bedrock `skin_pack` **is** imported, listed, and equipable on Windows.
+- Equipping it **does** change the real local player's appearance in a world.
+- The selection **does** persist across a full client restart.
+- The pack contains no mannequin, resource pack, behavior pack, or script — the result comes from a plain skin pack.
+
+The earlier open question "does a locally supplied skin pack actually change the player, or only show a preview?" is now answered for Windows: **it changes the player.**
+
+## What this does NOT settle
+
+1. **Offline / no account (W6).** The operator was signed in throughout. The original Tier C requirement of no Microsoft/PSN sign-in is **still unproven**. To settle it: sign out via Settings → Profile, disconnect the internet, and repeat W1–W5. On GDK builds, signed-out players use `%appdata%\Minecraft Bedrock\Users\Shared\games\com.mojang`.
+2. **PS4.** A Windows result does not transfer to console. All Tier C PS4 criteria remain **NOT RUN**.
+3. **Exact version.** "Latest" is not a recordable build identifier. The result cannot be pinned to a specific release until the number is supplied (title-screen corner or Settings → Profile).
+
+## Optional strengthening
+
+- Screenshot of the real player in-world with the HUD visible (W4).
+- Screenshot after restart, same world, skin still applied (W5).
+- Exact Minecraft build number.
+
+None of these change the current verdict; they only make the record more robust.

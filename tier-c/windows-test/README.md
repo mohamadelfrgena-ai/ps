@@ -2,7 +2,13 @@
 
 Clean skin packs plus exact instructions to test whether a local skin pack changes the **real local player's appearance** in Minecraft Bedrock on Windows.
 
-**The Minecraft client was not launched. All in-client tests are NOT RUN.**
+## Result: PASS on Windows ✅
+
+The operator ran `windows-skin-test-azure.mcpack` on a real Windows Bedrock client, equipped **Azure Mechanic**, saw the **real player change in a world** (third person, HUD visible), and confirmed it **persisted after a full restart**. W1–W5 all pass.
+
+**Still open:** W6 offline / no Microsoft sign-in — the run was signed in, so the no-account requirement is unproven. **PS4 remains NOT RUN.** The exact Minecraft build number is also still unrecorded.
+
+The agent did not launch Minecraft; W1/W2 rest on a screenshot and W3/W4/W5 on operator attestation. Details in `reports/observed-results.md`.
 
 ## Start here
 

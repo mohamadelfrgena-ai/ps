@@ -6,9 +6,13 @@ Client evidence: an operator-run Windows session, supplied as a screenshot.
 
 ## Headline
 
-**Update 2026-11-12 23:20:** the operator ran the pack on a real Windows Bedrock client and supplied a screenshot. **W1 (import) and W2 (four skins in the Dressing Room) now PASS on observed evidence.** W3 is PARTIAL, and **W4/W5 remain NOT RUN**, so the overall verdict is still **NOT PASS**.
+**Overall: PASS on Windows Bedrock (signed-in session).** The operator ran the pack on a real client, equipped **Azure Mechanic**, confirmed the **real player's appearance changed in a world** in third person, and confirmed it **persisted after a full restart**. All five required conditions W1–W5 are satisfied.
 
-See `reports/observed-results.md` for the evidence analysis and `evidence/01-dressing-room-pack-visible.png` for the screenshot.
+**W6 (offline / no Microsoft sign-in) remains NOT RUN** — the operator was signed in throughout, so the original no-account requirement is still unproven. **PS4 remains NOT RUN.**
+
+Evidence split: W1/W2 are supported by a screenshot; W3/W4/W5 by operator attestation through a structured questionnaire. The agent never launched Minecraft.
+
+See `reports/observed-results.md` for the full analysis and `evidence/01-dressing-room-pack-visible.png` for the screenshot.
 
 Everything labelled PASS in section 2 below is a file-level check performed in this sandbox, not a client behaviour.
 
@@ -61,24 +65,24 @@ They say nothing about whether Minecraft actually imports the pack, lists it, le
 
 ---
 
-## 3. Required client tests — operator evidence received
+## 3. Required client tests — operator-verified
 
-Evidence: `evidence/01-dressing-room-pack-visible.png`, operator Windows session, 2026-11-12 23:20.
+Operator Windows session, 2026-11-12. Pack: `windows-skin-test-azure.mcpack`. Skin equipped: **Azure Mechanic**.
 
 | ID | Condition | Result | Basis |
 |---|---|---|---|
-| W1 | Import into Minecraft Bedrock for Windows | **PASS** | Pack tile "Azure Mechanic Skin Test" is listed in the live client's Classic Skins screen |
-| W2 | Four skins found in the real Dressing Room | **PASS** | Four thumbnails render; info panel independently reports "4 Skins" |
-| W3 | Select **Azure Mechanic** and equip | **PARTIAL** | Selection confirmed, but the operator selected **Violet Navigator**, and **Equip was not confirmed** |
-| W4 | **Real local player model changed in a world** | **NOT RUN** | Only the Dressing Room preview pane is visible — no HUD/hotbar. Preview is excluded |
-| W5 | Persists after restarting Minecraft | **NOT RUN** | No restart in the evidence |
-| W6 | Works signed out / offline | **NOT RUN** | Operator confirmed they **are signed in**, so this session cannot answer the offline question |
+| W1 | Import into Minecraft Bedrock for Windows | **PASS** | Screenshot — pack tile listed in the live client's Classic Skins screen |
+| W2 | Four skins found in the real Dressing Room | **PASS** | Screenshot — four thumbnails; info panel reports "4 Skins" |
+| W3 | Select **Azure Mechanic** and equip | **PASS** | Operator attestation |
+| W4 | **Real local player model changed in a world** | **PASS** | Operator attestation — in-world third person (F5), HUD visible; not a preview |
+| W5 | Persists after restarting Minecraft | **PASS** | Operator attestation — fully closed, relaunched, still applied, not re-selected |
+| W6 | Works signed out / offline | **NOT RUN** | Operator was signed in; requires a separate disconnected run |
 
-**Overall Windows verdict: NOT PASS — main criterion W4 unproven.**
+**Overall Windows verdict: PASS** — W1 ∧ W2 ∧ W3 ∧ W4 ∧ W5 all satisfied.
 
-**Session scope:** the operator confirmed a **signed-in Microsoft account** and describes the client as the "latest" version (exact build number not yet supplied). All observed passes therefore apply to a **signed-in session only**; no offline or no-account claim is made. The exact version number is still outstanding.
+**Session scope and limits:** signed-in Microsoft account; client described as "latest" with the exact build number still unrecorded. No offline or no-account claim is made, and nothing here transfers to PS4. W4/W5 rest on operator attestation rather than screenshots; supplying screenshots would strengthen the evidence class without changing the verdict.
 
-Corroborated by the client itself: the pack registers as a skin pack, reports **0 Texture Packs / 0 Worlds** (so it is not a resource pack), and shows **✔ Usable everywhere**. The pack-format question is settled for Windows; the equip-and-apply question is not.
+Corroborated by the client itself: the pack registers as a skin pack, reports **0 Texture Packs / 0 Worlds** (so it is not a resource pack), and shows **✔ Usable everywhere**.
 
 Explicitly excluded as evidence: the Dressing Room preview on its own, menu thumbnails, the Tier B mannequin, browser renders, and the mere presence of files on disk.
 
@@ -93,7 +97,7 @@ What the sources support:
 - The game may still require a previously cached Microsoft Store licence to launch offline. If it refuses, that is a platform licensing blocker, not a pack defect.
 - Cloud/Marketplace and account-bound skins behave differently from a local skin pack; general advice about "skins reverting to Steve offline" mostly concerns account skins, not locally imported packs.
 
-**Conclusion: plausible but unverified.** W6 in the checklist is designed to settle it. No bypass, patch, or authentication change is proposed or permitted.
+**Conclusion: still unverified.** The successful run was performed **signed in**, so it does not answer the offline question. W6 in the checklist is designed to settle it: sign out, disconnect, repeat W1–W5. No bypass, patch, or authentication change is proposed or permitted.
 
 ---
 
