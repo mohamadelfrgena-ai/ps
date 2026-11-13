@@ -1025,6 +1025,59 @@ static bool stageStreamToFile(std::FILE* inFp, const std::string& dstPath, int& 
     return true;
 }
 
+// v0.79 («في كل اضافة توجد ايقونة للاضافة خوذها لانه نحطها في ايقونات
+// التنزيلات في التطبيق ps4»): capture the pack's own pack_icon.png into
+// /data/AddonStation/icons/<slug>.png so the Downloads list (drawMine) shows
+// the addon's real icon instead of the letter fallback tile.
+static std::string findPackIconFile(const std::string& dir, int depth) {
+    if (depth > 4) return std::string();
+    DIR* d = ::opendir(dir.c_str());
+    if (!d) return std::string();
+    std::string found;
+    struct dirent* ent;
+    while ((ent = ::readdir(d)) != nullptr) {
+        const std::string n = ent->d_name;
+        if (n == "." || n == "..") continue;
+        const std::string p = dir + "/" + n;
+        if (n == "pack_icon.png" || n == "pack_icon.PNG") {
+            struct stat st {};
+            if (::stat(p.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+                found = p;
+                break;
+            }
+        } else {
+            struct stat st {};
+            if (::stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+                found = findPackIconFile(p, depth + 1);
+                if (!found.empty()) break;
+            }
+        }
+    }
+    ::closedir(d);
+    return found;
+}
+
+static void capturePackIcon(const std::string& unpackedDir,
+                            const std::string& addonFolderName) {
+    // slug = dest folder minus its _uuid8 suffix — exactly what drawMine derives.
+    std::string slug = addonFolderName;
+    if (slug.size() >= 9 && slug[slug.size() - 9] == '_')
+        slug = slug.substr(0, slug.size() - 9);
+    if (slug.empty()) return;
+    const std::string icon = findPackIconFile(unpackedDir, 0);
+    if (icon.empty()) return;
+    ::mkdir("/data/AddonStation/icons", 0777);
+    std::FILE* in = std::fopen(icon.c_str(), "rb");
+    if (!in) return;
+    std::FILE* out = std::fopen(("/data/AddonStation/icons/" + slug + ".png").c_str(), "wb");
+    if (!out) { std::fclose(in); return; }
+    char buf[65536];
+    size_t n;
+    while ((n = std::fread(buf, 1, sizeof(buf), in)) > 0) std::fwrite(buf, 1, n, out);
+    std::fclose(in);
+    std::fclose(out);
+}
+
 CopyResult installOrQueueAddon(const std::string& sourceRawPath,
                                const std::string& addonFolderName,
                                const std::string& stageDir,
@@ -1088,12 +1141,14 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
 
         // Verify if manifest.json / level.dat inside the unpacked pack belongs in another subfolder
         const std::string detectedCat = detectCategoryFromExtractedDir(targetPackDir, result.targetCategory);
+        std::string targetPackDirCorrected = targetPackDir;
         if (detectedCat != result.targetCategory) {
             const std::string correctedDir = mountedMojang + "/" + detectedCat + "/" + addonFolderName;
             ensureDirectory(mountedMojang + "/" + detectedCat, err);
             removeTreeRecursive(correctedDir);
             ::rename(targetPackDir.c_str(), correctedDir.c_str());
             result.targetCategory = detectedCat;
+            targetPackDirCorrected = correctedDir;
         }
 
         // Clean up any staged .raw and .pending files so PS4 HDD space is freed immediately!
@@ -1104,6 +1159,7 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
             ::unlink(sourceRawPath.c_str());
         }
         recordInstalledAddon(stageDir, addonFolderName);
+        capturePackIcon(targetPackDirCorrected, addonFolderName);
 
         result.ok = true;
         result.queuedForMinecraft = false;
@@ -1255,6 +1311,7 @@ CopyResult syncPendingAddonsIfMounted(const std::string& stageDir,
             ::unlink(pendingPath.c_str());
             ::unlink(rawPath.c_str());
             recordInstalledAddon(stageDir, addonName);
+            capturePackIcon(mountedMojang + "/" + detectedCat + "/" + addonName, addonName);
 
             result.ok = true;
             result.filesCopied += singleRes.filesCopied;
