@@ -76,6 +76,12 @@ jobs:
           if cover and os.path.isfile(cover):
               shutil.copy(cover, os.path.join(out_dir, os.path.basename(cover)))
 
+          # per-addon icon art (pack_icon extracted from the pack) -> release asset <slug>-pack-icon.png
+          import glob as _gl
+          for _e in _gl.glob("content-staging/src/" + str(m.get("slug", "")) + "-*"):
+              if _e.endswith((".jpg", ".png")):
+                  shutil.copy(_e, os.path.join(out_dir, os.path.basename(_e)))
+
           assets = [os.path.join(out_dir, f) for f in sorted(os.listdir(out_dir))
                     if f.endswith((".raw", ".zip", ".json", ".jpg", ".png"))]
           if not assets:
