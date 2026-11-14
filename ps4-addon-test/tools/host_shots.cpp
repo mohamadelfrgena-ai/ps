@@ -5,6 +5,7 @@
 //       src/installer.cpp -o /tmp/shots && /tmp/shots out_dir [scene.jpg]
 #include "../src/screens.hpp"
 #include "../src/ui_engine.hpp"
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -96,18 +97,34 @@ int main(int argc, char** argv) {
         {"home", 0, 0}, {"store", 0, 0}, {"deals", 5, 0}, {"detail", 0, 3},
         {"downloads", 0, 0}, {"settings", 0, 0}, {"profile", 0, 0}, {"plans", 0, 0},
     };
+    // v0.72 Task 2 (smoothness): --bench renders each screen N times and prints
+    // average ms/frame — the BEFORE/AFTER measurement harness.
+    auto drawShot = [&](const Shot& sh) {
+        const std::string lang = "ar";
+        if (std::strcmp(sh.name, "home") == 0) drawHome(e, sh.a, 0, sh.b, lang);
+        else if (std::strcmp(sh.name, "store") == 0) drawStore(e, sh.a, sh.b, lang, 0.0f);
+        else if (std::strcmp(sh.name, "deals") == 0) drawDeals(e, sh.a, sh.b, lang);
+        else if (std::strcmp(sh.name, "detail") == 0) drawAddonDetail(e, sh.a, sh.b, DemoState::Idle, 0, lang, std::string());
+        else if (std::strcmp(sh.name, "downloads") == 0) drawMine(e, sh.a, lang);
+        else if (std::strcmp(sh.name, "settings") == 0) drawSettings(e, sh.a, sh.b, false, lang);
+        else if (std::strcmp(sh.name, "profile") == 0) drawProfile(e, sh.a, lang);
+        else if (std::strcmp(sh.name, "plans") == 0) drawPlans(e, sh.a, lang);
+    };
+    const bool bench = (outDir == "--bench");
     for (int theme = 0; theme < 2; ++theme) {
         setThemeLight(theme == 1);
         for (const Shot& sh : shots) {
-            const std::string lang = "ar";
-            if (std::strcmp(sh.name, "home") == 0) drawHome(e, sh.a, 0, sh.b, lang);
-            else if (std::strcmp(sh.name, "store") == 0) drawStore(e, sh.a, sh.b, lang, 0.0f);
-            else if (std::strcmp(sh.name, "deals") == 0) drawDeals(e, sh.a, sh.b, lang);
-            else if (std::strcmp(sh.name, "detail") == 0) drawAddonDetail(e, sh.a, sh.b, DemoState::Idle, 0, lang, std::string());
-            else if (std::strcmp(sh.name, "downloads") == 0) drawMine(e, sh.a, lang);
-            else if (std::strcmp(sh.name, "settings") == 0) drawSettings(e, sh.a, sh.b, false, lang);
-            else if (std::strcmp(sh.name, "profile") == 0) drawProfile(e, sh.a, lang);
-            else if (std::strcmp(sh.name, "plans") == 0) drawPlans(e, sh.a, lang);
+            if (bench) {
+                for (int i = 0; i < 3; ++i) drawShot(sh);            // warm-up (bakes caches)
+                const int N = 40;
+                const auto t0 = std::chrono::steady_clock::now();
+                for (int i = 0; i < N; ++i) drawShot(sh);
+                const double ms = std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now() - t0).count() / 1000.0 / N;
+                std::printf("%-10s %-5s %7.3f ms/frame\n", sh.name, theme ? "light" : "dark", ms);
+                continue;
+            }
+            drawShot(sh);
             const std::string path = outDir + "/" + sh.name + (theme ? "_light" : "_dark") + ".ppm";
             dumpPPM(e, path);
             std::fprintf(stderr, "shot %s\n", path.c_str());
