@@ -1228,7 +1228,7 @@ static bool navigate(View view, int dx, int dy) {
 
     if (strip) {   // ONE horizontal row — the last slot is the "View more" tile
         const int colN = abs + dx;
-        if (dx != 0 && colN >= 0 && colN < n) abs = colN;   // edges STOP
+        if (dx != 0 && n > 0) abs = ((colN % n) + n) % n;   // v0.80: WRAP — past «View more» -> first card
         if (extra && abs == n - 1) { A.focus = fb + 5; return true; }   // v0.75: the tile = fixed slot 5, never scrolls
     } else {
         const int rows = (n + cols - 1) / cols;
@@ -1270,24 +1270,17 @@ static void moveFocus(int dx, int dy) {
             A.focus = clampInto(A.focus + dx + dy, 0, 1);
             break;
         case Scr::Home: {
-            // v0.65 («نفس ذا»): hero 0-1 | chips 5-11 | ONE strip 12.. = the 10 newest
-            // cards + the gold "View more" tile at the end («شريط واحد يعرض اخر عشر بطاقات»).
-            if (A.focus >= 12 && A.focus - 12 > 5) A.focus = 12 + 5;   // v0.75: strip slots 0-5 (slot 5 = the tile)
+            // v0.80 («احذف الشريط»): the filter chips are GONE — hero 0-1 | strip 12..
+            // (10 newest cards + the fixed «View more» tile at slot 5). One card per
+            // press; the strip WRAPS («اذا وصل للعرض المزيد وتمرير اخرى يرجع بيه للبطاقة
+            // الاولة»): past the tile -> the first card, past the first -> the tile.
+            if (A.focus >= 12 && A.focus - 12 > 5) A.focus = 12 + 5;
             if (A.focus <= 1) {
-                if (dy > 0) A.focus = 5 + std::min(A.filter, 6);
-                else A.focus = clampInto(A.focus + dx, 0, 1);
-            } else if (A.focus <= 11) {
                 if (dy > 0) A.focus = 12;
-                else if (dy < 0) A.focus = clampInto(A.hero, 0, 1);
-                else {
-                    int f = A.focus - 5 + dx;
-                    if (f < 0) f = 6;
-                    if (f > 6) f = 0;
-                    A.focus = 5 + f;
-                }
+                else A.focus = clampInto(A.focus + dx, 0, 1);
             } else {
-                if (dy < 0) A.focus = 5 + std::min(A.filter, 6);
-                else if (dx != 0) navigate(View::Home, dx, 0);   // v0.72: one row, ends STOP after «View more»
+                if (dy < 0) A.focus = clampInto(A.hero, 0, 1);
+                else if (dx != 0) navigate(View::Home, dx, 0);
             }
             break;
         }
