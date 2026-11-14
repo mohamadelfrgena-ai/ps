@@ -43,7 +43,7 @@ static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
 static const char* kAppVersion = "0.79";
 static const char* kBrandSuffix = " by sliver fox";
 
-static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
+static const char* kLangs[9] = {"en", "ar", "fa", "fr", "tr", "es", "ru", "pt", "zh"};
 
 enum class Btn { None, Up, Down, Left, Right, Cross, Circle, Triangle, Square, L1, R1, L2, R2, Options };
 
@@ -1035,7 +1035,7 @@ static void startDownloadFlow(int catIdx) {
 // v0.29: input hardening — PS-menu-style hold-repeat + logical held state (post-RTL).
 static Btn swapRtl(Btn b) {
     // Arabic (RTL): the layout mirrors horizontally, so the horizontal controls mirror too
-    if (A.lang == "ar") {
+    if (A.lang == "ar" || A.lang == "fa") {
         if (b == Btn::Left) return Btn::Right;
         if (b == Btn::Right) return Btn::Left;
         if (b == Btn::L2) return Btn::R2;
@@ -1224,7 +1224,7 @@ static bool navigate(View view, int dx, int dy) {
     if (abs < 0) abs = 0;
     if (abs >= n) abs = n - 1;
 
-    if (A.lang == "ar") dx = -dx;                  // RTL: Left/Right swap only
+    if (A.lang == "ar" || A.lang == "fa") dx = -dx;                  // RTL: Left/Right swap only
 
     if (strip) {   // ONE horizontal row — the last slot is the "View more" tile
         const int colN = abs + dx;
@@ -1375,7 +1375,7 @@ static void moveFocus(int dx, int dy) {
         case Scr::Settings: {
             const int rows = 6;   // v0.67 («والخيار الذي في الاعداات ارجعه»): {lang, theme, account, autolaunch, about, signout}
             if (A.subFocus >= 0) {
-                const int n = A.focus == 0 ? 8 : 2, cols = 2;
+                const int n = A.focus == 0 ? 9 : 2, cols = 2;   // v0.79: 9 languages
                 if (dx > 0) A.subFocus = std::min(n - 1, A.subFocus + 1);
                 else if (dx < 0) A.subFocus = std::max(0, A.subFocus - 1);
                 else if (dy > 0 && A.focus == 0) A.subFocus = std::min(n - 1, A.subFocus + cols);
