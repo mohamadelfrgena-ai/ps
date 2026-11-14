@@ -3401,12 +3401,11 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
         }
     }
 
-    // ---- tabs (focus 5-11) + shelf (focus 12-16): newest first ----
-    // v0.45 (option D, user pick): compact hero + two WHOLE rows at the current card size
-    tabRow(e, L, cx, 630, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang), tr("chip_free", lang),
-                           tr("chip_epic", lang), tr("chip_legendary", lang), tr("chip_new", lang)}, filterIndex, 5, focus);
+    // ---- shelf (focus 12..): newest first ----
+    // v0.80 («احذف الشريط الذي محدد في الدائرة الزرقاء»): the filter-chip row is gone —
+    // the strip moves up to fill the gap it left.
     {   // v0.65 («نفس ذا»): ONE strip = the 10 newest cards + the gold "View more" tile
-        cardStrip(e, L, homeItems, scrollOf(View::Home), 12, focus, cx, 700, lang);
+        cardStrip(e, L, homeItems, scrollOf(View::Home), 12, focus, cx, 645, lang);
     }
 
     std::vector<std::pair<std::string, std::string>> leg = {{"\xE2\x9C\x95", "select"}, {"\xE2\x96\xB3", "search"}};
