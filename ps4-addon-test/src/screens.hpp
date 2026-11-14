@@ -145,7 +145,11 @@ enum class View { Home, Deals, Store, Search, Mine };
 // Catalog indices shown by a screen for a filter (same order as drawn). Use it for focus limits and ✕.
 //  Home filter 0..6: All Addons Worlds Free Epic Legendary New   |  Deals 0..4: All Addons Worlds Under100AC Biggest
 //  Store filter 0..6: All Addons Worlds Free Epic Legendary New (+ storeSort) |  Search 0..2: All Addons Worlds (+query)
-std::vector<int> viewItems(View v, int filter, const std::string& query = "");
+const std::vector<int>& viewItems(View v, int filter, const std::string& query = "");
+// v0.72 Task 2 (smoothness): cache invalidation + icon loads outside draw fns
+void bumpViewGen();
+void requestIconLoad(const std::string& key, const std::string& path);
+int pumpIconLoads(UiEngine& e);
 std::vector<int> searchCatalog(const std::string& query, int filter);
 void setScroll(View v, int firstVisible);               // first card shown (main.cpp scrolls when focus passes the last card)
 int scrollOf(View v);
