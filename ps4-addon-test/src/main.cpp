@@ -40,7 +40,7 @@ using namespace pkgtest;
 // ---------------------------------------------------------------- config ----
 static const char* kStageDir = "/data/AddonStation/installed";
 static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
-static const char* kAppVersion = "0.78";
+static const char* kAppVersion = "0.79";
 static const char* kBrandSuffix = " by sliver fox";
 
 static const char* kLangs[8] = {"en", "ar", "fr", "tr", "es", "ru", "pt", "zh"};
@@ -377,6 +377,7 @@ static void reconcileInstalled() {
         }
         if (it.installed != present) {
             it.installed = present;
+            bumpViewGen();
             upsertCatalogItem(it);
             changed = true;
         }
@@ -417,6 +418,7 @@ static AddonItem toItem(const ItemData& d) {
     it.exclusiveSlot = (int)d.exclusiveSlot;
     it.featured = d.isFeatured;
     it.installed = computeInstalled(it);
+    bumpViewGen();
     it.createdAt = isoToTime(d.createdAt);
     return it;
 }
@@ -472,7 +474,7 @@ static void syncCatalogLive() {
             if (old >= 0) {
                 const AddonItem& o = catalog()[(std::size_t)old];
                 u.unlocked = o.unlocked;          // keep AC unlocks across live updates
-                if (o.installed) u.installed = true;
+                if (o.installed) { u.installed = true; bumpViewGen(); }
             }
             upsertCatalogItem(u);
             changed = true;
@@ -1016,6 +1018,7 @@ static void startDownloadFlow(int catIdx) {
             toast(formatEnjoyNotification(displayName, lang));
             AddonItem u = it;
             u.installed = true;
+            bumpViewGen();
             upsertCatalogItem(u);
             A.detailIdx = findItem(u.id);
         } else {
@@ -1839,7 +1842,7 @@ int main(int, char**) {
     // (user request 2026-10-28: never with the boot/legal splash). Same intent as the
     // Sfx::AppStart comment ("عند ظهور المنزل بعد الإسبلاش").
     ui_sfx(Sfx::AppStart);
-    setAppVersion(std::string(kAppVersion) + " (2026-11-11)");  // ختم البناء في الإعدادات ← تمييز هذه النسخة
+    setAppVersion(std::string(kAppVersion) + " (2026-11-14)");  // ختم البناء في الإعدادات ← تمييز هذه النسخة
     if (!gSession.valid) setAccount(Account{});
     setCoverRequestHandler([](const AddonItem& it) { requestCoverAsync(it); });
 
@@ -1978,10 +1981,11 @@ int main(int, char**) {
             engine.present(SDL_GetWindowSurface(window));
             SDL_UpdateWindowSurface(window);
             gLastAnimMs = nowMs;
-        } else if (animHas() && nowMs - gLastAnimMs >= 33) {
+        } else if (animHas() && nowMs - gLastAnimMs >= 15) {   // v0.72 Task 2: 30fps -> 60fps motion pacing
             // v0.30: ~30 fps motion (glow comet, gem, mascot, settings tiles) without a full redraw
             gLastAnimMs = nowMs;
-            std::vector<int> rects;
+            static std::vector<int> rects;   // v0.72 Task 2: reuse — no per-frame allocation
+            rects.clear();
             animRects(rects);
             if (!rects.empty())
                 engine.restoreFrom(gFrameBase, rects.data(), static_cast<int>(rects.size()) / 4);
@@ -1989,6 +1993,8 @@ int main(int, char**) {
             engine.present(SDL_GetWindowSurface(window));
             SDL_UpdateWindowSurface(window);
         }
+        // v0.72 Task 2: icon images load outside draw fns (bounded per tick)
+        if (pumpIconLoads(engine) > 0) A.dirty = true;
         SDL_Delay(8);       // 120 Hz input polling — PS-menu responsiveness
     }
     ui_audio_shutdown();
