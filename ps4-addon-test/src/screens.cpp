@@ -1894,7 +1894,31 @@ bool saleActive() {
 
 void setAccount(const Account& a) { gAcc = a; if (!gAcc.signedIn) { gAcc = Account{}; } }
 const Account& account() { return gAcc; }
-void setCatalog(const std::vector<AddonItem>& items) { gCat = items; sortNewest(gCat); }
+// v0.72 Task 2 («سلاسة»): draw functions must not allocate per frame nor load
+// images. gViewGen invalidates the viewItems() cache when catalog/installed
+// changes; icon requests queue here and pumpIconLoads() runs them from the
+// main loop (never from a draw call).
+int gViewGen = 1;
+void bumpViewGen() { ++gViewGen; }
+
+struct IconReq { std::string key, path; };
+static std::vector<IconReq> gIconReq;
+void requestIconLoad(const std::string& key, const std::string& path) {
+    for (const auto& q : gIconReq) if (q.key == key) return;
+    if (gIconReq.size() < 64) gIconReq.push_back({key, path});
+}
+int pumpIconLoads(UiEngine& e) {
+    int loaded = 0;
+    while (!gIconReq.empty() && loaded < 2) {
+        const IconReq r = gIconReq.front();
+        gIconReq.erase(gIconReq.begin());
+        if (!e.hasImage(r.key)) e.loadImageFile(r.key, r.path, 128, 128);
+        ++loaded;
+    }
+    return loaded;
+}
+
+void setCatalog(const std::vector<AddonItem>& items) { gCat = items; sortNewest(gCat); bumpViewGen(); }
 void upsertCatalogItem(const AddonItem& item) {
     for (auto& it : gCat) if (it.id == item.id) { it = item; sortNewest(gCat); return; }
     gCat.push_back(item);
@@ -1991,9 +2015,17 @@ std::vector<int> searchCatalog(const std::string& query, int filter) {
     return out;
 }
 
-std::vector<int> viewItems(View v, int filter, const std::string& query) {
-    if (v == View::Search) return searchCatalog(query, filter);
+static std::vector<int> gViewCache;
+static int gViewCacheV = -1, gViewCacheF = -999, gViewCacheGen = -1;
+static std::string gViewCacheQ;
+
+const std::vector<int>& viewItems(View v, int filter, const std::string& query) {
+    if (gViewCacheGen == gViewGen && gViewCacheV == static_cast<int>(v) &&
+        gViewCacheF == filter && gViewCacheQ == query)
+        return gViewCache;
     std::vector<int> out;
+    if (v == View::Search) out = searchCatalog(query, filter);
+    else {
     for (std::size_t i = 0; i < gCat.size(); ++i) {
         const AddonItem& it = gCat[i];
         bool keep = true;
@@ -2034,6 +2066,7 @@ std::vector<int> viewItems(View v, int filter, const std::string& query) {
         }
         if (keep) out.push_back(static_cast<int>(i));
     }
+    }
     if (v == View::Store && gStoreSort == 0)   // catalog is already newest-first (sort 1)
         std::stable_sort(out.begin(), out.end(), [](int a, int b) { return gCat[a].downloads > gCat[b].downloads; });
     if (v == View::Store && gStoreSort == 2)
@@ -2042,7 +2075,10 @@ std::vector<int> viewItems(View v, int filter, const std::string& query) {
             return ra > rb; });
     if (v == View::Deals && filter == 4)
         std::stable_sort(out.begin(), out.end(), [](int a, int b) { return discountOf(gCat[a]) > discountOf(gCat[b]); });
-    return out;
+    gViewCache = std::move(out);
+    gViewCacheV = static_cast<int>(v); gViewCacheF = filter;
+    gViewCacheQ = query; gViewCacheGen = gViewGen;
+    return gViewCache;
 }
 std::vector<int> homeHeroItems() {
     std::vector<int> out;
@@ -3224,7 +3260,7 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     // v0.38: the hero banner follows the focused card — image + name change live.
     // It KEEPS the card when focus moves up to the CTA («عرض الإضافة» opens it),
     // and hands the banner back to the carousel when a tab is focused.
-    const std::vector<int> homeItems = viewItems(View::Home, filterIndex);
+    const std::vector<int>& homeItems = viewItems(View::Home, filterIndex);
     static int sFollow = -1, sFollowFilter = -2;
     if (sFollowFilter != filterIndex) { sFollowFilter = filterIndex; sFollow = -1; }
     if (focus >= 12) {
@@ -3402,7 +3438,7 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
     }
     drawTopNav(e, 1, langCode);
     const int cx = kCL + 20, cw = kCR - cx;
-    std::vector<int> any = viewItems(View::Deals, 0);
+    const std::vector<int>& any = viewItems(View::Deals, 0);
     int y = 44;
     if (sale) {
         if (baked) {
@@ -3431,7 +3467,7 @@ void drawDeals(UiEngine& e, int focus, int filterIndex, const std::string& langC
     }
     tabRow(e, L, cx, 636, {tr("chip_all", lang), tr("chip_addons", lang), tr("chip_worlds", lang),
                            tr("chip_under100", lang), tr("chip_biggest", lang)}, filterIndex, 0, focus);
-    const std::vector<int> items = viewItems(View::Deals, filterIndex);
+    const std::vector<int>& items = viewItems(View::Deals, filterIndex);
     if (items.empty()) emptyState(e, L, cx, 694, cw, 290, 11, tr(any.empty() ? "deals_soon" : "empty_t", lang),
                                   tr(any.empty() ? "deals_soon_sub" : "empty_s", lang));
     else cardGrid(e, L, items, scrollOf(View::Deals), 5, focus, cx, 684, cw, 1010, lang, true);
@@ -3551,7 +3587,7 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
     // ---- v0.69 cards: 6 wide filling the width while the drawer is hidden, 5 when it is
     // open — every card interpolates between the two layouts so the drawer visibly PUSHES them ----
     {
-        const std::vector<int> items = viewItems(View::Store, filterIndex);
+        const std::vector<int>& items = viewItems(View::Store, filterIndex);
         const int first = std::max(0, std::min(scrollOf(View::Store), std::max(0, static_cast<int>(items.size()) - 1)));
         const int shown = std::min(12, static_cast<int>(items.size()) - first);   // v0.75: two full rows
         const int gxL = cx + lerpI(0, catW + catGap, panT);
@@ -3886,7 +3922,7 @@ void drawMine(UiEngine& e, int focus, const std::string& langCode) {
     e.drawText(tr("mine_recent", lang), L.X(cx, e.measureText(tr("mine_recent", lang), 26, FontRole::Body, L.rtl)),
                118, 26, kTX, FontRole::Body, L.rtl);
 
-    const std::vector<int> items = viewItems(View::Mine, 0);
+    const std::vector<int>& items = viewItems(View::Mine, 0);
     const int rowH = 100, pitch = 110, top = 168;
     const int scroll = scrollOf(View::Mine);
     const int visible = 7;
@@ -3923,9 +3959,8 @@ void drawMine(UiEngine& e, int focus, const std::string& langCode) {
         }
         const std::string inm = "ic_" + islug;
         const int ix = rx + 18, iy = y + (rowH - 64) / 2;
-        if (!islug.empty() && !e.hasImage(inm)) {
-            e.loadImageFile(inm, "/data/AddonStation/icons/" + islug + ".png", 128, 128);
-        }
+        if (!islug.empty() && !e.hasImage(inm))
+            requestIconLoad(inm, "/data/AddonStation/icons/" + islug + ".png");
         if (!islug.empty() && e.hasImage(inm)) {
             e.drawImageRounded(inm, ix, iy, 64, 64, 16);
         } else {
