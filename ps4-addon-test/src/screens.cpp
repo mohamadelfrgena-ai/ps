@@ -3530,23 +3530,6 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
     }
     drawTopNav(e, 2, langCode);
         pageTitle(e, L, tr("nav_store", lang), cx, 44);
-    {   // ---- sort pill (focus 20): Popular / Newest / Top rated — ✕ cycles it (setStoreSort) ----
-        static const char* kSortKeys[3] = {"sort_popular", "sort_newest", "sort_rating"};
-        const std::string lab = tr("sort_by", lang) + ":  " + tr(kSortKeys[storeSort()], lang);
-        // v6.7: label + chevron centred together, equal padding on both sides
-        std::vector<GPiece> g;
-        g.push_back(gText(e, lab, 21, kTX, L.rtl, 14));
-        g.push_back(gIcon(17, 10, [&](int vx, int vy) {   // small chevron pointing down
-            for (int i = 0; i <= 7; ++i) { e.fillRect(vx + i, vy + i, 3, 3, kMU); e.fillRect(vx + 14 - i, vy + i, 3, 3, kMU); }
-        }));
-        const int sw = 26 + groupW(g) + 26, sh = 52, sxl = 1490 - sw, sy = 46;
-        const int srx = L.X(sxl, sw);
-        e.drawRoundRect(srx, sy, sw, sh, sh / 2, ink(gLight ? 8 : 12));
-        e.drawRoundBorder(srx, sy, sw, sh, sh / 2, 2, ink(gLight ? 30 : 34));
-        drawGroupCentered(e, L, g, srx + sw / 2, sy + sh / 2);
-        if (focus == 20) focusRing(e, srx, sy, sw, sh, sh / 2);
-    }
-
     // ---- banner (focus 10): sale strip (art as backdrop of the strip) or the newest item ----
     if (sale) {
         const std::string art = stripArt(e);
