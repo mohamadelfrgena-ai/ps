@@ -1029,29 +1029,36 @@ static bool stageStreamToFile(std::FILE* inFp, const std::string& dstPath, int& 
 // التنزيلات في التطبيق ps4»): capture the pack's own pack_icon.png into
 // /data/AddonStation/icons/<slug>.png so the Downloads list (drawMine) shows
 // the addon's real icon instead of the letter fallback tile.
+// v0.80 (CE-34878-0 fix): the old recursive scan walked INTO a world's db/
+// folder (thousands of files) — the app froze mid-install and crashed. The
+// icon lives at the pack root (or one wrapper folder): test those two spots
+// directly, with a bounded root scan. No deep traversal, ever.
 static std::string findPackIconFile(const std::string& dir, int depth) {
-    if (depth > 4) return std::string();
+    // fast path: the icon sits at the folder root
+    for (const char* nm : {"pack_icon.png", "pack_icon.PNG"}) {
+        const std::string p = dir + "/" + nm;
+        struct stat st {};
+        if (::stat(p.c_str(), &st) == 0 && S_ISREG(st.st_mode)) return p;
+    }
+    if (depth > 0) return std::string();   // one wrapper level only
     DIR* d = ::opendir(dir.c_str());
     if (!d) return std::string();
     std::string found;
     struct dirent* ent;
-    while ((ent = ::readdir(d)) != nullptr) {
+    int seen = 0;
+    while ((ent = ::readdir(d)) != nullptr && seen < 32) {   // bounded: a world root has few entries
+        ++seen;
         const std::string n = ent->d_name;
         if (n == "." || n == "..") continue;
-        const std::string p = dir + "/" + n;
-        if (n == "pack_icon.png" || n == "pack_icon.PNG") {
-            struct stat st {};
-            if (::stat(p.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
-                found = p;
-                break;
-            }
-        } else {
-            struct stat st {};
-            if (::stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
-                found = findPackIconFile(p, depth + 1);
-                if (!found.empty()) break;
-            }
+        const std::string sub = dir + "/" + n;
+        struct stat st {};
+        if (::stat(sub.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) continue;
+        for (const char* nm : {"pack_icon.png", "pack_icon.PNG"}) {   // exact test — no recursion inside
+            const std::string p = sub + "/" + nm;
+            struct stat st2 {};
+            if (::stat(p.c_str(), &st2) == 0 && S_ISREG(st2.st_mode)) { found = p; break; }
         }
+        if (!found.empty()) break;
     }
     ::closedir(d);
     return found;
