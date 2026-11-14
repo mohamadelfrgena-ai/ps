@@ -1820,7 +1820,7 @@ std::vector<WalletTx> gTx;
 std::vector<PlanInfo> gPlans;
 std::string gAppVersion;
 std::function<void(const AddonItem&)> gCoverReq;
-int gScroll[4] = {0, 0, 0, 0};
+int gScroll[5] = {0, 0, 0, 0, 0};   // v0.80: 5 views (Mine=4 was writing out of bounds!)
 int gDetailIdx = -1;
 std::time_t gTimeOffset = 0;   // server time - device time (seconds)
 int gSeasonOverride = -1;      // testing only
@@ -2467,7 +2467,7 @@ int tierChip(UiEngine& e, const Lay& L, int xl, int y, Tier t, const std::string
 //          4 info (about), 5 log-out (sign out)
 struct LnPrim { int t; float a, b, c, d, e5, f; };   // t: 0 seg(x0,y0,x1,y1) 1 arc(cx,cy,r,deg0,deg1) 2 disc(cx,cy,r) 3 right half-disc
 const std::vector<LnPrim>& lineIconPrims(int kind) {
-    static std::vector<LnPrim> k[6];
+    static std::vector<LnPrim> k[13];
     static bool init = false;
     if (!init) {
         init = true;
@@ -2485,8 +2485,26 @@ const std::vector<LnPrim>& lineIconPrims(int kind) {
         k[4] = {A(12, 12, 10, 0, 360), S(12, 16, 12, 12), D(12, 8, 1.15f)};
         k[5] = {S(9, 21, 5, 21), A(5, 19, 2, 90, 180), S(3, 19, 3, 5), A(5, 5, 2, 180, 270), S(5, 3, 9, 3),
                 S(16, 17, 21, 12), S(21, 12, 16, 7), S(21, 12, 9, 12)};
+        // v0.80 («ايقونات الشريط الجانبي — Material»): 6 Home, 7 LocalOffer (tag),
+        // 8 Store, 9 Download, 10 WorkspacePremium (medal), 11 Person, 12 Settings (gear)
+        k[6] = {S(3.5f, 11, 12, 3.5f), S(12, 3.5f, 20.5f, 11), S(5.5f, 9.5f, 5.5f, 21),
+                S(18.5f, 9.5f, 18.5f, 21), S(5.5f, 21, 18.5f, 21),
+                S(10, 21, 10, 14.5f), S(14, 21, 14, 14.5f), S(10, 14.5f, 14, 14.5f)};
+        k[7] = {S(8, 4, 20, 4), S(20, 4, 20, 20), S(20, 20, 8, 20), S(8, 20, 3, 12), S(3, 12, 8, 4),
+                D(7, 12, 1.4f)};
+        k[8] = {S(3, 5.5f, 21, 5.5f), S(3, 5.5f, 3, 9), S(21, 5.5f, 21, 9), S(3, 9, 21, 9),
+                A(7, 9, 2, 0, 180), A(12, 9, 2, 0, 180), A(17, 9, 2, 0, 180),
+                S(5, 9, 5, 21), S(19, 9, 19, 21), S(5, 21, 19, 21),
+                S(10, 21, 10, 14), S(14, 21, 14, 14), S(10, 14, 14, 14)};
+        k[9] = {S(12, 3.5f, 12, 15), S(6.5f, 9.5f, 12, 15), S(17.5f, 9.5f, 12, 15), S(5, 20, 19, 20)};
+        k[10] = {A(12, 9.5f, 6.5f, 0, 360), A(12, 9.5f, 3, 0, 360), S(8, 15, 5, 22), S(16, 15, 19, 22)};
+        k[11] = k[2];
+        k[12] = {A(12, 12, 3.2f, 0, 360), A(12, 12, 6.2f, 0, 360),
+                 S(18.2f, 12, 21.5f, 12), S(16.38f, 16.38f, 18.72f, 18.72f), S(12, 18.2f, 12, 21.5f),
+                 S(7.62f, 16.38f, 5.28f, 18.72f), S(5.8f, 12, 2.5f, 12), S(7.62f, 7.62f, 5.28f, 5.28f),
+                 S(12, 5.8f, 12, 2.5f), S(16.38f, 7.62f, 18.72f, 5.28f)};
     }
-    return k[std::max(0, std::min(5, kind))];
+    return k[std::max(0, std::min(12, kind))];
 }
 void lineIcon(UiEngine& e, int kind, int x, int y, int s, SDL_Color c, float angle = 0.0f, int dx = 0, int dy = 0) {
     char nm[48];
@@ -2540,26 +2558,19 @@ void lineIcon(UiEngine& e, int kind, int x, int y, int s, SDL_Color c, float ang
 // log-out slides. Everything is cached images + a few rounded rects, so it stays cheap on the PS4.
 void lineIconTile(UiEngine& e, int kind, int x, int y, int s, SDL_Color acc, bool focused = false) {
     animPush({AnimCall::Tile, kind, x, y, s, focused ? 1 : 0, 0, acc}, x - 12, y - 12, s + 24, s + 24);
-    // v0.35: the settings icons are STATIC — no spin / float / sway and no pulsing glow
-    // (user: «ايقونات الاعدات لا اريدها متحركة»). Focused tile = steady soft halo only.
-    const int r = s * 28 / 100;
-    auto dark = [&](int k) { return SDL_Color{static_cast<Uint8>(acc.r * k / 100), static_cast<Uint8>(acc.g * k / 100), static_cast<Uint8>(acc.b * k / 100), 255}; };
-    // soft glow under / around the tile
+    // v0.80 («ايقونات الاعدادات — نمط مكعبات ماين كرافت»): SOLID block cube —
+    // near-sharp corners (4dp), a 4dp black-35% bottom edge for the block look,
+    // no gradients/glass/gloss. White icon at half the cube (22dp of 44dp).
+    const int r = std::max(4, s * 9 / 100);
     if (focused) {
-        e.drawRoundRect(x - 8, y - 4, s + 16, s + 14, r + 8, SDL_Color{acc.r, acc.g, acc.b, 18});
-        e.drawRoundRect(x - 4, y - 2, s + 8, s + 8, r + 4, SDL_Color{acc.r, acc.g, acc.b, 40});
-    } else {
-        e.drawRoundRect(x - 2, y + 3, s + 4, s + 4, r + 2, SDL_Color{acc.r, acc.g, acc.b, static_cast<Uint8>(gLight ? 20 : 18)});
+        e.drawRoundRect(x - 6, y - 3, s + 12, s + 10, r + 6, SDL_Color{acc.r, acc.g, acc.b, 34});
     }
-    e.drawRoundGradD(x, y, s, s, r, SDL_Color{acc.r, acc.g, acc.b, static_cast<Uint8>(gLight ? 205 : 160)},
-                     SDL_Color{dark(62).r, dark(62).g, dark(62).b, static_cast<Uint8>(gLight ? 170 : 90)});
-    e.drawRoundBorder(x, y, s, s, r, 2, SDL_Color{acc.r, acc.g, acc.b, static_cast<Uint8>(focused ? 230 : 175)});
-    if (s > 24) e.drawRoundGradV(x + 2, y + 2, s - 4, s / 2 - 2, std::max(2, r - 2), SDL_Color{255, 255, 255, 70}, SDL_Color{255, 255, 255, 0});
-    const int is = s * 54 / 100;
+    e.drawRoundRect(x, y, s, s, r, acc);                                    // solid colour
+    const int be = std::max(3, s * 9 / 100);                                // bottom edge shading
+    e.fillRect(x + r / 2, y + s - be, s - r, be, SDL_Color{0, 0, 0, 90});   // 35% black
+    const int is = s * 50 / 100;
     const int ix = x + (s - is) / 2, iy = y + (s - is) / 2;
     const float ang = 0.0f; const int dx = 0, dy = 0;   // static icons (v0.35)
-    const SDL_Color sh{dark(30).r, dark(30).g, dark(30).b, 255};
-    lineIcon(e, kind, ix, iy + 1, is, sh, ang, dx, dy);                         // drop shadow of the icon
     lineIcon(e, kind, ix, iy, is, SDL_Color{255, 255, 255, 255}, ang, dx, dy);  // white icon
 }
 
@@ -2899,17 +2910,10 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
     static const It items[7] = {{10, "nav_home"}, {11, "nav_deals"}, {12, "nav_store"}, {14, "nav_mine"},
                                 {7, "nav_plans"}, {1, "rail_profile"}, {9, "nav_settings"}};
     const int bw = 72, bh = 60, itemH = bh + 7 + 18, gap = 14;   // v0.56: 7 rail items (Search removed)
-    static const char* kRailIcon[7] = {"home", "deals", "store", "my_addons", "plans", "profile", "settings"};
-    static int railIcons = 0;   // v0.70: 0 = not tried, 1 = PNG icons ready, -1 = missing -> vector fallback
-    if (railIcons == 0) {
-        railIcons = 1;
-        for (int i = 0; i < 7; ++i) {
-            const std::string n = kRailIcon[i];
-            if (!e.loadImageFile("rail_w_" + n, "assets/sidebar-icons/png_white/" + n + ".png", 64, 64) ||
-                !e.loadImageFile("rail_m_" + n, "assets/sidebar-icons/png_mist/" + n + ".png", 64, 64) ||
-                !e.loadImageFile("rail_g_" + n, "assets/sidebar-icons/png_gray/" + n + ".png", 64, 64)) railIcons = -1;
-        }
-    }
+    // v0.80 («غير الايقونات فقط»): Material line icons — Home, LocalOffer, Store,
+    // Download, WorkspacePremium, Person, Settings (drawn as vectors, same colours
+    // and states as before: dark icon on the inverted tile when selected, mist when idle).
+    static const int kRailLine[7] = {6, 7, 8, 9, 10, 11, 12};
     auto item = [&](int i, int y) {
         const bool on = (i == railIdx);
         const int bx = cx - bw / 2;
@@ -2923,14 +2927,9 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
         if (i == 5 && gAcc.signedIn && !gAcc.avatar.empty()) {   // profile item
             int iw = 0, ih = 0;
             if (e.imageSize(gAcc.avatar, iw, ih)) e.drawImageRounded(gAcc.avatar, cx - 17, y + (bh - 34) / 2, 34, 34, 17);
-            else glyph(e, items[i].kind, cx - is / 2, y + (bh - is) / 2, is, in, in, false);
-        } else if (railIcons == 1) {
-            // v0.70: real PNG sidebar icons — white on the inverted tile (light theme),
-            // gray on the white tile (dark theme), mist when idle
-            const std::string nm = std::string("rail_") + (on ? (gLight ? "w_" : "g_") : (gLight ? "g_" : "m_")) + kRailIcon[i];
-            e.drawImage(nm, cx - is / 2, y + (bh - is) / 2, is, is);
+            else lineIcon(e, kRailLine[i], cx - is / 2, y + (bh - is) / 2, is, in);
         } else {
-            glyph(e, items[i].kind, cx - is / 2, y + (bh - is) / 2, is, in, in, false);
+            lineIcon(e, kRailLine[i], cx - is / 2, y + (bh - is) / 2, is, in);
         }
         const std::string lab = tr(items[i].key, langCode);
         int px = 16;
@@ -4216,10 +4215,13 @@ void drawSettings(UiEngine& e, int focus, int subFocus, bool autoLaunchOn, const
     const int f = std::max(0, std::min(rows - 1, focus));
     // line icons (lineIconTile): 0 globe, 1 contrast, 2 user, 3 gamepad, 4 info, 5 log-out — saturated accents
     static const int kKinds[6] = {0, 1, 2, 3, 4, 5};
-    static const SDL_Color kAccD[6] = {{88, 156, 255, 255}, {176, 132, 255, 255}, {250, 196, 64, 255},
-                                       {76, 214, 124, 255}, {160, 170, 188, 255}, {255, 96, 112, 255}};
-    static const SDL_Color kAccL[6] = {{29, 104, 222, 255}, {124, 74, 222, 255}, {184, 128, 8, 255},
-                                       {22, 150, 78, 255}, {92, 101, 114, 255}, {214, 40, 64, 255}};
+    // v0.80 («نمط مكعبات ماين كرافت»): fixed block colours from the design spec —
+    // Language #4F8EF7, Appearance #8B6FE0, Account #E0A830, Auto-launch #3FB36B,
+    // About #8A93A6, Sign out #EF5470.
+    static const SDL_Color kAccD[6] = {{79, 142, 247, 255}, {139, 111, 224, 255}, {224, 168, 48, 255},
+                                       {63, 179, 107, 255}, {138, 147, 166, 255}, {239, 84, 112, 255}};
+    static const SDL_Color kAccL[6] = {{79, 142, 247, 255}, {139, 111, 224, 255}, {224, 168, 48, 255},
+                                       {63, 179, 107, 255}, {138, 147, 166, 255}, {239, 84, 112, 255}};
     const SDL_Color* kAcc = gLight ? kAccL : kAccD;
     const std::string labels[6] = {tr("settings_language", lang), tr("settings_appearance", lang), tr("settings_account", lang),
                                    tr("autolaunch", lang), tr("settings_about", lang), tr("settings_signout", lang)};
