@@ -1183,8 +1183,8 @@ static int focusedCard() {
 //   - Left/Right = col ± 1 INSIDE the same row only — at a row edge the focus
 //     simply STOPS (the Home strip's last slot is the "View more" tile, so that
 //     IS the logical neighbour; no jump to another row, no list wrap-around).
-//   - Up/Down = row ± 1 keeping the COLUMN: the remembered column of a visited
-//     row wins, otherwise the nearest column on short rows.
+//   - Up/Down = row ± 1 keeping the COLUMN (v0.79: always the same column —
+//     the card exactly below/above; nearest column on short rows only).
 //   - RTL (Arabic) flips Left/Right only.
 //   - Returns false when the move leaves the grid vertically — the caller hops
 //     to the logically adjacent zone (banner / chips / tabs).
@@ -1241,9 +1241,8 @@ static bool navigate(View view, int dx, int dy) {
             const int rowN = row + dy;
             if (rowN < 0 || rowN >= rows) return false;                // leave the grid (zone hop)
             const int rowLen = std::min(cols, n - rowN * cols);
-            const int want = mem.col[rowN] >= 0 ? mem.col[rowN] : col; // remembered column wins
-            col = std::max(0, std::min(rowLen - 1, want));             // nearest column on short rows
-            abs = rowN * cols + col;
+            col = std::max(0, std::min(rowLen - 1, col));   // v0.79: SAME column — down = the card
+            abs = rowN * cols + col;                        // exactly below, up = exactly above
         }
         if (abs / cols < 64) mem.col[abs / cols] = abs % cols;         // remember the column per row
     }
@@ -1322,10 +1321,10 @@ static void moveFocus(int dx, int dy) {
                     if (dy != 0) A.focus = 10;
                 }
             } else if (A.focus == 10) {
-                if (dy > 0) A.focus = A.filterOpen ? 11 + selRow : 20;
+                if (dy > 0) A.focus = A.filterOpen ? 11 + selRow : 10;   // v0.79: sort pill removed
                 else if (dy < 0) A.focus = gridN > 0 ? gridN - 1 : (A.filterOpen ? 11 + selRow : 20);
             } else if (A.focus <= 19) {
-                if (!A.filterOpen) A.focus = 20;
+                if (!A.filterOpen) A.focus = 10;   // v0.79: sort pill removed
                 else if (dy < 0) A.focus = (A.focus == 11) ? 10 : A.focus - 1;
                 else if (dy > 0 && A.focus == 19) startFilterAnim(false);   // v0.73: past the plan list -> filter + back to the store
                 else if (dy > 0) A.focus = A.focus + 1;
@@ -1336,8 +1335,7 @@ static void moveFocus(int dx, int dy) {
                     A.focus = 11 + r;
                 }
             } else {
-                if (dy < 0) A.focus = A.filterOpen ? 11 + selRow : (gridN > 0 ? gridN - 1 : 10);
-                else if (dx != 0) setStoreSort((storeSort() + (dx > 0 ? 1 : 2)) % 3);
+                A.focus = 10;   // v0.79: sort pill removed — no zone above the banner
             }
             break;
         }
@@ -1629,13 +1627,6 @@ static void handle(Btn b) {
                     A.filter = A.focus;
                     setScroll(View::Deals, 0);
                     navReset(View::Deals);
-                    break;
-                }
-                if (A.scr == Scr::Store && A.focus == 20) {
-                    setStoreSort((storeSort() + 1) % 3);
-                    setScroll(View::Store, 0);
-                    navReset(View::Store);
-                    ui_sfx(Sfx::Toggle);
                     break;
                 }
                 if (A.scr == Scr::Store && A.focus >= 11 && A.focus <= 19) {
