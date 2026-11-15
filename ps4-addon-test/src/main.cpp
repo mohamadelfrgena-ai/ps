@@ -1116,6 +1116,7 @@ static void openItem(int catIdx) {
     }
 #endif
     A.detailIdx = catIdx;
+    setDetailRailOff(0);   // v0.80: the creator rail opens at its start
     gDetailId = catalog()[(std::size_t)catIdx].id;
     {
         // v0.51: if this item is staged (its .raw is downloaded and waiting for
@@ -1354,10 +1355,28 @@ static void moveFocus(int dx, int dy) {
             break;
         }
         case Scr::Detail: {
-            const AddonItem& it = catalog()[(std::size_t)A.detailIdx];
-            const bool ac = acUnlockOffered(it);
-            if (dy > 0 || dx > 0) { if (ac) A.focus = 1; }
-            else if (dy < 0 || dx < 0) A.focus = 0;
+            // v0.80 (spec 5): focus 0 main, 1 AC (when offered), 2-5 the creator-rail cards.
+            // Left/Right walk the cards (RTL = mirrored, like the grids) and SCROLL the
+            // rail at the edges; Up on a card returns to the main button.
+            const int n = (int)creatorItems(A.detailIdx).size();
+            const int cardEnd = std::min(5, 1 + n);   // highest card focus; = 1 when the rail is empty
+            const bool onCard = A.focus >= 2;
+            if (dy > 0) {
+                if (!onCard && n > 0) A.focus = 2;
+            } else if (dy < 0) {
+                if (onCard) A.focus = 0;
+            } else if (onCard) {
+                const int ddx = (A.lang == "ar" || A.lang == "fa") ? -dx : dx;
+                int f = A.focus + ddx;
+                if (f < 2) {
+                    f = 2;
+                    if (detailRailOff() > 0) setDetailRailOff(detailRailOff() - 1);
+                } else if (f > cardEnd) {
+                    f = cardEnd;
+                    if (detailRailOff() + 4 < n) setDetailRailOff(detailRailOff() + 1);
+                }
+                A.focus = f;
+            }
             break;
         }
         case Scr::Profile: {
@@ -1540,9 +1559,11 @@ static void handle(Btn b) {
             if (A.detailIdx < 0 || A.detailIdx >= (int)catalog().size()) { goBack(); break; }
             const AddonItem& it = catalog()[(std::size_t)A.detailIdx];
             const bool ac = acUnlockOffered(it);
-            if (b == Btn::Up || b == Btn::Left) moveFocus(-1, 0);
-            else if (b == Btn::Down || b == Btn::Right) moveFocus(1, 0);
-            else if (b == Btn::Cross && A.focus == 1 && ac) {
+            if (b == Btn::Up) moveFocus(0, -1);
+            else if (b == Btn::Down) moveFocus(0, 1);
+            else if (b == Btn::Left) moveFocus(-1, 0);
+            else if (b == Btn::Right) moveFocus(1, 0);
+            else if (b == Btn::Cross && (A.focus == 1 || (A.focus >= 2 && A.focus <= 5)) && ac) {
                 // AC unlock (v7 payment rules) — v0.61: BACKGROUND thread (was on the UI
                 // thread: the app froze for the whole round-trip «بطء استجابة» + «ويعلق»).
                 static std::atomic<bool> sAcBusy{false};
@@ -1580,6 +1601,11 @@ static void handle(Btn b) {
                         A.dirty = true;
                     }).detach();
                 }
+            } else if (b == Btn::Cross && A.focus >= 2) {
+                // v0.80: open the focused creator-rail card (spec 5 — Cross on a card)
+                const std::vector<int> cr = creatorItems(A.detailIdx);
+                const int gi = A.focus - 2 + detailRailOff();
+                if (gi >= 0 && gi < (int)cr.size()) openItem(cr[(std::size_t)gi]);
             } else if (b == Btn::Cross && A.focus == 0) {
                 switch (accessFor(it)) {
                     case Access::NeedSignIn: startSignIn(); break;
