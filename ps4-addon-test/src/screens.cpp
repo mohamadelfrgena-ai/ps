@@ -2930,34 +2930,35 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
     struct It { int kind; const char* key; };
     static const It items[7] = {{10, "nav_home"}, {11, "nav_deals"}, {12, "nav_store"}, {14, "nav_mine"},
                                 {7, "nav_plans"}, {1, "rail_profile"}, {9, "nav_settings"}};
-    const int bw = 72, bh = 60, itemH = bh + 7 + 18, gap = 14;   // v0.56: 7 rail items (Search removed)
-    // v0.80 («غير الايقونات فقط»): Material line icons — Home, LocalOffer, Store,
-    // Download, WorkspacePremium, Person, Settings (drawn as vectors, same colours
-    // and states as before: dark icon on the inverted tile when selected, mist when idle).
-    static const int kRailLine[7] = {6, 7, 8, 9, 10, 11, 12};
+    // v0.81 (his SidebarIcons-v5 spec): baked SVG icons (48-grid, stroke 2.8, 20% fill).
+    // Active: blue-gradient tile 76x76 r22 + WHITE icon 40x40. Idle: kMU (baked per theme).
+    static const char* kRailIcons[7] = {"ric_home", "ric_offers", "ric_store", "ric_downloads",
+                                        "ric_plans", "ric_account", "ric_settings"};
+    const int bw = 76, bh = 76, itemH = bh + 24, gap = 8;
     auto item = [&](int i, int y) {
         const bool on = (i == railIdx);
         const int bx = cx - bw / 2;
         if (on) {
-            e.dropShadow(bx, y + 4, bw, bh, 20, 10, gLight ? 60 : 120);
-            e.drawRoundRect(bx, y, bw, bh, 20, kTX);              // ink box (white in dark, near-black in light)
+            e.dropShadow(bx, y + 4, bw, bh, 22, 10, gLight ? 60 : 120);
+            e.drawRoundGradD(bx, y, bw, bh, 22, SDL_Color{43, 132, 243, 255}, SDL_Color{21, 96, 204, 255});
             e.drawRoundRect(L.X(0, 5), y + (bh - 34) / 2, 5, 34, 2, kBLl);
         }
-        const SDL_Color in = on ? kBG : kMU;
-        const int is = 30;
+        char iname[32];
+        std::snprintf(iname, sizeof iname, "%s%s", kRailIcons[i], on ? "_w" : (gLight ? "_l" : "_d"));
+        const int is = 40;
         if (i == 5 && gAcc.signedIn && !gAcc.avatar.empty()) {   // profile item
             int iw = 0, ih = 0;
             if (e.imageSize(gAcc.avatar, iw, ih)) e.drawImageRounded(gAcc.avatar, cx - 17, y + (bh - 34) / 2, 34, 34, 17);
-            else lineIcon(e, kRailLine[i], cx - is / 2, y + (bh - is) / 2, is, in);
+            else e.drawImage(iname, cx - is / 2, y + (bh - is) / 2, is, is);
         } else {
-            lineIcon(e, kRailLine[i], cx - is / 2, y + (bh - is) / 2, is, in);
+            e.drawImage(iname, cx - is / 2, y + (bh - is) / 2, is, is);
         }
         const std::string lab = tr(items[i].key, langCode);
         int px = 16;
         while (px > 11 && e.measureText(lab, px, FontRole::Body, L.rtl) > RW - 14) --px;
-        e.drawTextCentered(lab, cx, y + bh + 7 + 9, px, on ? kTX : kMU, FontRole::Body, L.rtl);
+        e.drawTextCentered(lab, cx, y + bh + 15, px, on ? kTX : kMU, FontRole::Body, L.rtl);
     };
-    const int navTop = 540 - (4 * itemH + 3 * gap) / 2;
+    const int navTop = 510 - (4 * itemH + 3 * gap) / 2;
     for (int i = 0; i < 4; ++i) item(i, navTop + i * (itemH + gap));
     const int botTop = 1080 - 30 - (3 * itemH + 12);
     for (int i = 0; i < 3; ++i) item(4 + i, botTop + i * (itemH + 12));
