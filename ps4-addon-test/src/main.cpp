@@ -40,7 +40,7 @@ using namespace pkgtest;
 // ---------------------------------------------------------------- config ----
 static const char* kStageDir = "/data/AddonStation/installed";
 static const char* kUiCfgPath = "/data/AddonStation/ui.cfg";
-static const char* kAppVersion = "0.79";
+static const char* kAppVersion = "0.80";
 static const char* kBrandSuffix = " by sliver fox";
 
 static const char* kLangs[9] = {"en", "ar", "fa", "fr", "tr", "es", "ru", "pt", "zh"};
