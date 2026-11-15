@@ -164,7 +164,11 @@ void setStoreSort(int sort);
 int storeSort();
 enum class Access { NeedSignIn, Download, NeedPlan };
 Access accessFor(const AddonItem& it);                  // same rule as can_access_item on the server
-bool acUnlockOffered(const AddonItem& it);              // "Unlock for X AC" visible? (hidden for Legendary / price 0 / free)
+bool acUnlockOffered(const AddonItem& it);              // "Unlock for X AC" visible? (hidden for the user's Legendary plan / price 0 / free)
+const char* ftKeyOf(int ftype);                         // v0.80: type key by ftype (0 addon / 1 skin / 2 world / 3 texture)
+std::vector<int> creatorItems(int idx);                 // v0.80: same-creator rail items (newest first)
+int detailRailOff();                                    // v0.80: detail rail scroll offset
+void setDetailRailOff(int v);
 std::string formatAC(int v);
 
 // Row icons: 0 pixel, 1 filled, 2 outline (default — chosen by the user)
