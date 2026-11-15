@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # Renders the NEW addon-page design (AddonStation-PS4-AddonPage spec) in the app's real visual style.
-# Outputs: mine-preview/addonpage-newdesign-{en,ar,states}.png
-# Run from the repo root. Self-contained: extracts fonts/avatars from assets/ui.pak and covers
-# from mine-preview/content-releases-upload.zip. Blurred bg = mine-preview/detail-bg-store.jpg
-# (his store image; cover stays the item cover). Legendary items get the AC unlock at a fixed,
-# higher price (e.g. 1200 AC vs Epic 600), with the same gold AC button style as Epic.
+# v2: real app side rail (sliced from tools/host_shots store render), redesigned creator rail
+# (app-style gradient cards, floating arrows, counter pill, gold accents), Arabic typography polish.
+# Outputs: mine-preview/addonpage-newdesign-{en,ar,states}.png   Run from the repo root.
 import struct, os, math, zipfile
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import arabic_reshaper
@@ -13,7 +11,8 @@ from bidi.algorithm import get_display
 W, H = 1920, 1080
 PN=(21,24,29); LN=(42,56,70); TX=(238,243,248); MU=(142,160,179)
 GD=(255,214,90); GR=(20,184,138); BL=(26,111,214); WN=(251,160,60); ER=(255,128,150)
-CTL=(27,42,57); GDLINE=(185,138,28); GDBG=(48,36,10); PU=(124,58,237); PU2=(199,155,255)
+GDLINE=(185,138,28); GDBG=(48,36,10); PU=(124,58,237); PU2=(199,155,255)
+STAT=(74,168,255); CBT=(38,81,119); CBB=(18,34,46); CHIPC=(26,55,78)
 
 # ---------- self-contained asset prep ----------
 os.makedirs('/tmp/mock', exist_ok=True)
@@ -24,7 +23,7 @@ for _ in range(n):
     nl, dl = struct.unpack_from('<HI', data, off); off += 4+2
     name = data[off:off+nl].decode(); off += nl
     E[name] = data[off:off+dl]; off += dl
-for k in ('font_ar','font_body','font_f77','fox_avatar','icon_coin','btn_cross','btn_circle','btn_triangle'):
+for k in ('font_ar','font_body','font_f77','fox_avatar','icon_coin','btn_cross','btn_circle','btn_triangle','logo_app'):
     open('/tmp/pk_'+k+('.ttf' if k.startswith('font') else '.png'),'wb').write(E[k])
 z = zipfile.ZipFile('mine-preview/content-releases-upload.zip')
 for nme in z.namelist():
@@ -48,6 +47,14 @@ def rounded_img(img, r):
     out = Image.new('RGBA', img.size, (0,0,0,0)); out.paste(img, (0,0), mask)
     return out
 
+def grad_panel(w, h, top, bottom, r=14):
+    g = Image.new('RGB', (w, h))
+    d = ImageDraw.Draw(g)
+    for y in range(h):
+        t = y/(h-1) if h > 1 else 0
+        d.line([(0,y),(w,y)], fill=tuple(int(top[i]+(bottom[i]-top[i])*t) for i in range(3)))
+    return rounded_img(g, r)
+
 def rrect(d, box, r, fill=None, outline=None, w=1, width=None):
     d.rounded_rectangle(box, radius=r, fill=fill, outline=outline, width=width or w)
 
@@ -64,7 +71,7 @@ def arrow_down(d, cx, cy, s, color, w=4):
                (cx+s*0.32, cy-s*0.95), (cx+s*0.32, cy), (cx+s*0.85, cy)], fill=color)
 
 def chevron(d, cx, cy, s, color, right=True, w=6):
-    dx = -1 if right else 1   # right=True draws '>', right=False draws '<'
+    dx = -1 if right else 1
     d.line([(cx+dx*s*0.45, cy-s*0.7), (cx-dx*s*0.45, cy), (cx+dx*s*0.45, cy+s*0.7)], fill=color, width=w, joint='curve')
 
 def focus_ring(d, box, r, color=GD, wdt=3):
@@ -75,7 +82,7 @@ def txt_c(d, cx, cy, s, font, color):
     x0,y0,x1,y1 = d.textbbox((0,0), s, font=font)
     d.text((cx-(x1+x0)/2, cy-(y1+y0)/2), s, font=font, fill=color)
 
-# blurred background = his store image (detail-bg-store.jpg); the item cover stays the cover
+# blurred background = his store image; the item cover stays the cover
 base = Image.open('mine-preview/detail-bg-store.jpg').convert('RGB')
 bg = cover_crop(base, W, H).filter(ImageFilter.GaussianBlur(28))
 ov = Image.new('RGB', (W,H), (6,12,19))
@@ -83,9 +90,11 @@ bg = Image.blend(bg, ov, 0.55)
 
 fox = Image.open('/tmp/pk_fox_avatar.png').convert('RGBA')
 coin = Image.open('/tmp/pk_icon_coin.png').convert('RGBA')
+logo = Image.open('/tmp/pk_logo_app.png').convert('RGBA')
 b_cross = Image.open('/tmp/pk_btn_cross.png').convert('RGBA')
 b_circle = Image.open('/tmp/pk_btn_circle.png').convert('RGBA')
 b_tri = Image.open('/tmp/pk_btn_triangle.png').convert('RGBA')
+rail_slice = Image.open('mine-preview/rail-app-slice.png').convert('RGBA')
 
 def paste_icon(base, icon, x, y, size):
     im = icon.resize((size, size), Image.LANCZOS)
@@ -97,44 +106,54 @@ def draw_cover(base, img_path, x, y, w, h, r=8, border=LN, bw=3):
     d = ImageDraw.Draw(base)
     d.rounded_rectangle([x,y,x+w-1,y+h-1], radius=r, outline=border, width=bw)
 
-def draw_rail(base, side='left', selected=2):
-    rw = 128
-    x0 = 0 if side=='left' else W-rw
-    rl = Image.new('RGBA', (rw, H), (5,12,19,150))
-    base.alpha_composite(rl, (x0,0))
-    d = ImageDraw.Draw(base)
-    d.line([(x0+rw-1 if side=='left' else x0+1, 0), (x0+rw-1 if side=='left' else x0+1, H)], fill=LN, width=2)
-    paste_icon(base, rounded_img(cover_crop(fox, 64, 64), 16), x0+32, 34, 64)
-    icons = ['home','pct','store','dl','star','user']
-    ys = 130
-    for i, ic in enumerate(icons):
-        cy = ys + i*86 + 38
-        cx = x0+rw//2
-        sel = (i == selected)
-        if sel:
-            rrect(d, [cx-38, cy-38, cx+38, cy+38], 20, fill=BL)
-        col = (255,255,255) if sel else MU
-        if ic=='home':
-            d.polygon([(cx, cy-22),(cx-20, cy-2),(cx+20, cy-2)], fill=col)
-            d.rectangle([cx-13, cy-2, cx+13, cy+18], fill=col)
-        elif ic=='pct':
-            d.ellipse([cx-16, cy-16, cx-4, cy-4], outline=col, width=4)
-            d.ellipse([cx+4, cy+4, cx+16, cy+16], outline=col, width=4)
-            d.line([(cx-14, cy+16), (cx+14, cy-14)], fill=col, width=4)
-        elif ic=='store':
-            for a in range(2):
-                for b in range(2):
-                    rrect(d, [cx-17+a*19, cy-17+b*19, cx-4+a*19, cy-4+b*19], 3, fill=col)
-        elif ic=='dl':
-            arrow_down(d, cx, cy, 17, col, 3)
-        elif ic=='star':
-            star(d, cx, cy, 19, col)
-        elif ic=='user':
-            d.ellipse([cx-9, cy-19, cx+9, cy-1], fill=col)
-            d.pieslice([cx-16, cy+2, cx+16, cy+32], 180, 360, fill=col)
-    cy = H-70; cx = x0+rw//2
-    d.ellipse([cx-17, cy-17, cx+17, cy+17], outline=MU, width=5)
-    d.ellipse([cx-6, cy-6, cx+6, cy+6], fill=MU)
+# ---------- real app side rail ----------
+RAIL_W = 128
+EN_LABELS = [("Home",422,0),("Offers",522,0),("Store",621,1),("Downloads",721,0),
+             ("Plans",855,0),("Account",957,0),("Settings",1051,0)]
+LABEL_BANDS = [(410,434),(509,535),(608,634),(707,735),(844,866),(944,970),(1038,1064)]
+
+def paste_real_rail(img, side='right', english=False):
+    sl = rail_slice.copy()
+    d = ImageDraw.Draw(sl)
+    if english:
+        # repaint Arabic labels with the row's own bg (sampled beside the text) and write EN
+        px = sl.load()
+        for (b0,b1) in LABEL_BANDS:
+            for y in range(b0,b1+1):
+                r1,g1,b1c = px[16,y][:3]; r2,g2,b2c = px[108,y][:3]
+                for x in range(8,121):
+                    t = (x-8)/112
+                    col = (int(r1+(r2-r1)*t), int(g1+(g2-g1)*t), int(b1c+(b2c-b1c)*t))
+                    d.point((x,y), fill=col+(255,))
+        f15 = fb(15)
+        for (txt,yc,sel) in EN_LABELS:
+            tw = d.textlength(txt, font=f15)
+            d.text((64-tw/2, yc-9), txt, font=f15, fill=(255,255,255) if sel else (176,196,210))
+    if side == 'left':
+        # EN: rail at left — move the blue edge bar from the slice's right edge to x=0..4
+        px = sl.load()
+        for y in range(555,600):
+            for x in range(118,128):
+                r,g,b,a = px[x,y]
+                bgc = px[16,y][:3]
+                px[x,y] = bgc+(255,)
+        d2 = ImageDraw.Draw(sl)
+        d2.rounded_rectangle([1,560,6,593], radius=2, fill=STAT+(255,))
+        # feather inner (right) edge so it melts into the page bg
+        mask = Image.new('L', sl.size, 255)
+        md = ImageDraw.Draw(mask)
+        for x in range(24):
+            md.line([(x,0),(x,1080)], fill=int(255*(x/24)))
+        sl.putalpha(mask)
+        img.alpha_composite(sl, (0,0))
+    else:
+        # AR: rail at right, slice as-is; feather inner (left) edge
+        mask = Image.new('L', sl.size, 255)
+        md = ImageDraw.Draw(mask)
+        for x in range(24):
+            md.line([(x,0),(x,1080)], fill=int(255*(1-x/24)))
+        sl.putalpha(mask)
+        img.alpha_composite(sl, (W-RAIL_W,0))
 
 def draw_topbar(base, rtl=False):
     d = ImageDraw.Draw(base)
@@ -158,72 +177,72 @@ def draw_topbar(base, rtl=False):
         d.text((cx2-tw, 68), clk, font=f22, fill=TX)
     else:
         d.text((cx2, 68), clk, font=f22, fill=TX)
-    pill_w = 170; px = (cx2-tw-22-pill_w) if not rtl else (cx2+tw+22)
-    rrect(d, [px, 56, px+pill_w, 96], 20, fill=(18,26,35), outline=LN, width=2)
-    paste_icon(base, coin, px+14, 63, 28)
-    d.text((px+50, 66), "1,250 AC", font=fb(21), fill=GD)
+    # gold-bordered AC pill (like the real app)
+    pill_w = 180; px_ = (cx2-tw-22-pill_w) if not rtl else (cx2+tw+22)
+    rrect(d, [px_, 54, px_+pill_w, 98], 22, fill=GDBG, outline=GDLINE, width=2)
+    paste_icon(base, coin, px_+14, 62, 30)
+    d.text((px_+54, 66), "1,250", font=fb(21), fill=GD)
+    d.text((px_+54+d.textlength("1,250", font=fb(21))+8, 68), "AC", font=fb(17), fill=MU)
 
 def draw_meta_row(base, x, y):
     d = ImageDraw.Draw(base)
-    f18 = fb(18)
+    f19 = fb(19)
     cx = x
     def chip_ltr(text, fg, bgc, ol, gap_after):
         nonlocal cx
-        tw = d.textlength(text, font=f18)
-        rrect(d, [cx, y, cx+tw+28, y+38], 9, fill=bgc, outline=ol, width=2)
-        d.text((cx+14, y+9), text, font=f18, fill=fg)
-        cx += tw+28+gap_after
+        tw = d.textlength(text, font=f19)
+        rrect(d, [cx, y, cx+tw+32, y+40], 10, fill=bgc, outline=ol, width=2)
+        d.text((cx+16, y+10), text, font=f19, fill=fg)
+        cx += tw+32+gap_after
     chip_ltr("Add-On", MU, None, LN, 16)
     chip_ltr("Free", (111,177,255), (14,32,54), (45,93,150), 18)
-    star(d, cx+10, y+19, 11, GD)
-    d.text((cx+26, y+9), "4.3", font=f18, fill=GD)
-    cx += 26+46
-    arrow_down(d, cx+9, y+18, 9, TX, 2)
-    d.text((cx+24, y+9), "1.2K", font=f18, fill=TX)
-    cx += 24+62
-    d.text((cx, y+9), "995 KB", font=f18, fill=TX)
-    cx += d.textlength("995 KB", font=f18)+18
-    d.text((cx, y+9), "v1.0.0", font=f18, fill=TX)
-    cx += d.textlength("v1.0.0", font=f18)+18
-    nw = d.textlength("NEW", font=fb(15))
-    rrect(d, [cx, y+4, cx+nw+22, y+34], 8, fill=GR)
-    d.text((cx+11, y+10), "NEW", font=fb(15), fill=(255,255,255))
+    star(d, cx+11, y+20, 12, GD)
+    d.text((cx+28, y+10), "4.3", font=f19, fill=GD)
+    cx += 28+50
+    arrow_down(d, cx+10, y+19, 10, TX, 2)
+    d.text((cx+26, y+10), "1.2K", font=f19, fill=TX)
+    cx += 26+66
+    d.text((cx, y+10), "995 KB", font=f19, fill=TX)
+    cx += d.textlength("995 KB", font=f19)+18
+    d.text((cx, y+10), "v1.0.0", font=f19, fill=TX)
+    cx += d.textlength("v1.0.0", font=f19)+18
+    nw = d.textlength("NEW", font=fb(16))
+    rrect(d, [cx, y+4, cx+nw+24, y+36], 8, fill=GR)
+    d.text((cx+12, y+11), "NEW", font=fb(16), fill=(255,255,255))
 
 def meta_rtl(img, xr, y):
-    # exact geometric mirror of the EN meta row: type chip first (rightmost), NEW last (leftmost);
-    # inside pairs the glyph sits to the RIGHT of its number (bidi RTL).
     d = ImageDraw.Draw(img)
-    f18 = far(18)
+    f19 = far(19)
     cx = xr
     def chip(text, fg, bgc, ol):
         nonlocal cx
         t = ar(text)
-        tw = d.textlength(t, font=f18)
-        rrect(d, [cx-tw-28, y, cx, y+38], 9, fill=bgc, outline=ol, width=2)
-        d.text((cx-14-tw, y+9), t, font=f18, fill=fg)
-        cx -= tw+28+16
+        tw = d.textlength(t, font=f19)
+        rrect(d, [cx-tw-32, y, cx, y+40], 10, fill=bgc, outline=ol, width=2)
+        d.text((cx-16-tw, y+10), t, font=f19, fill=fg)
+        cx -= tw+32+16
     def pair(num, glyph):
         nonlocal cx
         if glyph=='star':
-            star(d, cx-11, y+19, 11, GD)
+            star(d, cx-12, y+20, 12, GD)
         else:
-            arrow_down(d, cx-9, y+18, 9, TX, 2)
-        d.text((cx-26-d.textlength(num,font=f18), y+9), num, font=f18, fill=GD if glyph=='star' else TX)
-        cx -= 26+d.textlength(num,font=f18)+16
+            arrow_down(d, cx-10, y+19, 10, TX, 2)
+        d.text((cx-28-d.textlength(num,font=f19), y+10), num, font=f19, fill=GD if glyph=='star' else TX)
+        cx -= 28+d.textlength(num,font=f19)+16
     chip("إضافة", MU, None, LN)
     chip("مجاني", (111,177,255), (14,32,54), (45,93,150))
     pair("4.3", 'star')
     pair("1.2K", 'arrow')
     for t in ("995 KB","v1.0.0"):
-        d.text((cx-d.textlength(t,font=f18), y+9), t, font=f18, fill=TX)
-        cx -= d.textlength(t,font=f18)+18
-    nw = d.textlength(ar("جديد"), font=far(15))
-    rrect(d, [cx-nw-22, y+4, cx, y+34], 8, fill=GR)
-    d.text((cx-11-nw, y+10), ar("جديد"), font=far(15), fill=(255,255,255))
+        d.text((cx-d.textlength(t,font=f19), y+10), t, font=f19, fill=TX)
+        cx -= d.textlength(t,font=f19)+18
+    nw = d.textlength(ar("جديد"), font=far(16))
+    rrect(d, [cx-nw-24, y+4, cx, y+36], 8, fill=GR)
+    d.text((cx-12-nw, y+11), ar("جديد"), font=far(16), fill=(255,255,255))
 
 def draw_facts(base, x, y, w, cells, rtl=False):
     d = ImageDraw.Draw(base)
-    h = 70
+    h = 72
     rrect(d, [x, y, x+w, y+h], 14, fill=PN, outline=LN, width=2)
     n = len(cells); cw = w/n
     fl = (lambda s: far(s)) if rtl else fb
@@ -235,13 +254,13 @@ def draw_facts(base, x, y, w, cells, rtl=False):
         if rtl:
             tx = x+w-i*cw
             d.text((tx-d.textlength(lab,font=f16)-20, y+12), lab, font=f16, fill=MU)
-            d.text((tx-d.textlength(val,font=f20)-20, y+34), val, font=f20, fill=TX)
+            d.text((tx-d.textlength(val,font=f20)-20, y+36), val, font=f20, fill=TX)
         else:
             d.text((cx+20, y+12), lab, font=f16, fill=MU)
-            d.text((cx+20, y+34), val, font=f20, fill=TX)
+            d.text((cx+20, y+36), val, font=f20, fill=TX)
     return y+h
 
-def draw_desc(base, x, y, w, text, font, rtl=False, h=112):
+def draw_desc(base, x, y, w, text, font, rtl=False, h=116):
     d = ImageDraw.Draw(base)
     rrect(d, [x, y, x+w, y+h], 12, fill=PN, outline=LN, width=2)
     words = text.split(' ')
@@ -255,9 +274,9 @@ def draw_desc(base, x, y, w, text, font, rtl=False, h=112):
     if cur: lines.append(cur)
     for i, ln in enumerate(lines[:2]):
         if rtl:
-            d.text((x+w-26-d.textlength(ln, font=font), y+22+i*42), ln, font=font, fill=TX)
+            d.text((x+w-26-d.textlength(ln, font=font), y+22+i*44), ln, font=font, fill=TX)
         else:
-            d.text((x+26, y+22+i*42), ln, font=font, fill=TX)
+            d.text((x+26, y+22+i*44), ln, font=font, fill=TX)
     return y+h
 
 def draw_box(base, x, y, rtl=False, state='free', focus_main=True, focus_ac=False):
@@ -285,7 +304,6 @@ def draw_box(base, x, y, rtl=False, state='free', focus_main=True, focus_ac=Fals
         btn = ("Get Epic on your phone", 'purple')
         acbtn = ("Unlock for 600 AC", False)
     elif state=='legendary':
-        # NEW rule: Legendary ALSO unlocks with AC, at a fixed price higher than Epic
         access = ("Requires Legendary or higher", True)
         btn = ("Get Legendary on your phone", 'gold')
         acbtn = ("Unlock for 1200 AC", False)
@@ -325,7 +343,6 @@ def draw_box(base, x, y, rtl=False, state='free', focus_main=True, focus_ac=Fals
     rrect(d, [x, y, x+bw, y+total], 26, fill=PN, outline=LN, width=2)
     acy = y2+2
     if rtl:
-        # start side = right: dot at right, text to its left
         if access[1]:
             rrect(d, [x+bw-pad-26, acy, x+bw-pad, acy+26], 8, outline=PU2, width=3)
         else:
@@ -414,64 +431,108 @@ def draw_box(base, x, y, rtl=False, state='free', focus_main=True, focus_ac=Fals
     y2 += pad
     return y2 - y
 
-def draw_creator_rail(base, x, y, w, rtl=False, titles=None, prices=None, covers=None, badges=None):
+# ---------- redesigned creator rail (app-style) ----------
+RATINGS = ["4.8","4.5","4.2","4.7"]
+DL_COUNTS = ["1.3K","860","2.1K","940"]
+
+def draw_creator_rail2(base, x, y, w, rtl=False, titles=None, prices=None, covers=None, badges=None):
     d = ImageDraw.Draw(base)
     f28 = far(28) if rtl else fb(28)
-    f20 = fb(20); f22 = fb(22); f19 = far(19) if rtl else fb(19)
+    f18 = far(18) if rtl else fb(18)
+    f22 = far(22) if rtl else fb(22)
+    f19 = far(19) if rtl else fb(19)
     head = ar("المزيد من هذا المطوّر") if rtl else "More by this creator"
+    # gold accent bar + title
+    if rtl:
+        rrect(d, [x+w-5, y+4, x+w, y+32], 2, fill=GD)
+        d.text((x+w-20-d.textlength(head, font=f28), y), head, font=f28, fill=TX)
+    else:
+        rrect(d, [x, y+4, x+5, y+32], 2, fill=GD)
+        d.text((x+20, y), head, font=f28, fill=TX)
+    # counter pill at the end side
     counter = "1–4 / 8"
-    d.text((x, y), head, font=f28, fill=TX)
-    cw = d.textlength(counter, font=f20)
-    d.text((x+w-cw, y+6), counter, font=f20, fill=MU)
-    y += 52
-    aw = 50
-    card_h = 210
-    gap = 18
-    cards_w = w - 2*aw - 2*gap
-    card_w = (cards_w - 3*gap)/4
-    # RTL mirror: left end = next (active '‹'), right end = prev (dim '›'); shapes stay '‹' left / '›' right
-    dim_left = (not rtl)
-    for ax, right, dim in [(x, False, dim_left), (x+w-aw, True, not dim_left)]:
-        rrect(d, [ax, y, ax+aw, y+card_h], 8, fill=CTL, outline=LN, width=1)
+    cw_ = d.textlength(counter, font=f18)+36
+    px_ = (x+w-cw_) if not rtl else x
+    rrect(d, [px_, y-2, px_+cw_, y+34], 14, fill=(18,26,35), outline=LN, width=2)
+    txt_c(d, px_+cw_/2, y+16, counter, f18, MU)
+    y += 56
+    aw = 52; card_h = 252; gap = 14
+    zone_x = x+aw+14
+    zone_w = w-2*(aw+14)
+    card_w = (zone_w-3*gap)/4
+    cy_mid = y+card_h//2
+    # floating rounded arrow buttons (prev dims at the start edge on page 1)
+    dim_start = True
+    for ax, right, dim in [(x, False, dim_start), (x+w-aw, True, not dim_start)] if not rtl else \
+                          [(x, False, not dim_start), (x+w-aw, True, dim_start)]:
+        rrect(d, [ax, cy_mid-26, ax+aw, cy_mid+26], 16, fill=(18,26,35), outline=LN, width=2)
         col = MU if dim else TX
-        chevron(d, ax+aw/2, y+card_h/2, 14, col, right=right, w=6)
+        chevron(d, ax+aw/2, cy_mid, 13, col, right=right, w=6)
         if dim:
-            ov = Image.new('RGBA', (aw, card_h), (0,0,0,110))
-            base.alpha_composite(ov, (int(ax), int(y)))
+            ov = Image.new('RGBA', (aw, 52), (0,0,0,120))
+            base.alpha_composite(ov, (int(ax), int(cy_mid-26)))
     for i in range(4):
         if rtl:
-            cx = x+w-aw-gap-(i+1)*card_w-i*gap   # first card at the right (start)
+            cx = x+w-aw-14-(i+1)*card_w-i*gap
         else:
-            cx = x+aw+gap+i*(card_w+gap)
-        rrect(d, [cx, y, cx+card_w, y+card_h], 10, fill=PN, outline=LN, width=2)
-        im = rounded_img(cover_crop(Image.open(covers[i]).convert('RGB'), int(card_w), 150), 8)
-        base.alpha_composite(im, (int(cx), int(y)))
+            cx = zone_x+i*(card_w+gap)
+        panel = grad_panel(int(card_w), card_h, CBT, CBB, r=14)
+        base.alpha_composite(panel, (int(cx), int(y)))
+        cw2 = int(card_w)-16
+        im = rounded_img(cover_crop(Image.open(covers[i]).convert('RGB'), cw2, 152), 10)
+        base.alpha_composite(im, (int(cx+8), int(y+8)))
         bd = badges[i]
         bw2 = d.textlength(bd, font=f19)
         if rtl:
-            bx = cx+card_w-10-bw2-18
+            bx = cx+card_w-8-bw2-18
         else:
-            bx = cx+10
-        rrect(d, [bx, y+150-38, bx+bw2+18, y+150-8], 4, fill=(0,0,0,190), outline=GD, width=2)
-        d.text((bx+9, y+150-35), bd, font=f19, fill=GD)
+            bx = cx+8
+        rrect(d, [bx, y+8+152-38, bx+bw2+18, y+8+152-8], 4, fill=(0,0,0,190), outline=GD, width=2)
+        d.text((bx+9, y+8+152-35), bd, font=f19, fill=GD)
+        # name
         name = titles[i]
-        if d.textlength(name, font=f22) > card_w-28:
-            while d.textlength(name+"…", font=f22) > card_w-28 and len(name)>3:
+        if d.textlength(name, font=f22) > card_w-32:
+            while d.textlength(name+"…", font=f22) > card_w-32 and len(name)>3:
                 name = name[:-1]
             name += "…"
-        rating = ["4.8","4.5","4.2","4.7"][i]
-        pr = prices[i]
         if rtl:
-            d.text((cx+card_w-14-d.textlength(name, font=f22), y+162), name, font=f22, fill=TX)
-            star(d, cx+card_w-22, y+194, 9, MU)
-            d.text((cx+card_w-36-d.textlength(rating, font=f19), y+183), rating, font=f19, fill=MU)
-            d.text((cx+14, y+183), pr, font=f19, fill=GD)
+            d.text((cx+card_w-16-d.textlength(name, font=f22), y+170), name, font=f22, fill=TX)
         else:
-            d.text((cx+14, y+162), name, font=f22, fill=TX)
-            star(d, cx+22, y+194, 9, MU)
-            d.text((cx+36, y+183), rating, font=f19, fill=MU)
-            pw = d.textlength(pr, font=f19)
-            d.text((cx+card_w-14-pw, y+183), pr, font=f19, fill=GD)
+            d.text((cx+16, y+170), name, font=f22, fill=TX)
+        # rating: 5 mini stars + number
+        r = float(RATINGS[i])
+        sx = (cx+card_w-16-96) if rtl else cx+16
+        for s5 in range(5):
+            full = (s5+1) <= int(r)
+            star(d, sx+s5*19+8, y+208, 8, GD if full else (70,88,104))
+        rt = RATINGS[i]
+        if rtl:
+            d.text((sx-12-d.textlength(rt, font=f18), y+199), rt, font=f18, fill=MU)
+        else:
+            d.text((sx+100, y+199), rt, font=f18, fill=MU)
+        # price chip + downloads
+        pr = prices[i]
+        if pr == "Free" or pr == "مجاني":
+            txt = ar("مجاني") if rtl else "Free"
+            pw = d.textlength(txt, font=f19)+28
+            pxx = (cx+card_w-16-pw) if rtl else cx+16
+            rrect(d, [pxx, y+222, pxx+pw, y+250], 10, fill=CHIPC)
+            txt_c(d, pxx+pw/2, y+236, txt, f19, (130,195,255))
+        else:
+            txt = pr
+            pw = d.textlength(txt, font=f19)+56
+            pxx = (cx+card_w-16-pw) if rtl else cx+16
+            rrect(d, [pxx, y+222, pxx+pw, y+250], 10, fill=GDBG, outline=GDLINE, width=2)
+            paste_icon(base, coin, pxx+10, y+226, 22)
+            d.text((pxx+38, y+227), txt, font=f19, fill=GD)
+        dc = DL_COUNTS[i]
+        arrow_down(d, (cx+16+8) if rtl else (cx+card_w-16-42), y+236, 8, MU, 2)
+        if rtl:
+            d.text((cx+30, y+227), dc, font=f18, fill=MU)
+        else:
+            d.text((cx+card_w-16-d.textlength(dc, font=f18), y+227), dc, font=f18, fill=MU)
+        if i == 0:
+            focus_ring(d, [cx, y, cx+card_w, y+card_h], 14)
     return y+card_h
 
 def draw_legend(base, rtl=False):
@@ -482,7 +543,6 @@ def draw_legend(base, rtl=False):
              (b_circle, "Back" if not rtl else ar("رجوع")),
              (b_tri, "Search" if not rtl else ar("بحث"))]
     if rtl:
-        # mirror: start edge = right; label to the LEFT of its icon
         x = W-210
         for icon, label in items:
             lw = d.textlength(label, font=f21)
@@ -503,11 +563,12 @@ covers = ['/tmp/mock/combine-items-add-on-cover.jpg','/tmp/mock/backpacks-and-je
 titles = ["Zephyr Add-On","Castle Skin","Ocean Texture Pack","Space Add-On"]
 prices = ["450 AC","Free","620 AC","1100 AC"]
 badges_en = ["Add-On","Skin","Texture Pack","Add-On"]
+badges_ar = [ar("إضافة"), ar("سكين"), ar("حزمة قوام"), ar("إضافة")]
 
 # ================= EN main page =================
 img = Image.new('RGBA', (W,H), (0,0,0,0))
 img.alpha_composite(bg.convert('RGBA'))
-draw_rail(img, 'left')
+paste_real_rail(img, 'left', english=True)
 draw_topbar(img, rtl=False)
 d = ImageDraw.Draw(img)
 X0 = 210; X1 = 1830
@@ -516,18 +577,19 @@ IX = 750; IW = 560
 f52 = ff77(52)
 d.text((IX, 128), "COMBINE ITEMS!", font=f52, fill=TX)
 d.text((IX, 184), "ADD-ON", font=f52, fill=TX)
-paste_icon(img, rounded_img(cover_crop(fox, 42, 42), 12), IX, 252, 42)
-d.text((IX+58, 258), "sliver fox", font=fb(24), fill=TX)
-draw_meta_row(img, IX, 312)
-fy = draw_facts(img, IX, 366, IW, [("Size","995 KB"),("Version","1.0.0"),("Published","2026-11-01"),("Downloads","1,240")])
+rrect(d, [IX, 252, IX+72, 258], 3, fill=GD)          # gold accent under title
+paste_icon(img, rounded_img(cover_crop(fox, 42, 42), 12), IX, 276, 42)
+d.text((IX+58, 282), "sliver fox", font=fb(24), fill=TX)
+draw_meta_row(img, IX, 336)
+fy = draw_facts(img, IX, 392, IW, [("Size","995 KB"),("Version","1.0.0"),("Published","2026-11-01"),("Downloads","1,240")])
 bh = draw_box(img, 1350, 130, rtl=False, state='free', focus_main=True)
 desc = "Combine items in new ways and discover new recipes in your world. Craft, merge and upgrade everything you find — made by sliver fox (silverfoxstudio) for your Minecraft worlds."
 top_h = max(281, fy-130, bh)
 dy = 130 + top_h + 28
 draw_desc(img, X0, dy, X1-X0, desc, fb(23))
-ry = dy + 112 + 26
-draw_creator_rail(img, X0, ry, X1-X0, rtl=False, titles=titles, prices=prices,
-                  covers=covers[1:], badges=badges_en)
+ry = dy + 116 + 26
+draw_creator_rail2(img, X0, ry, X1-X0, rtl=False, titles=titles, prices=prices,
+                   covers=covers[1:], badges=badges_en)
 draw_legend(img, rtl=False)
 img.convert('RGB').save('mine-preview/addonpage-newdesign-en.png')
 print("EN saved")
@@ -535,30 +597,31 @@ print("EN saved")
 # ================= AR main page (RTL) =================
 img = Image.new('RGBA', (W,H), (0,0,0,0))
 img.alpha_composite(bg.convert('RGBA'))
-draw_rail(img, 'right')
+paste_real_rail(img, 'right', english=False)
 draw_topbar(img, rtl=True)
 d = ImageDraw.Draw(img)
 cover_x = W-210-500
 draw_cover(img, covers[0], cover_x, 130, 500, 281, r=8)
 IX = 610; IW = 560
-f44 = far(44)
+f52ar = far(52)
 t1 = ar("إضافة دمج العناصر")
-d.text((IX+IW-d.textlength(t1, font=f44), 138), t1, font=f44, fill=TX)
-paste_icon(img, rounded_img(cover_crop(fox, 42, 42), 12), IX+IW-42, 202, 42)
+d.text((IX+IW-d.textlength(t1, font=f52ar), 132), t1, font=f52ar, fill=TX)
+rrect(d, [IX+IW-72, 202, IX+IW, 208], 3, fill=GD)    # gold accent (start side = right)
+paste_icon(img, rounded_img(cover_crop(fox, 42, 42), 12), IX+IW-42, 226, 42)
 by = "sliver fox"
-d.text((IX+IW-42-16-d.textlength(by, font=fb(24)), 208), by, font=fb(24), fill=TX)
-meta_rtl(img, IX+IW, 262)
-fy = draw_facts(img, IX, 320, IW, [("الحجم","995 KB"),("الإصدار","1.0.0"),("تاريخ النشر","2026-11-01"),("التنزيلات","1,240")], rtl=True)
+d.text((IX+IW-42-16-d.textlength(by, font=fb(24)), 232), by, font=fb(24), fill=TX)
+meta_rtl(img, IX+IW, 286)
+fy = draw_facts(img, IX, 342, IW, [("الحجم","995 KB"),("الإصدار","1.0.0"),("تاريخ النشر","2026-11-01"),("التنزيلات","1,240")], rtl=True)
 bh = draw_box(img, 90, 130, rtl=True, state='free', focus_main=True)
 desc_ar = ar("اجمع العناصر بطرق جديدة واكتشف وصفات جديدة في عالمك. اصنع وادمج وطوّر كل ما تجده — من صنع sliver fox (silverfoxstudio) لعوالم ماينكرافت.")
 draw_desc(img, 90, dy, 1740, desc_ar, far(23), rtl=True)
-draw_creator_rail(img, 90, ry, 1740, rtl=True, titles=titles, prices=prices,
-                  covers=covers[1:], badges=[ar("إضافة"), ar("سكين"), ar("حزمة قوام"), ar("إضافة")])
+draw_creator_rail2(img, 90, ry, 1740, rtl=True, titles=titles, prices=prices,
+                   covers=covers[1:], badges=badges_ar)
 draw_legend(img, rtl=True)
 img.convert('RGB').save('mine-preview/addonpage-newdesign-ar.png')
 print("AR saved")
 
-# ================= states sheet (6 key action-box states) =================
+# ================= states sheet =================
 img = Image.new('RGBA', (W,H), (0,0,0,0))
 img.alpha_composite(bg.convert('RGBA'))
 d = ImageDraw.Draw(img)
