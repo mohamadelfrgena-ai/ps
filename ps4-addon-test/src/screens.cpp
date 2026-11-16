@@ -3755,56 +3755,12 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
     const bool acOffer = acUnlockOffered(it);
     const bool lowBal = acOffer && gAcc.signedIn && gAcc.acBalance < it.acPrice;
     auto C = [](int r, int g, int b, int a = 255) { return SDL_Color{static_cast<Uint8>(r), static_cast<Uint8>(g), static_cast<Uint8>(b), static_cast<Uint8>(a)}; };
-    {   // BACKGROUND (Design A §3-b): the item's cover fills the screen + 80px bleed, then
-        // blur 26px + brightness 0.5 + saturate 1.1 — baked once per item/theme/direction.
-        static std::string bakedFor;
-        const std::string want = it.id + (gLight ? "|L" : "|D") + (L.rtl ? "|R" : "|N") + "A3" +
-                                 (!it.cover.empty() && e.hasImage(it.cover) ? "|1" : "|0");
-        if (bakedFor == want && e.hasImage("__bg_detail")) {
-            e.drawImage("__bg_detail", 0, 0, 1920, 1080);
-        } else {
-            e.clear(kBG);
-            itemCover(e, it, -80, -80, 2080, 1240, 0);
-            const auto& fb = e.framebuffer();
-            std::vector<std::uint8_t> rgba(fb.size() * 4);
-            for (std::size_t i = 0; i < fb.size(); ++i) {
-                const std::uint32_t p = fb[i];
-                rgba[i * 4] = static_cast<std::uint8_t>(p >> 16); rgba[i * 4 + 1] = static_cast<std::uint8_t>(p >> 8);
-                rgba[i * 4 + 2] = static_cast<std::uint8_t>(p); rgba[i * 4 + 3] = 255;
-            }
-            {
-                const int R = 13;
-                std::vector<std::uint8_t> tmp(rgba.size());
-                for (int pass = 0; pass < 2; ++pass) {
-                    for (int yy2 = 0; yy2 < 1080; ++yy2) {
-                        for (int xx2 = 0; xx2 < 1920; ++xx2) {
-                            int r = 0, g = 0, b = 0, cnt = 0;
-                            for (int k = -R; k <= R; ++k) {
-                                const int sx = pass == 0 ? std::min(1919, std::max(0, xx2 + k)) : xx2;
-                                const int sy = pass == 0 ? yy2 : std::min(1079, std::max(0, yy2 + k));
-                                const std::size_t o = (static_cast<std::size_t>(sy) * 1920 + sx) * 4;
-                                r += rgba[o]; g += rgba[o + 1]; b += rgba[o + 2]; ++cnt;
-                            }
-                            const std::size_t o = (static_cast<std::size_t>(yy2) * 1920 + xx2) * 4;
-                            const float rr = r / (float)cnt, gg = g / (float)cnt, bb = b / (float)cnt;
-                            const float lum = 0.213f * rr + 0.715f * gg + 0.072f * bb;
-                            auto fin = [&](float v) { const float x2 = (lum + (v - lum) * 1.1f) * 0.5f; return static_cast<std::uint8_t>(x2 < 0.f ? 0 : (x2 > 255.f ? 255 : x2)); };
-                            tmp[o] = fin(rr); tmp[o + 1] = fin(gg); tmp[o + 2] = fin(bb); tmp[o + 3] = 255;
-                        }
-                    }
-                    rgba.swap(tmp);
-                }
-            }
-            for (std::size_t i = 0; i < fb.size(); ++i) {   // veil rgba(8,14,26,0.4) baked in
-                rgba[i * 4]     = static_cast<std::uint8_t>((rgba[i * 4]     * 153 + 8  * 102 + 127) / 255);
-                rgba[i * 4 + 1] = static_cast<std::uint8_t>((rgba[i * 4 + 1] * 153 + 14 * 102 + 127) / 255);
-                rgba[i * 4 + 2] = static_cast<std::uint8_t>((rgba[i * 4 + 2] * 153 + 26 * 102 + 127) / 255);
-            }
-            e.addImageRGBA("__bg_detail", 1920, 1080, rgba.data());
-            bakedFor = want;
-        }
-    }
-    // (the veil rgba(8,14,26,0.4) is baked into __bg_detail above — v0.83 perf)
+    // v0.84 («خلفية صفحات الإضافات/العوالم ... لا اريدها خلفية الاضافة بل هذه الصورة
+    // مضببة نفس تضبيبت خلفية المتجر»): one bundled pre-blurred art per theme
+    // (bg_detail_dark/light — same heavy-blur + vignette treatment as bg_app_*),
+    // NOT the item's cover. Also removes the old per-item bake stutter entirely.
+    static const std::string kBgd = "bg_detail_dark", kBgl = "bg_detail_light";
+    e.drawImage(gLight ? kBgl : kBgd, 0, 0, 1920, 1080);
 
     drawTopNav(e, 2, langCode, -1, true);   // side rail + status row (avatar/clock/gold AC badge)
 
