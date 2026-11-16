@@ -285,7 +285,7 @@ static void ensureFreshSession() {
 }
 
 static std::atomic<unsigned> gSessGen{0};   // v0.62: bumped on sign-out — kills in-flight refreshes
-static void requestAvatarAsync(const std::string& url);   // v0.65e: defined with the cover worker
+static void requestAvatarAsync(const std::string& url, bool force = false);   // v0.65e: defined with the cover worker
 static void applyAccountFromSession() {
     const unsigned gen0 = gSessGen.load();
     ensureFreshSession();
@@ -306,6 +306,7 @@ static void applyAccountFromSession() {
     for (const AddonItem& it : catalog())
         if (it.installed) a.installed += 1;
     if (gen0 != gSessGen.load()) return;   // signed out while fetching — do NOT resurrect
+    if (!a.avatar.empty()) gSession.avatarUrl = a.avatar;   // v0.83: stay in step with profiles.avatar_url
     setAccount(a);
     A.dirty = true;   // v0.50: the AC balance chip repaints the moment it changes
 }
@@ -527,7 +528,7 @@ static void loadPlansNow() {
 
 // covers: ONE serial worker downloads (never floods the HTTP pool), decode on the UI thread.
 // The cover URL travels on the item — no network refetch per cover.
-struct CoverJob { std::string name; std::string url; std::string file; };   // v0.65e: file = safe cache name
+struct CoverJob { std::string name; std::string url; std::string file; bool force = false; };   // v0.65e: file = safe cache name
 static std::deque<CoverJob> gCoverJobs;
 static std::mutex gCoverJobMx;
 static bool gCoverWorkerOn = false;
@@ -588,7 +589,7 @@ static void requestCoverAsync(const AddonItem& it) {
                 std::fclose(f);
                 return !blob.data.empty();
             };
-            if (!readAll(cache)) {
+            if (job.force || !readAll(cache)) {   // v0.83: forced avatar refresh ignores the disk cache
                 ::mkdir("/data", 0777);
                 ::mkdir("/data/AddonStation", 0777);
                 ::mkdir(kCoverDir, 0777);
@@ -625,18 +626,21 @@ static void requestCoverAsync(const AddonItem& it) {
 // image was NEVER downloaded — the person glyph always showed. Queue it through
 // the same cover worker; the engine key stays the URL (screens look it up there),
 // the disk cache uses a safe hashed name.
-static void requestAvatarAsync(const std::string& url) {
+static void requestAvatarAsync(const std::string& url, bool force) {
+    // v0.83 («غيرت صورة البروفايل في تطبيق الهاتف لازم يتغير حتى هذا التطبيق»):
+    // force = re-download even when this URL was fetched before (the phone app may
+    // overwrite the same storage path with new pixels).
     if (url.empty()) return;
     unsigned long long h = 1469598103934665603ULL;   // FNV-1a -> safe cache name
     for (unsigned char c : url) { h ^= c; h *= 1099511628211ULL; }
     char hb[24]; std::snprintf(hb, sizeof hb, "acc_%016llx", h);
     {
         std::lock_guard<std::mutex> lk(gCoverMx);
-        if (gCoverRequested[url]) return;
+        if (!force && gCoverRequested[url]) return;
         gCoverRequested[url] = true;
     }
     std::lock_guard<std::mutex> jk(gCoverJobMx);
-    gCoverJobs.push_back(CoverJob{url, url, hb});
+    gCoverJobs.push_back(CoverJob{url, url, hb, force});
     if (gCoverWorkerOn) return;
     gCoverWorkerOn = true;
     std::thread([]() {
@@ -662,7 +666,7 @@ static void requestAvatarAsync(const std::string& url) {
                 std::fclose(f);
                 return !blob.data.empty();
             };
-            if (!readAll(cache)) {
+            if (job.force || !readAll(cache)) {   // v0.83: forced avatar refresh ignores the disk cache
                 ::mkdir("/data", 0777);
                 ::mkdir("/data/AddonStation", 0777);
                 ::mkdir(kCoverDir, 0777);
@@ -1895,6 +1899,8 @@ int main(int, char**) {
             if (gSession.valid && gSession.accessToken.size() > 20) {
                 if (cycle % 3 == 0) applyAccountFromSession();   // ~15s
                 requestAvatarAsync(gSession.avatarUrl);   // v0.65e: keep the avatar image loaded
+                if (cycle % 12 == 0)   // v0.83: 60s — profile pictures changed on the phone must show here
+                    requestAvatarAsync(account().avatar.empty() ? gSession.avatarUrl : account().avatar, true);
                 if (cycle % 6 == 0) loadWalletHistory();         // ~30s
             }
         }
