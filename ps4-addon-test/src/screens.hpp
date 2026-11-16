@@ -222,6 +222,10 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
 enum class DemoState { Idle = 0, Downloading = 1, Installing = 2, Installed = 3, Queued = 4 };   // v0.41: staged, waiting for Minecraft
 void drawAddonDetail(UiEngine& e, int focus, int catalogIndex, DemoState state, int percent,
                      const std::string& langCode, const std::string& notice = "");
+// v0.82 (Design A §5): the AC-unlock confirm dialog (purple for Epic, gold for Legendary)
+void drawAcConfirm(UiEngine& e, int focus, const AddonItem& it, const std::string& langCode);
+// v0.82 (Design A §6): the shine band crossing a rounded button (replayed by AnimCall::Shine)
+void buttonShine(UiEngine& e, int x, int y, int w, int h, int r);
 // Search (△): focus 0 field, 1-3 tabs, 4-8 results. Empty query shows the most downloaded items.
 void drawSearch(UiEngine& e, int focus, const std::string& query, int filterIndex, const std::string& langCode);
 // Profile + AC wallet. Guest: focus 0 = "Sign in with code". Signed in: focus = history row 0..5 (-1 none)
