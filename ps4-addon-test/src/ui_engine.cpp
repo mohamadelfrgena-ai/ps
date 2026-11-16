@@ -461,35 +461,82 @@ void UiEngine::fillRect(int x, int y, int w, int h, SDL_Color c) {
 }
 
 void UiEngine::fillGradH(int x, int y, int w, int h, SDL_Color left, SDL_Color right) {
-    const int steps = std::min(w, 64);
-    if (steps <= 0) return;
-    for (int i = 0; i < steps; ++i) {
-        const int x0 = x + (i * w) / steps;
-        const int x1 = x + ((i + 1) * w) / steps;
-        const float t = static_cast<float>(i) / static_cast<float>(std::max(1, steps - 1));
-        SDL_Color c{
-            clamp8(static_cast<int>(left.r + (right.r - left.r) * t)),
-            clamp8(static_cast<int>(left.g + (right.g - left.g) * t)),
-            clamp8(static_cast<int>(left.b + (right.b - left.b) * t)),
-            clamp8(static_cast<int>(left.a + (right.a - left.a) * t))};
-        fillRect(x0, y, std::max(1, x1 - x0), h, c);
+    // v0.83: ONE interpolated colour per column — smooth, no banding edges.
+    if (w <= 0 || h <= 0) return;
+    const int y0 = std::max(0, y), y1 = std::min(kHeight, y + h);
+    const int x0 = std::max(0, x), x1 = std::min(kWidth, x + w);
+    if (y0 >= y1 || x0 >= x1) return;
+    for (int xx = x0; xx < x1; ++xx) {
+        const float t = (w <= 1) ? 0.0f : static_cast<float>(xx - x) / static_cast<float>(w - 1);
+        const Uint8 cr = clamp8(static_cast<int>(left.r + (right.r - left.r) * t));
+        const Uint8 cg = clamp8(static_cast<int>(left.g + (right.g - left.g) * t));
+        const Uint8 cb = clamp8(static_cast<int>(left.b + (right.b - left.b) * t));
+        const Uint8 ca = clamp8(static_cast<int>(left.a + (right.a - left.a) * t));
+        if (ca == 0) continue;
+        for (int yy = y0; yy < y1; ++yy) blendPx(xx, yy, cr, cg, cb, ca);
     }
 }
 
 void UiEngine::fillGradV(int x, int y, int w, int h, SDL_Color top, SDL_Color bottom) {
-    const int steps = std::min(h, 64);
-    if (steps <= 0) return;
-    for (int i = 0; i < steps; ++i) {
-        const int y0 = y + (i * h) / steps;
-        const int y1 = y + ((i + 1) * h) / steps;
-        const float t = static_cast<float>(i) / static_cast<float>(std::max(1, steps - 1));
-        SDL_Color c{
-            clamp8(static_cast<int>(top.r + (bottom.r - top.r) * t)),
-            clamp8(static_cast<int>(top.g + (bottom.g - top.g) * t)),
-            clamp8(static_cast<int>(top.b + (bottom.b - top.b) * t)),
-            clamp8(static_cast<int>(top.a + (bottom.a - top.a) * t))};
-        fillRect(x, y0, w, std::max(1, y1 - y0), c);
+    // v0.83: ONE interpolated colour per row (the old 64-block version left visible
+    // banding edges on large panels — «تنعيم الحواف»).
+    if (w <= 0 || h <= 0) return;
+    const int y0 = std::max(0, y), y1 = std::min(kHeight, y + h);
+    const int x0 = std::max(0, x), x1 = std::min(kWidth, x + w);
+    if (x0 >= x1) return;
+    for (int yy = y0; yy < y1; ++yy) {
+        const float t = (h <= 1) ? 0.0f : static_cast<float>(yy - y) / static_cast<float>(h - 1);
+        const Uint8 cr = clamp8(static_cast<int>(top.r + (bottom.r - top.r) * t));
+        const Uint8 cg = clamp8(static_cast<int>(top.g + (bottom.g - top.g) * t));
+        const Uint8 cb = clamp8(static_cast<int>(top.b + (bottom.b - top.b) * t));
+        const Uint8 ca = clamp8(static_cast<int>(top.a + (bottom.a - top.a) * t));
+        if (ca == 0) continue;
+        if (ca >= 255) {
+            std::uint32_t* row = &fb_[static_cast<std::size_t>(yy) * kWidth];
+            std::fill(row + x0, row + x1, (255u << 24) | (static_cast<std::uint32_t>(cr) << 16) |
+                                          (static_cast<std::uint32_t>(cg) << 8) | cb);
+        } else {
+            blendRow(x0, x1, yy, cr, cg, cb, ca);
+        }
     }
+}
+
+// v0.83 «تنعيم الحواف»: per-radius corner-coverage table — 4x4 supersampled ONCE per
+// radius (17 coverage levels) instead of a single SDF sample per pixel (the old stipple
+// made arcs look rough). Lookup is a byte read; every rounded primitive shares it.
+static std::map<int, std::vector<std::uint8_t>>& cornerCovCache() {
+    static std::map<int, std::vector<std::uint8_t>> m;
+    return m;
+}
+static const std::uint8_t* cornerCovTable(int r) {
+    auto& m = cornerCovCache();
+    auto it = m.find(r);
+    if (it != m.end()) return it->second.data();
+    std::vector<std::uint8_t> tab(static_cast<std::size_t>(r) * r, 0);
+    for (int dy = 0; dy < r; ++dy) {
+        for (int dx = 0; dx < r; ++dx) {
+            int inside = 0;
+            for (int sy = 0; sy < 4; ++sy) {
+                for (int sx = 0; sx < 4; ++sx) {
+                    const float fx = static_cast<float>(r) - (dx + 0.125f + sx * 0.25f);
+                    const float fy = static_cast<float>(r) - (dy + 0.125f + sy * 0.25f);
+                    if (fx * fx + fy * fy <= static_cast<float>(r) * r) ++inside;
+                }
+            }
+            tab[static_cast<std::size_t>(dy) * r + dx] = static_cast<std::uint8_t>((inside * 255 + 8) / 16);
+        }
+    }
+    const std::uint8_t* p = tab.data();
+    m.emplace(r, std::move(tab));
+    return m.find(r)->second.data();
+}
+
+// zero-alloc integer append for the cache keys (was std::to_string per call per frame)
+static void appendInt(std::string& out, int v) {
+    char b[16]; int n = 0;
+    if (v < 0) { out.push_back('-'); v = -v; }
+    do { b[n++] = static_cast<char>('0' + v % 10); v /= 10; } while (v);
+    while (n) out.push_back(b[--n]);
 }
 
 // v7.0: signed distance to a rounded-rect boundary (negative inside) — used for AA edge coverage
@@ -507,13 +554,13 @@ void UiEngine::drawRoundRect(int x, int y, int w, int h, int radius, SDL_Color c
     fillRect(x, y + r, w, h - 2 * r, c);
     fillRect(x + r, y, w - 2 * r, r, c);
     fillRect(x + r, y + h - r, w - 2 * r, r, c);
+    const std::uint8_t* tab = cornerCovTable(r);
     for (int dy = 0; dy < r; ++dy) {
         for (int dx = 0; dx < r; ++dx) {
-            const float d = rr_dist_sdf(x + dx, y + dy, x, y, w, h, r);
-            float cov = 0.5f - d;
-            if (cov <= 0.0f) continue;
-            if (cov > 1.0f) cov = 1.0f;
-            const Uint8 a = static_cast<Uint8>(cov * c.a + 0.5f);
+            const int cov = tab[static_cast<std::size_t>(dy) * r + dx];
+            if (cov <= 0) continue;
+            const Uint8 a = static_cast<Uint8>((cov * c.a + 127) / 255);
+            if (a == 0) continue;
             blendPx(x + dx, y + dy, c.r, c.g, c.b, a);
             blendPx(x + w - 1 - dx, y + dy, c.r, c.g, c.b, a);
             blendPx(x + dx, y + h - 1 - dy, c.r, c.g, c.b, a);
@@ -537,15 +584,15 @@ void UiEngine::drawRoundGradH(int x, int y, int w, int h, int radius, SDL_Color 
             for (int dy = 0; dy < h; ++dy) blendPx(x + col, y + dy, cr, cg, cb, ca);
         } else {
             for (int dy = r; dy < h - r; ++dy) blendPx(x + col, y + dy, cr, cg, cb, ca);   // fully inside between the corner zones
+            const int cdx = col < r ? col : w - 1 - col;
+            const std::uint8_t* tab = cornerCovTable(r);
             for (int dy = 0; dy < r; ++dy) {
-                float cov = 0.5f - rr_dist_sdf(x + col, y + dy, x, y, w, h, r);
-                if (cov <= 0.0f) continue;
-                if (cov > 1.0f) cov = 1.0f;
-                blendPx(x + col, y + dy, cr, cg, cb, static_cast<Uint8>(cov * ca + 0.5f));
-                cov = 0.5f - rr_dist_sdf(x + col, y + h - 1 - dy, x, y, w, h, r);
-                if (cov <= 0.0f) continue;
-                if (cov > 1.0f) cov = 1.0f;
-                blendPx(x + col, y + h - 1 - dy, cr, cg, cb, static_cast<Uint8>(cov * ca + 0.5f));
+                const int cov = tab[static_cast<std::size_t>(dy) * r + cdx];
+                if (cov <= 0) continue;
+                const Uint8 a = static_cast<Uint8>((cov * ca + 127) / 255);
+                if (a == 0) continue;
+                blendPx(x + col, y + dy, cr, cg, cb, a);
+                blendPx(x + col, y + h - 1 - dy, cr, cg, cb, a);
             }
         }
     }
@@ -574,14 +621,17 @@ void UiEngine::drawRoundBorder(int x, int y, int w, int h, int radius, int thick
         if (dy >= h - rOut) blendRow(x + rOut, x + w - rOut, y + dy, c.r, c.g, c.b, c.a);
         else blendRow(x, x + w, y + dy, c.r, c.g, c.b, c.a);
     }
+    const std::uint8_t* tabO = cornerCovTable(rOut);
+    const std::uint8_t* tabI = rIn > 0 ? cornerCovTable(rIn) : nullptr;
     for (int dy = 0; dy < rOut; ++dy) {
         for (int dx = 0; dx < rOut; ++dx) {
-            const float dO = rr_dist_sdf(x + dx, y + dy, x, y, w, h, rOut);
-            const float dI = rr_dist_sdf(x + dx, y + dy, x + t, y + t, w - 2 * t, h - 2 * t, rIn);
-            float cov = std::min(0.5f - dO, 0.5f + dI);
-            if (cov <= 0.0f) continue;
-            if (cov > 1.0f) cov = 1.0f;
-            const Uint8 a = static_cast<Uint8>(cov * c.a + 0.5f);
+            int cov = tabO[static_cast<std::size_t>(dy) * rOut + dx];
+            if (tabI && dx >= t && dy >= t) {
+                cov -= tabI[static_cast<std::size_t>(dy - t) * rIn + (dx - t)];
+            }
+            if (cov <= 0) continue;
+            const Uint8 a = static_cast<Uint8>((cov * c.a + 127) / 255);
+            if (a == 0) continue;
             blendPx(x + dx, y + dy, c.r, c.g, c.b, a);
             blendPx(x + w - 1 - dx, y + dy, c.r, c.g, c.b, a);
             blendPx(x + dx, y + h - 1 - dy, c.r, c.g, c.b, a);
@@ -614,12 +664,13 @@ void UiEngine::drawRoundGradV(int x, int y, int w, int h, int radius, SDL_Color 
             blendRow(x, x + w, y + dy, cr, cg, cb, ca);
         } else {
             for (int dx = r; dx < w - r; ++dx) blendPx(x + dx, y + dy, cr, cg, cb, ca);
+            const int ddy = dy < r ? dy : h - 1 - dy;
+            const std::uint8_t* tab = cornerCovTable(r);
             for (int dx = 0; dx < r; ++dx) {
-                const float d = rr_dist_sdf(x + dx, y + dy, x, y, w, h, r);
-                float cov = 0.5f - d;
-                if (cov <= 0.0f) continue;
-                if (cov > 1.0f) cov = 1.0f;
-                const Uint8 a = static_cast<Uint8>(cov * ca + 0.5f);
+                const int cov = tab[static_cast<std::size_t>(ddy) * r + dx];
+                if (cov <= 0) continue;
+                const Uint8 a = static_cast<Uint8>((cov * ca + 127) / 255);
+                if (a == 0) continue;
                 blendPx(x + dx, y + dy, cr, cg, cb, a);
                 blendPx(x + w - 1 - dx, y + dy, cr, cg, cb, a);
             }
@@ -632,27 +683,27 @@ void UiEngine::drawRoundGradD(int x, int y, int w, int h, int radius, SDL_Color 
     // 135deg diagonal gradient (design: .pb.pri linear-gradient(135deg,#2E7BEF,#4C9AFF))
     if (w <= 0 || h <= 0) return;
     const int r = std::max(0, std::min({radius, w / 2, h / 2}));
+    const std::uint8_t* tab = r > 1 ? cornerCovTable(r) : nullptr;
     for (int row = 0; row < h; ++row) {
-        int xr0 = 0, xr1 = w;
-        if (r > 1) {
-            if (row < r) {
-                const float yf = static_cast<float>(r - row) - 0.5f;
-                const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(r * r) - yf * yf)));
-                xr0 = r - dx; xr1 = w - (r - dx);
-            } else if (row >= h - r) {
-                const float yf = static_cast<float>(row - (h - r)) + 0.5f;
-                const int dx = static_cast<int>(std::sqrt(std::max(0.0f, static_cast<float>(r * r) - yf * yf)));
-                xr0 = r - dx; xr1 = w - (r - dx);
+        const bool cornerRow = r > 1 && (row < r || row >= h - r);
+        for (int col = 0; col < w; ++col) {
+            int cov = 255;
+            if (cornerRow && (col < r || col >= w - r)) {
+                const int dx = col < r ? col : w - 1 - col;
+                const int dy = row < r ? row : h - 1 - row;
+                cov = tab[static_cast<std::size_t>(dy) * r + dx];
             }
-        }
-        for (int col = xr0; col < xr1; ++col) {
+            if (cov <= 0) continue;
             const float t = (static_cast<float>(col) / std::max(1, w) +
                              static_cast<float>(row) / std::max(1, h)) * 0.5f;
+            const Uint8 ca = clamp8(static_cast<int>(c0.a + (c1.a - c0.a) * t));
+            const Uint8 a = static_cast<Uint8>((cov * ca + 127) / 255);
+            if (a == 0) continue;
             blendPx(x + col, y + row,
                     clamp8(static_cast<int>(c0.r + (c1.r - c0.r) * t)),
                     clamp8(static_cast<int>(c0.g + (c1.g - c0.g) * t)),
                     clamp8(static_cast<int>(c0.b + (c1.b - c0.b) * t)),
-                    clamp8(static_cast<int>(c0.a + (c1.a - c0.a) * t)));
+                    a);
         }
     }
 }
@@ -922,9 +973,16 @@ void UiEngine::drawImageCropped(const std::string& name,
     const ImageData& img = (*ip);
 
     // Cache key: source crop + target size (zoom is quantized by the caller)
-    const std::string key = img.key + "|" + std::to_string(sx0) + "," + std::to_string(sy0) +
-                            "," + std::to_string(sw) + "," + std::to_string(sh) +
-                            "|" + std::to_string(w) + "x" + std::to_string(h);
+    // v0.83: built in a reused scratch buffer — was ~6 heap strings per drawImage per frame.
+    static thread_local std::string key;
+    key.clear();
+    key.append(img.key).push_back('|');
+    appendInt(key, sx0); key.push_back(',');
+    appendInt(key, sy0); key.push_back(',');
+    appendInt(key, sw); key.push_back(',');
+    appendInt(key, sh); key.push_back('|');
+    appendInt(key, w); key.push_back('x');
+    appendInt(key, h);
     auto sc = scaledCache_.find(key);
     if (sc == scaledCache_.end()) {
         trimScaled(static_cast<std::size_t>(w) * h * 4);
@@ -1047,13 +1105,10 @@ void UiEngine::drawImageCropped(const std::string& name,
             if (yCorner) {
                 const int lx = dx - x;
                 if (lx < rr || lx >= w - rr) {
-                    const float ccx = lx < rr ? static_cast<float>(rr) : static_cast<float>(w - rr);
-                    const float ccy = ly < rr ? static_cast<float>(rr) : static_cast<float>(h - rr);
-                    const float ddx = lx + 0.5f - ccx;
-                    const float ddy = ly + 0.5f - ccy;
-                    float cov = static_cast<float>(rr) - std::sqrt(ddx * ddx + ddy * ddy) + 0.5f;
-                    cov = cov < 0.0f ? 0.0f : (cov > 1.0f ? 1.0f : cov);
-                    sa = static_cast<int>(sa * cov);
+                    const int gdx = lx < rr ? lx : w - 1 - lx;
+                    const int gdy = ly < rr ? ly : h - 1 - ly;
+                    const int cov = cornerCovTable(rr)[static_cast<std::size_t>(gdy) * rr + gdx];
+                    sa = (sa * cov + 127) / 255;
                     if (sa <= 0) continue;
                 }
             }
@@ -1189,8 +1244,14 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
     static TextBitmap kEmpty{};
     if (utf8.empty() || pxSize <= 0) return kEmpty;
 
-    const std::string key = std::to_string(static_cast<int>(role)) + ":" +
-                            std::to_string(pxSize) + ":" + (isArabicLang ? "1:" : "0:") + utf8;
+    // v0.83: scratch key buffer — was 4 heap strings per drawText per frame.
+    static thread_local std::string key;
+    key.clear();
+    key.push_back(static_cast<char>('0' + static_cast<int>(role)));
+    key.push_back(':');
+    appendInt(key, pxSize);
+    key.append(isArabicLang ? ":1:" : ":0:");
+    key.append(utf8);
     auto it = textCache_.find(key);
     if (it != textCache_.end()) { it->second.used = ++tick_; return it->second; }
 
