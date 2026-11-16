@@ -240,7 +240,8 @@ void drawConfirmDialog(UiEngine& e, const std::string& title, const std::string&
                        const std::string& yesLabel, const std::string& noLabel, int focus, const std::string& langCode);
 void drawLanguageDialog(UiEngine& e, int selectedLang, const std::string& langCode);   // optional (not used by the v5 flow)
 
-std::string tr(const std::string& key, const std::string& langCode);
+// v0.83: returns a REFERENCE (static storage) — was copying every label every frame.
+const std::string& tr(const std::string& key, const std::string& langCode);
 
 // ============================================================================
 //  DEPRECATED (kept so old main.cpp still compiles — they forward to the v5 screens; remove when migrated)
