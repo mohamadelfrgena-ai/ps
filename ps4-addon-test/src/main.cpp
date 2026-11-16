@@ -117,6 +117,8 @@ struct App {
     int askFocus = 0;
     bool confirmSignOut = false;
     int confirmFocus = 1;
+    bool acConfirm = false;      // v0.82 (Design A §5): AC-unlock confirm dialog (purple/gold)
+    int acConfirmFocus = 0;
     std::string query, notice, code, pollSecret, exchangeId, linkedConsoleId, sessionRef, sessionRefresh;
     std::string linkedUsername, linkedDisplayName, linkedAvatar;   // v0.42/0.48: profile from the poll response
     int codeSecs = 0, codeStatus = 4;
@@ -1152,6 +1154,48 @@ static void openItem(int catIdx) {
     }
 }
 
+static void startSignIn();   // forward (used inside startAcUnlock worker)
+// v0.82 (Design A §5): AC unlock runs from the confirm dialog — background thread
+// (the UI must never freeze for the round-trip). Shared by the dialog and the old flow.
+static void startAcUnlock() {
+    if (A.detailIdx < 0 || A.detailIdx >= (int)catalog().size()) return;
+    const std::string itemId = catalog()[(std::size_t)A.detailIdx].id;
+    static std::atomic<bool> sAcBusy{false};
+    if (sAcBusy.exchange(true)) return;
+    const std::string langU = A.lang;
+    std::thread([itemId, langU]() {
+
+        RpcResult r = callAcUnlock(gCfg, itemId, gSession.accessToken);
+        if (r.ok && (r.rpcOk || jsonGetBool(r.body, "ok", true))) {
+            ui_sfx(Sfx::Purchase);
+            applyAccountFromSession();   // balance drops in the same moment
+            loadWalletHistory();
+            const int gi = findItem(itemId);
+            if (gi >= 0) {
+                AddonItem u = catalog()[(std::size_t)gi];
+                u.unlocked = true;
+                upsertCatalogItem(u);
+                A.detailIdx = findItem(u.id);
+                A.focus = 0;
+            }
+        } else {
+            ui_sfx(Sfx::Error);
+            if (r.statusCode == 401) {
+                // v0.51: the session expired — ask to link again instead
+                // of a misleading "not enough AC" message.
+                A.notice = tr("sign_in_continue", langU);
+                gSession.accessToken.clear();
+                gSession.valid = false;
+                startSignIn();
+            } else {
+                A.notice = tr("err_not_enough_ac", langU);
+            }
+        }
+        sAcBusy = false;
+        A.dirty = true;
+        }).detach();
+}
+
 static void startSignIn() {
     pushScr(Scr::SignIn);
     A.qrView = false;
@@ -1478,6 +1522,14 @@ static void handle(Btn b) {
         } else if (b == Btn::Circle) A.confirmSignOut = false;
         return;
     }
+    if (A.acConfirm) {
+        if (b == Btn::Up || b == Btn::Down) { A.acConfirmFocus ^= 1; }
+        else if (b == Btn::Cross) {
+            A.acConfirm = false;
+            if (A.acConfirmFocus == 0) startAcUnlock();
+        } else if (b == Btn::Circle) A.acConfirm = false;
+        return;
+    }
     // ---- global: △ = Search (no triangle menu in v5) ----
     if (b == Btn::Triangle && A.scr != Scr::SignIn && A.scr != Scr::Search) {
         pushScr(Scr::Search);
@@ -1563,44 +1615,13 @@ static void handle(Btn b) {
             else if (b == Btn::Down) moveFocus(0, 1);
             else if (b == Btn::Left) moveFocus(-1, 0);
             else if (b == Btn::Right) moveFocus(1, 0);
-            else if (b == Btn::Cross && (A.focus == 1 || (A.focus >= 2 && A.focus <= 5)) && ac) {
-                // AC unlock (v7 payment rules) — v0.61: BACKGROUND thread (was on the UI
-                // thread: the app froze for the whole round-trip «بطء استجابة» + «ويعلق»).
-                static std::atomic<bool> sAcBusy{false};
-                if (!sAcBusy.exchange(true)) {
-                    const std::string itemId = it.id;
-                    const std::string langU = A.lang;
-                    std::thread([itemId, langU]() {
-                        RpcResult r = callAcUnlock(gCfg, itemId, gSession.accessToken);
-                        if (r.ok && (r.rpcOk || jsonGetBool(r.body, "ok", true))) {
-                            ui_sfx(Sfx::Purchase);
-                            applyAccountFromSession();   // balance drops in the same moment
-                            loadWalletHistory();
-                            const int gi = findItem(itemId);
-                            if (gi >= 0) {
-                                AddonItem u = catalog()[(std::size_t)gi];
-                                u.unlocked = true;
-                                upsertCatalogItem(u);
-                                A.detailIdx = findItem(u.id);
-                                A.focus = 0;
-                            }
-                        } else {
-                            ui_sfx(Sfx::Error);
-                            if (r.statusCode == 401) {
-                                // v0.51: the session expired — ask to link again instead
-                                // of a misleading "not enough AC" message.
-                                A.notice = tr("sign_in_continue", langU);
-                                gSession.accessToken.clear();
-                                gSession.valid = false;
-                                startSignIn();
-                            } else {
-                                A.notice = tr("err_not_enough_ac", langU);
-                            }
-                        }
-                        sAcBusy = false;
-                        A.dirty = true;
-                    }).detach();
-                }
+            else if (b == Btn::Cross && A.focus == 0 && ac) {
+                // v0.82 (Design A §5): the AC button opens the confirm dialog first
+                A.acConfirm = true;
+                A.acConfirmFocus = 0;
+            } else if (b == Btn::Cross && A.focus == 1 && ac) {
+                // v0.82 (Design A §4): the subscribe button -> Plans
+                go(Scr::Plans);
             } else if (b == Btn::Cross && A.focus >= 2) {
                 // v0.80: open the focused creator-rail card (spec 5 — Cross on a card)
                 const std::vector<int> cr = creatorItems(A.detailIdx);
@@ -1708,7 +1729,7 @@ static void drawFrame(UiEngine& e) {
     // v0.38: while a modal is open the page's focus rings must not be animation-replayed
     // over it (they were drawing ON TOP of the sign-in dialog). The dialog's own gleams
     // register after this block, so they keep animating normally.
-    const bool modal = A.askSignIn || A.confirmSignOut;
+    const bool modal = A.askSignIn || A.confirmSignOut || A.acConfirm;
     animBlock(modal);
     switch (A.scr) {
         case Scr::SignIn:   drawSignIn(e, A.focus, A.code, A.codeSecs, A.codeStatus, L, A.back != Scr::Home, A.qrView); break;
@@ -1726,6 +1747,8 @@ static void drawFrame(UiEngine& e) {
     if (A.askSignIn) drawSignInRequired(e, A.askFocus, L);
     if (A.confirmSignOut)
         drawConfirmDialog(e, tr("signout_q", L), tr("signout_sub", L), tr("settings_signout", L), tr("cancel", L), A.confirmFocus, L);
+    if (A.acConfirm && A.detailIdx >= 0 && A.detailIdx < (int)catalog().size())
+        drawAcConfirm(e, A.acConfirmFocus, catalog()[(std::size_t)A.detailIdx], L);
     if (!A.toastText.empty()) drawToast(e, A.toastText, L, A.toastKind);
 }
 
