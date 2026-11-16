@@ -349,6 +349,13 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable() {
         {"ft_world", {{"en", "World"}, {"fa", "دنیا"}, {"ar", "عالم"}, {"fr", "Monde"}, {"tr", "Dünya"}, {"es", "Mundo"}, {"ru", "Мир"}, {"pt", "Mundo"}, {"zh", "世界"}}},
         {"ft_texture", {{"en", "Texture Pack"}, {"fa", "پک بافت"}, {"ar", "حزمة قوام"}, {"fr", "Pack de textures"}, {"tr", "Doku paketi"}, {"es", "Pack de texturas"}, {"ru", "Текстур-пак"}, {"pt", "Pacote de texturas"}, {"zh", "材质包"}}},
         {"more_by", {{"en", "More by this creator"}, {"fa", "بیشتر از این سازنده"}, {"ar", "المزيد من هذا المطوّر"}, {"fr", "Plus de ce créateur"}, {"tr", "Bu yapımcıdan daha fazlası"}, {"es", "Más de este creador"}, {"ru", "Ещё от этого автора"}, {"pt", "Mais deste criador"}, {"zh", "此创作者的更多作品"}}},
+        {"ac_confirm_t", {{"en", "Confirm unlock"}, {"fa", "تأیید باز کردن"}, {"ar", "تأكيد الفتح"}, {"fr", "Confirmer le déblocage"}, {"tr", "Açmayı onayla"}, {"es", "Confirmar desbloqueo"}, {"ru", "Подтвердить открытие"}, {"pt", "Confirmar desbloqueio"}, {"zh", "确认解锁"}}},
+        {"ac_after_bal", {{"en", "Balance after unlock %s AC"}, {"fa", "موجودی پس از باز کردن %s AC"}, {"ar", "رصيدك بعد الفتح %s AC"}, {"fr", "Solde après déblocage %s AC"}, {"tr", "Açtıktan sonra bakiye %s AC"}, {"es", "Saldo después de desbloquear %s AC"}, {"ru", "Баланс после открытия %s AC"}, {"pt", "Saldo após desbloquear %s AC"}, {"zh", "解锁后余额 %s AC"}}},
+        {"save_x", {{"en", "Save %s"}, {"fa", "صرفه‌جویی %s"}, {"ar", "وفّر %s"}, {"fr", "Économisez %s"}, {"tr", "%s kazan"}, {"es", "Ahorra %s"}, {"ru", "Сэкономьте %s"}, {"pt", "Economize %s"}, {"zh", "省 %s"}}},
+        {"ready_mc", {{"en", "Ready inside Minecraft"}, {"fa", "آماده داخل ماینکرافت"}, {"ar", "جاهزة داخل ماينكرافت"}, {"fr", "Prêt dans Minecraft"}, {"tr", "Minecraft içinde hazır"}, {"es", "Listo dentro de Minecraft"}, {"ru", "Готово внутри Minecraft"}, {"pt", "Pronto dentro do Minecraft"}, {"zh", "已在 Minecraft 中就绪"}}},
+        {"confirm_btn", {{"en", "Confirm"}, {"fa", "تأیید"}, {"ar", "تأكيد"}, {"fr", "Confirmer"}, {"tr", "Onayla"}, {"es", "Confirmar"}, {"ru", "Подтвердить"}, {"pt", "Confirmar"}, {"zh", "确认"}}},
+        {"range_of", {{"en", "%d-%d of %d"}, {"fa", "%d–%d از %d"}, {"ar", "%d–%d من %d"}, {"fr", "%d–%d sur %d"}, {"tr", "%d–%d / %d"}, {"es", "%d–%d de %d"}, {"ru", "%d–%d из %d"}, {"pt", "%d–%d de %d"}, {"zh", "%d–%d / %d"}}},
+        {"ac_unlock_l", {{"en", "Unlock for"}, {"fa", "باز کردن با"}, {"ar", "افتح مقابل"}, {"fr", "Débloquer pour"}, {"tr", "Şununla aç"}, {"es", "Desbloquear por"}, {"ru", "Открыть за"}, {"pt", "Desbloquear por"}, {"zh", "解锁价格"}}},
         {"chip_under100", {{"en", "Under 100 AC"}, {"fa", "کمتر از ۱۰۰ AC"}, {"ar", "أقل من 100 AC"}, {"fr", "Moins de 100 AC"}, {"tr", "100 AC altı"}, {"es", "Menos de 100 AC"}, {"ru", "До 100 AC"}, {"pt", "Menos de 100 AC"}, {"zh", "低于 100 AC"}}},
         {"chip_biggest", {{"en", "Biggest discount"}, {"fa", "بیشترین تخفیف"}, {"ar", "أكبر خصم"}, {"fr", "Plus grosse remise"}, {"tr", "En büyük indirim"}, {"es", "Mayor descuento"}, {"ru", "Максимальная скидка"}, {"pt", "Maior desconto"}, {"zh", "最大折扣"}}},
         {"chip_newest", {{"en", "Newest"}, {"fa", "جدیدترین"}, {"ar", "الأحدث"}, {"fr", "Plus récent"}, {"tr", "En yeni"}, {"es", "Más reciente"}, {"ru", "Новейшие"}, {"pt", "Mais recente"}, {"zh", "最新"}}},
@@ -767,7 +774,7 @@ int drawBtn(UiEngine& e, const std::string& key, int cx, int cy, int h) {
 // states the main loop restores the animated rectangles from a frame snapshot and replays just
 // these calls (focus ring/gleam, gem, settings icon tiles) ~30 times a second.
 struct AnimCall {
-    enum Kind : std::uint8_t { Ring, Mark, Tile } kind;
+    enum Kind : std::uint8_t { Ring, Mark, Tile, Shine } kind;
     int a0 = 0, a1 = 0, a2 = 0, a3 = 0, a4 = 0, a5 = 0;
     SDL_Color c{0, 0, 0, 255};
 };
@@ -2987,18 +2994,17 @@ static void drawStatusRow(UiEngine& e, const Lay& L) {
         x -= 18;
     }
     const std::string bal = formatAC(gAcc.signedIn ? gAcc.acBalance : 0);
-    // v6.7: coin + amount + "AC" centred as one group, same padding on both sides; "AC" sits on the digits' baseline
+    // v0.82 (Design A): the AC badge gets the GOLD style — gold ring + gold F77 "AC N,NNN"
     std::vector<GPiece> g;
-    g.push_back(gIcon(28, 28, [&](int gx, int gy) { e.drawImage("icon_coin", gx, gy, 28, 28); }, 10));
     g.push_back(gText(e, bal, 23, kGD, false, 8, FontRole::Pixel));
-    GPiece ac = gText(e, "AC", 16, kMU, false, 0, FontRole::Pixel);
+    GPiece ac = gText(e, "AC", 16, kGD, false, 0, FontRole::Pixel);
     ac.dy = (e.inkCapHeight(bal, 23, FontRole::Pixel) - e.inkCapHeight("AC", 16, FontRole::Pixel) + 1) / 2;
     g.push_back(ac);
     const int pillH = 52, pillW = 18 + groupW(g) + 20;
     const int pillX = x - pillW, py = top + (av - pillH) / 2;
     const int prx = L.X(pillX, pillW);
-    e.drawRoundRect(prx, py, pillW, pillH, pillH / 2, gLight ? SDL_Color{255, 255, 255, 235} : SDL_Color{10, 12, 15, 190});
-    e.drawRoundBorder(prx, py, pillW, pillH, pillH / 2, 2, SDL_Color{255, 201, 64, static_cast<Uint8>(gLight ? 160 : 90)});
+    e.drawRoundRect(prx, py, pillW, pillH, pillH / 2, gLight ? SDL_Color{255, 255, 255, 235} : SDL_Color{10, 12, 15, 210});
+    e.drawRoundBorder(prx, py, pillW, pillH, pillH / 2, 2, SDL_Color{245, 197, 66, 255});
     drawGroupCentered(e, L, g, prx + pillW / 2, py + pillH / 2);
 }
 } // namespace
@@ -3614,13 +3620,121 @@ void drawStore(UiEngine& e, int focus, int filterIndex, const std::string& langC
 // ============================================================================
 //  Addon / world page — tier access first, AC unlock as the alternative (replaces Share)
 // ============================================================================
+// ============================================================================
+//  v0.82 (Design A §6): the SHINE — a soft white light band skewed -20° crossing
+//  the primary buttons left→right, clipped to the rounded rect. 3.2s cycle, the
+//  crossing takes 55% of it, ease-in-out. Animated via the AnimCall replay loop.
+// ============================================================================
+void buttonShine(UiEngine& e, int x, int y, int w, int h, int r) {
+    const double T = 3.2, act = 0.55;
+    const double tsec = (SDL_GetTicks() % 3200000) / 1000.0;
+    double ph = std::fmod(tsec, T) / T;
+    if (ph > act) return;
+    double u = ph / act;
+    u = u < 0.5 ? 2.0 * u * u : 1.0 - (-2.0 * u + 2.0) * (-2.0 * u + 2.0) / 2.0;
+    const double bw = w * 0.35;
+    const double cxx = -0.60 * w + u * 1.90 * w;
+    const double tan20 = 0.36397;
+    const int peak = 140;
+    for (int sy = 0; sy < h; sy += 2) {
+        const double dx = (sy - h / 2.0) * tan20;
+        const double bx = x + cxx - bw / 2 + dx;
+        int inset = 0;
+        if (sy < r) { const double dd = r - sy; inset = (int)(r - std::sqrt(std::max(0.0, (double)r * r - dd * dd))); }
+        else if (sy > h - r) { const double dd = sy - (h - r); inset = (int)(r - std::sqrt(std::max(0.0, (double)r * r - dd * dd))); }
+        const int xa = std::max(x + inset, (int)bx), xb = std::min(x + w - inset, (int)(bx + bw));
+        if (xb <= xa) continue;
+        const int mid = (int)(bx + bw / 2);
+        if (mid > xa) e.fillGradH(xa, y + sy, std::min(mid, xb) - xa, 2, SDL_Color{255, 255, 255, 0}, SDL_Color{255, 255, 255, (Uint8)peak});
+        if (xb > std::max(mid, xa)) e.fillGradH(std::max(mid, xa), y + sy, xb - std::max(mid, xa), 2, SDL_Color{255, 255, 255, (Uint8)peak}, SDL_Color{255, 255, 255, 0});
+    }
+}
+
+// v0.82 (Design A §5): the AC unlock CONFIRM dialog — purple for Epic, gold for Legendary.
+// Diamond "AC" half above the window, item name, huge price, balance-after line,
+// gold confirm button + plain cancel text.
+void drawAcConfirm(UiEngine& e, int focus, const AddonItem& it, const std::string& langCode) {
+    Lay L; L.rtl = (langCode == "ar" || langCode == "fa");
+    const std::string& lang = langCode;
+    auto C = [](int r, int g, int b, int a = 255) { return SDL_Color{static_cast<Uint8>(r), static_cast<Uint8>(g), static_cast<Uint8>(b), static_cast<Uint8>(a)}; };
+    const bool leg = it.tier == Tier::Legendary;
+    e.fillRect(0, 0, 1920, 1080, C(5, 9, 18, 209));   // scrim rgba(5,9,18,0.82)
+    const int w = 680, h = 560, cx = (1920 - w) / 2, cy = (1080 - h) / 2 + 26;
+    const SDL_Color glow = leg ? C(201, 154, 34, 46) : C(122, 75, 214, 46);
+    e.drawRoundBorder(cx - 12, cy - 12, w + 24, h + 24, 46, 8, glow);
+    e.drawRoundBorder(cx - 6, cy - 6, w + 12, h + 12, 41, 5, glow);
+    if (leg) e.drawRoundGradV(cx, cy, w, h, 36, C(58, 42, 10), C(23, 17, 10));
+    else e.drawRoundGradV(cx, cy, w, h, 36, C(34, 22, 77), C(18, 13, 43));
+    e.drawRoundBorder(cx, cy, w, h, 36, 2, leg ? C(201, 154, 34) : C(122, 75, 214));
+    {   // the AC diamond — a 45° rounded square, half above the window edge
+        const int R = 68, rr = 16;
+        const int dcx = cx + w / 2, dcy = cy;
+        const SDL_Color dCol = leg ? C(245, 197, 66) : C(176, 124, 255);
+        for (int dy = -R; dy <= R; dy += 2) {
+            const int t = std::abs(dy), a = R - rr;
+            const int hw = t <= a ? (R - t) : (int)std::sqrt(std::max(0.0, (double)rr * rr - (double)(t - a) * (t - a)));
+            if (hw > 0) e.fillRect(dcx - hw, dcy + dy, hw * 2, 2, dCol);
+        }
+        e.drawTextCentered("AC", dcx, dcy, 26, leg ? C(26, 19, 0) : C(18, 13, 43), FontRole::Pixel, false);
+    }
+    int yy = cy + 96;
+    e.drawTextCentered(tr("ac_confirm_t", lang), cx + w / 2, yy, 24, leg ? C(245, 197, 66) : C(176, 124, 255), FontRole::Body, L.rtl);
+    yy += 42;
+    {   // item name — F77, shrink to fit
+        std::string t = it.title;
+        int px = 46;
+        while (px > 28 && e.inkWidth(t, px, FontRole::Pixel, L.rtl) > w - 112) px -= 2;
+        e.drawTextCentered(t, cx + w / 2, yy, px, C(243, 246, 251), FontRole::Pixel, L.rtl);
+        yy += px + 22;
+    }
+    {   // the price — huge pixel number + AC
+        const std::string num = formatAC(it.acPrice);
+        const int nw = e.inkWidth(num, 84, FontRole::Pixel, L.rtl), aw = e.inkWidth("AC", 32, FontRole::Pixel, false);
+        const int total = nw + 12 + aw;
+        int sx = cx + (w - total) / 2;
+        e.drawText(num, L.X(sx, nw), yy, 84, C(245, 197, 66), FontRole::Pixel, false, L.rtl);
+        e.drawText("AC", L.X(sx + nw + 12, aw), yy + 52, 32, C(245, 197, 66), FontRole::Pixel, false, false);
+        yy += 104;
+    }
+    {   // balance after — the number in green
+        const std::string t = tr("ac_after_bal", lang);
+        const std::size_t p = t.find("%s");
+        const std::string pre = p == std::string::npos ? t : t.substr(0, p);
+        const std::string post = p == std::string::npos ? "" : t.substr(p + 2);
+        const std::string val = formatAC(std::max(0, gAcc.acBalance - it.acPrice));
+        const int w0 = e.inkWidth(pre, 26, FontRole::Body, L.rtl), w1 = e.inkWidth(val, 26, FontRole::Body, L.rtl),
+                  w2 = e.inkWidth(post, 26, FontRole::Body, L.rtl);
+        const int total = w0 + (w0 ? 8 : 0) + w1 + (w2 ? 8 + w2 : 0);
+        int sx = cx + (w - total) / 2;
+        if (w0) { e.drawText(pre, L.X(sx, w0), yy, 26, C(168, 179, 199), FontRole::Body, false, L.rtl); sx += w0 + 8; }
+        e.drawText(val, L.X(sx, w1), yy, 26, C(127, 224, 164), FontRole::Body, false, L.rtl); sx += w1;
+        if (w2) e.drawText(post, L.X(sx + 8, w2), yy, 26, C(168, 179, 199), FontRole::Body, false, L.rtl);
+        yy += 52;
+    }
+    {   // تأكيد — gold button + shine
+        const int bw = w - 112, bx = cx + 56;
+        e.drawRoundRect(bx, yy, bw, 92, 20, C(245, 197, 66));
+        e.drawRoundBorder(bx, yy, bw, 92, 20, 2, C(255, 224, 138));
+        e.drawTextCentered(tr("confirm_btn", lang), bx + bw / 2, yy + 46, 30, C(26, 19, 0), FontRole::Body, L.rtl);
+        buttonShine(e, bx, yy, bw, 92, 20);
+        if (focus == 0) focusRing(e, bx, yy, bw, 92, 20, false);
+        yy += 92 + 18;
+    }
+    {   // إلغاء — plain text
+        const std::string c2 = tr("cancel", lang);
+        const int cw = e.inkWidth(c2, 28, FontRole::Body, L.rtl) + 64;
+        e.drawTextCentered(c2, cx + w / 2, yy + 12, 28, C(201, 211, 229), FontRole::Body, L.rtl);
+        if (focus == 1) focusRing(e, cx + (w - cw) / 2, yy - 10, cw, 48, 14, false);
+    }
+}
+
 void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int percent, const std::string& langCode,
                      const std::string& notice) {
     Lay L; L.rtl = (langCode == "ar" || langCode == "fa");
     const std::string& lang = langCode;
     if (idx < 0 || idx >= static_cast<int>(gCat.size())) {   // item disappeared (unpublished) -> calm empty page
         backdrop(e);
-        drawTopNav(e, 2, langCode, -1, true);   // v0.80: side rail ON (spec: the removed-item page keeps the rail)
+        drawTopNav(e, 2, langCode, -1, true);
         emptyState(e, L, kCL + 20, 200, kCR - kCL - 20, 600, 12, tr("empty_t", lang), tr("empty_s", lang));
         drawLegendBar(e, {{"\xE2\x97\x8B", "back"}}, langCode);
         return;
@@ -3628,19 +3742,18 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
     const AddonItem& it = gCat[static_cast<std::size_t>(idx)];
     const Access acc = accessFor(it);
     const bool acOffer = acUnlockOffered(it);
-    {   // PERFORMANCE: the full-screen cover + 3 shade layers are composed ONCE per item/theme/direction and
-        // kept as one opaque image ("__bg_detail"); later frames are a single straight copy.
+    const bool lowBal = acOffer && gAcc.signedIn && gAcc.acBalance < it.acPrice;
+    auto C = [](int r, int g, int b, int a = 255) { return SDL_Color{static_cast<Uint8>(r), static_cast<Uint8>(g), static_cast<Uint8>(b), static_cast<Uint8>(a)}; };
+    {   // BACKGROUND (Design A §3-b): the item's cover fills the screen + 80px bleed, then
+        // blur 26px + brightness 0.5 + saturate 1.1 — baked once per item/theme/direction.
         static std::string bakedFor;
-        const std::string want = it.id + (gLight ? "|L" : "|D") + (L.rtl ? "|R" : "|N") +
+        const std::string want = it.id + (gLight ? "|L" : "|D") + (L.rtl ? "|R" : "|N") + "A2" +
                                  (!it.cover.empty() && e.hasImage(it.cover) ? "|1" : "|0");
         if (bakedFor == want && e.hasImage("__bg_detail")) {
             e.drawImage("__bg_detail", 0, 0, 1920, 1080);
         } else {
             e.clear(kBG);
-            itemCover(e, it, 0, 0, 1920, 1080, 0);
-            leadShade(e, L, 1080, true);
-            bottomShade(e);
-            e.fillGradV(0, 0, 1920, 150, shade(140), shade(0));
+            itemCover(e, it, -80, -80, 2080, 1240, 0);
             const auto& fb = e.framebuffer();
             std::vector<std::uint8_t> rgba(fb.size() * 4);
             for (std::size_t i = 0; i < fb.size(); ++i) {
@@ -3648,9 +3761,8 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
                 rgba[i * 4] = static_cast<std::uint8_t>(p >> 16); rgba[i * 4 + 1] = static_cast<std::uint8_t>(p >> 8);
                 rgba[i * 4 + 2] = static_cast<std::uint8_t>(p); rgba[i * 4 + 3] = 255;
             }
-            {   // v0.80 («استخدم نفس الصورة التي في المتجر للخلفية المضبببة»): blur the baked
-                // store image — one-time cost per item, kept in "__bg_detail".
-                const int R = 10;
+            {
+                const int R = 13;
                 std::vector<std::uint8_t> tmp(rgba.size());
                 for (int pass = 0; pass < 2; ++pass) {
                     for (int yy2 = 0; yy2 < 1080; ++yy2) {
@@ -3663,10 +3775,10 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
                                 r += rgba[o]; g += rgba[o + 1]; b += rgba[o + 2]; ++cnt;
                             }
                             const std::size_t o = (static_cast<std::size_t>(yy2) * 1920 + xx2) * 4;
-                            tmp[o] = static_cast<std::uint8_t>(r / cnt);
-                            tmp[o + 1] = static_cast<std::uint8_t>(g / cnt);
-                            tmp[o + 2] = static_cast<std::uint8_t>(b / cnt);
-                            tmp[o + 3] = 255;
+                            const float rr = r / (float)cnt, gg = g / (float)cnt, bb = b / (float)cnt;
+                            const float lum = 0.213f * rr + 0.715f * gg + 0.072f * bb;
+                            auto fin = [&](float v) { const float x2 = (lum + (v - lum) * 1.1f) * 0.5f; return static_cast<std::uint8_t>(x2 < 0.f ? 0 : (x2 > 255.f ? 255 : x2)); };
+                            tmp[o] = fin(rr); tmp[o + 1] = fin(gg); tmp[o + 2] = fin(bb); tmp[o + 3] = 255;
                         }
                     }
                     rgba.swap(tmp);
@@ -3676,57 +3788,52 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
             bakedFor = want;
         }
     }
-    drawTopNav(e, 2, langCode, -1, true);   // v0.80 («استخدم الشريط الجنبي»): side rail ON
-    const int x0 = kCL + 20, xEnd = kCR;
-    const int contentW = xEnd - x0;                 // 1656
-    const int coverW = 500, coverH = 281, gap = 36;
-    const int bxW = 480, bxs = xEnd - bxW;          // action box: end side, 480 (was 660 under the title)
-    const int midX = x0 + coverW + gap;
-    const int midW = contentW - coverW - bxW - 2 * gap;   // 604
-    const int yTop = 150;
-    {   // breadcrumb — v0.80: ftype keys (skin/texture no longer "Addons")
-        const int y = 112;
+    e.fillRect(0, 0, 1920, 1080, C(8, 14, 26, 102));   // veil rgba(8,14,26,0.4)
+
+    drawTopNav(e, 2, langCode, -1, true);   // side rail + status row (avatar/clock/gold AC badge)
+
+    const int x0 = kCL + 20, xEnd = kCR, contentW = xEnd - x0;                       // 1656
+    const int yTop = 120, coverW = 640, coverH = 360, covGap = 56;
+    const int infoX = x0 + coverW + covGap, infoW = contentW - coverW - covGap;      // 960
+
+    {   // top row: breadcrumb at the start side (Design A §2)
+        const int y = 52;
         const std::string a = tr("nav_store", lang), b = tr(ftKeyOf(it.ftype), lang);
-        const int aw = textW(e, L, a, 19);
-        boxText(e, L, a, x0, aw + 4, y, 19, kMU);
-        chevron(e, L.X(x0 + aw + 14, 8), y + 5, 7, !L.rtl, 2, kMU);
-        boxText(e, L, b, x0 + aw + 34, 400, y, 19, kCHIPTX);
+        const int aw = textW(e, L, a, 20);
+        boxText(e, L, a, x0, aw + 4, y, 20, kMU);
+        chevron(e, L.X(x0 + aw + 16, 8), y + 6, 7, !L.rtl, 2, kMU);
+        boxText(e, L, b, x0 + aw + 38, 560, y, 20, kCHIPTX);
     }
-    // ---- row 1: cover | title/creator/meta/facts | action box ----
-    {
+
+    {   // cover 640x360 — start side (right in RTL), radius 24, 2px border
         const int rx = L.X(x0, coverW);
-        itemCover(e, it, rx, yTop, coverW, coverH, 10);
-        e.drawRoundBorder(rx, yTop, coverW, coverH, 10, 3, ink(30));
+        itemCover(e, it, rx, yTop, coverW, coverH, 24);
+        e.drawRoundBorder(rx, yTop, coverW, coverH, 24, 2, C(43, 59, 92, gLight ? 130 : 215));
     }
-    int my = yTop - 4;
-    {   // title (pixel, up to 2 lines)
+
+    int y = yTop - 4;
+    {   // title — F77 pixel 64, ONE line (shrink to fit) — the creator is NEVER in the title
         std::string t = it.title;
-        if (!L.rtl) for (auto& ch : t) if (ch >= 'a' && ch <= 'z') ch = static_cast<char>(ch - 32);
-        int px = 56;
-        auto lines = wrapLines(e, t, px, midW, L.rtl, FontRole::Pixel);
-        while (lines.size() > 2 && px > 52) { px -= 4; lines = wrapLines(e, t, px, midW, L.rtl, FontRole::Pixel); }
-        for (std::size_t i = 0; i < lines.size() && i < 2; ++i) {
-            if (!gLight) boxText(e, L, lines[i], midX + 3, midW, my + 3, px, SDL_Color{0, 0, 0, 90}, FontRole::Pixel);
-            boxText(e, L, lines[i], midX, midW, my, px, kTX, FontRole::Pixel);
-            my += px + 10;
-        }
-        e.drawRoundRect(L.X(midX, 72), my + 2, 72, 6, 3, kGD);   // flat gold accent (approved preview)
-        my += 24;
+        int px = 64;
+        while (px > 40 && e.inkWidth(t, px, FontRole::Pixel, L.rtl) > infoW) px -= 4;
+        boxText(e, L, t, infoX, infoW, y, px, kTX, FontRole::Pixel);
+        y += px + 16;
     }
-    if (!it.creator.empty()) {   // creator: avatar + name (studio = the FOX logo)
-        const int s = 44, ax = L.X(midX, s);
+    if (!it.creator.empty()) {   // creator — avatar circle 48 + name (shown ONCE)
+        const int s2 = 48;
+        const int ax = L.X(infoX, s2);
         std::string low = it.creator;
-        for (char& c : low) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c + 32);
+        for (char& ch : low) if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch + 32);
         const bool studio = low.find("sliver fox") != std::string::npos ||
                             low.find("silverfoxstudio") != std::string::npos;
         if (studio && e.hasImage("fox_avatar")) {
-            e.drawRoundRect(ax, my, s, s, 12, SDL_Color{198, 92, 42, 255});
-            e.drawImageRounded("fox_avatar", ax, my, s, s, 12);
+            e.drawRoundRect(ax, y, s2, s2, 24, C(198, 92, 42));
+            e.drawImageRounded("fox_avatar", ax, y, s2, s2, 24);
         } else {
             unsigned hsh = 0;
             for (unsigned char ch : it.creator) hsh = hsh * 31u + ch;
             static const SDL_Color kAv[5] = {{20, 184, 166, 255}, {59, 130, 246, 255}, {168, 85, 247, 255}, {245, 158, 11, 255}, {239, 68, 68, 255}};
-            e.drawRoundRect(ax, my, s, s, 12, kAv[hsh % 5]);
+            e.drawRoundRect(ax, y, s2, s2, 24, kAv[hsh % 5]);
             std::string ini;
             for (std::size_t i = 0; i < it.creator.size() && ini.size() < 2; ++i) {
                 const unsigned char ch = static_cast<unsigned char>(it.creator[i]);
@@ -3735,207 +3842,224 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
                     ini += static_cast<char>(lo ? ch - 32 : ch);
             }
             if (ini.empty()) ini = "@";
-            e.drawTextCentered(ini, ax + s / 2, my + s / 2, 19, kWHT, FontRole::Body, false);
+            e.drawTextCentered(ini, ax + s2 / 2, y + s2 / 2, 20, C(255, 255, 255), FontRole::Body, false);
         }
-        boxText(e, L, it.creator, midX + s + 14, midW - s - 14, my + 9, 23, kTX);
-        my += 58;
+        const int nw = textW(e, L, it.creator, 26);
+        boxText(e, L, it.creator, infoX + s2 + 12, nw + 6, y + 10, 26, kTX);
+        y += 64;
     }
-    {   // meta row: type chip · tier chip · ★ · ⬇ · NEW  (size/version live in the facts strip — spec 1: no duplicates)
-        int mx = midX;
+    {   // badges — type chip · tier chip · star rating (Design A §2)
+        int mx = infoX;
         {
             const std::string tk = tr(ftKeyOf(it.ftype), lang);
-            const int tkw = textW(e, L, tk, 18) + 32;
-            chipBox(e, L.X(mx, tkw), my - 4, tkw, 38, ink(14), ink(30));
-            e.drawTextCentered(tk, L.X(mx, tkw) + tkw / 2, my + 15, 18, kCHIPTX, FontRole::Body, L.rtl);
-            mx += tkw + 16;
+            const int tkw = textW(e, L, tk, 20) + 36;
+            chipBox(e, L.X(mx, tkw), y, tkw, 42, C(17, 27, 48, 225), C(43, 59, 92, 225));
+            e.drawTextCentered(tk, L.X(mx, tkw) + tkw / 2, y + 21, 20, kTX, FontRole::Body, L.rtl);
+            mx += tkw + 14;
         }
-        mx += tierChip(e, L, mx, my - 4, it.tier, lang, 38) + 18;
-        const int cy = my + 15;
-        auto meta = [&](void (*ic)(UiEngine&, int, int, int, SDL_Color), SDL_Color icc, const std::string& t) {
-            if (ic) { ic(e, L.X(mx, 22), cy - 11, 22, icc); mx += 22 + 8; }
-            const int tw = e.inkWidth(t, 20, FontRole::Body, L.rtl);
-            e.drawTextCentered(t, L.X(mx, tw) + tw / 2, cy, 20, kCHIPTX, FontRole::Body, L.rtl);
-            mx += tw + 26;
-        };
-        if (it.ratingCount > 0) { char b[24]; std::snprintf(b, sizeof b, "%.1f", it.rating); meta(icStar, kGD, b); }
-        if (it.downloads > 0) meta(icDownloadArrow, kBLl, fmtCompact(it.downloads));
-        if (isNewItem(it)) {
-            const std::string b = tr("badge_new", lang);
-            const int nw2 = e.inkWidth(b, 16, FontRole::Body, L.rtl) + 24;
-            e.drawRoundRect(L.X(mx, nw2), cy - 15, nw2, 30, 8, SDL_Color{16, 185, 129, 255});
-            e.drawTextCentered(b, L.X(mx, nw2) + nw2 / 2, cy, 16, kWHT, FontRole::Body, L.rtl);
+        mx += tierChip(e, L, mx, y + 1, it.tier, lang, 40) + 18;
+        if (it.ratingCount > 0) {
+            char b2[24]; std::snprintf(b2, sizeof b2, "%.1f", it.rating);
+            icStar(e, L.X(mx, 26), y + 8, 26, C(245, 197, 66));
+            mx += 26 + 8;
+            const int rw = e.inkWidth(b2, 26, FontRole::Pixel, L.rtl);
+            e.drawTextCentered(b2, L.X(mx, rw) + rw / 2, y + 21, 26, kTX, FontRole::Pixel, L.rtl);
         }
-        my += 46;
+        y += 58;
     }
-    {   // facts strip — one row, 4 cells (empty cells hidden) — spec 1: the ONLY place with size/version
-        std::vector<std::pair<std::string, std::string>> facts;
-        if (it.fileSize > 0) facts.push_back({tr("f_size", lang), fmtSize(it.fileSize)});
-        if (!it.version.empty()) facts.push_back({tr("f_version", lang), it.version});
-        if (it.createdAt > 0) facts.push_back({tr("f_published", lang), fmtDate(it.createdAt)});
-        if (it.downloads > 0) facts.push_back({tr("f_downloads", lang), formatAC(it.downloads)});
-        if (!facts.empty()) {
-            const int fh = 72, frx = L.X(midX, midW);
-            e.drawRoundRect(frx, my, midW, fh, 14, gLight ? SDL_Color{255, 255, 255, 235} : SDL_Color{21, 24, 29, 225});
-            e.drawRoundBorder(frx, my, midW, fh, 14, 2, ink(22));
-            const int n = static_cast<int>(facts.size()), cwn = midW / n;
-            for (int i = 0; i < n; ++i) {
-                const int fx = midX + i * cwn;
-                if (i) e.fillRect(L.X(fx, 1), my + 14, 1, fh - 28, ink(22));
-                boxText(e, L, facts[static_cast<std::size_t>(i)].first, fx + 18, cwn - 26, my + 11, 15, kMU);
-                boxText(e, L, facts[static_cast<std::size_t>(i)].second, fx + 18, cwn - 26, my + 37, 21, kTX);
-            }
-            my += fh;
+    {   // facts — size / version / downloads, shown ONCE, empty cells hidden (Design A §2)
+        std::vector<std::pair<const char*, std::string>> facts;
+        if (it.fileSize > 0) facts.push_back({"f_size", fmtSize(it.fileSize)});
+        if (!it.version.empty()) facts.push_back({"f_version", it.version});
+        if (it.downloads > 0) facts.push_back({"f_downloads", formatAC(it.downloads)});
+        int mx = infoX;
+        for (std::size_t i = 0; i < facts.size(); ++i) {
+            const std::string lb = tr(facts[i].first, lang);
+            const int lw = textW(e, L, lb, 21), vw = textW(e, L, facts[i].second, 22);
+            boxText(e, L, lb, mx, lw + 4, y + 4, 21, kMU);
+            boxText(e, L, facts[i].second, mx + lw + 10, vw + 4, y + 2, 22, kTX);
+            mx += lw + 10 + vw + 36;
         }
+        y += 52;
     }
 
-    // ---- action box (480, end side) — all access/download logic UNCHANGED ----
-    const int pad = 26;
-    const bool lowBal = acOffer && gAcc.signedIn && gAcc.acBalance < it.acPrice;
-    const bool dlLine = gAcc.signedIn && acc == Access::Download && gAcc.downloadLimit > 0;
-    const bool hintLine = lowBal || dlLine || acc == Access::Download || acc == Access::NeedSignIn;
-    int bxH = pad + 34 + 18 + 80 + (acOffer ? 14 + 72 : 0) + (hintLine ? 16 + 26 : 0) + pad;
-    if (lowBal && dlLine) bxH += 32;
-    const int brx = L.X(bxs, bxW);
-    e.dropShadow(brx, yTop + 10, bxW, bxH, 26, 24, gLight ? 60 : 170);
-    e.drawRoundRect(brx, yTop, bxW, bxH, 26, gLight ? SDL_Color{255, 255, 255, 240} : SDL_Color{21, 24, 29, 235});
-    e.drawRoundBorder(brx, yTop, bxW, bxH, 26, 2, ink(24));
-    int yy = yTop + pad;
-    {   // access line
-        std::string t;
-        SDL_Color c = kCHIPTX;
-        if (acc == Access::NeedSignIn) { t = it.tier == Tier::Free ? tr("acc_free", lang) : fmt1(tr("acc_need_s", lang), tierName(it.tier, lang)); c = kTX; }
-        else if (acc == Access::Download) { t = it.unlocked && rankOf(gAcc.plan) < rankOf(it.tier) ? tr("acc_unlocked", lang) : (it.tier == Tier::Free ? tr("acc_free", lang) : tr("acc_included", lang)); c = gLight ? SDL_Color{10, 85, 160, 255} : kGRN2; }
-        else { t = fmt1(tr("acc_need", lang), tierName(it.tier, lang)); c = it.tier == Tier::Legendary ? kGD : kEPICT; }
-        if (acc == Access::Download) { e.drawCircle(L.X(bxs + pad, 28) + 14, yy + 15, 14, kGRN); icCheck(e, L.X(bxs + pad, 28) + 6, yy + 7, 16, kWHT); }
-        else lockIcon(e, L.X(bxs + pad, 28), yy + 1, 28, c);
-        boxText(e, L, t, bxs + pad + 42, bxW - 2 * pad - 42, yy + 3, 22, c);
-    }
-    yy += 34 + 18;
-    const int bw = bxW - 2 * pad, bh = 80, bx = bxs + pad;
-    if (acc == Access::NeedSignIn) {
-        button(e, L, bx, yy, bw, bh, tr("signin_dl", lang), 0, 28, 20);
-    } else if (acc == Access::NeedPlan) {
-        button(e, L, bx, yy, bw, bh, fmt1(tr("get_tier", lang), tierName(it.tier, lang)), it.tier == Tier::Legendary ? 2 : 0, 27, 20);
-    } else if (state == DemoState::Downloading) {
-        button(e, L, bx, yy, bw, bh, tr("downloading", lang) + "  " + num(percent) + "%", 0, 26, 20);
-        const int pbw = bw - 40, pw = std::max(8, pbw * std::max(0, std::min(100, percent)) / 100);
-        const int pbx = L.X(bx + 20, pbw);
-        e.drawRoundRect(pbx, yy + bh - 16, pbw, 6, 3, SDL_Color{0, 0, 0, 70});
-        e.drawRoundRect(L.rtl ? pbx + pbw - pw : pbx, yy + bh - 16, pw, 6, 3, SDL_Color{6, 24, 14, 200});
+    // ---- buttons (Design A §4) ----
+    const int bh = acOffer ? 100 : 84;
+    auto shineBtn = [&](int rx, int yy2, int w2, int h2) {
+        animPush({AnimCall::Shine, rx, yy2, w2, h2, 20, 0}, rx, yy2, w2, h2);
+        buttonShine(e, rx, yy2, w2, h2, 20);
+    };
+    auto dashGaps = [&](int rx, int yy2, int w2, int h2, int r, SDL_Color bg) {
+        for (int i = r + 8; i < w2 - r - 6; i += 18) {
+            e.fillRect(rx + i, yy2, 8, 2, bg); e.fillRect(rx + i, yy2 + h2 - 2, 8, 2, bg);
+        }
+        for (int j = r + 8; j < h2 - r - 6; j += 18) {
+            e.fillRect(rx, yy2 + j, 2, 8, bg); e.fillRect(rx + w2 - 2, yy2 + j, 2, 8, bg);
+        }
+    };
+    int extraAfter = 0;
+    if (state == DemoState::Downloading) {
+        const int rx = L.X(infoX, infoW);
+        e.drawRoundRect(rx, y, infoW, bh, 20, C(17, 27, 48, 235));
+        const int fw = std::max(28, infoW * std::max(0, std::min(100, percent)) / 100);
+        const int fx = L.rtl ? rx + infoW - fw : rx;   // fills from the start side (RTL: right)
+        e.drawRoundRect(fx, y, fw, bh, 20, C(29, 106, 229));
+        e.fillRect(L.rtl ? fx : fx + 20, y, fw - 20, bh, C(29, 106, 229));
+        e.drawRoundBorder(rx, y, infoW, bh, 20, 2, C(43, 59, 92, 225));
+        char pb[64]; std::snprintf(pb, sizeof pb, "%s %d%%", tr("downloading", lang).c_str(), percent);
+        e.drawTextCentered(pb, rx + infoW / 2, y + bh / 2, 30, C(243, 246, 251), FontRole::Body, L.rtl);
     } else if (state == DemoState::Installing) {
-        button(e, L, bx, yy, bw, bh, tr("installing", lang), 2, 28, 20);
+        button(e, L, infoX, y, infoW, bh, tr("installing", lang), 0, 30, 20);
     } else if (state == DemoState::Queued) {
-        button(e, L, bx, yy, bw, bh, tr("queued_state", lang), 3, 26, 20);
+        button(e, L, infoX, y, infoW, bh, tr("queued_state", lang), 3, 28, 20);
     } else if (state == DemoState::Installed || it.installed) {
-        button(e, L, bx, yy, bw, bh, tr("installed", lang), 3, 28, 20);
+        const int rx = L.X(infoX, infoW);
+        e.drawRoundRect(rx, y, infoW, bh, 20, C(18, 51, 31));
+        e.drawRoundBorder(rx, y, infoW, bh, 20, 2, C(46, 125, 79));
+        e.drawTextCentered(tr("installed", lang), rx + infoW / 2, y + bh / 2, 30, C(127, 224, 164), FontRole::Body, L.rtl);
+        e.drawTextCentered(tr("ready_mc", lang), rx + infoW / 2, y + bh + 28, 22, C(127, 224, 164, 215), FontRole::Body, L.rtl);
+        extraAfter = 36;
+    } else if (acc == Access::NeedSignIn) {
+        button(e, L, infoX, y, infoW, bh, tr("signin_dl", lang), 0, 30, 20);
+    } else if (acOffer) {
+        // AC gold (start, 3/5) + subscribe (end, 2/5) — Design A §4
+        const int acW = (infoW - 16) * 3 / 5, subW = infoW - 16 - acW;
+        const int acRx = L.X(infoX, acW), subRx = L.X(infoX + acW + 16, subW);
+        if (lowBal) {
+            e.drawRoundRect(acRx, y, acW, bh, 20, C(17, 27, 48));
+            e.drawRoundBorder(acRx, y, acW, bh, 20, 2, C(58, 71, 95));
+            dashGaps(acRx, y, acW, bh, 20, C(17, 27, 48));
+        } else {
+            e.drawRoundRect(acRx, y, acW, bh, 20, C(245, 197, 66));
+            e.drawRoundBorder(acRx, y, acW, bh, 20, 2, C(255, 224, 138));
+            shineBtn(acRx, y, acW, bh);
+        }
+        const SDL_Color acTx = lowBal ? C(107, 119, 140) : C(26, 19, 0);
+        e.drawTextCentered(tr("ac_unlock_l", lang), acRx + acW / 2, y + 26, 22, acTx, FontRole::Body, L.rtl);
+        {   // price row: [big price + AC] [old struck] [save badge] — pieces from the START edge
+            const std::string num = formatAC(it.acPrice);
+            const int nw = e.inkWidth(num, 34, FontRole::Pixel, L.rtl), aw = e.inkWidth("AC", 20, FontRole::Pixel, false);
+            const int pw = nw + 8 + aw;
+            std::string oldS; int ow = 0;
+            if (it.acPriceOld > it.acPrice) { oldS = formatAC(it.acPriceOld); ow = e.inkWidth(oldS, 22, FontRole::Pixel, L.rtl); }
+            const std::string saveS = fmt1(tr("save_x", lang), formatAC(it.acPriceOld - it.acPrice));
+            const int sw = ow ? e.inkWidth(saveS, 18, FontRole::Body, L.rtl) + 22 : 0;
+            const int total = pw + (ow ? 14 + ow + 12 + sw : 0);
+            int mx = L.rtl ? acRx + (acW - total) / 2 + total : acRx + (acW - total) / 2;
+            auto place = [&](int wp) { if (L.rtl) { mx -= wp; return mx; } const int at = mx; mx += wp; return at; };
+            const int pxx = place(pw);
+            e.drawText(num, pxx, y + 52, 34, acTx, FontRole::Pixel, false, L.rtl);
+            e.drawText("AC", pxx + nw + 8, y + 68, 20, acTx, FontRole::Pixel, false, false);
+            if (ow) {
+                place(14);
+                const SDL_Color oCol = lowBal ? C(107, 119, 140) : C(97, 74, 8);
+                const int oxx = place(ow);
+                e.drawText(oldS, oxx, y + 58, 22, oCol, FontRole::Pixel, false, L.rtl);
+                e.fillRect(oxx, y + 68, ow, 2, oCol);
+                place(12);
+                const int bxx = place(sw);
+                e.drawRoundRect(bxx, y + 52, sw, 34, 10, C(10, 8, 2, 235));
+                e.drawTextCentered(saveS, bxx + sw / 2, y + 69, 18, C(243, 246, 251), FontRole::Body, L.rtl);
+            }
+        }
+        if (focus == 0) focusRing(e, acRx, y, acW, bh, 20, false);
+        // subscribe (end side) — the tier word takes its own colour
+        e.drawRoundBorder(subRx, y, subW, bh, 20, 2, C(29, 106, 229, 175));
+        {
+            const std::string tn = tierName(it.tier, lang);
+            std::string s2 = fmt1(tr("get_tier", lang), tn);
+            const SDL_Color tCol = it.tier == Tier::Legendary ? C(245, 197, 66) : C(176, 124, 255);
+            const SDL_Color bCol = C(141, 184, 255);
+            const std::size_t p = s2.find(tn);
+            if (p == std::string::npos) {
+                e.drawTextCentered(s2, subRx + subW / 2, y + bh / 2, 21, bCol, FontRole::Body, L.rtl);
+            } else {
+                std::string p0 = s2.substr(0, p), p2 = s2.substr(p + tn.size());
+                while (!p0.empty() && p0.back() == ' ') p0.pop_back();
+                while (!p2.empty() && (p2.front() == ' ' || p2.front() == '\n')) p2.erase(p2.begin());
+                const int w0 = e.inkWidth(p0, 21, FontRole::Body, L.rtl), w1 = e.inkWidth(tn, 21, FontRole::Body, L.rtl);
+                const int l1 = w0 + (w0 && w1 ? 8 : 0) + w1;
+                int sx = L.rtl ? subRx + (subW - l1) / 2 + l1 : subRx + (subW - l1) / 2;
+                if (w0) {
+                    if (L.rtl) { sx -= w0; e.drawText(p0, sx, y + 32, 21, bCol, FontRole::Body, false, L.rtl); sx -= 8; }
+                    else { e.drawText(p0, sx, y + 32, 21, bCol, FontRole::Body, false, L.rtl); sx += w0 + 8; }
+                }
+                if (L.rtl) { sx -= w1; e.drawText(tn, sx, y + 32, 21, tCol, FontRole::Body, false, L.rtl); }
+                else e.drawText(tn, sx, y + 32, 21, tCol, FontRole::Body, false, L.rtl);
+                e.drawTextCentered(p2, subRx + subW / 2, y + 66, 21, bCol, FontRole::Body, L.rtl);
+            }
+        }
+        if (focus == 1) focusRing(e, subRx, y, subW, bh, 20, false);
+    } else if (acc == Access::NeedPlan) {
+        // not designed yet → keep the current behaviour (subscribe CTA)
+        const int rx = L.X(infoX, infoW);
+        e.drawRoundBorder(rx, y, infoW, bh, 20, 2, C(29, 106, 229, 175));
+        e.drawTextCentered(fmt1(tr("get_tier", lang), tierName(it.tier, lang)), rx + infoW / 2, y + bh / 2, 26, C(141, 184, 255), FontRole::Body, L.rtl);
+        if (focus == 0) focusRing(e, rx, y, infoW, bh, 20, false);
     } else {
-        button(e, L, bx, yy, bw, bh, "", 0, 28, 20);
-        const SDL_Color dk{6, 24, 14, 255};
-        std::vector<GPiece> g;
-        g.push_back(gIcon(28, 28, [&](int gx, int gy) { icDownloadArrow(e, gx, gy, 28, dk); }, 12));
-        g.push_back(gText(e, tr("download", lang), 28, dk, L.rtl));
-        drawGroupCentered(e, L, g, L.X(bx, bw) + bw / 2, yy + bh / 2);
+        // Download — Design A §4: #1D6AE5 + shine; AC-unlocked items get the green line
+        if (it.unlocked && rankOf(gAcc.plan) < rankOf(it.tier))
+            e.drawTextCentered(tr("acc_unlocked", lang), L.X(infoX, infoW) + infoW / 2, y - 28, 22, C(127, 224, 164), FontRole::Body, L.rtl);
+        const int rx = L.X(infoX, infoW);
+        e.drawRoundRect(rx, y, infoW, bh, 20, C(29, 106, 229));
+        e.drawTextCentered(tr("download", lang), rx + infoW / 2, y + bh / 2, 30, C(255, 255, 255), FontRole::Body, L.rtl);
+        shineBtn(rx, y, infoW, bh);
+        if (focus == 0) focusRing(e, rx, y, infoW, bh, 20, false);
     }
-    if (focus == 0 || (!acOffer && focus == 1)) focusRing(e, L.X(bx, bw), yy, bw, bh, 20);
-    yy += bh;
-    if (acOffer) {   // AC alternative — v0.80: also for Legendary items (fixed price, above Epic)
-        yy += 14;
-        const int ah = 72, arx = L.X(bx, bw);
-        e.drawRoundRect(arx, yy, bw, ah, 20, gLight ? SDL_Color{255, 246, 220, 255} : SDL_Color{48, 36, 10, 220});
-        e.drawRoundBorder(arx, yy, bw, ah, 20, 2, SDL_Color{255, 201, 64, static_cast<Uint8>(lowBal ? 90 : 190)});
-        const std::string lab = fmt1(tr("unlock_for", lang), formatAC(it.acPrice));
-        std::vector<GPiece> g;
-        g.push_back(gIcon(36, 36, [&](int gx, int gy) { e.drawImage("icon_coin", gx, gy, 36, 36); }, 12));
-        g.push_back(gText(e, lab, 26, kGD, L.rtl, 14));
-        if (it.acPriceOld > it.acPrice) {
-            const std::string old = formatAC(it.acPriceOld);
-            const int ow = e.inkWidth(old, 20, FontRole::Pixel), cyy = yy + ah / 2;
-            g.push_back(gIcon(ow, 22, [&, old, ow, cyy](int gx, int) {
-                e.drawTextCentered(old, gx + ow / 2, cyy, 20, kMU, FontRole::Pixel, false);
-                e.fillRect(gx, cyy, ow, 2, kMU);
-            }));
-        }
-        drawGroupCentered(e, L, g, arx + bw / 2, yy + ah / 2);
-        if (focus == 1) focusRing(e, arx, yy, bw, ah, 20);
-        yy += ah;
-    }
-    yy += 16;
-    {   // hints (only real values)
-        if (lowBal) { boxText(e, L, fmt1(tr("bal_low", lang), formatAC(gAcc.acBalance)), bx, bw, yy, 19, kWARN); yy += 32; }
-        if (dlLine) boxText(e, L, fmtDD(tr("dl_used", lang), gAcc.downloadsUsed, gAcc.downloadLimit) + " / " + periodName("day", lang), bx, bw, yy, 19, kMU);
-        else if (!lowBal && acc == Access::Download) {
-            glyph(e, 2, L.X(bx, 24), yy - 1, 24, kMU, kMU, false);
-            boxText(e, L, tr("autolaunch_hint", lang), bx + 34, bw - 34, yy, 18, kMU);
-        } else if (!lowBal && acc == Access::NeedSignIn) {
-            boxText(e, L, tr("acc_guest", lang), bx, bw, yy, 18, kMU);
-        }
-    }
-    if (!notice.empty()) {
-        const int nw2 = textW(e, L, notice, 21) + 60, ny = yTop + bxH + 18;
-        const int nrx = L.X(bxs, nw2);
-        e.drawRoundRect(nrx, ny, nw2, 50, 25, SDL_Color{251, 76, 110, 34});
-        e.drawRoundBorder(nrx, ny, nw2, 50, 25, 2, SDL_Color{251, 76, 110, 160});
-        boxText(e, L, notice, bxs + 30, nw2 - 40, ny + 13, 21, kERT);
+    y += bh + extraAfter;
+
+    if (!notice.empty()) {   // server notice (not designed → keep the current pill)
+        const int nw2 = textW(e, L, notice, 21) + 60;
+        const int nrx = L.X(infoX, nw2);
+        e.drawRoundRect(nrx, y + 12, nw2, 50, 25, C(251, 76, 110, 34));
+        e.drawRoundBorder(nrx, y + 12, nw2, 50, 25, 2, C(251, 76, 110, 160));
+        boxText(e, L, notice, infoX + 30, nw2 - 40, y + 25, 21, kERT);
+        y += 72;
     }
 
-    // ---- row 2: description strip (2 lines, no Show More) ----
-    int rowH = std::max(coverH, my - yTop);
-    rowH = std::max(rowH, bxH + (notice.empty() ? 0 : 68));
-    int y = yTop + rowH + 26;
+    // ---- description — 2 lines max, no box (Design A §2) ----
+    int yy = yTop + std::max(coverH, y - yTop) + 30;
     if (!it.description.empty()) {
-        const int dh = 104, drx = L.X(x0, contentW);
-        e.drawRoundRect(drx, y, contentW, dh, 12, gLight ? SDL_Color{255, 255, 255, 235} : SDL_Color{21, 24, 29, 225});
-        e.drawRoundBorder(drx, y, contentW, dh, 12, 2, ink(22));
-        paragraphAt(e, L, it.description, x0 + 26, contentW - 52, y + 17, 23, kCHIPTX, 2, 14);
-        y += dh + 22;
-    } else {
-        y += 22;
+        paragraphAt(e, L, it.description, x0, contentW, yy, 26, kCHIPTX, 2, 16);
+        yy += 96;
     }
+    yy += 8;
 
-    // ---- row 3: "more by this creator" rail (spec 4-5) ----
+    // ---- More by this creator (Design A §2) — title + counter beside, 4 simple cards ----
     std::vector<int> cr = creatorItems(idx);
     if (!cr.empty()) {
         static int sLastIdx = -1;
-        if (idx != sLastIdx) { sLastIdx = idx; railOffRef() = 0; }   // railOff resets when the page opens
+        if (idx != sLastIdx) { sLastIdx = idx; railOffRef() = 0; }
         const int n = static_cast<int>(cr.size());
         if (railOffRef() + 4 > n) railOffRef() = std::max(0, n - 4);
         const int off = railOffRef();
-        {   // header: gold accent + title + counter pill
-            e.drawRoundRect(L.X(x0, 6), y + 4, 6, 30, 3, kGD);
-            boxText(e, L, tr("more_by", lang), x0 + 22, 900, y, 28, kTX);
-            char cb[32];
-            const int shown = std::min(4, n);
-            std::snprintf(cb, sizeof cb, "%d-%d / %d", off + 1, off + shown, n);
-            const int cw2 = e.inkWidth(cb, 18, FontRole::Body, L.rtl) + 40;
-            const int cx2 = xEnd - cw2;
-            e.drawRoundRect(L.X(cx2, cw2), y - 2, cw2, 36, 14, gLight ? SDL_Color{255, 255, 255, 235} : SDL_Color{18, 26, 35, 235});
-            e.drawRoundBorder(L.X(cx2, cw2), y - 2, cw2, 36, 14, 2, ink(22));
-            e.drawTextCentered(cb, L.X(cx2, cw2) + cw2 / 2, y + 16, 18, kMU, FontRole::Body, L.rtl);
+        const int shown = std::min(4, n);
+        const std::string ttl = tr("more_by", lang);
+        boxText(e, L, ttl, x0, 700, yy, 32, kTX);
+        {
+            const int tw = textW(e, L, ttl, 32);
+            const std::string cb = fmtD(fmtD(fmtD(tr("range_of", lang), off + 1), off + shown), n);
+            boxText(e, L, cb, x0 + tw + 24, 320, yy + 7, 22, kMU);
         }
-        y += 50;
-        const int aw = 50, agap = 16;
-        const int cw2 = (contentW - 2 * (aw + agap) - 3 * agap) / 4;
-        const int ih = 150, ch = vcardHeight(ih, true);
-        for (int s = 0; s < 2; ++s) {   // arrows by PHYSICAL position (locked): left "‹", right "›";
-            const int axl = (s == 0) ? x0 : (xEnd - aw);   // dim 25% at the row edges (RTL swapped)
-            const bool physLeft = L.rtl ? (s == 1) : (s == 0);
-            const bool atStartEdge = off <= 0, atEndEdge = off + 4 >= n;
-            const bool dim = physLeft ? (L.rtl ? atEndEdge : atStartEdge) : (L.rtl ? atStartEdge : atEndEdge);
-            const int arx = L.X(axl, aw);
-            e.drawRoundRect(arx, y + ch / 2 - 26, aw, 52, 16, gLight ? SDL_Color{255, 255, 255, 235} : SDL_Color{18, 26, 35, 235});
-            e.drawRoundBorder(arx, y + ch / 2 - 26, aw, 52, 16, 2, ink(22));
-            const SDL_Color cc = dim ? SDL_Color{static_cast<Uint8>(kMU.r), static_cast<Uint8>(kMU.g), static_cast<Uint8>(kMU.b), 64} : kTX;
-            chevron(e, arx + aw / 2 - 8, y + ch / 2 - 11, 16, !physLeft, 3, cc);
-        }
+        yy += 54;
+        const int cw3 = (contentW - 3 * 24) / 4, imgH = 150, bandH = 92, ch = imgH + bandH;
         for (int i = 0; i < 4; ++i) {
             const int gi = off + i;
             if (gi >= n) break;
-            const int cxl = x0 + aw + agap + i * (cw2 + agap);
-            const bool foc = (focus == 2 + i);
-            vcard(e, L, cxl, y, cw2, ih, gCat[cr[static_cast<std::size_t>(gi)]], foc, lang, true, true, false);
-            if (foc) focusRing(e, L.X(cxl, cw2), y, cw2, ch, 18);
+            const AddonItem& cIt = gCat[static_cast<std::size_t>(cr[static_cast<std::size_t>(gi)])];
+            const int cxl = x0 + i * (cw3 + 24);
+            const int rx = L.X(cxl, cw3);
+            const SDL_Color band = gLight ? C(255, 255, 255, 238) : C(17, 27, 48, 238);
+            e.drawRoundRect(rx, yy, cw3, ch, 16, band);
+            itemCover(e, cIt, rx, yy, cw3, imgH, 16);
+            e.drawRoundRect(rx, yy + imgH - 16, cw3, bandH + 16, 16, band);
+            e.fillRect(rx, yy + imgH - 16, cw3, 17, band);
+            e.drawTextCentered(cIt.title, rx + cw3 / 2, yy + imgH + 30, 26, kTX, FontRole::Pixel, L.rtl);
+            const std::string sub = tr(ftKeyOf(cIt.ftype), lang) + " · " + tierName(cIt.tier, lang);
+            e.drawTextCentered(sub, rx + cw3 / 2, yy + imgH + 68, 21, kMU, FontRole::Body, L.rtl);
+            if (focus == 2 + i) focusRing(e, rx, yy, cw3, ch, 16, false);
         }
-        y += ch;
+        yy += ch;
     }
     drawLegendBar(e, {{"\xE2\x9C\x95", "select"}, {"\xE2\x97\x8B", "back"}, {"\xE2\x96\xB3", "search"}}, langCode);
 }
@@ -4761,6 +4885,7 @@ void animReplay(UiEngine& e) {
             case AnimCall::Ring:   focusRing(e, a.a0, a.a1, a.a2, a.a3, a.a4, a.a5 != 0); break;
             case AnimCall::Mark:   sectionMark(e, a.a0, a.a1, a.a2, a.c); break;
             case AnimCall::Tile:   lineIconTile(e, a.a0, a.a1, a.a2, a.a3, a.c, a.a4 != 0); break;
+            case AnimCall::Shine:  buttonShine(e, a.a0, a.a1, a.a2, a.a3, a.a4); break;
         }
     }
     gAnimRec = true;
