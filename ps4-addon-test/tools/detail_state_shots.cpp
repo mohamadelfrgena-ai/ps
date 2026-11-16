@@ -130,6 +130,7 @@ int main(int argc, char** argv) {
         const char* noticeKey;   // tr() key (used per language when non-null)
         const Account* acc;
         int railOff;
+        int dialog;            // 0 none, 1 = AC confirm (Epic purple), 2 = AC confirm (Legendary gold)
     };
     static const char* NOTICE_AR = "\xD8\xB9\xD8\xB0\xD8\xB1\xD9\x8B\xD8\xA7\xD8\x8C \xD9\x81\xD8\xB4\xD9\x84 \xD8\xA7\xD9\x84\xD8\xAA\xD8\xAD\xD9\x85\xD9\x8A\xD9\x84";   // عذرًا، فشل التحميل
     static const char* NOTICE_EN = "Download failed, please try again";
@@ -156,6 +157,8 @@ int main(int argc, char** argv) {
         {"20-long-description-stats",     I_BIG,   0, DemoState::Idle,        0,   nullptr,     nullptr,          &freeU,   0},
         {"21-removed-item-empty",         -1,      0, DemoState::Idle,        0,   nullptr,     nullptr,          &freeU,   0},
         {"22-unlocked-owned",             I_OWNED, 0, DemoState::Idle,        0,   nullptr,     nullptr,          &freeU,   0},
+        {"23-confirm-dialog-epic",        I_EPIC,  0, DemoState::Idle,        0,   nullptr,     nullptr,          &freeU,   0, 1},
+        {"24-confirm-dialog-legendary",   I_LEG,   0, DemoState::Idle,        0,   nullptr,     nullptr,          &freeU,   0, 2},
     };
 
     struct Combo { const char* lang; bool light; const char* tag; };
@@ -174,6 +177,8 @@ int main(int argc, char** argv) {
             if (s.notice && std::strcmp(s.notice, "NOTICE") == 0)
                 notice = (std::strcmp(c.lang, "ar") == 0) ? NOTICE_AR : NOTICE_EN;
             drawAddonDetail(e, s.focus, s.idx, s.st, s.pct, c.lang, notice);
+            if (s.dialog && s.idx >= 0 && s.idx < (int)items.size())
+                drawAcConfirm(e, 0, items[(std::size_t)s.idx], c.lang);
             const std::string path = outDir + "/" + s.name + "__" + c.tag + ".ppm";
             dumpPPM(e, path);
             std::fprintf(stderr, "shot %s\n", path.c_str());
