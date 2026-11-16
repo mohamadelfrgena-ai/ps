@@ -691,7 +691,9 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable2() 
 
 } // namespace
 
-std::string tr(const std::string& key, const std::string& langCode) {
+const std::string& tr(const std::string& key, const std::string& langCode) {
+    // v0.83: const& — every return points to STATIC storage (map values or the
+    // thread-local fallback), so no label copies a string per frame anymore.
     {
         const auto& t2 = stringTable2();
         auto i2 = t2.find(key);
@@ -704,11 +706,18 @@ std::string tr(const std::string& key, const std::string& langCode) {
     }
     const auto& table = stringTable();
     auto it = table.find(key);
-    if (it == table.end()) return key;
+    if (it == table.end()) {
+        static thread_local std::string sFb;
+        sFb = key;
+        return sFb;
+    }
     auto lit = it->second.find(langCode);
     if (lit == it->second.end()) {
         auto en = it->second.find("en");
-        return en != it->second.end() ? en->second : key;
+        if (en != it->second.end()) return en->second;
+        static thread_local std::string sFb2;
+        sFb2 = key;
+        return sFb2;
     }
     return lit->second;
 }
@@ -2950,8 +2959,10 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
             e.drawRoundGradD(bx, y, bw, bh, 22, SDL_Color{43, 132, 243, 255}, SDL_Color{21, 96, 204, 255});
             e.drawRoundRect(L.X(0, 5), y + (bh - 34) / 2, 5, 34, 2, kBLl);
         }
-        char iname[32];
-        std::snprintf(iname, sizeof iname, "%s%s", kRailIcons[i], on ? "_w" : (gLight ? "_l" : "_d"));
+        static thread_local std::string iname;   // v0.83: scratch — no per-frame string build
+        iname.clear();
+        iname.append(kRailIcons[i]);
+        iname.append(on ? "_w" : (gLight ? "_l" : "_d"));
         const int is = 40;
         if (i == 5 && gAcc.signedIn && !gAcc.avatar.empty()) {   // profile item
             int iw = 0, ih = 0;
@@ -2960,7 +2971,7 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
         } else {
             e.drawImage(iname, cx - is / 2, y + (bh - is) / 2, is, is);
         }
-        const std::string lab = tr(items[i].key, langCode);
+        const std::string& lab = tr(items[i].key, langCode);
         int px = 16;
         while (px > 11 && e.measureText(lab, px, FontRole::Body, L.rtl) > RW - 14) --px;
         e.drawTextCentered(lab, cx, y + bh + 15, px, on ? kTX : kMU, FontRole::Body, L.rtl);
@@ -3747,7 +3758,7 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
     {   // BACKGROUND (Design A §3-b): the item's cover fills the screen + 80px bleed, then
         // blur 26px + brightness 0.5 + saturate 1.1 — baked once per item/theme/direction.
         static std::string bakedFor;
-        const std::string want = it.id + (gLight ? "|L" : "|D") + (L.rtl ? "|R" : "|N") + "A2" +
+        const std::string want = it.id + (gLight ? "|L" : "|D") + (L.rtl ? "|R" : "|N") + "A3" +
                                  (!it.cover.empty() && e.hasImage(it.cover) ? "|1" : "|0");
         if (bakedFor == want && e.hasImage("__bg_detail")) {
             e.drawImage("__bg_detail", 0, 0, 1920, 1080);
@@ -3784,11 +3795,16 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
                     rgba.swap(tmp);
                 }
             }
+            for (std::size_t i = 0; i < fb.size(); ++i) {   // veil rgba(8,14,26,0.4) baked in
+                rgba[i * 4]     = static_cast<std::uint8_t>((rgba[i * 4]     * 153 + 8  * 102 + 127) / 255);
+                rgba[i * 4 + 1] = static_cast<std::uint8_t>((rgba[i * 4 + 1] * 153 + 14 * 102 + 127) / 255);
+                rgba[i * 4 + 2] = static_cast<std::uint8_t>((rgba[i * 4 + 2] * 153 + 26 * 102 + 127) / 255);
+            }
             e.addImageRGBA("__bg_detail", 1920, 1080, rgba.data());
             bakedFor = want;
         }
     }
-    e.fillRect(0, 0, 1920, 1080, C(8, 14, 26, 102));   // veil rgba(8,14,26,0.4)
+    // (the veil rgba(8,14,26,0.4) is baked into __bg_detail above — v0.83 perf)
 
     drawTopNav(e, 2, langCode, -1, true);   // side rail + status row (avatar/clock/gold AC badge)
 
