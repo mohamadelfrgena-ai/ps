@@ -461,19 +461,45 @@ void UiEngine::fillRect(int x, int y, int w, int h, SDL_Color c) {
 }
 
 void UiEngine::fillGradH(int x, int y, int w, int h, SDL_Color left, SDL_Color right) {
-    // v0.83: ONE interpolated colour per column — smooth, no banding edges.
+    // v0.83: ONE interpolated colour per column (smooth, no banding) written ROW-MAJOR
+    // through a per-column LUT — the column-major version thrashed the cache on the
+    // full-screen backdrop gradients.
     if (w <= 0 || h <= 0) return;
     const int y0 = std::max(0, y), y1 = std::min(kHeight, y + h);
     const int x0 = std::max(0, x), x1 = std::min(kWidth, x + w);
     if (y0 >= y1 || x0 >= x1) return;
+    static thread_local std::vector<std::uint32_t> lut;
+    lut.assign(static_cast<std::size_t>(x1 - x0), 0u);
+    bool anyAlpha = false;
     for (int xx = x0; xx < x1; ++xx) {
         const float t = (w <= 1) ? 0.0f : static_cast<float>(xx - x) / static_cast<float>(w - 1);
         const Uint8 cr = clamp8(static_cast<int>(left.r + (right.r - left.r) * t));
         const Uint8 cg = clamp8(static_cast<int>(left.g + (right.g - left.g) * t));
         const Uint8 cb = clamp8(static_cast<int>(left.b + (right.b - left.b) * t));
         const Uint8 ca = clamp8(static_cast<int>(left.a + (right.a - left.a) * t));
-        if (ca == 0) continue;
-        for (int yy = y0; yy < y1; ++yy) blendPx(xx, yy, cr, cg, cb, ca);
+        if (ca < 255) anyAlpha = true;
+        lut[static_cast<std::size_t>(xx - x0)] = (static_cast<std::uint32_t>(ca) << 24) |
+                                                 (static_cast<std::uint32_t>(cr) << 16) |
+                                                 (static_cast<std::uint32_t>(cg) << 8) | cb;
+    }
+    for (int yy = y0; yy < y1; ++yy) {
+        std::uint32_t* row = &fb_[static_cast<std::size_t>(yy) * kWidth];
+        if (!anyAlpha) {
+            std::memcpy(row + x0, lut.data(), lut.size() * 4);
+            continue;
+        }
+        for (int xx = x0; xx < x1; ++xx) {
+            const std::uint32_t s = lut[static_cast<std::size_t>(xx - x0)];
+            const int sa = static_cast<int>(s >> 24);
+            if (sa == 0) continue;
+            if (sa >= 255) { row[xx] = s; continue; }
+            const int ia = 255 - sa;
+            const std::uint32_t d = row[xx];
+            const std::uint32_t r2 = (static_cast<std::uint32_t>((s >> 16 & 0xFF) * sa + (d >> 16 & 0xFF) * ia + 127) / 255) & 0xFF;
+            const std::uint32_t g2 = (static_cast<std::uint32_t>((s >> 8 & 0xFF) * sa + (d >> 8 & 0xFF) * ia + 127) / 255) & 0xFF;
+            const std::uint32_t b2 = (static_cast<std::uint32_t>((s & 0xFF) * sa + (d & 0xFF) * ia + 127) / 255) & 0xFF;
+            row[xx] = (255u << 24) | (r2 << 16) | (g2 << 8) | b2;
+        }
     }
 }
 
@@ -1611,7 +1637,13 @@ UiEngine::ImageData* UiEngine::findImage(const std::string& name) {
     if (!px) { packed_.erase(pk); return nullptr; }
     ImageData img;
     img.w = w; img.h = h;
-    img.key = name;
+    {   // v0.83: a RELOADED image (same name, new bytes) must invalidate the derived
+        // scaled caches — the key carries a per-name version.
+        static std::map<std::string, int> sImgVer;
+        img.key = name;
+        img.key += '#';
+        img.key += std::to_string(++sImgVer[name]);
+    }
     img.rgba.assign(px, px + static_cast<std::size_t>(w) * h * 4);
     stbi_image_free(px);
     imageBytes_ += img.rgba.size();
@@ -1654,7 +1686,13 @@ bool UiEngine::storeImage(const std::string& name, int w, int h, const std::uint
         img.rgba.assign(rgba, rgba + static_cast<std::size_t>(w) * h * 4);
     }
     unloadImage(name);
-    img.key = name;
+    {   // v0.83: a RELOADED image (same name, new bytes) must invalidate the derived
+        // scaled caches — the key carries a per-name version.
+        static std::map<std::string, int> sImgVer;
+        img.key = name;
+        img.key += '#';
+        img.key += std::to_string(++sImgVer[name]);
+    }
     imageBytes_ += img.rgba.size();
     images_[name] = std::move(img);
     return true;
