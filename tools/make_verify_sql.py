@@ -3,7 +3,7 @@
 """
 يولّد **`supabase/99_VERIFY_ALL.sql`** — فاحص القاعدة الكامل (قراءة فقط).
 
-ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 51) نُفِّذت
+ماذا يفعل الملف المُولَّد؟ يفحص بنداً بنداً أن كل ملفات SQL (01 → 52) نُفِّذت
 كما نريد، ويطبع جدولاً: ✅/❌ + التفاصيل (وما هو المفقود بالاسم). يلصقه المالك
 في Supabase → SQL Editor مرة واحدة.
 
@@ -333,6 +333,52 @@ add("51_admin_creator_codes", "Code type and channel name columns exist",
     qdet("select string_agg(column_name || ':' || data_type, ' · ' order by ordinal_position) "
          "from information_schema.columns where table_schema = 'public' and table_name = 'ac_redeem_codes' "
          "and column_name in ('code_kind', 'channel_name')", "missing"))
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  52_plan_ac_discounts — shared Android / PS4 / PS5 AC pricing
+# ═══════════════════════════════════════════════════════════════════════════
+add("52_plan_ac_discounts", "Epic and Legendary have one canonical AC pricing row each",
+    qbool("select (count(*) = 2 and count(*) filter (where plan in ('epic', 'legendary')) = 2)::text "
+          "from public.plan_ac_pricing"),
+    qdet("select string_agg(plan || '=' || base_ac_price::text || ' AC', ' · ' order by plan) "
+         "from public.plan_ac_pricing", "missing"))
+
+missing_list("52_plan_ac_discounts", "Plan AC pricing functions",
+             ["plan_ac_pricing_snapshot", "effective_plan_ac_price", "admin_set_plan_ac_pricing", "touch_plan_ac_pricing"],
+             "not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+             "where n.nspname = 'public' and p.proname = t)", "4/4 present")
+
+add("52_plan_ac_discounts", "Snapshot exposes server time, effective prices, expiry, and two plans",
+    qbool("select ((public.plan_ac_pricing_snapshot() ? 'server_now_epoch_ms') "
+          "and (public.plan_ac_pricing_snapshot() ? 'revision') "
+          "and jsonb_array_length(public.plan_ac_pricing_snapshot() -> 'plans') = 2 "
+          "and not exists (select 1 from jsonb_array_elements(public.plan_ac_pricing_snapshot() -> 'plans') p "
+          "where not (p ? 'effective_ac_price' and p ? 'sale_ends_at_epoch_ms' and p ? 'discount_active')))::text"),
+    qdet("select public.plan_ac_pricing_snapshot()::text", "missing"))
+
+add("52_plan_ac_discounts", "Timed prices use server expiry and purchases lock wallets and ignore client prices",
+    qbool("select (position('clock_timestamp()' in lower(pg_get_functiondef(p.oid))) > 0 "
+          "and position('v_now < v_sale_ends' in lower(pg_get_functiondef(p.oid))) > 0 "
+          "and position('for update' in lower(pg_get_functiondef(p.oid))) > 0 "
+          "and position('p_item_id uuid' in lower(pg_get_functiondef(p.oid))) > 0 "
+          "and position('p_price' in lower(pg_get_functiondef(p.oid))) = 0)::text "
+          "from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+          "where n.nspname = 'public' and p.proname = 'ac_unlock_content'"),
+    qdet("select 'server-expiry + wallet-lock + item-only purchase'", "missing"))
+
+add("52_plan_ac_discounts", "Plan AC pricing is touched, RLS-readable, and published through Realtime",
+    qbool("select (exists (select 1 from pg_trigger where not tgisinternal "
+          "and tgname = 'trg_touch_plan_ac_pricing') "
+          "and exists (select 1 from pg_policies where schemaname = 'public' "
+          "and tablename = 'plan_ac_pricing' and policyname = 'plan_ac_pricing_read') "
+          "and exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' "
+          "and schemaname = 'public' and tablename = 'plan_ac_pricing'))::text"),
+    qdet("select 'trigger=' || exists(select 1 from pg_trigger where not tgisinternal "
+         "and tgname = 'trg_touch_plan_ac_pricing')::text || ' · policy=' "
+         "|| exists(select 1 from pg_policies where schemaname = 'public' "
+         "and tablename = 'plan_ac_pricing' and policyname = 'plan_ac_pricing_read')::text "
+         "|| ' · realtime=' || exists(select 1 from pg_publication_tables where pubname = 'supabase_realtime' "
+         "and schemaname = 'public' and tablename = 'plan_ac_pricing')::text", "missing"))
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  15_assets_v2 (+16_fix_asset_paths) + 21_banners + 27_admin_only_assets

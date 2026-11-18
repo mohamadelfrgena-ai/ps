@@ -93,6 +93,7 @@ import com.addonstation.mobile.data.model.CreatorApplication
 import com.addonstation.mobile.data.model.CreatorSubmission
 import com.addonstation.mobile.data.model.CreatorTip
 import com.addonstation.mobile.data.model.PaymentOrder
+import com.addonstation.mobile.data.model.PlanAcPricing
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.SiteAsset
 import com.addonstation.mobile.data.toApiError
@@ -118,9 +119,15 @@ import com.addonstation.mobile.ui.theme.AppText
 import com.addonstation.mobile.ui.theme.HomePalette
 import com.addonstation.mobile.ui.theme.LocalHomePalette
 import com.addonstation.mobile.util.TimeFormat
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
+import java.util.concurrent.TimeUnit
 
 /** A bottom-bar selection made from an admin detail route is consumed by the restored panel. */
 internal object AdminPanelTabRequest {
@@ -153,6 +160,7 @@ fun AdminPanelScreen(
     onOpenAc: (String?) -> Unit,
     onOpenAudit: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenPlanAcPricing: () -> Unit,
 ) {
     val container = rememberContainer()
     val profile by container.state.profile.collectAsStateWithLifecycle()
@@ -279,6 +287,7 @@ fun AdminPanelScreen(
                                 "assets" -> onOpenAssets()
                                 "creators" -> onOpenCreatorApps()
                                 "settings" -> onOpenSettings()
+                                "ac-pricing" -> onOpenPlanAcPricing()
                                 "ac" -> onOpenAc(null)
                                 "tips" -> onOpenTips()
                                 "chat" -> onOpenChat()
@@ -1506,6 +1515,7 @@ private fun MoreTab(
         AdminMoreTool(Icons.Filled.Image, R.string.admin_assets_plain, R.string.admin_upload, palette.blueLink, "assets"),
         AdminMoreTool(Icons.Filled.Person, R.string.admin_creator_requests_plain, R.string.admin_creator_requests_plain, palette.epic, "creators"),
         AdminMoreTool(Icons.Filled.Settings, R.string.admin_plans_and_payment_plain, R.string.admin_plans_and_payment_plain, palette.goldText, "settings"),
+        AdminMoreTool(Icons.Filled.MonetizationOn, R.string.admin_plan_ac_pricing_title, R.string.admin_plan_ac_pricing_subtitle, palette.epic, "ac-pricing"),
         AdminMoreTool(Icons.Filled.MonetizationOn, R.string.admin_ac_tools, R.string.admin_give_ac_history, adminOkText(palette), "ac"),
         AdminMoreTool(Icons.Filled.Receipt, R.string.admin_tips_title, R.string.admin_tips_title, palette.goldText, "tips"),
         AdminMoreTool(Icons.Filled.Chat, R.string.admin_chat_plain, R.string.admin_chat_reports_plain, palette.blueLink, "chat"),
@@ -2940,6 +2950,299 @@ fun AdminAcScreen(onBack: () -> Unit, preselectUserId: String? = null) {
             },
             onDismiss = { pendingAll = false },
         )
+    }
+}
+
+private data class PlanAcPricingForm(
+    val basePrice: String,
+    val saleEnabled: Boolean,
+    val salePrice: String,
+    val saleEndsAtUtcMs: Long?,
+)
+
+private fun PlanAcPricing.toAdminForm(): PlanAcPricingForm = PlanAcPricingForm(
+    basePrice = baseAcPrice.toString(),
+    saleEnabled = saleAcPrice != null && saleEndsAtEpochMs != null,
+    salePrice = saleAcPrice?.toString().orEmpty(),
+    saleEndsAtUtcMs = saleEndsAtEpochMs,
+)
+
+private fun formatTripoliDateTime(epochMs: Long, locale: Locale): String =
+    SimpleDateFormat("yyyy-MM-dd HH:mm", locale).apply {
+        timeZone = TimeZone.getTimeZone("Africa/Tripoli")
+    }.format(Date(epochMs))
+
+private fun utcIso(epochMs: Long): String =
+    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+    }.format(Date(epochMs))
+
+private fun showTripoliDateTimePicker(
+    context: android.content.Context,
+    initialEpochMs: Long?,
+    onSelected: (Long) -> Unit,
+) {
+    val zone = TimeZone.getTimeZone("Africa/Tripoli")
+    val initial = Calendar.getInstance(zone).apply {
+        timeInMillis = initialEpochMs ?: (System.currentTimeMillis() + TimeUnit.DAYS.toMillis(1))
+    }
+    android.app.DatePickerDialog(
+        context,
+        { _, year, month, day ->
+            android.app.TimePickerDialog(
+                context,
+                { _, hour, minute ->
+                    val selected = Calendar.getInstance(zone).apply {
+                        clear()
+                        set(year, month, day, hour, minute, 0)
+                    }
+                    onSelected(selected.timeInMillis)
+                },
+                initial.get(Calendar.HOUR_OF_DAY),
+                initial.get(Calendar.MINUTE),
+                true,
+            ).show()
+        },
+        initial.get(Calendar.YEAR),
+        initial.get(Calendar.MONTH),
+        initial.get(Calendar.DAY_OF_MONTH),
+    ).show()
+}
+
+private fun remainingLabel(remainingMs: Long): String {
+    val seconds = (remainingMs.coerceAtLeast(0L) / 1_000L)
+    val days = seconds / 86_400L
+    val hours = (seconds % 86_400L) / 3_600L
+    val minutes = (seconds % 3_600L) / 60L
+    val rest = seconds % 60L
+    return if (days > 0) "%dd %02d:%02d:%02d".format(Locale.US, days, hours, minutes, rest)
+    else "%02d:%02d:%02d".format(Locale.US, hours, minutes, rest)
+}
+
+/** Global Epic / Legendary AC alternative pricing, using Libya input time and server UTC. */
+@Composable
+fun AdminPlanAcPricingScreen(onBack: () -> Unit) {
+    val container = rememberContainer()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val locale = Locale.getDefault()
+    var pricing by remember { mutableStateOf<List<PlanAcPricing>>(emptyList()) }
+    var forms by remember { mutableStateOf<Map<String, PlanAcPricingForm>>(emptyMap()) }
+    var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
+    var savingPlan by remember { mutableStateOf<String?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var messageIsError by remember { mutableStateOf(false) }
+    var reloadTick by remember { mutableIntStateOf(0) }
+    var clockTick by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(reloadTick) {
+        loading = true
+        failed = false
+        try {
+            val loaded = container.admin.planAcPricing()
+            pricing = loaded
+            forms = loaded.associate { it.plan to it.toAdminForm() }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            failed = true
+        } finally {
+            loading = false
+        }
+    }
+    LaunchedEffect(pricing) {
+        while (true) {
+            delay(1_000L)
+            clockTick += 1
+        }
+    }
+
+    Column(Modifier.fillMaxSize().background(LocalHomePalette.current.bg)) {
+        AdminSubscreenHeader(
+            kicker = stringResource(R.string.admin_kicker_dashboard),
+            title = stringResource(R.string.admin_plan_ac_pricing_title),
+            onBack = onBack,
+        )
+        when {
+            loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                LoadingBox(text = stringResource(R.string.common_loading))
+            }
+            failed -> Column(
+                Modifier.weight(1f).fillMaxWidth().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                EmptyState(stringResource(R.string.msg_network_error))
+                Spacer(Modifier.height(12.dp))
+                GhostButton(
+                    text = stringResource(R.string.common_retry),
+                    onClick = { reloadTick += 1 },
+                )
+            }
+            else -> Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .imePadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 14.dp),
+            ) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    stringResource(R.string.admin_plan_ac_pricing_help),
+                    style = AppText.bodySmall,
+                    color = AppColors.Muted,
+                )
+                Text(
+                    stringResource(R.string.admin_plan_ac_pricing_timezone),
+                    style = AppText.tiny,
+                    color = LocalHomePalette.current.blueLink,
+                )
+                message?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        it,
+                        style = AppText.bodySmall,
+                        color = if (messageIsError) AppColors.Red else AppColors.Green,
+                    )
+                }
+                pricing.sortedBy { if (it.plan == "epic") 0 else 1 }.forEach { row ->
+                    val form = forms[row.plan] ?: row.toAdminForm()
+                    // Read clockTick so this card recomposes and invalidates an expired sale.
+                    @Suppress("UNUSED_VARIABLE") val countdownTick = clockTick
+                    val activeNow = row.discountActiveNow
+                    val remainingMs = row.saleEndsAtEpochMs?.minus(row.estimatedServerNowEpochMs) ?: 0L
+                    SectionHeader(
+                        title = if (row.plan == "epic") "Epic" else "Legendary",
+                        leadingEmoji = if (row.plan == "epic") "💎" else "👑",
+                    )
+                    GlassCard(padding = 12.dp) {
+                        Text(
+                            if (activeNow) {
+                                stringResource(
+                                    R.string.admin_plan_ac_pricing_active_summary,
+                                    row.baseAcPrice,
+                                    row.effectiveAcPriceNow,
+                                )
+                            } else {
+                                stringResource(R.string.admin_plan_ac_pricing_base_summary, row.baseAcPrice)
+                            },
+                            style = AppText.bodySmall,
+                            color = if (activeNow) AppColors.Green else AppColors.Text,
+                        )
+                        if (activeNow) {
+                            Text(
+                                stringResource(
+                                    R.string.admin_plan_ac_pricing_remaining,
+                                    remainingLabel(remainingMs),
+                                ),
+                                style = AppText.tiny,
+                                color = AppColors.Muted,
+                            )
+                        }
+                        OutlinedTextField(
+                            value = form.basePrice,
+                            onValueChange = { value ->
+                                forms = forms + (row.plan to form.copy(basePrice = value.filter(Char::isDigit).take(7)))
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                            label = { Text(stringResource(R.string.admin_plan_ac_base_price)) },
+                            suffix = { Text("AC") },
+                            singleLine = true,
+                            enabled = savingPlan == null,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.admin_plan_ac_sale_toggle), style = AppText.bodySmall, color = AppColors.Text)
+                                Text(stringResource(R.string.admin_plan_ac_sale_toggle_hint), style = AppText.tiny, color = AppColors.Muted)
+                            }
+                            Switch(
+                                checked = form.saleEnabled,
+                                onCheckedChange = { enabled ->
+                                    forms = forms + (row.plan to form.copy(saleEnabled = enabled))
+                                },
+                                enabled = savingPlan == null,
+                            )
+                        }
+                        if (form.saleEnabled) {
+                            OutlinedTextField(
+                                value = form.salePrice,
+                                onValueChange = { value ->
+                                    forms = forms + (row.plan to form.copy(salePrice = value.filter(Char::isDigit).take(7)))
+                                },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                                label = { Text(stringResource(R.string.admin_plan_ac_sale_price)) },
+                                suffix = { Text("AC") },
+                                singleLine = true,
+                                enabled = savingPlan == null,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            GhostButton(
+                                text = form.saleEndsAtUtcMs?.let { selected ->
+                                    stringResource(
+                                        R.string.admin_plan_ac_sale_end_value,
+                                        formatTripoliDateTime(selected, locale),
+                                    )
+                                } ?: stringResource(R.string.admin_plan_ac_sale_end_pick),
+                                onClick = {
+                                    showTripoliDateTimePicker(context, form.saleEndsAtUtcMs) { selected ->
+                                        forms = forms + (row.plan to form.copy(saleEndsAtUtcMs = selected))
+                                    }
+                                },
+                                enabled = savingPlan == null,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        GradientButton(
+                            text = if (savingPlan == row.plan) stringResource(R.string.common_loading)
+                            else stringResource(R.string.admin_save),
+                            onClick = {
+                                val base = form.basePrice.toIntOrNull()
+                                val sale = form.salePrice.toIntOrNull()
+                                val end = form.saleEndsAtUtcMs
+                                val valid = base != null && base >= 0 &&
+                                    (!form.saleEnabled || (sale != null && sale > 0 && sale < base && end != null))
+                                if (!valid) {
+                                    messageIsError = true
+                                    message = context.getString(R.string.admin_plan_ac_pricing_invalid)
+                                } else {
+                                    scope.launch {
+                                        savingPlan = row.plan
+                                        message = null
+                                        container.admin.updatePlanAcPricing(
+                                            plan = row.plan,
+                                            baseAcPrice = base!!,
+                                            saleAcPrice = sale.takeIf { form.saleEnabled },
+                                            saleEndsAtIso = end?.takeIf { form.saleEnabled }?.let(::utcIso),
+                                        ).onSuccess { saved ->
+                                            pricing = pricing.map { if (it.plan == saved.plan) saved else it }
+                                            forms = forms + (saved.plan to saved.toAdminForm())
+                                            container.content.invalidate()
+                                            messageIsError = false
+                                            message = context.getString(R.string.admin_plan_ac_pricing_saved, saved.plan)
+                                        }.onFailure { error ->
+                                            messageIsError = true
+                                            message = error.message ?: context.getString(R.string.msg_generic_error)
+                                        }
+                                        savingPlan = null
+                                    }
+                                }
+                            },
+                            enabled = savingPlan == null,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                Spacer(Modifier.height(96.dp))
+            }
+        }
     }
 }
 

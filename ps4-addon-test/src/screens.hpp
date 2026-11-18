@@ -57,8 +57,10 @@ struct AddonItem {
     std::string category;        // content_items.category
     bool isWorld = false;        // content_type == "world"
     Tier tier = Tier::Free;      // content_items.plan
-    int acPrice = 0;             // effective_item_ac_price(id)  (sale applied). 0 = no AC unlock offered
-    int acPriceOld = 0;          // content_items.ac_price when a sale price is active (else 0)
+    int acPrice = 0;             // server-effective plan price at the last snapshot
+    int acPriceOld = 0;          // plan base price while a timed offer is active (else 0)
+    long long acSaleRemainingMs = 0; // server-derived remaining duration at sync
+    unsigned int acSaleSyncTickMs = 0; // SDL monotonic tick; never console wall-clock time
     std::string cover;           // engine image name for the cover (e.g. "cv_" + id). Loaded lazily — see setCoverRequestHandler
     std::string coverUrl;        // source URL for the cover download (content_items.cover_url)
     std::string version;         // content_items.version

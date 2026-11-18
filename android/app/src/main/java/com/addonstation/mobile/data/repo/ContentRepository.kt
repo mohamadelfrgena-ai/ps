@@ -5,6 +5,7 @@ import com.addonstation.mobile.data.ApiError
 import com.addonstation.mobile.data.ApiErrorKind
 import com.addonstation.mobile.data.SupabaseClient
 import com.addonstation.mobile.data.model.ContentItem
+import com.addonstation.mobile.data.model.PlanAcPricing
 import com.addonstation.mobile.data.model.parseIsoMillis
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -55,6 +56,8 @@ class ContentRepository(
     private val featuredCache = TtlCache<List<ContentItem>>(60_000L)
     private val latestCache = TtlCache<List<ContentItem>>(60_000L)
     private val recommendedCache = TtlCache<List<ContentItem>>(60_000L)
+    /** Short TTL + server timestamps keep timed plan discounts synchronized. */
+    private val planAcPricingCache = TtlCache<List<PlanAcPricing>>(15_000L)
 
     /**
      * Bounded cache for store filter/search combinations. Returning to a recent
@@ -121,21 +124,45 @@ class ContentRepository(
         }
     }
 
-    private suspend fun decorateWeeklyFree(items: List<ContentItem>): List<ContentItem> =
-        decorateWeeklyFree(items, currentWeeklyFreeId())
+    private suspend fun currentPlanAcPricing(force: Boolean = false): List<PlanAcPricing> =
+        runCatching {
+            through(planAcPricingCache, force) { loadPlanAcPricingSnapshot(supabase) }
+        }.getOrElse { planAcPricingCache.peek().orEmpty() }
+
+    private fun decoratePlanAcPricing(
+        items: List<ContentItem>,
+        pricing: List<PlanAcPricing>,
+    ): List<ContentItem> {
+        val byPlan = pricing.associateBy { it.plan }
+        return items.map { item ->
+            item.copy(planAcPricing = byPlan[item.plan.lowercase()])
+        }
+    }
+
+    private suspend fun decorateCatalog(items: List<ContentItem>): List<ContentItem> {
+        val weekly = decorateWeeklyFree(items, currentWeeklyFreeId())
+        return decoratePlanAcPricing(weekly, currentPlanAcPricing())
+    }
+
+    private fun decorateCachedCatalog(items: List<ContentItem>): List<ContentItem> =
+        decoratePlanAcPricing(
+            decorateWeeklyFree(items, activeWeeklyFreeId()),
+            planAcPricingCache.peek().orEmpty(),
+        )
 
     /** آخر نسخة معروفة (بلا شبكة) لتبذر بها الشاشة فوراً. */
-    fun cachedFeatured(): List<ContentItem> = decorateWeeklyFree(featuredCache.peek().orEmpty(), activeWeeklyFreeId())
+    fun cachedFeatured(): List<ContentItem> = decorateCachedCatalog(featuredCache.peek().orEmpty())
 
-    fun cachedLatest(): List<ContentItem> = decorateWeeklyFree(latestCache.peek().orEmpty(), activeWeeklyFreeId())
+    fun cachedLatest(): List<ContentItem> = decorateCachedCatalog(latestCache.peek().orEmpty())
 
-    fun cachedRecommended(): List<ContentItem> = decorateWeeklyFree(recommendedCache.peek().orEmpty(), activeWeeklyFreeId())
+    fun cachedRecommended(): List<ContentItem> = decorateCachedCatalog(recommendedCache.peek().orEmpty())
 
-    /** إبطال الذاكرة بعد إضافة محتوى أو تعديله. */
+    /** إبطال الذاكرة بعد إضافة محتوى أو تعديل السعر أو التخفيض. */
     fun invalidate() {
         featuredCache.clear()
         latestCache.clear()
         recommendedCache.clear()
+        planAcPricingCache.clear()
         synchronized(browseCaches) { browseCaches.clear() }
     }
 
@@ -181,7 +208,10 @@ class ContentRepository(
             }
             supabase.decodeList<ContentItem>(supabase.select("content_items", filters))
         }
-        return decorateWeeklyFree(items, weeklyId)
+        return decoratePlanAcPricing(
+            decorateWeeklyFree(items, weeklyId),
+            currentPlanAcPricing(force = force),
+        )
     }
 
     private fun orderFor(sort: String): String = when (sort) {
@@ -192,7 +222,7 @@ class ContentRepository(
         else -> "created_at.desc"
     }
 
-    suspend fun featured(limit: Int = 8, force: Boolean = false): List<ContentItem> = decorateWeeklyFree(
+    suspend fun featured(limit: Int = 8, force: Boolean = false): List<ContentItem> = decorateCatalog(
         through(featuredCache, force) {
             supabase.decodeList(
                 supabase.select(
@@ -203,7 +233,7 @@ class ContentRepository(
         }
     )
 
-    suspend fun latest(limit: Int = 6, force: Boolean = false): List<ContentItem> = decorateWeeklyFree(
+    suspend fun latest(limit: Int = 6, force: Boolean = false): List<ContentItem> = decorateCatalog(
         through(latestCache, force) {
             supabase.decodeList(
                 supabase.select(
@@ -214,7 +244,7 @@ class ContentRepository(
         }
     )
 
-    suspend fun recommended(limit: Int = 6, force: Boolean = false): List<ContentItem> = decorateWeeklyFree(
+    suspend fun recommended(limit: Int = 6, force: Boolean = false): List<ContentItem> = decorateCatalog(
         through(recommendedCache, force) {
             supabase.decodeList(
                 supabase.select(
@@ -225,7 +255,7 @@ class ContentRepository(
         }
     )
 
-    suspend fun exclusives(limit: Int = 24): List<ContentItem> = decorateWeeklyFree(
+    suspend fun exclusives(limit: Int = 24): List<ContentItem> = decorateCatalog(
         supabase.decodeList(
             supabase.select(
                 "content_items",
@@ -234,7 +264,7 @@ class ContentRepository(
         )
     )
 
-    suspend fun topDownloaded(limit: Int = 6): List<ContentItem> = decorateWeeklyFree(
+    suspend fun topDownloaded(limit: Int = 6): List<ContentItem> = decorateCatalog(
         supabase.decodeList(
             supabase.select(
                 "content_items",
@@ -247,17 +277,17 @@ class ContentRepository(
         val item = supabase.decodeOne<ContentItem>(
             supabase.select("content_items", "select=*&id=eq.$id&limit=1")
         ) ?: return null
-        return decorateWeeklyFree(listOf(item)).first()
+        return decorateCatalog(listOf(item)).first()
     }
 
     suspend fun byIds(ids: List<String>): List<ContentItem> {
         if (ids.isEmpty()) return emptyList()
         val filter = ids.distinct().joinToString(",")
         val items = supabase.decodeList<ContentItem>(supabase.select("content_items", "select=*&id=in.($filter)"))
-        return decorateWeeklyFree(items)
+        return decorateCatalog(items)
     }
 
-    suspend fun byCreator(userId: String, limit: Int = 24): List<ContentItem> = decorateWeeklyFree(
+    suspend fun byCreator(userId: String, limit: Int = 24): List<ContentItem> = decorateCatalog(
         supabase.decodeList(
             supabase.select(
                 "content_items",
@@ -266,7 +296,7 @@ class ContentRepository(
         )
     )
 
-    suspend fun similar(item: ContentItem, limit: Int = 6): List<ContentItem> = decorateWeeklyFree(
+    suspend fun similar(item: ContentItem, limit: Int = 6): List<ContentItem> = decorateCatalog(
         supabase.decodeList(
             supabase.select(
                 "content_items",

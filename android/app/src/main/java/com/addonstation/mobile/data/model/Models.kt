@@ -136,6 +136,36 @@ data class PaymentOrder(
 )
 
 @Immutable
+data class PlanAcPricing(
+    val plan: String,
+    val baseAcPrice: Int,
+    val saleAcPrice: Int? = null,
+    val effectiveAcPriceAtFetch: Int = baseAcPrice,
+    val discountActiveAtFetch: Boolean = false,
+    val discountPercent: Int = 0,
+    val saleStartsAt: String? = null,
+    val saleEndsAt: String? = null,
+    val saleEndsAtEpochMs: Long? = null,
+    val serverNowEpochMs: Long,
+    val updatedAt: String? = null,
+    val revision: String? = null,
+    /** Monotonic receive time keeps expiry correct even if the device clock is changed. */
+    val receivedAtElapsedMs: Long = android.os.SystemClock.elapsedRealtime(),
+) {
+    val estimatedServerNowEpochMs: Long
+        get() = serverNowEpochMs +
+            (android.os.SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)
+
+    val discountActiveNow: Boolean
+        get() = discountActiveAtFetch &&
+            saleAcPrice != null &&
+            (saleEndsAtEpochMs == null || estimatedServerNowEpochMs < saleEndsAtEpochMs)
+
+    val effectiveAcPriceNow: Int
+        get() = if (discountActiveNow) saleAcPrice ?: baseAcPrice else baseAcPrice
+}
+
+@Immutable
 @Serializable
 data class ContentItem(
     val id: String,
@@ -163,7 +193,21 @@ data class ContentItem(
     @SerialName("rating_count") val ratingCount: Int = 0,
     @SerialName("created_by") val createdBy: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
-)
+    /** Global Epic/Legendary AC pricing, fetched from the server snapshot. */
+    @kotlinx.serialization.Transient val planAcPricing: PlanAcPricing? = null,
+) {
+    /** Normal price shown crossed out while a plan-wide discount is active. */
+    val regularAcPrice: Int
+        get() = if (weeklyFree) 0 else planAcPricing?.baseAcPrice ?: acPrice
+
+    /** Current display price. The purchase RPC independently re-evaluates it on server time. */
+    val effectiveAcPrice: Int
+        get() = if (weeklyFree) 0 else planAcPricing?.effectiveAcPriceNow ?: acPrice
+
+    val hasActiveAcDiscount: Boolean
+        get() = !weeklyFree && planAcPricing?.discountActiveNow == true &&
+            regularAcPrice > effectiveAcPrice && effectiveAcPrice > 0
+}
 
 @Immutable
 @Serializable

@@ -853,4 +853,22 @@ CRÉE-LE.</string>
     <string name="console_device_unlink_confirm_message">Retirer %1$s de vos appareils associés ?</string>
     <string name="console_device_unlink_success">Appareil dissocié.</string>
     <string name="console_device_unlink_failed">Impossible de dissocier cet appareil.</string>
+
+    <!-- Shared plan-wide AC pricing -->
+    <string name="admin_plan_ac_pricing_title">Tarification AC des offres</string>
+    <string name="admin_plan_ac_pricing_subtitle">Prix Epic et Legendary communs et promotions temporisées</string>
+    <string name="admin_plan_ac_pricing_help">Les AC sont une alternative à l’abonnement. Le serveur calcule le prix effectif lors du déblocage ; le client n’envoie jamais de prix.</string>
+    <string name="admin_plan_ac_pricing_timezone">La fin de l’offre est saisie à l’heure de Libye (Africa/Tripoli) et stockée en UTC.</string>
+    <string name="admin_plan_ac_pricing_active_summary">Offre active : %1$d AC → %2$d AC</string>
+    <string name="admin_plan_ac_pricing_base_summary">Prix de base actuel : %1$d AC</string>
+    <string name="admin_plan_ac_pricing_remaining">Temps restant : %1$s</string>
+    <string name="admin_plan_ac_base_price">Prix de base de chaque contenu</string>
+    <string name="admin_plan_ac_sale_toggle">Prix final temporaire</string>
+    <string name="admin_plan_ac_sale_toggle_hint">Commence à l’enregistrement et s’arrête selon l’heure du serveur</string>
+    <string name="admin_plan_ac_sale_price">Prix final de l’offre</string>
+    <string name="admin_plan_ac_sale_end_value">Fin (Libye) : %1$s</string>
+    <string name="admin_plan_ac_sale_end_pick">Choisir la date et l’heure de fin (Libye)</string>
+    <string name="admin_plan_ac_pricing_invalid">Saisissez un prix de base valide. Une offre exige un prix positif inférieur et une fin future.</string>
+    <string name="admin_plan_ac_pricing_saved">Tarification %1$s enregistrée.</string>
+    <string name="phone_item_ac_offer_countdown">Offre %1$d AC → %2$d AC · se termine dans %3$s</string>
 </resources>

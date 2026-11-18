@@ -96,6 +96,20 @@ struct PackTarget {
     std::string sha256;
 };
 
+// Shared server-time plan price used by PS4/PS5. Prices are never accepted by purchase RPCs.
+struct PlanAcPrice {
+    std::string plan;          // epic | legendary
+    long baseAcPrice = 0;
+    long saleAcPrice = -1;     // -1 = no configured sale
+    long effectiveAcPrice = 0; // server decision at fetch time
+    bool discountActive = false;
+    long discountPercent = 0;
+    long long saleEndsAtEpochMs = 0;
+    long long serverNowEpochMs = 0;
+    std::string saleEndsAt;
+    std::string revision;
+};
+
 struct ItemData {
     std::string id;
     std::string title;
@@ -103,7 +117,8 @@ struct ItemData {
     std::string contentType;
     std::string plan;
     long acPrice = 0;
-    long saleAcPrice = -1;    // -1 = لا يوجد سعر خصم
+    long saleAcPrice = -1;    // -1 = no active plan-wide discount
+    long long saleRemainingMs = 0; // derived from snapshot server time, not console time
     bool isFeatured = false;
     bool isExclusive = false;
     // ---- v7.3 fields (all optional — empty/0 hides them in the UI) ----
@@ -136,6 +151,11 @@ std::vector<ItemData> fetchContentItemsByIds(const SupabaseConfig& cfg, const st
 
 // قراءة البانرات والمحتوى المنشور (anon)
 std::vector<BannerData> fetchStoreBanners(const SupabaseConfig& cfg);
+// Canonical plan snapshot: poll every 5–15 seconds and on Realtime invalidation.
+std::vector<PlanAcPrice> fetchPlanAcPricing(const SupabaseConfig& cfg);
+// Overlays the server-time plan price onto catalog items for existing UI code.
+void applyPlanAcPricing(std::vector<ItemData>& items, const std::vector<PlanAcPrice>& pricing,
+                        long long elapsedSinceFetchMs = 0);
 std::vector<ItemData> fetchContentItems(const SupabaseConfig& cfg, int limit = 20);
 
 // طلب التحميل المسجَّل (يتطلب جلسة مستخدم) → رابط .raw ووجهات الحزم

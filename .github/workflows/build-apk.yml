@@ -628,6 +628,7 @@ jobs:
           python3 tools/check_bulk_content_import.py
           python3 tools/check_staff_rewards.py
           python3 tools/check_admin_code_generator.py
+          python3 tools/check_plan_ac_pricing.py
 
       - name: Compile debug Kotlin without building an APK
         working-directory: android
@@ -760,6 +761,7 @@ jobs:
           python3 tools/check_theme_mode.py
           python3 tools/check_staff_rewards.py
           python3 tools/check_admin_code_generator.py
+          python3 tools/check_plan_ac_pricing.py
 
       - name: Build debug APK
         working-directory: android

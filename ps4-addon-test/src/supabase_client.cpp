@@ -3,6 +3,7 @@
 #include "content_config.hpp"
 #include "http_download.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -386,6 +387,52 @@ std::vector<BannerData> fetchStoreBanners(const SupabaseConfig& cfg) {
         out.push_back(b);
     }
     return out;
+}
+
+std::vector<PlanAcPrice> fetchPlanAcPricing(const SupabaseConfig& cfg) {
+    std::vector<PlanAcPrice> out;
+    const RpcResult r = supabaseRpc(cfg, "plan_ac_pricing_snapshot", "{}");
+    if (!r.ok || !r.rpcOk) return out;
+
+    const long long serverNow = (long long)jsonGetInt(r.body, "server_now_epoch_ms", 0);
+    const std::string revision = jsonGetString(r.body, "revision");
+    for (const std::string& obj : splitJsonObjects(jsonGetRaw(r.body, "plans"))) {
+        PlanAcPrice p;
+        p.plan = jsonGetString(obj, "plan");
+        if (p.plan != "epic" && p.plan != "legendary") continue;
+        p.baseAcPrice = jsonGetInt(obj, "base_ac_price", 0);
+        const std::string sale = jsonGetString(obj, "sale_ac_price");
+        p.saleAcPrice = (sale.empty() || sale == "null") ? -1 : std::strtol(sale.c_str(), nullptr, 10);
+        p.effectiveAcPrice = jsonGetInt(obj, "effective_ac_price", p.baseAcPrice);
+        p.discountActive = jsonGetBool(obj, "discount_active", false);
+        p.discountPercent = jsonGetInt(obj, "discount_percent", 0);
+        p.saleEndsAtEpochMs = (long long)jsonGetInt(obj, "sale_ends_at_epoch_ms", 0);
+        p.saleEndsAt = jsonGetString(obj, "sale_ends_at");
+        p.serverNowEpochMs = serverNow;
+        p.revision = revision;
+        out.push_back(p);
+    }
+    return out;
+}
+
+void applyPlanAcPricing(std::vector<ItemData>& items,
+                        const std::vector<PlanAcPrice>& pricing,
+                        long long elapsedSinceFetchMs) {
+    for (ItemData& item : items) {
+        for (const PlanAcPrice& p : pricing) {
+            if (item.plan != p.plan) continue;
+            const long long estimatedServerNow = p.serverNowEpochMs +
+                (elapsedSinceFetchMs > 0 ? elapsedSinceFetchMs : 0);
+            const bool active = p.discountActive && p.saleAcPrice > 0 &&
+                (p.saleEndsAtEpochMs <= 0 || estimatedServerNow < p.saleEndsAtEpochMs);
+            item.acPrice = p.baseAcPrice;
+            item.saleAcPrice = active ? p.saleAcPrice : -1;
+            item.saleRemainingMs = active && p.saleEndsAtEpochMs > 0
+                ? std::max<long long>(0, p.saleEndsAtEpochMs - estimatedServerNow)
+                : 0;
+            break;
+        }
+    }
 }
 
 std::vector<ItemData> fetchContentItems(const SupabaseConfig& cfg, int limit) {

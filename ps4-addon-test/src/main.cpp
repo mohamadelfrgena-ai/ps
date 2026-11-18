@@ -139,6 +139,10 @@ static std::map<std::string, bool> gCoverRequested;
 static std::mutex gSyncMx;
 static std::map<std::string, std::string> gTouchSeen;   // id -> updated_at/created_at
 static std::string gDetailId;
+static std::mutex gPlanPricingMx;
+static std::vector<PlanAcPrice> gPlanPricing;
+static std::chrono::steady_clock::time_point gPlanPricingReceivedAt;
+static bool gHavePlanPricing = false;
 
 static UiEngine* gEngine = nullptr;
 
@@ -342,6 +346,8 @@ static AddonItem toItem(const ItemData& d) {
     it.tier = tierFromPlan(d.plan);
     it.acPrice = (int)(d.saleAcPrice >= 0 ? d.saleAcPrice : d.acPrice);
     it.acPriceOld = (d.saleAcPrice >= 0) ? (int)d.acPrice : 0;
+    it.acSaleRemainingMs = d.saleRemainingMs;
+    it.acSaleSyncTickMs = SDL_GetTicks();
     it.cover = "cv_" + d.id;
     it.coverUrl = d.coverUrl;
     it.version = d.version;
@@ -360,8 +366,65 @@ static AddonItem toItem(const ItemData& d) {
     return it;
 }
 
+static std::vector<PlanAcPrice> planPricingSnapshot(long long* elapsedMs = nullptr) {
+    std::lock_guard<std::mutex> lk(gPlanPricingMx);
+    if (elapsedMs) {
+        *elapsedMs = gHavePlanPricing
+            ? (long long)std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::steady_clock::now() - gPlanPricingReceivedAt).count()
+            : 0;
+    }
+    return gPlanPricing;
+}
+
+static void refreshPlanPricing(bool updateCatalog) {
+    const std::vector<PlanAcPrice> fresh = fetchPlanAcPricing(gCfg);
+    if (!fresh.empty()) {
+        std::lock_guard<std::mutex> lk(gPlanPricingMx);
+        gPlanPricing = fresh;
+        gPlanPricingReceivedAt = std::chrono::steady_clock::now();
+        gHavePlanPricing = true;
+    }
+    if (!updateCatalog) return;
+
+    long long elapsed = 0;
+    const std::vector<PlanAcPrice> pricing = planPricingSnapshot(&elapsed);
+    if (pricing.empty()) return;
+    std::vector<AddonItem> updated = catalog();
+    bool changed = false;
+    for (AddonItem& item : updated) {
+        const std::string plan = item.tier == Tier::Legendary ? "legendary" :
+                                 item.tier == Tier::Epic ? "epic" : "free";
+        for (const PlanAcPrice& p : pricing) {
+            if (p.plan != plan) continue;
+            const long long estimatedServerNow = p.serverNowEpochMs + elapsed;
+            const bool active = p.discountActive && p.saleAcPrice > 0 &&
+                (p.saleEndsAtEpochMs <= 0 || estimatedServerNow < p.saleEndsAtEpochMs);
+            const int nextPrice = (int)(active ? p.saleAcPrice : p.baseAcPrice);
+            const int nextOld = active ? (int)p.baseAcPrice : 0;
+            const long long remaining = active && p.saleEndsAtEpochMs > 0
+                ? std::max<long long>(0, p.saleEndsAtEpochMs - estimatedServerNow)
+                : 0;
+            if (item.acPrice != nextPrice || item.acPriceOld != nextOld ||
+                item.acSaleRemainingMs != remaining) changed = true;
+            item.acPrice = nextPrice;
+            item.acPriceOld = nextOld;
+            item.acSaleRemainingMs = remaining;
+            item.acSaleSyncTickMs = SDL_GetTicks();
+            break;
+        }
+    }
+    if (changed) {
+        setCatalog(updated);
+        A.dirty = true;
+    }
+}
+
 static void loadCatalogNow() {
+    refreshPlanPricing(false);
     std::vector<ItemData> items = fetchContentItems(gCfg, 40);
+    long long pricingElapsed = 0;
+    applyPlanAcPricing(items, planPricingSnapshot(&pricingElapsed), pricingElapsed);
     std::vector<AddonItem> out;
     out.reserve(items.size());
     {
@@ -402,7 +465,9 @@ static void syncCatalogLive() {
         }
     }
     if (!need.empty()) {
-        const std::vector<ItemData> rows = fetchContentItemsByIds(gCfg, need);
+        std::vector<ItemData> rows = fetchContentItemsByIds(gCfg, need);
+        long long pricingElapsed = 0;
+        applyPlanAcPricing(rows, planPricingSnapshot(&pricingElapsed), pricingElapsed);
         for (const ItemData& d : rows) {
             if (!d.isPublished) continue;
             AddonItem u = toItem(d);
@@ -1164,7 +1229,11 @@ static void handle(Btn b) {
                     A.focus = 0;
                 } else {
                     ui_sfx(Sfx::Error);
-                    A.notice = tr("err_not_enough_ac", A.lang);
+                    const std::string reason = jsonGetString(r.body, "message");
+                    if (!r.ok) A.notice = tr("err_network", A.lang);
+                    else if (reason == "not_enough_ac") A.notice = tr("err_not_enough_ac", A.lang);
+                    else if (reason == "sign_in_required") A.notice = tr("err_sign_in_required", A.lang);
+                    else A.notice = tr("err_ac_unavailable", A.lang);
                 }
             } else if (b == Btn::Cross && A.focus == 0) {
                 switch (accessFor(it)) {
@@ -1388,6 +1457,7 @@ int main(int, char**) {
         for (;;) {
             std::this_thread::sleep_for(std::chrono::seconds(5));
             ++cycle;
+            refreshPlanPricing(true);                  // 5s: phone price/sale + expiry
             syncCatalogLive();
             if (cycle % 6 == 0) loadBannerNow();       // 30s: sale banner goes live at once
             if (cycle % 60 == 0) loadPlansNow();       // 5min: plan changes
@@ -1460,7 +1530,8 @@ int main(int, char**) {
                 --A.codeSecs;
                 A.dirty = true;
             }
-            if (now / 60 != lastSec / 60) A.dirty = true;   // clock + sale countdown
+            if (A.scr == Scr::Detail) A.dirty = true;       // AC offer countdown / exact expiry
+            else if (now / 60 != lastSec / 60) A.dirty = true;
             lastSec = now;
         }
         if (A.scr == Scr::SignIn && (A.codeStatus == 0 || A.codeStatus == 3)) {

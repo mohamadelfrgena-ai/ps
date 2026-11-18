@@ -853,4 +853,22 @@ YARAT.</string>
     <string name="console_device_unlink_confirm_message">%1$s bağlı cihazlarınızdan kaldırılsın mı?</string>
     <string name="console_device_unlink_success">Cihaz bağlantısı kaldırıldı.</string>
     <string name="console_device_unlink_failed">Cihaz bağlantısı kaldırılamadı.</string>
+
+    <!-- Shared plan-wide AC pricing -->
+    <string name="admin_plan_ac_pricing_title">Plan AC fiyatlandırması</string>
+    <string name="admin_plan_ac_pricing_subtitle">Ortak Epic ve Legendary fiyatları ve süreli teklifler</string>
+    <string name="admin_plan_ac_pricing_help">AC, aboneliğe alternatiftir. Sunucu kilidi açarken geçerli fiyatı hesaplar; istemci asla fiyat göndermez.</string>
+    <string name="admin_plan_ac_pricing_timezone">Teklif bitişi Libya saatiyle (Africa/Tripoli) girilir ve UTC olarak saklanır.</string>
+    <string name="admin_plan_ac_pricing_active_summary">Etkin teklif: %1$d AC → %2$d AC</string>
+    <string name="admin_plan_ac_pricing_base_summary">Geçerli taban fiyat: %1$d AC</string>
+    <string name="admin_plan_ac_pricing_remaining">Kalan süre: %1$s</string>
+    <string name="admin_plan_ac_base_price">Her içerik için taban fiyat</string>
+    <string name="admin_plan_ac_sale_toggle">Süreli nihai teklif fiyatı</string>
+    <string name="admin_plan_ac_sale_toggle_hint">Kaydedilince başlar ve sunucu saatinde otomatik biter</string>
+    <string name="admin_plan_ac_sale_price">Nihai teklif fiyatı</string>
+    <string name="admin_plan_ac_sale_end_value">Bitiş (Libya): %1$s</string>
+    <string name="admin_plan_ac_sale_end_pick">Bitiş tarihini ve saatini seç (Libya)</string>
+    <string name="admin_plan_ac_pricing_invalid">Geçerli bir taban fiyat girin. Teklif daha düşük pozitif fiyat ve gelecekte bitiş ister.</string>
+    <string name="admin_plan_ac_pricing_saved">%1$s fiyatlandırması kaydedildi.</string>
+    <string name="phone_item_ac_offer_countdown">Teklif %1$d AC → %2$d AC · %3$s içinde biter</string>
 </resources>

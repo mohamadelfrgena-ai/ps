@@ -149,6 +149,7 @@ object Routes {
     const val ADMIN_AC_USER = "admin-ac/user/{userId}"
     fun adminAcUser(id: String) = "admin-ac/user/$id"
     const val ADMIN_SETTINGS = "admin-settings"
+    const val ADMIN_PLAN_AC_PRICING = "admin-plan-ac-pricing"
     const val ADMIN_AUDIT = "admin-audit"
     const val ADMIN_CHAT = "admin-chat"
 }
@@ -1069,6 +1070,7 @@ private fun MainNavigation(
                         },
                         onOpenAudit = { go(Routes.ADMIN_AUDIT) },
                         onOpenSettings = { go(Routes.ADMIN_SETTINGS) },
+                        onOpenPlanAcPricing = { go(Routes.ADMIN_PLAN_AC_PRICING) },
                     )
                     }
                 }
@@ -1209,6 +1211,20 @@ private fun MainNavigation(
                         },
                     ) {
                         com.addonstation.mobile.ui.admin.AdminSettingsScreen(onBack = { back() })
+                    }
+                }
+                composable(Routes.ADMIN_PLAN_AC_PRICING) {
+                    com.addonstation.mobile.ui.admin.AdminGate(
+                        onExit = { back() },
+                        showAdminBottomBar = true,
+                        selectedAdminTab = null,
+                        onSelectAdminTab = { index ->
+                            com.addonstation.mobile.ui.admin.AdminPanelTabRequest.requestTab(index)
+                            if (navController.previousBackStackEntry?.destination?.route == Routes.ADMIN) back()
+                            else go(Routes.ADMIN)
+                        },
+                    ) {
+                        com.addonstation.mobile.ui.admin.AdminPlanAcPricingScreen(onBack = { back() })
                     }
                 }
                 composable(Routes.ADMIN_AUDIT) {

@@ -69,6 +69,42 @@ int main() {
     assert(pkgtest::formatInstallPhaseLabel(pkgtest::InstallPhase::Installing, "ar") == "جارٍ التثبيت...");
     assert(pkgtest::formatInstallPhaseLabel(pkgtest::InstallPhase::Installed, "en") == "Installed ✓");
 
+    // Shared plan-wide AC prices use the snapshot's server clock, not wall time.
+    {
+        std::vector<pkgtest::ItemData> items(2);
+        items[0].plan = "epic";
+        items[0].acPrice = 12; // legacy per-item value must be replaced
+        items[1].plan = "legendary";
+        items[1].acPrice = 34;
+
+        pkgtest::PlanAcPrice epic;
+        epic.plan = "epic";
+        epic.baseAcPrice = 800;
+        epic.saleAcPrice = 500;
+        epic.discountActive = true;
+        epic.serverNowEpochMs = 1'000;
+        epic.saleEndsAtEpochMs = 3'000;
+
+        pkgtest::PlanAcPrice legendary;
+        legendary.plan = "legendary";
+        legendary.baseAcPrice = 1'400;
+        legendary.discountActive = false;
+        legendary.serverNowEpochMs = 1'000;
+
+        const std::vector<pkgtest::PlanAcPrice> prices{epic, legendary};
+        pkgtest::applyPlanAcPricing(items, prices, 500);
+        assert(items[0].acPrice == 800);
+        assert(items[0].saleAcPrice == 500);
+        assert(items[0].saleRemainingMs == 1'500);
+        assert(items[1].acPrice == 1'400);
+        assert(items[1].saleAcPrice == -1);
+
+        pkgtest::applyPlanAcPricing(items, prices, 2'001);
+        assert(items[0].acPrice == 800);
+        assert(items[0].saleAcPrice == -1); // strict expiry at server time
+        assert(items[0].saleRemainingMs == 0);
+    }
+
     char tempTemplate[] = "/tmp/pkg-addon-test-XXXXXX";
     char* rootPtr = ::mkdtemp(tempTemplate);
     assert(rootPtr != nullptr);

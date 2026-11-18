@@ -853,4 +853,22 @@
     <string name="console_device_unlink_confirm_message">确定从已绑定设备中移除 %1$s 吗？</string>
     <string name="console_device_unlink_success">设备已解除绑定。</string>
     <string name="console_device_unlink_failed">无法解除此设备的绑定。</string>
+
+    <!-- Shared plan-wide AC pricing -->
+    <string name="admin_plan_ac_pricing_title">套餐 AC 定价</string>
+    <string name="admin_plan_ac_pricing_subtitle">Epic 和 Legendary 统一价格与限时优惠</string>
+    <string name="admin_plan_ac_pricing_help">AC 是订阅的替代付款方式。服务器在解锁时计算有效价格；客户端绝不提交价格。</string>
+    <string name="admin_plan_ac_pricing_timezone">优惠结束时间按利比亚时间（Africa/Tripoli）输入，并以 UTC 保存。</string>
+    <string name="admin_plan_ac_pricing_active_summary">优惠生效中：%1$d AC → %2$d AC</string>
+    <string name="admin_plan_ac_pricing_base_summary">当前基础价格：%1$d AC</string>
+    <string name="admin_plan_ac_pricing_remaining">剩余时间：%1$s</string>
+    <string name="admin_plan_ac_base_price">所有内容的基础价格</string>
+    <string name="admin_plan_ac_sale_toggle">限时最终优惠价</string>
+    <string name="admin_plan_ac_sale_toggle_hint">保存时开始，并按服务器时间自动结束</string>
+    <string name="admin_plan_ac_sale_price">最终优惠价</string>
+    <string name="admin_plan_ac_sale_end_value">结束（利比亚）：%1$s</string>
+    <string name="admin_plan_ac_sale_end_pick">选择结束日期和时间（利比亚）</string>
+    <string name="admin_plan_ac_pricing_invalid">请输入有效基础价格。优惠价必须为较低的正数，并设置未来结束时间。</string>
+    <string name="admin_plan_ac_pricing_saved">已保存 %1$s 定价。</string>
+    <string name="phone_item_ac_offer_countdown">优惠 %1$d AC → %2$d AC · %3$s 后结束</string>
 </resources>

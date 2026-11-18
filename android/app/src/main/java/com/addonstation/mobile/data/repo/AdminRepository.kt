@@ -11,6 +11,7 @@ import com.addonstation.mobile.data.model.CreatorApplication
 import com.addonstation.mobile.data.model.CreatorSubmission
 import com.addonstation.mobile.data.model.CreatorTip
 import com.addonstation.mobile.data.model.PaymentOrder
+import com.addonstation.mobile.data.model.PlanAcPricing
 import com.addonstation.mobile.data.model.Profile
 import com.addonstation.mobile.data.model.SubscriptionPlan
 import kotlinx.coroutines.CancellationException
@@ -98,6 +99,37 @@ class AdminRepository(private val supabase: SupabaseClient) {
                 Unit
             }
         }
+
+    /** Canonical Epic / Legendary AC prices shared by Android, PS4 and PS5. */
+    suspend fun planAcPricing(): List<PlanAcPricing> = withContext(Dispatchers.IO) {
+        loadPlanAcPricingSnapshot(supabase)
+    }
+
+    /**
+     * Saves one plan-wide price. A null sale price and end time clear the sale.
+     * The RPC verifies Admin on the server and starts a new sale at server time.
+     */
+    suspend fun updatePlanAcPricing(
+        plan: String,
+        baseAcPrice: Int,
+        saleAcPrice: Int?,
+        saleEndsAtIso: String?,
+    ): Result<PlanAcPricing> = withContext(Dispatchers.IO) {
+        runCatching {
+            val response = supabase.rpc(
+                "admin_set_plan_ac_pricing",
+                mapOf(
+                    "p_plan" to JsonPrimitive(plan.lowercase()),
+                    "p_base_ac_price" to JsonPrimitive(baseAcPrice),
+                    "p_sale_ac_price" to (saleAcPrice?.let { JsonPrimitive(it) } ?: JsonNull),
+                    "p_sale_ends_at" to (saleEndsAtIso?.let { JsonPrimitive(it) } ?: JsonNull),
+                ),
+                signedOnly = true,
+            )
+            parsePlanAcPricingSnapshot(response).firstOrNull { it.plan == plan.lowercase() }
+                ?: error("plan_ac_pricing_missing")
+        }
+    }
 
     // ------------------------------------------------------------- المستخدمون
 

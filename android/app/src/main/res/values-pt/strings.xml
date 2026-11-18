@@ -853,4 +853,22 @@ CRIE.</string>
     <string name="console_device_unlink_confirm_message">Remover %1$s dos seus dispositivos vinculados?</string>
     <string name="console_device_unlink_success">Dispositivo desvinculado.</string>
     <string name="console_device_unlink_failed">Não foi possível desvincular o dispositivo.</string>
+
+    <!-- Shared plan-wide AC pricing -->
+    <string name="admin_plan_ac_pricing_title">Preços AC dos planos</string>
+    <string name="admin_plan_ac_pricing_subtitle">Preços partilhados Epic e Legendary e ofertas temporárias</string>
+    <string name="admin_plan_ac_pricing_help">AC é uma alternativa à subscrição. O servidor calcula o preço efetivo ao desbloquear; o cliente nunca envia um preço.</string>
+    <string name="admin_plan_ac_pricing_timezone">O fim da oferta é introduzido na hora da Líbia (Africa/Tripoli) e guardado em UTC.</string>
+    <string name="admin_plan_ac_pricing_active_summary">Oferta ativa: %1$d AC → %2$d AC</string>
+    <string name="admin_plan_ac_pricing_base_summary">Preço base atual: %1$d AC</string>
+    <string name="admin_plan_ac_pricing_remaining">Tempo restante: %1$s</string>
+    <string name="admin_plan_ac_base_price">Preço base de cada conteúdo</string>
+    <string name="admin_plan_ac_sale_toggle">Preço final temporário</string>
+    <string name="admin_plan_ac_sale_toggle_hint">Começa ao guardar e termina automaticamente pela hora do servidor</string>
+    <string name="admin_plan_ac_sale_price">Preço final da oferta</string>
+    <string name="admin_plan_ac_sale_end_value">Fim (Líbia): %1$s</string>
+    <string name="admin_plan_ac_sale_end_pick">Escolher data e hora de fim (Líbia)</string>
+    <string name="admin_plan_ac_pricing_invalid">Introduza um preço base válido. A oferta precisa de preço positivo inferior e fim futuro.</string>
+    <string name="admin_plan_ac_pricing_saved">Preços de %1$s guardados.</string>
+    <string name="phone_item_ac_offer_countdown">Oferta %1$d AC → %2$d AC · termina em %3$s</string>
 </resources>

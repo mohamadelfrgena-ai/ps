@@ -605,6 +605,10 @@ const std::map<std::string, std::map<std::string, std::string>>& stringTable2() 
                                    {"pt", "Arquivo ainda indisponível"}, {"zh", "文件暂不可用，请稍后再试"}}},
         {"err_not_enough_ac", {{"en", "Not enough AC"}, {"ar", "رصيد AC غير كافٍ"}, {"fr", "Pas assez d'AC"}, {"tr", "Yeterli AC yok"},
                                {"es", "AC insuficientes"}, {"ru", "Недостаточно AC"}, {"pt", "AC insuficiente"}, {"zh", "AC 不足"}}},
+        {"err_ac_unavailable", {{"en", "AC unlock is unavailable — refresh and try again"}, {"ar", "فتح AC غير متاح — حدّث وحاول مجدداً"},
+                                {"fr", "Déblocage AC indisponible — actualisez et réessayez"}, {"tr", "AC ile açma kullanılamıyor — yenileyip tekrar deneyin"},
+                                {"es", "Desbloqueo AC no disponible — actualiza e inténtalo de nuevo"}, {"ru", "Разблокировка за AC недоступна — обновите и повторите"},
+                                {"pt", "Desbloqueio com AC indisponível — atualize e tente novamente"}, {"zh", "AC 解锁暂不可用 — 刷新后重试"}}},
         {"ok_unlocked", {{"en", "Unlocked — enjoy!"}, {"ar", "تم الفتح — استمتع!"}, {"fr", "Débloqué — amuse-toi !"}, {"tr", "Açıldı — iyi eğlenceler!"},
                          {"es", "¡Desbloqueado, disfruta!"}, {"ru", "Открыто — наслаждайся!"}, {"pt", "Desbloqueado — divirta-se!"}, {"zh", "已解锁，尽情享受！"}}},
         {"all_items", {{"en", "All"}, {"ar", "الكل"}, {"fr", "Tout"}, {"tr", "Tümü"}, {"es", "Todo"}, {"ru", "Все"}, {"pt", "Tudo"}, {"zh", "全部"}}},
@@ -1786,8 +1790,28 @@ int gSeasonOverride = -1;      // testing only
 std::time_t nowServer() { return std::time(nullptr) + gTimeOffset; }
 int rankOf(Tier t) { return static_cast<int>(t); }
 bool isNewItem(const AddonItem& it) { return it.createdAt > 0 && nowServer() - it.createdAt < 14 * 86400; }
-bool onSale(const AddonItem& it) { return it.acPrice > 0 && it.acPriceOld > it.acPrice; }
+long long acSaleRemainingMs(const AddonItem& it) {
+    if (it.acSaleRemainingMs <= 0) return 0;
+    const unsigned int elapsed = SDL_GetTicks() - it.acSaleSyncTickMs; // wrap-safe
+    return std::max<long long>(0, it.acSaleRemainingMs - (long long)elapsed);
+}
+bool onSale(const AddonItem& it) {
+    return it.acPrice > 0 && it.acPriceOld > it.acPrice && acSaleRemainingMs(it) > 0;
+}
+int displayAcPrice(const AddonItem& it) { return onSale(it) ? it.acPrice : (it.acPriceOld > 0 ? it.acPriceOld : it.acPrice); }
 int discountOf(const AddonItem& it) { return onSale(it) ? (100 * (it.acPriceOld - it.acPrice) + it.acPriceOld / 2) / it.acPriceOld : 0; }
+std::string acSaleCountdown(const AddonItem& it) {
+    long long seconds = acSaleRemainingMs(it) / 1000;
+    if (seconds <= 0) return "";
+    const long long days = seconds / 86400;
+    const int hours = (int)(seconds % 86400 / 3600);
+    const int minutes = (int)(seconds % 3600 / 60);
+    const int rest = (int)(seconds % 60);
+    char out[32];
+    if (days > 0) std::snprintf(out, sizeof out, "%lldd %02d:%02d:%02d", days, hours, minutes, rest);
+    else std::snprintf(out, sizeof out, "%02d:%02d:%02d", hours, minutes, rest);
+    return out;
+}
 void sortNewest(std::vector<AddonItem>& v) {
     std::stable_sort(v.begin(), v.end(), [](const AddonItem& a, const AddonItem& b) { return a.createdAt > b.createdAt; });
 }
@@ -1969,7 +1993,7 @@ std::vector<int> viewItems(View v, int filter, const std::string& query) {
             keep = onSale(it);
             if (keep && filter == 1) keep = !it.isWorld;
             if (keep && filter == 2) keep = it.isWorld;
-            if (keep && filter == 3) keep = it.acPrice < 100;
+            if (keep && filter == 3) keep = displayAcPrice(it) < 100;
         } else {   // Store: 0 All, 1 Addons, 2 Worlds, 3 Free, 4 Epic, 5 Legendary, 6 New
             switch (filter) {
                 case 1: keep = !it.isWorld; break;
@@ -3483,7 +3507,7 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
 
     // ---- action box ----
     const int bxW = 660, pad = 28;
-    const bool lowBal = acOffer && gAcc.signedIn && gAcc.acBalance < it.acPrice;
+    const bool lowBal = acOffer && gAcc.signedIn && gAcc.acBalance < displayAcPrice(it);
     const bool dlLine = gAcc.signedIn && acc == Access::Download && gAcc.downloadLimit > 0;
     // v6.6: the panel is exactly as tall as its content (no empty strip when there is no hint line)
     const bool hintLine = lowBal || dlLine || acc == Access::Download || acc == Access::NeedSignIn;
@@ -3537,18 +3561,19 @@ void drawAddonDetail(UiEngine& e, int focus, int idx, DemoState state, int perce
         const int ah = 72, arx = L.X(bx, bw);
         e.drawRoundRect(arx, yy, bw, ah, 20, gLight ? SDL_Color{255, 246, 220, 255} : SDL_Color{48, 36, 10, 220});
         e.drawRoundBorder(arx, yy, bw, ah, 20, 2, SDL_Color{255, 201, 64, static_cast<Uint8>(lowBal ? 90 : 190)});
-        const std::string lab = fmt1(tr("unlock_for", lang), formatAC(it.acPrice));
+        const std::string lab = fmt1(tr("unlock_for", lang), formatAC(displayAcPrice(it)));
         // v6.7: coin + label (+ old price struck through) centred together as one group
         std::vector<GPiece> g;
         g.push_back(gIcon(36, 36, [&](int gx, int gy) { e.drawImage("icon_coin", gx, gy, 36, 36); }, 12));
         g.push_back(gText(e, lab, 26, kGD, L.rtl, 14));
-        if (it.acPriceOld > it.acPrice) {
+        if (onSale(it)) {
             const std::string old = formatAC(it.acPriceOld);
             const int ow = e.inkWidth(old, 20), cyy = yy + ah / 2;
             g.push_back(gIcon(ow, 22, [&, old, ow, cyy](int gx, int) {
                 e.drawTextCentered(old, gx + ow / 2, cyy, 20, kMU, FontRole::Body, false);
                 e.fillRect(gx, cyy, ow, 2, kMU);
-            }));
+            }, 10));
+            g.push_back(gText(e, acSaleCountdown(it), 18, kMU, false));
         }
         drawGroupCentered(e, L, g, arx + bw / 2, yy + ah / 2);
         if (focus == 1) focusRing(e, arx, yy, bw, ah, 20);

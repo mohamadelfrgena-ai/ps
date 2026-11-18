@@ -853,4 +853,22 @@
     <string name="console_device_unlink_confirm_message">Удалить %1$s из списка привязанных устройств?</string>
     <string name="console_device_unlink_success">Устройство отвязано.</string>
     <string name="console_device_unlink_failed">Не удалось отвязать устройство.</string>
+
+    <!-- Shared plan-wide AC pricing -->
+    <string name="admin_plan_ac_pricing_title">Цены AC для планов</string>
+    <string name="admin_plan_ac_pricing_subtitle">Общие цены Epic и Legendary и временные предложения</string>
+    <string name="admin_plan_ac_pricing_help">AC — альтернатива подписке. Сервер вычисляет действующую цену при разблокировке; клиент никогда не отправляет цену.</string>
+    <string name="admin_plan_ac_pricing_timezone">Окончание вводится по времени Ливии (Africa/Tripoli) и хранится в UTC.</string>
+    <string name="admin_plan_ac_pricing_active_summary">Активное предложение: %1$d AC → %2$d AC</string>
+    <string name="admin_plan_ac_pricing_base_summary">Текущая базовая цена: %1$d AC</string>
+    <string name="admin_plan_ac_pricing_remaining">Осталось: %1$s</string>
+    <string name="admin_plan_ac_base_price">Базовая цена каждого материала</string>
+    <string name="admin_plan_ac_sale_toggle">Временная итоговая цена</string>
+    <string name="admin_plan_ac_sale_toggle_hint">Начинается при сохранении и завершается по времени сервера</string>
+    <string name="admin_plan_ac_sale_price">Итоговая цена предложения</string>
+    <string name="admin_plan_ac_sale_end_value">Окончание (Ливия): %1$s</string>
+    <string name="admin_plan_ac_sale_end_pick">Выбрать дату и время окончания (Ливия)</string>
+    <string name="admin_plan_ac_pricing_invalid">Введите допустимую базовую цену. Нужны меньшая положительная цена и будущее время окончания.</string>
+    <string name="admin_plan_ac_pricing_saved">Цены %1$s сохранены.</string>
+    <string name="phone_item_ac_offer_countdown">Предложение %1$d AC → %2$d AC · осталось %3$s</string>
 </resources>

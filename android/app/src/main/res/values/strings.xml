@@ -867,4 +867,22 @@ CREATE IT.</string>
     <string name="console_device_unlink_confirm_message">Remove %1$s from your linked devices?</string>
     <string name="console_device_unlink_success">Device unlinked.</string>
     <string name="console_device_unlink_failed">Could not unlink this device.</string>
+
+    <!-- Shared plan-wide AC pricing -->
+    <string name="admin_plan_ac_pricing_title">Plan AC pricing</string>
+    <string name="admin_plan_ac_pricing_subtitle">Shared Epic and Legendary prices and timed offers</string>
+    <string name="admin_plan_ac_pricing_help">AC is an alternative to subscribing. The server calculates the effective price when it grants an unlock; clients never submit a price.</string>
+    <string name="admin_plan_ac_pricing_timezone">Offer end time is entered in Libya time (Africa/Tripoli) and stored as UTC.</string>
+    <string name="admin_plan_ac_pricing_active_summary">Active offer: %1$d AC → %2$d AC</string>
+    <string name="admin_plan_ac_pricing_base_summary">Current base price: %1$d AC</string>
+    <string name="admin_plan_ac_pricing_remaining">Time remaining: %1$s</string>
+    <string name="admin_plan_ac_base_price">Base price for every item</string>
+    <string name="admin_plan_ac_sale_toggle">Timed final offer price</string>
+    <string name="admin_plan_ac_sale_toggle_hint">Starts when saved and stops automatically at server time</string>
+    <string name="admin_plan_ac_sale_price">Final offer price</string>
+    <string name="admin_plan_ac_sale_end_value">End (Libya): %1$s</string>
+    <string name="admin_plan_ac_sale_end_pick">Choose end date and time (Libya)</string>
+    <string name="admin_plan_ac_pricing_invalid">Enter a valid base price. An offer needs a lower positive price and a future end time.</string>
+    <string name="admin_plan_ac_pricing_saved">Saved %1$s pricing.</string>
+    <string name="phone_item_ac_offer_countdown">Offer %1$d AC → %2$d AC · ends in %3$s</string>
 </resources>

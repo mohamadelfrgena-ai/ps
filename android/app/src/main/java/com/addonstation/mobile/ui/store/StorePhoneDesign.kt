@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,6 +60,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -86,6 +88,7 @@ import com.addonstation.mobile.util.TimeFormat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -93,6 +96,16 @@ import kotlin.math.roundToInt
 
 private const val NEW_ITEM_WINDOW_MILLIS = 14L * 24L * 60L * 60L * 1000L
 private const val MINECRAFT_ANDROID_PACKAGE = "com.mojang.minecraftpe"
+
+private fun formatOfferCountdown(remainingMs: Long): String {
+    val seconds = remainingMs.coerceAtLeast(0L) / 1_000L
+    val days = seconds / 86_400L
+    val hours = (seconds % 86_400L) / 3_600L
+    val minutes = (seconds % 3_600L) / 60L
+    val rest = seconds % 60L
+    return if (days > 0L) "%dd %02d:%02d:%02d".format(Locale.US, days, hours, minutes, rest)
+    else "%02d:%02d:%02d".format(Locale.US, hours, minutes, rest)
+}
 
 private enum class MinecraftOpenResult { OPENED, NOT_INSTALLED, FAILED }
 
@@ -248,7 +261,19 @@ private fun ContentAccessBadge(
     modifier: Modifier = Modifier,
 ) {
     val plan = item.plan.lowercase(Locale.ROOT)
-    val isAc = item.acPrice > 0 && !item.weeklyFree
+    var expiryTick by remember(item.planAcPricing?.revision, item.planAcPricing?.saleEndsAtEpochMs) {
+        mutableIntStateOf(0)
+    }
+    LaunchedEffect(item.planAcPricing?.revision, item.planAcPricing?.saleEndsAtEpochMs) {
+        val pricing = item.planAcPricing ?: return@LaunchedEffect
+        val remaining = pricing.saleEndsAtEpochMs?.minus(pricing.estimatedServerNowEpochMs) ?: return@LaunchedEffect
+        if (remaining > 0L) {
+            delay(remaining)
+            expiryTick += 1
+        }
+    }
+    @Suppress("UNUSED_VARIABLE") val expiryRecompose = expiryTick
+    val isAc = item.effectiveAcPrice > 0 && !item.weeklyFree
     val color = when {
         isAc -> Color(0xD91A2438)
         plan == "legendary" -> Color(0xFFF0C25E)
@@ -279,19 +304,37 @@ private fun ContentAccessBadge(
                 modifier = Modifier.size(if (compact) 12.dp else 15.dp),
             )
         }
-        Text(
-            when {
-                item.weeklyFree -> stringResource(R.string.weekly_epic_free)
-                isAc -> item.acPrice.toString()
-                plan == "legendary" -> stringResource(R.string.plan_legendary_name)
-                plan == "epic" -> stringResource(R.string.plan_epic_name)
-                else -> stringResource(R.string.plan_free_name)
-            },
-            color = ink,
-            fontSize = if (compact) 10.sp else 12.sp,
-            fontWeight = FontWeight.ExtraBold,
-            maxLines = 1,
-        )
+        if (isAc && item.hasActiveAcDiscount) {
+            Text(
+                item.regularAcPrice.toString(),
+                color = ink.copy(alpha = 0.68f),
+                fontSize = if (compact) 9.sp else 11.sp,
+                fontWeight = FontWeight.Bold,
+                textDecoration = TextDecoration.LineThrough,
+                maxLines = 1,
+            )
+            Text(
+                item.effectiveAcPrice.toString(),
+                color = ink,
+                fontSize = if (compact) 10.sp else 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+            )
+        } else {
+            Text(
+                when {
+                    item.weeklyFree -> stringResource(R.string.weekly_epic_free)
+                    isAc -> item.effectiveAcPrice.toString()
+                    plan == "legendary" -> stringResource(R.string.plan_legendary_name)
+                    plan == "epic" -> stringResource(R.string.plan_epic_name)
+                    else -> stringResource(R.string.plan_free_name)
+                },
+                color = ink,
+                fontSize = if (compact) 10.sp else 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -341,6 +384,14 @@ internal fun DesignedContentDetailScreen(
     var notice by remember(itemId) { mutableStateOf<String?>(null) }
     var favouriteBusy by remember(itemId) { mutableStateOf(false) }
     var downloadJob by remember(itemId) { mutableStateOf<Job?>(null) }
+    var planPricingTick by remember(itemId) { mutableIntStateOf(0) }
+
+    LaunchedEffect(item?.planAcPricing?.revision, item?.planAcPricing?.saleEndsAtEpochMs) {
+        while (item?.planAcPricing?.discountActiveNow == true) {
+            delay(1_000L)
+            planPricingTick += 1
+        }
+    }
 
     val signInMessage = stringResource(R.string.msg_sign_in_needed)
     val genericError = stringResource(R.string.item_download_failed)
@@ -445,6 +496,7 @@ internal fun DesignedContentDetailScreen(
         }
     }
 
+    @Suppress("UNUSED_VARIABLE") val pricingRecompose = planPricingTick
     val current = item
     if (loading) {
         Box(Modifier.fillMaxSize().background(palette.bg), contentAlignment = Alignment.Center) {
@@ -463,6 +515,15 @@ internal fun DesignedContentDetailScreen(
         isOwner = current.createdBy != null && current.createdBy == profile?.id,
         isAdmin = profile?.role == "admin",
     )
+    val acAlternativeAvailable = current.effectiveAcPrice > 0 &&
+        !current.weeklyFree &&
+        !unlocked &&
+        (
+            current.plan == "free" ||
+                access is AccessState.RequiresLegendary ||
+                access is AccessState.RequiresEpic ||
+                access is AccessState.RequiresPlan
+            )
     val mode = when {
         !signedIn -> DetailMode.SIGNED_OUT
         stage == DetailStage.DOWNLOADING -> DetailMode.DOWNLOADING
@@ -470,9 +531,10 @@ internal fun DesignedContentDetailScreen(
         stage == DetailStage.LIMIT -> DetailMode.LIMIT
         stage == DetailStage.FAILED -> DetailMode.FAILED
         stage == DetailStage.NO_FILE || current.filePath.isNullOrBlank() -> DetailMode.NO_FILE
+        unlocked -> DetailMode.FREE
+        acAlternativeAvailable -> DetailMode.PAID_AC
         access is AccessState.RequiresLegendary -> DetailMode.NEEDS_LEGENDARY
         access is AccessState.RequiresEpic || access is AccessState.RequiresPlan -> DetailMode.NEEDS_EPIC
-        current.acPrice > 0 && !current.weeklyFree && !unlocked -> DetailMode.PAID_AC
         else -> DetailMode.FREE
     }
 
@@ -575,6 +637,7 @@ internal fun DesignedContentDetailScreen(
                         val file = downloaded
                         if (file == null || !shareDownloadedFile(context, file)) notice = shareFailed
                     }
+                    DetailMode.PAID_AC -> onUpgrade()
                     else -> toggleFavourite()
                 }
             },
@@ -846,10 +909,27 @@ private fun DetailStateNote(
     walletBalance: Int,
     failureKind: ApiErrorKind?,
 ) {
+    val balanceNote = stringResource(
+        R.string.phone_item_balance_after,
+        walletBalance,
+        (walletBalance - item.effectiveAcPrice).coerceAtLeast(0),
+    )
+    val paidAcNote = if (item.hasActiveAcDiscount) {
+        val pricing = item.planAcPricing
+        val remaining = if (pricing != null) {
+            pricing.saleEndsAtEpochMs?.minus(pricing.estimatedServerNowEpochMs)?.coerceAtLeast(0L) ?: 0L
+        } else 0L
+        stringResource(
+            R.string.phone_item_ac_offer_countdown,
+            item.regularAcPrice,
+            item.effectiveAcPrice,
+            formatOfferCountdown(remaining),
+        ) + "\n" + balanceNote
+    } else balanceNote
     val note = when (mode) {
         DetailMode.PAID_AC -> NoteSpec(
             R.drawable.ic_phone_info,
-            stringResource(R.string.phone_item_balance_after, walletBalance, (walletBalance - item.acPrice).coerceAtLeast(0)),
+            paidAcNote,
             Color(0xFFF0C25E),
         )
         DetailMode.NEEDS_EPIC -> NoteSpec(
@@ -1040,7 +1120,7 @@ private fun DetailActionBar(
     val mainTextColor = if (mode == DetailMode.PAID_AC || mode == DetailMode.NEEDS_LEGENDARY) Color(0xFF1B1405) else Color.White
     val mainEnabled = mode != DetailMode.NO_FILE && mode != DetailMode.DOWNLOADING
     val mainLabel = when (mode) {
-        DetailMode.PAID_AC -> stringResource(R.string.phone_item_unlock_ac, item.acPrice)
+        DetailMode.PAID_AC -> stringResource(R.string.phone_item_unlock_ac, item.effectiveAcPrice)
         DetailMode.NEEDS_EPIC -> stringResource(R.string.phone_item_upgrade_epic)
         DetailMode.NEEDS_LEGENDARY -> stringResource(R.string.phone_item_upgrade_legendary)
         DetailMode.SIGNED_OUT -> stringResource(R.string.phone_item_sign_in_download)
@@ -1129,6 +1209,15 @@ private fun DetailActionBar(
             when (mode) {
                 DetailMode.DOWNLOADING -> Icon(Icons.Filled.Close, stringResource(R.string.common_cancel), tint = AppColors.AuthText, modifier = Modifier.size(22.dp))
                 DetailMode.DOWNLOADED -> Icon(painterResource(R.drawable.ic_phone_share), stringResource(R.string.phone_item_share), tint = AppColors.AuthText, modifier = Modifier.size(22.dp))
+                DetailMode.PAID_AC -> Icon(
+                    painterResource(if (item.plan == "legendary") R.drawable.ic_phone_crown else R.drawable.ic_phone_gem),
+                    stringResource(
+                        if (item.plan == "legendary") R.string.phone_item_upgrade_legendary
+                        else R.string.phone_item_upgrade_epic,
+                    ),
+                    tint = if (item.plan == "legendary") Color(0xFFF0C25E) else Color(0xFF9B6BFF),
+                    modifier = Modifier.size(23.dp),
+                )
                 else -> Icon(
                     if (favourite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                     stringResource(if (favourite) R.string.item_saved_plain else R.string.item_save_plain),
