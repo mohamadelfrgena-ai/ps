@@ -692,7 +692,9 @@ static void requestAvatarAsync(const std::string& url, bool force) {
 
 static void pumpCovers() {
     std::lock_guard<std::mutex> lk(gCoverMx);
-    while (!gCoverQ.empty()) {
+    // v0.85 («بطيء في الانتقال عليها»): at most 2 covers per frame — a burst of 6
+    // JPEG decodes inside ONE frame froze browsing. Spreading them keeps frames light.
+    for (int budget = 2; budget > 0 && !gCoverQ.empty(); --budget) {
         CoverBlob& b = gCoverQ.front();
         if (gEngine) gEngine->loadImageMemory(b.name, b.data.data(), b.data.size(), 640, 360);
         gCoverQ.pop_front();
@@ -1270,10 +1272,14 @@ static bool navigate(View view, int dx, int dy) {
     NavMem& mem = gNav[navIdx(view)];
     int first = scrollOf(view);
     int abs = first + (A.focus - fb);
+    if (strip && extra && A.focus == fb + 5) abs = n - 1;   // v0.85 («دون قفز»): the tile IS the wrap slot (n includes it) — not window+5
     if (abs < 0) abs = 0;
     if (abs >= n) abs = n - 1;
 
-    if (A.lang == "ar" || A.lang == "fa") dx = -dx;                  // RTL: Left/Right swap only
+    // v0.85 («دون قفز»): NO second RTL flip here. swapRtl() already mirrors Left/Right
+    // at input level (main.cpp:1042); flipping again inverted the walk (pressing left
+    // stepped right) and the tile's old `abs = first + 5` mapping made the wrap land on
+    // a MIDDLE card instead of the first one.
 
     if (strip) {   // ONE horizontal row — the last slot is the "View more" tile
         const int colN = abs + dx;
@@ -1414,7 +1420,7 @@ static void moveFocus(int dx, int dy) {
             } else if (dy < 0) {
                 if (onCard) A.focus = 0;
             } else if (onCard) {
-                const int ddx = (A.lang == "ar" || A.lang == "fa") ? -dx : dx;
+                const int ddx = dx;   // v0.85: swapRtl() already mirrored Left/Right at input level — no second flip
                 int f = A.focus + ddx;
                 if (f < 2) {
                     f = 2;
@@ -1996,6 +2002,18 @@ int main(int, char**) {
         }
 
         pumpCovers();
+        {   // v0.85 («فتح بطاقة الاضافة بطيء جدا لين تفتح»): decode the four page
+            // backgrounds ONCE at startup (~110ms each on first use) so the first open
+            // of Home/Detail never pays the lazy JPEG decode on the UI thread.
+            static bool sBgWarm = false;
+            if (!sBgWarm && gEngine) {
+                sBgWarm = true;
+                for (const char* nm : { "bg_detail_dark", "bg_detail_light", "bg_app_dark", "bg_app_light" }) {
+                    int iw = 0, ih = 0;
+                    gEngine->imageSize(nm, iw, ih);
+                }
+            }
+        }
 
         if (!A.toastText.empty() && (int)(std::chrono::duration_cast<std::chrono::milliseconds>(
                                               std::chrono::steady_clock::now().time_since_epoch()).count()) > A.toastUntil) {
