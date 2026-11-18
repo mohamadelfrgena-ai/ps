@@ -804,6 +804,55 @@ bool copyTreeRecursive(const std::string& srcDir,
 
 } // namespace
 
+// v0.85 («عند تنصيب الاضافة يجب ان يذهب للملف داخل اللعبة behavior_packs و resource_packs
+// فقط behavior_packs يذهب»): some addons ship BOTH packs inside ONE .raw/zip — the root
+// folder is one pack (own manifest.json / level.dat) and a NESTED subfolder is the other.
+// Everything used to extract into ONE category folder, so the nested pack never reached
+// its own mojang/<category>/<name> folder and the game ignored it. After extraction any
+// DIRECT subfolder that owns its own pack markers is MOVED OUT to its own category
+// folder next to the root pack (the root keeps its own files).
+// عام (external linkage) — يُستدعى أيضاً من main.cpp (مسار v0.49 متعدد الحزم).
+void relocateNestedPacks(const std::string& packDir) {
+    DIR* d = ::opendir(packDir.c_str());
+    if (!d) return;
+    std::vector<std::string> subs;
+    while (dirent* ent = ::readdir(d)) {
+        const std::string name = ent->d_name;
+        if (name == "." || name == "..") continue;
+        const std::string sub = packDir + "/" + name;
+        struct stat st {};
+        if (::stat(sub.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) continue;
+        struct stat m {};
+        if (::stat((sub + "/manifest.json").c_str(), &m) == 0 ||
+            ::stat((sub + "/level.dat").c_str(), &m) == 0 ||
+            ::stat((sub + "/levelname.txt").c_str(), &m) == 0)
+            subs.push_back(name);
+    }
+    ::closedir(d);
+    if (subs.empty()) return;
+
+    // <mojang>/<category>/<packName> -> the mojang root is two levels up
+    std::string root = packDir;
+    for (int i = 0; i < 2; ++i) {
+        const std::size_t p = root.find_last_of('/');
+        if (p == std::string::npos || p == 0) return;
+        root.erase(p);
+    }
+    const std::string folderName = packDir.substr(packDir.find_last_of('/') + 1);
+    for (const std::string& subName : subs) {
+        const std::string sub = packDir + "/" + subName;
+        const std::string cat = detectCategoryFromExtractedDir(sub, "resource_packs");
+        const std::string dest = root + "/" + cat + "/" + subName;
+        if (dest == sub) continue;
+        int err = 0;
+        ensureDirectory(root + "/" + cat, err);
+        removeTreeRecursive(dest);   // stale copy from an earlier install — same policy as the category fixup
+        ::rename(sub.c_str(), dest.c_str());
+        diagLine("nested pack relocated: " + folderName + "/" + subName + " -> " + cat + "/" + subName);
+        // a relocated pack keeps its own pack_icon.png; the game reads it per pack
+    }
+}
+
 // عام (external linkage) — يُستدعى من main.cpp لزر «فتح Minecraft» (△).
 bool launchMinecraftOnPs4() { return launchMinecraftImpl(); }
 
@@ -1157,6 +1206,7 @@ CopyResult installOrQueueAddon(const std::string& sourceRawPath,
             result.targetCategory = detectedCat;
             targetPackDirCorrected = correctedDir;
         }
+        relocateNestedPacks(targetPackDirCorrected);   // v0.85: nested packs -> their own mojang folders
 
         // Clean up any staged .raw and .pending files so PS4 HDD space is freed immediately!
         ::unlink(pendingFlagPath.c_str());
@@ -1305,13 +1355,16 @@ CopyResult syncPendingAddonsIfMounted(const std::string& stageDir,
         std::fclose(inFp);
         if (ok) {
             const std::string detectedCat = detectCategoryFromExtractedDir(targetPackDir, itemCategory);
+            std::string targetPackDirCorrected = targetPackDir;
             if (detectedCat != itemCategory) {
                 int err = 0;
                 const std::string correctedDir = mountedMojang + "/" + detectedCat + "/" + addonName;
                 ensureDirectory(mountedMojang + "/" + detectedCat, err);
                 removeTreeRecursive(correctedDir);
                 ::rename(targetPackDir.c_str(), correctedDir.c_str());
+                targetPackDirCorrected = correctedDir;
             }
+            relocateNestedPacks(targetPackDirCorrected);   // v0.85: nested packs -> their own mojang folders
             result.lastAddonName = addonName;
 
             // Delete both .pending and the large .raw file to free PS4 HDD space!
