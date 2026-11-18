@@ -2218,27 +2218,27 @@ void bakedBackdrop(UiEngine& e, const std::string& key, const std::function<void
     // v0.38: 3-slot LRU + smooth crossfade — revisits are instant, banner
     // changes glide (old art under, new art fading in over 240ms).
     struct Slot { std::string key; Uint32 at = 0; };
-    static Slot slot[8];   // v0.53 SPEED: 8 slots = every recent screen is a hit
+    static Slot slot[16];   // v0.85: 16 slots — walking the shelf/strip revisits hit (each miss ≈ 100ms bake)
     static int cur = -1, prev = -1;
     static Uint32 fadeAt = 0;
     const std::string want = key + (gLight ? "|L" : "|D");
     int found = -1;
-    for (int i = 0; i < 8; ++i) if (slot[i].key == want) { found = i; break; }
+    for (int i = 0; i < 16; ++i) if (slot[i].key == want) { found = i; break; }
     if (found < 0) {
         int tgt = -1;
-        for (int i = 0; i < 8; ++i) if (i != cur && slot[i].key.empty()) { tgt = i; break; }
-        if (tgt < 0) for (int i = 0; i < 8; ++i) if (i != cur && (tgt < 0 || slot[i].at < slot[tgt].at)) tgt = i;
-        if (tgt < 0) tgt = (cur + 1) % 8;
+        for (int i = 0; i < 16; ++i) if (i != cur && slot[i].key.empty()) { tgt = i; break; }
+        if (tgt < 0) for (int i = 0; i < 16; ++i) if (i != cur && (tgt < 0 || slot[i].at < slot[tgt].at)) tgt = i;
+        if (tgt < 0) tgt = (cur + 1) % 16;
         e.clear(kBG);
         paint();
         const auto& fb = e.framebuffer();
-        std::vector<std::uint8_t> rgba(fb.size() * 4);
+        // v0.85: one 32-bit write per pixel (was: four byte stores + shifts)
+        std::vector<std::uint32_t> rgba(fb.size());
         for (std::size_t i = 0; i < fb.size(); ++i) {
-            const std::uint32_t px = fb[i];
-            rgba[i * 4] = static_cast<std::uint8_t>(px >> 16); rgba[i * 4 + 1] = static_cast<std::uint8_t>(px >> 8);
-            rgba[i * 4 + 2] = static_cast<std::uint8_t>(px); rgba[i * 4 + 3] = 255;
+            const std::uint32_t px = fb[i];   // 0x00RRGGBB -> RGBA bytes in memory
+            rgba[i] = 0xFF000000u | ((px & 0xFFu) << 16) | (px & 0xFF00u) | ((px >> 16) & 0xFFu);
         }
-        e.addImageRGBA("__bg_" + std::to_string(tgt), 1920, 1080, rgba.data());
+        e.addImageRGBA("__bg_" + std::to_string(tgt), 1920, 1080, reinterpret_cast<const std::uint8_t*>(rgba.data()));
         slot[tgt].key = want;
         slot[tgt].at = SDL_GetTicks();
         prev = (cur >= 0 && cur != tgt) ? cur : -1;
@@ -3299,8 +3299,9 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     // It KEEPS the card when focus moves up to the CTA («عرض الإضافة» opens it),
     // and hands the banner back to the carousel when a tab is focused.
     const std::vector<int>& homeItems = viewItems(View::Home, filterIndex);
-    static int sFollow = -1, sFollowFilter = -2;
-    if (sFollowFilter != filterIndex) { sFollowFilter = filterIndex; sFollow = -1; }
+    static int sFollow = -1, sFollowFilter = -2, sShown = -1, sWant = -1;
+    static Uint32 sWantAt = 0;
+    if (sFollowFilter != filterIndex) { sFollowFilter = filterIndex; sFollow = -1; sShown = -1; sWant = -1; }
     if (focus >= 12) {
         // v0.63: + scroll offset — the banner followed the WRONG card once the grid
         // scrolled (it read focus-12 as an absolute index into the full list).
@@ -3310,8 +3311,21 @@ void drawHome(UiEngine& e, int focus, int heroIndex, int filterIndex, const std:
     } else if (focus >= 2 && focus <= 11) {
         sFollow = -1;
     }
-    if ((focus <= 1 || focus >= 12) && sFollow >= 0 && sFollow < (int)gCat.size())
-        hero = &gCat[static_cast<std::size_t>(sFollow)];
+    // v0.85 («بطيء في الانتقال عليها»): the hero re-Baked a full-screen texture on
+    // EVERY focus move (97-123ms per card on the host — much worse on the PS4). The
+    // banner now waits until the focus SETTLES (120ms): walking the shelf is smooth
+    // (no bakes while moving) and the single bake lands while the user pauses.
+    // Carousel returns (tabs / hero buttons) stay INSTANT.
+    if (sFollow == sShown) {
+        sWant = sShown;
+    } else if (sFollow < 0 || sShown < 0) {
+        sShown = sFollow; sWant = sFollow;
+    } else {
+        if (sWant != sFollow) { sWant = sFollow; sWantAt = SDL_GetTicks(); }
+        if (SDL_GetTicks() - sWantAt >= 120) sShown = sFollow;
+    }
+    if ((focus <= 1 || focus >= 12) && sShown >= 0 && sShown < (int)gCat.size())
+        hero = &gCat[static_cast<std::size_t>(sShown)];
     const int cx = kCL + 20;
     const int textMax = 1180;
 
