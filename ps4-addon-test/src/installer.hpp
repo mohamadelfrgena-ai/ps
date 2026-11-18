@@ -84,6 +84,13 @@ bool launchMinecraftOnPs4();
 
 // v0.62: exported for the download pre-check (is any Minecraft com.mojang mounted?)
 std::string mountedMojangDir();
+
+// v0.85 («فقط behavior_packs يذهب»): after extraction, move any nested sub-pack
+// (own manifest.json / level.dat / levelname.txt) out to its own mojang/<category>/<name>
+// folder — one .raw can hold BOTH the behavior and the resource pack. Called from the
+// install paths inside installer.cpp and from main.cpp's multi-pack install (v0.49).
+void relocateNestedPacks(const std::string& packDir);
+
 CopyResult syncPendingAddonsIfMounted(
     const std::string& stageDir = "/data/AddonStation/installed",
     const std::string& preferredMojangDir = "",
