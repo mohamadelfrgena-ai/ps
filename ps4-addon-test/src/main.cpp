@@ -1,5 +1,7 @@
 // ============================================================================
 //  AddonStation PS4 — main.cpp (UI v7.3 final + real Supabase / installer)
+//  Release v0.85: one-card nav (RTL double-flip + View-more tile fixes), hero
+//  banner settle perf, dual-pack install (nested resource/behavior relocation).
 //  Guest-first, code sign-in only, sidebar rail, △ = search, HUD sounds,
 //  language auto-detected from the PS4 system language (8 languages).
 //  Keeps the proven pkg properties: dynamic dual-mode installer, staged .raw
