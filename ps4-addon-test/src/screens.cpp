@@ -707,7 +707,7 @@ const std::string& tr(const std::string& key, const std::string& langCode) {
     const auto& table = stringTable();
     auto it = table.find(key);
     if (it == table.end()) {
-        static thread_local std::string sFb;
+        static std::string sFb;   // v0.85: plain static — main thread only (OpenOrbis lacks __cxa_thread_atexit_impl)
         sFb = key;
         return sFb;
     }
@@ -715,7 +715,7 @@ const std::string& tr(const std::string& key, const std::string& langCode) {
     if (lit == it->second.end()) {
         auto en = it->second.find("en");
         if (en != it->second.end()) return en->second;
-        static thread_local std::string sFb2;
+        static std::string sFb2;   // v0.85: plain static — main thread only (OpenOrbis lacks __cxa_thread_atexit_impl)
         sFb2 = key;
         return sFb2;
     }
@@ -2959,7 +2959,7 @@ void drawRail(UiEngine& e, int railIdx, const std::string& langCode) {
             e.drawRoundGradD(bx, y, bw, bh, 22, SDL_Color{43, 132, 243, 255}, SDL_Color{21, 96, 204, 255});
             e.drawRoundRect(L.X(0, 5), y + (bh - 34) / 2, 5, 34, 2, kBLl);
         }
-        static thread_local std::string iname;   // v0.83: scratch — no per-frame string build
+        static std::string iname;   // v0.83 scratch, v0.85 plain static — main thread only (OpenOrbis lacks __cxa_thread_atexit_impl)
         iname.clear();
         iname.append(kRailIcons[i]);
         iname.append(on ? "_w" : (gLight ? "_l" : "_d"));
