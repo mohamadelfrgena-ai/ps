@@ -468,7 +468,7 @@ void UiEngine::fillGradH(int x, int y, int w, int h, SDL_Color left, SDL_Color r
     const int y0 = std::max(0, y), y1 = std::min(kHeight, y + h);
     const int x0 = std::max(0, x), x1 = std::min(kWidth, x + w);
     if (y0 >= y1 || x0 >= x1) return;
-    static thread_local std::vector<std::uint32_t> lut;
+    static std::vector<std::uint32_t> lut;   // v0.85: plain static — draw thread only (OpenOrbis lacks __cxa_thread_atexit_impl)
     lut.assign(static_cast<std::size_t>(x1 - x0), 0u);
     bool anyAlpha = false;
     for (int xx = x0; xx < x1; ++xx) {
@@ -1000,7 +1000,7 @@ void UiEngine::drawImageCropped(const std::string& name,
 
     // Cache key: source crop + target size (zoom is quantized by the caller)
     // v0.83: built in a reused scratch buffer — was ~6 heap strings per drawImage per frame.
-    static thread_local std::string key;
+    static std::string key;   // v0.85: plain static — draw thread only (OpenOrbis lacks __cxa_thread_atexit_impl)
     key.clear();
     key.append(img.key).push_back('|');
     appendInt(key, sx0); key.push_back(',');
@@ -1271,7 +1271,7 @@ const UiEngine::TextBitmap& UiEngine::getOrBuildText(const std::string& utf8,
     if (utf8.empty() || pxSize <= 0) return kEmpty;
 
     // v0.83: scratch key buffer — was 4 heap strings per drawText per frame.
-    static thread_local std::string key;
+    static std::string key;   // v0.85: plain static — draw thread only (OpenOrbis lacks __cxa_thread_atexit_impl)
     key.clear();
     key.push_back(static_cast<char>('0' + static_cast<int>(role)));
     key.push_back(':');
